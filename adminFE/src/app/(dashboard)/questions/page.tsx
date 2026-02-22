@@ -1,0 +1,407 @@
+'use client'
+
+import { useEffect, useState } from "react"
+import { questionService, lessonService, phraseService } from "@/services"
+import { ExerciseQuestion, Lesson, QuestionType, Status } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
+import { BookOpen, MessageSquare, Trash2, CheckCircle } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+export default function QuestionsPage() {
+  const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [phrases, setPhrases] = useState<{ _id: string; text: string; translation: string }[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    lessonId: "",
+    phraseId: "",
+    type: "vocabulary" as QuestionType,
+    promptTemplate: "What is {phrase} in English?",
+    optionsCsv: "",
+    correctIndex: 0,
+    explanation: "",
+    reviewSentence: "",
+    reviewWordsCsv: "",
+    reviewCorrectOrderCsv: "",
+    reviewMeaning: "",
+  })
+  const isReviewType = formData.type === "review"
+
+  useEffect(() => {
+    Promise.all([fetchLessons(), fetchQuestions()]).finally(() => setIsLoading(false))
+  }, [])
+
+  async function fetchLessons() {
+    try {
+      const data = await lessonService.listLessons()
+      setLessons(data)
+    } catch {
+      toast.error("Failed to load lessons")
+    }
+  }
+
+  async function fetchPhrases(lessonId: string) {
+    try {
+      const data = await phraseService.listPhrases(lessonId)
+      setPhrases(data.map((p: any) => ({ _id: p._id, text: p.text, translation: p.translation })))
+    } catch {
+      toast.error("Failed to load phrases")
+      setPhrases([])
+    }
+  }
+
+  async function fetchQuestions(status?: Status) {
+    try {
+      const data = await questionService.listQuestions(status ? { status } : undefined)
+      setQuestions(data)
+    } catch {
+      toast.error("Failed to load questions")
+    }
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formData.lessonId) {
+      toast.error("Select a lesson")
+      return
+    }
+    if (!formData.phraseId) {
+      toast.error("Select a phrase")
+      return
+    }
+
+    try {
+      if (isReviewType) {
+        const words = formData.reviewWordsCsv.split(",").map((v) => v.trim()).filter(Boolean)
+        const correctOrder = formData.reviewCorrectOrderCsv
+          .split(",")
+          .map((v) => Number(v.trim()))
+          .filter((n) => !Number.isNaN(n))
+
+        await questionService.createQuestion({
+          lessonId: formData.lessonId,
+          phraseId: formData.phraseId,
+          type: formData.type,
+          promptTemplate: formData.promptTemplate,
+          reviewData: {
+            sentence: formData.reviewSentence,
+            words,
+            correctOrder,
+            meaning: formData.reviewMeaning,
+          },
+          explanation: formData.explanation,
+        })
+      } else {
+        const options = formData.optionsCsv.split(",").map((v) => v.trim()).filter(Boolean)
+        if (options.length < 2) {
+          toast.error("Add at least 2 options")
+          return
+        }
+
+        await questionService.createQuestion({
+          lessonId: formData.lessonId,
+          phraseId: formData.phraseId,
+          type: formData.type,
+          promptTemplate: formData.promptTemplate,
+          options,
+          correctIndex: Number(formData.correctIndex),
+          explanation: formData.explanation,
+        })
+      }
+      toast.success("Question created")
+      setFormData({
+        lessonId: formData.lessonId,
+        phraseId: "",
+        type: formData.type,
+        promptTemplate: "What is {phrase} in English?",
+        optionsCsv: "",
+        correctIndex: 0,
+        explanation: "",
+        reviewSentence: "",
+        reviewWordsCsv: "",
+        reviewCorrectOrderCsv: "",
+        reviewMeaning: "",
+      })
+      fetchQuestions()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to create question")
+    }
+  }
+
+  async function handlePublish(id: string) {
+    try {
+      await questionService.publishQuestion(id)
+      toast.success("Question published")
+      fetchQuestions()
+    } catch {
+      toast.error("Failed to publish question")
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this question?")) return
+    try {
+      await questionService.deleteQuestion(id)
+      toast.success("Question deleted")
+      fetchQuestions()
+    } catch {
+      toast.error("Failed to delete question")
+    }
+  }
+
+  return (
+    <div className="space-y-10 pb-20">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Questions Bank</h1>
+        <p className="text-base text-muted-foreground">Create and manage your exercise questions curriculum.</p>
+      </div>
+
+      {/* Form Section - Full Width at Top */}
+      <Card className="border-4 border-primary/10 shadow-2xl rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="bg-primary/5 py-6 px-8 border-b border-primary/10">
+          <CardTitle className="text-lg font-bold flex items-center gap-3 text-primary">
+            <div className="p-3 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
+              <BookOpen className="h-6 w-6" />
+            </div>
+            Create New Question
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-10">
+          <form className="space-y-8" onSubmit={handleCreate}>
+            <div className="grid gap-8 md:grid-cols-3">
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Lesson</Label>
+                <Select value={formData.lessonId} onValueChange={(v) => {
+                  setFormData({ ...formData, lessonId: v, phraseId: "" })
+                  fetchPhrases(v)
+                }}>
+                  <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue placeholder="Choose a lesson..." /></SelectTrigger>
+                  <SelectContent className="rounded-2xl border-2 shadow-xl">
+                    {lessons.map((lesson) => (
+                      <SelectItem key={lesson._id} value={lesson._id} className="py-2">{lesson.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Phrase</Label>
+                <Select value={formData.phraseId} onValueChange={(v) => setFormData({ ...formData, phraseId: v })}>
+                  <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue placeholder="Choose a phrase..." /></SelectTrigger>
+                  <SelectContent className="rounded-2xl border-2 shadow-xl">
+                    {phrases.map((phrase) => (
+                      <SelectItem key={phrase._id} value={phrase._id} className="py-2">{phrase.text} ({phrase.translation})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Question Type</Label>
+                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as QuestionType })}>
+                  <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-2xl border-2 shadow-xl">
+                    <SelectItem value="vocabulary" className="py-2 text-orange-600">Vocabulary</SelectItem>
+                    <SelectItem value="practice" className="py-2 text-purple-600">Practice</SelectItem>
+                    <SelectItem value="listening" className="py-2 text-blue-600">Listening</SelectItem>
+                    <SelectItem value="review" className="py-2 text-emerald-600">Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Prompt Template</Label>
+              <Input 
+                value={formData.promptTemplate} 
+                onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })} 
+                placeholder={isReviewType ? "Arrange the words to form a sentence:" : "e.g. What is {phrase} in English?"} 
+                required 
+                className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+              />
+            </div>
+
+            {!isReviewType ? (
+              <>
+                <div className="grid gap-8 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Correct Index (0-based)</Label>
+                    <Input 
+                      type="number" 
+                      min={0} 
+                      value={formData.correctIndex} 
+                      onChange={(e) => setFormData({ ...formData, correctIndex: Number(e.target.value) })} 
+                      required 
+                      className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Answer Options (comma separated)</Label>
+                  <Input 
+                    value={formData.optionsCsv} 
+                    onChange={(e) => setFormData({ ...formData, optionsCsv: e.target.value })} 
+                    placeholder="Correct Answer, Wrong Answer 1, Wrong Answer 2" 
+                    required 
+                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-8 md:grid-cols-2">
+                <div className="space-y-3 md:col-span-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Sentence</Label>
+                  <Input
+                    value={formData.reviewSentence}
+                    onChange={(e) => setFormData({ ...formData, reviewSentence: e.target.value })}
+                    placeholder="Ẹ káàrọ̀ ní"
+                    required
+                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Words (comma separated)</Label>
+                  <Input
+                    value={formData.reviewWordsCsv}
+                    onChange={(e) => setFormData({ ...formData, reviewWordsCsv: e.target.value })}
+                    placeholder="ní, Ẹ, káàrọ̀"
+                    required
+                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Correct Order (indices)</Label>
+                  <Input
+                    value={formData.reviewCorrectOrderCsv}
+                    onChange={(e) => setFormData({ ...formData, reviewCorrectOrderCsv: e.target.value })}
+                    placeholder="1,2,0"
+                    required
+                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                  />
+                </div>
+                <div className="space-y-3 md:col-span-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Meaning</Label>
+                  <Input
+                    value={formData.reviewMeaning}
+                    onChange={(e) => setFormData({ ...formData, reviewMeaning: e.target.value })}
+                    placeholder="Good morning"
+                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Explanation</Label>
+              <Textarea 
+                value={formData.explanation} 
+                onChange={(e) => setFormData({ ...formData, explanation: e.target.value })} 
+                placeholder="Explain why the answer is correct..." 
+                className="min-h-[120px] rounded-xl border border-secondary focus-visible:ring-primary text-sm p-4"
+              />
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button type="submit" className="h-11 px-6 rounded-xl font-semibold text-sm shadow-sm">
+                Create Question
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* List Section - Full Width Below */}
+      <Card className="border-4 border-accent/10 shadow-2xl rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="bg-accent/5 py-6 px-8 border-b border-accent/10">
+          <CardTitle className="text-lg font-bold flex items-center gap-3 text-accent">
+            <div className="p-3 bg-accent rounded-2xl text-white shadow-lg shadow-accent/20">
+              <MessageSquare className="h-6 w-6" />
+            </div>
+            Active Question Bank
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow className="hover:bg-transparent border-b-2 border-muted/50">
+                  <TableHead className="font-semibold h-12 pl-6 uppercase tracking-wide text-xs">Type</TableHead>
+                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs">Prompt Template</TableHead>
+                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs">Target Phrase</TableHead>
+                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs text-center">Status</TableHead>
+                  <TableHead className="text-right font-semibold h-12 pr-6 uppercase tracking-wide text-xs">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={5} className="h-40 text-center text-muted-foreground text-sm">Loading questions...</TableCell></TableRow>
+                ) : questions.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="h-40 text-center text-muted-foreground text-sm">Empty Question Bank</TableCell></TableRow>
+                ) : (
+                  questions.map((q) => (
+                    <TableRow key={q._id} className="hover:bg-secondary/20 transition-colors border-b-2 border-muted/30 group">
+                      <TableCell className="pl-6 h-16">
+                        <Badge className={cn(
+                          "capitalize font-semibold px-3 py-1 rounded-md border-none text-xs",
+                          q.type === 'vocabulary' && "bg-orange-100 text-orange-700",
+                          q.type === 'practice' && "bg-purple-100 text-purple-700",
+                          q.type === 'listening' && "bg-blue-100 text-blue-700",
+                          q.type === 'review' && "bg-emerald-100 text-emerald-700",
+                        )}>
+                          {q.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[300px] text-foreground text-sm truncate group-hover:text-primary transition-colors">{q.promptTemplate}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{typeof q.phraseId === "string" ? q.phraseId : q.phraseId.text}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={cn(
+                          "font-semibold rounded-md border-none px-3 py-1 text-xs",
+                          q.status === "published" ? "bg-green-500" : "bg-zinc-400"
+                        )}>
+                          {q.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex justify-end items-center gap-3">
+                          {q.status === "draft" && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handlePublish(q._id)} 
+                              className="h-12 w-12 text-accent hover:text-accent hover:bg-accent/10 rounded-2xl transition-all"
+                              title="Publish"
+                            >
+                              <CheckCircle className="h-6 w-6" />
+                            </Button>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDelete(q._id)} 
+                            className="h-12 w-12 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-6 w-6" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

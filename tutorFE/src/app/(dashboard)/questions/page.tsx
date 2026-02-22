@@ -1,0 +1,332 @@
+'use client'
+
+import { useEffect, useState } from "react"
+import { questionService, lessonService, phraseService } from "@/services"
+import { ExerciseQuestion, Lesson, QuestionType, Status } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
+
+export default function TutorQuestionsPage() {
+  const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [phrases, setPhrases] = useState<{ _id: string; text: string; translation: string }[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    lessonId: "",
+    phraseId: "",
+    type: "practice" as QuestionType,
+    promptTemplate: "What is the missing word in: {phrase}?",
+    optionsCsv: "",
+    correctIndex: 0,
+    explanation: "",
+    reviewSentence: "",
+    reviewWordsCsv: "",
+    reviewCorrectOrderCsv: "",
+    reviewMeaning: "",
+  })
+
+  const isReviewType = formData.type === "review"
+
+  useEffect(() => {
+    Promise.all([fetchLessons(), fetchQuestions()]).finally(() => setIsLoading(false))
+  }, [])
+
+  async function fetchLessons() {
+    try {
+      const data = await lessonService.listLessons()
+      setLessons(data)
+    } catch {
+      toast.error("Failed to load lessons")
+    }
+  }
+
+  async function fetchPhrases(lessonId: string) {
+    try {
+      const data = await phraseService.listPhrases(lessonId)
+      setPhrases(data.map((p) => ({ _id: p._id, text: p.text, translation: p.translation })))
+    } catch {
+      toast.error("Failed to load phrases")
+      setPhrases([])
+    }
+  }
+
+  async function fetchQuestions(status?: Status) {
+    try {
+      const data = await questionService.listQuestions(status ? { status } : undefined)
+      setQuestions(data)
+    } catch {
+      toast.error("Failed to load questions")
+    }
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formData.lessonId) return toast.error("Select a lesson")
+    if (!formData.phraseId) return toast.error("Select a phrase")
+
+    try {
+      if (isReviewType) {
+        const words = formData.reviewWordsCsv.split(",").map((v) => v.trim()).filter(Boolean)
+        const correctOrder = formData.reviewCorrectOrderCsv
+          .split(",")
+          .map((v) => Number(v.trim()))
+          .filter((n) => !Number.isNaN(n))
+
+        await questionService.createQuestion({
+          lessonId: formData.lessonId,
+          phraseId: formData.phraseId,
+          type: formData.type,
+          promptTemplate: formData.promptTemplate,
+          reviewData: {
+            sentence: formData.reviewSentence,
+            words,
+            correctOrder,
+            meaning: formData.reviewMeaning,
+          },
+          explanation: formData.explanation,
+        })
+      } else {
+        const options = formData.optionsCsv.split(",").map((v) => v.trim()).filter(Boolean)
+        if (options.length < 2) return toast.error("Add at least 2 options")
+
+        await questionService.createQuestion({
+          lessonId: formData.lessonId,
+          phraseId: formData.phraseId,
+          type: formData.type,
+          promptTemplate: formData.promptTemplate,
+          options,
+          correctIndex: Number(formData.correctIndex),
+          explanation: formData.explanation,
+        })
+      }
+
+      toast.success("Question created")
+      setFormData({
+        lessonId: formData.lessonId,
+        phraseId: "",
+        type: formData.type,
+        promptTemplate: formData.type === "review" ? "Arrange the words to form a sentence:" : "What is the missing word in: {phrase}?",
+        optionsCsv: "",
+        correctIndex: 0,
+        explanation: "",
+        reviewSentence: "",
+        reviewWordsCsv: "",
+        reviewCorrectOrderCsv: "",
+        reviewMeaning: "",
+      })
+      fetchQuestions()
+    } catch (error: unknown) {
+      console.error(error)
+      toast.error("Failed to create question")
+    }
+  }
+
+  async function handlePublish(id: string) {
+    try {
+      await questionService.publishQuestion(id)
+      toast.success("Question published")
+      fetchQuestions()
+    } catch {
+      toast.error("Failed to publish question")
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this question?")) return
+    try {
+      await questionService.deleteQuestion(id)
+      toast.success("Question deleted")
+      fetchQuestions()
+    } catch {
+      toast.error("Failed to delete question")
+    }
+  }
+
+  return (
+    <div className="space-y-8 pb-20">
+      <h1 className="text-3xl font-black">Questions</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Question</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handleCreate}>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Lesson</Label>
+                <Select value={formData.lessonId} onValueChange={(v) => {
+                  setFormData({ ...formData, lessonId: v, phraseId: "" })
+                  fetchPhrases(v)
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Choose lesson" /></SelectTrigger>
+                  <SelectContent>
+                    {lessons.map((lesson) => (
+                      <SelectItem key={lesson._id} value={lesson._id}>{lesson.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Phrase</Label>
+                <Select value={formData.phraseId} onValueChange={(v) => setFormData({ ...formData, phraseId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Choose phrase" /></SelectTrigger>
+                  <SelectContent>
+                    {phrases.map((phrase) => (
+                      <SelectItem key={phrase._id} value={phrase._id}>{phrase.text} ({phrase.translation})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as QuestionType })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vocabulary">Vocabulary</SelectItem>
+                    <SelectItem value="practice">Practice (Fill in blank)</SelectItem>
+                    <SelectItem value="listening">Listening</SelectItem>
+                    <SelectItem value="review">Review (Sentence Builder)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Prompt</Label>
+              <Input
+                value={formData.promptTemplate}
+                onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })}
+                required
+              />
+            </div>
+
+            {!isReviewType ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Options (comma separated)</Label>
+                    <Input
+                      value={formData.optionsCsv}
+                      onChange={(e) => setFormData({ ...formData, optionsCsv: e.target.value })}
+                      placeholder="option1, option2, option3"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Correct Index</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={formData.correctIndex}
+                      onChange={(e) => setFormData({ ...formData, correctIndex: Number(e.target.value) })}
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Sentence</Label>
+                  <Input
+                    value={formData.reviewSentence}
+                    onChange={(e) => setFormData({ ...formData, reviewSentence: e.target.value })}
+                    placeholder="Ẹ káàrọ̀ ní"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Words (comma separated)</Label>
+                  <Input
+                    value={formData.reviewWordsCsv}
+                    onChange={(e) => setFormData({ ...formData, reviewWordsCsv: e.target.value })}
+                    placeholder="ní, Ẹ, káàrọ̀"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Correct Order (indices)</Label>
+                  <Input
+                    value={formData.reviewCorrectOrderCsv}
+                    onChange={(e) => setFormData({ ...formData, reviewCorrectOrderCsv: e.target.value })}
+                    placeholder="1,2,0"
+                    required
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Meaning</Label>
+                  <Input
+                    value={formData.reviewMeaning}
+                    onChange={(e) => setFormData({ ...formData, reviewMeaning: e.target.value })}
+                    placeholder="Good morning"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Explanation</Label>
+              <Textarea
+                value={formData.explanation}
+                onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
+              />
+            </div>
+
+            <Button type="submit">Create Question</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Prompt</TableHead>
+                <TableHead>Phrase</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>
+              ) : questions.length === 0 ? (
+                <TableRow><TableCell colSpan={5}>No questions yet</TableCell></TableRow>
+              ) : (
+                questions.map((q) => (
+                  <TableRow key={q._id}>
+                    <TableCell><Badge>{q.type}</Badge></TableCell>
+                    <TableCell>{q.promptTemplate}</TableCell>
+                    <TableCell>{typeof q.phraseId === 'string' ? q.phraseId : q.phraseId.text}</TableCell>
+                    <TableCell><Badge>{q.status}</Badge></TableCell>
+                    <TableCell className="text-right space-x-2">
+                      {q.status === 'draft' ? (
+                        <Button variant="outline" size="sm" onClick={() => handlePublish(q._id)}>Publish</Button>
+                      ) : null}
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(q._id)}>Delete</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

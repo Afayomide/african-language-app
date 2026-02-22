@@ -1,0 +1,272 @@
+'use client'
+
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { phraseService, lessonService, aiService } from "@/services"
+import { Lesson, Language } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { toast } from "sonner"
+import { ArrowLeft, Sparkles } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+function NewPhraseContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const lessonIdParam = searchParams.get("lessonId")
+  const languageParam = searchParams.get("language")
+  const selectedLanguage: Language | undefined =
+    languageParam === "yoruba" || languageParam === "igbo" || languageParam === "hausa"
+      ? languageParam
+      : undefined
+
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [formData, setFormData] = useState({
+    lessonId: lessonIdParam || "",
+    text: "",
+    translation: "",
+    pronunciation: "",
+    explanation: "",
+    difficulty: 1,
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [seedWords, setSeedWords] = useState("")
+
+  useEffect(() => {
+    fetchLessons()
+  }, [])
+
+  async function fetchLessons() {
+    try {
+      const data = await lessonService.listLessons(undefined, selectedLanguage)
+      setLessons(data)
+    } catch (error) {
+      toast.error("Failed to fetch lessons")
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.lessonId) {
+      toast.error("Please select a lesson")
+      return
+    }
+    setIsLoading(true)
+    try {
+      await phraseService.createPhrase(formData)
+      toast.success("Phrase created")
+      const lesson = lessons.find((item) => item._id === formData.lessonId)
+      if (lesson) {
+        router.push(`/phrases/lang/${lesson.language}?lessonId=${formData.lessonId}`)
+      } else {
+        router.push("/phrases")
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to create phrase")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGenerateAI = async () => {
+    if (!formData.lessonId) {
+      toast.error("Please select a lesson first")
+      return
+    }
+    const lesson = lessons.find((l) => l._id === formData.lessonId)
+    if (!lesson) {
+      toast.error("Lesson not found")
+      return
+    }
+    setIsGenerating(true)
+    try {
+      await aiService.generatePhrases(
+        lesson._id,
+        lesson.language,
+        lesson.level,
+        seedWords ? seedWords.split(",").map((s) => s.trim()).filter(Boolean) : undefined
+      )
+      toast.success("AI phrases generated")
+      setIsDialogOpen(false)
+      setSeedWords("")
+      router.push(`/phrases/lang/${lesson.language}?lessonId=${lesson._id}`)
+    } catch (error) {
+      toast.error("AI generation failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold">New Phrase</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
+              Generate with AI
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Generate Phrases with AI</DialogTitle>
+              <DialogDescription>
+                Provide seed words to guide the AI, or leave blank for general phrases.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="seedWords">Seed Words / Topics</Label>
+                <Input
+                  id="seedWords"
+                  placeholder="e.g. greetings, market, family"
+                  value={seedWords}
+                  onChange={(e) => setSeedWords(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerateAI} disabled={isGenerating}>
+                {isGenerating ? "Generating..." : "Generate"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Phrase Details</CardTitle>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="lesson">Lesson</Label>
+              <Select 
+                value={formData.lessonId} 
+                onValueChange={(v) => setFormData({...formData, lessonId: v})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select lesson" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lessons.map((lesson) => (
+                    <SelectItem key={lesson._id} value={lesson._id}>
+                      {lesson.orderIndex + 1}. {lesson.title} ({lesson.language})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="text">Text (Original)</Label>
+              <Input
+                id="text"
+                value={formData.text}
+                onChange={(e) => setFormData({...formData, text: e.target.value})}
+                placeholder="Enter the phrase in the target language"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="translation">Translation</Label>
+              <Input
+                id="translation"
+                value={formData.translation}
+                onChange={(e) => setFormData({...formData, translation: e.target.value})}
+                placeholder="Enter the English translation"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="pronunciation">Pronunciation (Optional)</Label>
+                <Input
+                  id="pronunciation"
+                  value={formData.pronunciation}
+                  onChange={(e) => setFormData({...formData, pronunciation: e.target.value})}
+                  placeholder="Phonetic spelling"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="difficulty">Difficulty (1-5)</Label>
+                <Select 
+                  value={String(formData.difficulty)} 
+                  onValueChange={(v) => setFormData({...formData, difficulty: Number(v)})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 - Very Easy</SelectItem>
+                    <SelectItem value="2">2 - Easy</SelectItem>
+                    <SelectItem value="3">3 - Medium</SelectItem>
+                    <SelectItem value="4">4 - Hard</SelectItem>
+                    <SelectItem value="5">5 - Very Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="explanation">Explanation (Optional)</Label>
+              <Textarea
+                id="explanation"
+                value={formData.explanation}
+                onChange={(e) => setFormData({...formData, explanation: e.target.value})}
+                placeholder="Grammar notes or cultural context"
+                rows={3}
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Phrase"}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+export default function NewPhrasePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewPhraseContent />
+    </Suspense>
+  )
+}

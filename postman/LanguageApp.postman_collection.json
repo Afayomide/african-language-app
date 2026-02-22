@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Language App API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Admin, learner, tutor and AI routes for BE"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "POST /api/admin/auth/login",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/auth/login"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const res = pm.response.json();",
+                      "if (res.token) pm.environment.set('adminToken', res.token);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Lessons",
+          "item": [
+            {
+              "name": "POST /api/admin/lessons",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Greetings 101\",\n  \"language\": \"yoruba\",\n  \"level\": \"beginner\",\n  \"description\": \"Basic greetings\"\n}"
+                },
+                "url": "{{baseUrl}}/api/admin/lessons"
+              },
+              "event": [{
+                "listen": "test",
+                "script": {"exec": [
+                  "const res = pm.response.json();",
+                  "const id = res.lesson?._id || res.lesson?.id;",
+                  "if (id) pm.environment.set('lessonId', id);"
+                ]}
+              }]
+            },
+            {
+              "name": "GET /api/admin/lessons",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/lessons?language=yoruba"
+              }
+            },
+            {
+              "name": "PUT /api/admin/lessons/:id",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {"mode": "raw", "raw": "{\n  \"description\": \"Updated lesson description\"\n}"},
+                "url": "{{baseUrl}}/api/admin/lessons/{{lessonId}}"
+              }
+            },
+            {
+              "name": "PUT /api/admin/lessons/:id/publish",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/lessons/{{lessonId}}/publish"
+              }
+            },
+            {
+              "name": "POST /api/admin/ai/lessons/generate-bulk",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {"mode": "raw", "raw": "{\n  \"language\": \"yoruba\",\n  \"level\": \"beginner\",\n  \"count\": 3,\n  \"topic\": \"Daily life\"\n}"},
+                "url": "{{baseUrl}}/api/admin/ai/lessons/generate-bulk"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phrases",
+          "item": [
+            {
+              "name": "POST /api/admin/phrases",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {"mode": "raw", "raw": "{\n  \"lessonId\": \"{{lessonId}}\",\n  \"text\": \"Bawo ni\",\n  \"translation\": \"How are you?\"\n}"},
+                "url": "{{baseUrl}}/api/admin/phrases"
+              },
+              "event": [{
+                "listen": "test",
+                "script": {"exec": [
+                  "const res = pm.response.json();",
+                  "const id = res.phrase?._id || res.phrase?.id;",
+                  "if (id) pm.environment.set('phraseId', id);"
+                ]}
+              }]
+            },
+            {
+              "name": "GET /api/admin/phrases",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/phrases?language=yoruba"
+              }
+            },
+            {
+              "name": "PUT /api/admin/phrases/:id/publish",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/phrases/{{phraseId}}/publish"
+              }
+            },
+            {
+              "name": "PUT /api/admin/phrases/:id/generate-audio",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/phrases/{{phraseId}}/generate-audio"
+              }
+            },
+            {
+              "name": "PUT /api/admin/phrases/bulk/:lessonId/generate-audio",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/phrases/bulk/{{lessonId}}/generate-audio"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Questions",
+          "item": [
+            {
+              "name": "POST /api/admin/questions",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {"mode": "raw", "raw": "{\n  \"lessonId\": \"{{lessonId}}\",\n  \"phraseId\": \"{{phraseId}}\",\n  \"type\": \"vocabulary\",\n  \"promptTemplate\": \"What is {phrase} in English?\",\n  \"options\": [\"How are you?\", \"Good morning\", \"Thank you\"],\n  \"correctIndex\": 0\n}"},
+                "url": "{{baseUrl}}/api/admin/questions"
+              },
+              "event": [{
+                "listen": "test",
+                "script": {"exec": [
+                  "const res = pm.response.json();",
+                  "const id = res.question?._id || res.question?.id;",
+                  "if (id) pm.environment.set('questionId', id);"
+                ]}
+              }]
+            },
+            {
+              "name": "GET /api/admin/questions",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/questions?lessonId={{lessonId}}"
+              }
+            },
+            {
+              "name": "PUT /api/admin/questions/:id/publish",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/questions/{{questionId}}/publish"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tutor Management",
+          "item": [
+            {
+              "name": "GET /api/admin/tutors",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/tutors"
+              },
+              "event": [{
+                "listen": "test",
+                "script": {"exec": [
+                  "const res = pm.response.json();",
+                  "const id = res.tutors && res.tutors[0] ? (res.tutors[0].id || res.tutors[0]._id) : '';",
+                  "if (id) pm.environment.set('tutorProfileId', id);"
+                ]}
+              }]
+            },
+            {
+              "name": "PUT /api/admin/tutors/:id/activate",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+                "url": "{{baseUrl}}/api/admin/tutors/{{tutorProfileId}}/activate"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI Key Routes",
+      "item": [
+        {
+          "name": "POST /api/ai/lessons/suggest",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-AI-KEY", "value": "{{aiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {"mode": "raw", "raw": "{\n  \"language\": \"yoruba\",\n  \"level\": \"beginner\",\n  \"topic\": \"Greetings\"\n}"},
+            "url": "{{baseUrl}}/api/ai/lessons/suggest"
+          }
+        },
+        {
+          "name": "POST /api/ai/phrases/generate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-AI-KEY", "value": "{{aiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {"mode": "raw", "raw": "{\n  \"lessonId\": \"{{lessonId}}\",\n  \"seedWords\": [\"market\", \"hello\"]\n}"},
+            "url": "{{baseUrl}}/api/ai/phrases/generate"
+          }
+        },
+        {
+          "name": "POST /api/ai/phrases/:id/enhance",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-AI-KEY", "value": "{{aiKey}}" }
+            ],
+            "url": "{{baseUrl}}/api/ai/phrases/{{phraseId}}/enhance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Learner",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "POST /api/learner/auth/signup",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {"mode": "raw", "raw": "{\n  \"name\": \"Test Learner\",\n  \"email\": \"{{learnerEmail}}\",\n  \"password\": \"{{learnerPassword}}\",\n  \"language\": \"yoruba\"\n}"},
+                "url": "{{baseUrl}}/api/learner/auth/signup"
+              },
+              "event": [{"listen":"test","script":{"exec":["const res = pm.response.json();","if (res.token) pm.environment.set('learnerToken', res.token);"]}}]
+            },
+            {
+              "name": "POST /api/learner/auth/login",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{learnerEmail}}\",\n  \"password\": \"{{learnerPassword}}\"\n}"},
+                "url": "{{baseUrl}}/api/learner/auth/login"
+              },
+              "event": [{"listen":"test","script":{"exec":["const res = pm.response.json();","if (res.token) pm.environment.set('learnerToken', res.token);"]}}]
+            }
+          ]
+        },
+        {
+          "name": "Dashboard + Lessons",
+          "item": [
+            {
+              "name": "GET /api/learner/dashboard/overview",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{learnerToken}}" }],
+                "url": "{{baseUrl}}/api/learner/dashboard/overview"
+              }
+            },
+            {
+              "name": "GET /api/learner/lessons/next",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{learnerToken}}" }],
+                "url": "{{baseUrl}}/api/learner/lessons/next"
+              },
+              "event": [{"listen":"test","script":{"exec":["const res = pm.response.json();","const id = res.lesson?.id || res.lesson?._id;","if (id) pm.environment.set('lessonId', id);"]}}]
+            },
+            {
+              "name": "GET /api/learner/lessons/:id/overview",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{learnerToken}}" }],
+                "url": "{{baseUrl}}/api/learner/lessons/{{lessonId}}/overview"
+              }
+            },
+            {
+              "name": "GET /api/learner/lessons/:id/questions?type=vocabulary",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{learnerToken}}" }],
+                "url": "{{baseUrl}}/api/learner/lessons/{{lessonId}}/questions?type=vocabulary"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tutor",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "POST /api/tutor/auth/signup",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {"mode":"raw","raw":"{\n  \"email\": \"{{tutorEmail}}\",\n  \"password\": \"{{tutorPassword}}\",\n  \"language\": \"yoruba\",\n  \"displayName\": \"Test Tutor\"\n}"},
+                "url": "{{baseUrl}}/api/tutor/auth/signup"
+              }
+            },
+            {
+              "name": "POST /api/tutor/auth/login",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {"mode":"raw","raw":"{\n  \"email\": \"{{tutorEmail}}\",\n  \"password\": \"{{tutorPassword}}\"\n}"},
+                "url": "{{baseUrl}}/api/tutor/auth/login"
+              },
+              "event": [{"listen":"test","script":{"exec":["const res = pm.response.json();","if (res.token) pm.environment.set('tutorToken', res.token);"]}}]
+            },
+            {
+              "name": "GET /api/tutor/auth/me",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{tutorToken}}" }],
+                "url": "{{baseUrl}}/api/tutor/auth/me"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tutor AI",
+          "item": [
+            {
+              "name": "POST /api/tutor/ai/lessons/suggest",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{tutorToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {"mode":"raw","raw":"{\n  \"level\": \"beginner\",\n  \"topic\": \"Introductions\"\n}"},
+                "url": "{{baseUrl}}/api/tutor/ai/lessons/suggest"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" }
+  ]
+}
