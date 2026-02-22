@@ -19,22 +19,22 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-screen w-72 flex-col p-4 bg-background">
-      <div className="flex flex-col h-full rounded-[2.5rem] bg-card shadow-2xl border-4 border-secondary/50 overflow-hidden">
-        <div className="flex h-24 items-center px-8 border-b-2 border-secondary/30">
+    <div className="flex h-screen w-72 flex-col border-r bg-card px-4 py-5">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex h-20 items-center border-b px-6">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-              <Settings className="h-6 w-6 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Settings className="h-5 w-5" />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-black tracking-tighter text-foreground leading-none">Admin</span>
-              <span className="text-xs font-black text-primary tracking-[0.2em] uppercase">Portal</span>
+              <span className="text-lg font-semibold leading-none text-foreground">Admin</span>
+              <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Portal</span>
             </div>
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto py-10 px-4">
-          <nav className="space-y-4">
+
+        <div className="flex-1 overflow-y-auto px-3 py-6">
+          <nav className="space-y-1.5">
             {menuItems.map((item) => {
               const isActive = pathname.startsWith(item.href)
               return (
@@ -42,18 +42,18 @@ export default function Sidebar() {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "group flex items-center rounded-[1.5rem] px-6 py-4 text-sm font-black transition-all duration-300",
+                    "group flex items-center rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-xl shadow-primary/20 scale-[1.05]"
-                      : "text-muted-foreground hover:bg-secondary/50 hover:text-primary hover:scale-[1.02]"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   )}
                 >
                   <item.icon
                     className={cn(
-                      "mr-4 h-5 w-5 flex-shrink-0 transition-transform duration-300 group-hover:scale-110",
+                      "mr-3 h-4 w-4 flex-shrink-0",
                       isActive
                         ? "text-primary-foreground"
-                        : "text-muted-foreground group-hover:text-primary"
+                        : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
                   {item.name}
@@ -62,13 +62,13 @@ export default function Sidebar() {
             })}
           </nav>
         </div>
-        
-        <div className="p-8 bg-secondary/10 mt-auto">
+
+        <div className="mt-auto border-t bg-secondary/35 p-4">
           <button
             onClick={() => authService.logout()}
-            className="flex w-full items-center justify-center rounded-2xl px-6 py-4 text-sm font-black text-destructive transition-all border-2 border-transparent hover:border-destructive/20 hover:bg-destructive/5"
+            className="flex w-full items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
           >
-            <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
+            <LogOut className="mr-2 h-4 w-4 flex-shrink-0" />
             Logout
           </button>
         </div>

@@ -289,7 +289,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         </div>
       </div>
 
-      <div className="flex items-center gap-4 rounded-md border bg-white p-4 dark:bg-zinc-950">
+      <div className="flex items-center gap-4 rounded-md border bg-white p-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Filter by Lesson:</span>
           <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
@@ -322,8 +322,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         </div>
       </div>
 
-      <div className="rounded-md border bg-white dark:bg-zinc-950">
-        <div className="px-6 pt-6">
+      <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
+        <div className="px-6 pt-4">
           <DataTableControls
             search={search}
             onSearchChange={setSearch}
@@ -341,14 +341,14 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
           />
         </div>
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead>Text</TableHead>
-              <TableHead>Translation</TableHead>
-              <TableHead>Difficulty</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created At</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="pl-8 font-bold text-primary">Text</TableHead>
+              <TableHead className="font-bold text-primary">Translation</TableHead>
+              <TableHead className="font-bold text-primary">Difficulty</TableHead>
+              <TableHead className="font-bold text-primary">Status</TableHead>
+              <TableHead className="font-bold text-primary">Created At</TableHead>
+              <TableHead className="pr-8 text-right font-bold text-primary">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -366,23 +366,27 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
               </TableRow>
             ) : (
               phrases.map((phrase) => (
-                <TableRow key={phrase._id}>
-                  <TableCell className="font-medium">{phrase.text}</TableCell>
-                  <TableCell>{phrase.translation}</TableCell>
+                <TableRow key={phrase._id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
+                  <TableCell className="font-medium text-muted-foreground italic">{phrase.translation}</TableCell>
                   <TableCell>{phrase.difficulty}/5</TableCell>
                   <TableCell>
                     <Badge
-                      variant={
-                        phrase.status === "published" ? "default" : phrase.status === "finished" ? "outline" : "secondary"
+                      className={
+                        phrase.status === "published"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : phrase.status === "finished"
+                            ? "bg-amber-500 hover:bg-amber-600"
+                            : "bg-zinc-400"
                       }
                     >
                       {phrase.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="font-medium text-muted-foreground">
                     {new Date(phrase.createdAt).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="pr-8 text-right">
                     <div className="flex justify-end gap-2">
                       {phrase.audio?.url && (
                         <Button

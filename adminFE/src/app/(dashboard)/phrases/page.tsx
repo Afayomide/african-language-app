@@ -6,25 +6,25 @@ const LANGUAGES = [
     key: "yoruba", 
     label: "Yoruba", 
     description: "Manage vocabulary and common phrases for Yoruba.",
-    color: "bg-orange-500",
-    lightColor: "bg-orange-50",
-    textColor: "text-orange-700"
+    color: "bg-primary",
+    lightColor: "bg-secondary",
+    textColor: "text-primary"
   },
   { 
     key: "igbo", 
     label: "Igbo", 
     description: "Manage vocabulary and common phrases for Igbo.",
-    color: "bg-purple-500",
-    lightColor: "bg-purple-50",
-    textColor: "text-purple-700"
+    color: "bg-primary",
+    lightColor: "bg-secondary",
+    textColor: "text-primary"
   },
   { 
     key: "hausa", 
     label: "Hausa", 
     description: "Manage vocabulary and common phrases for Hausa.",
-    color: "bg-emerald-500",
-    lightColor: "bg-emerald-50",
-    textColor: "text-emerald-700"
+    color: "bg-primary",
+    lightColor: "bg-secondary",
+    textColor: "text-primary"
   }
 ] as const;
 
@@ -32,7 +32,7 @@ export default function PhrasesHubPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Phrases Hub</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Phrases Hub</h1>
         <p className="text-muted-foreground mt-2">Select a language to manage its vocabulary database.</p>
       </div>
 
@@ -41,21 +41,21 @@ export default function PhrasesHubPage() {
           <Link
             key={language.key}
             href={`/phrases/lang/${language.key}`}
-            className="group relative overflow-hidden rounded-3xl border-2 border-transparent bg-card p-8 shadow-sm transition-all hover:border-primary/20 hover:shadow-xl hover:scale-[1.02]"
+            className="group relative overflow-hidden rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-border hover:bg-secondary/20"
           >
-            <div className={`absolute -right-8 -top-8 h-32 w-32 rounded-full ${language.color} opacity-10 transition-transform group-hover:scale-150`} />
+            <div className={`absolute -right-8 -top-8 h-32 w-32 rounded-full ${language.color} opacity-10`} />
             
             <div className="relative z-10">
-              <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl ${language.lightColor} ${language.textColor}`}>
+              <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-lg ${language.lightColor} ${language.textColor}`}>
                 <MessageSquare className="h-7 w-7" />
               </div>
               
-              <h2 className="mb-2 text-2xl font-black">{language.label}</h2>
-              <p className="mb-6 text-sm font-medium text-muted-foreground leading-relaxed">
+              <h2 className="mb-2 text-2xl font-semibold">{language.label}</h2>
+              <p className="mb-6 text-sm text-muted-foreground leading-relaxed">
                 {language.description}
               </p>
               
-              <div className={`flex items-center text-sm font-bold ${language.textColor} group-hover:gap-2 transition-all`}>
+              <div className={`flex items-center text-sm font-medium ${language.textColor}`}>
                 Manage Vocabulary <ArrowRight className="ml-1 h-4 w-4" />
               </div>
             </div>

@@ -45,21 +45,23 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Voice Dashboard</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Voice Dashboard</h1>
         <p className="text-muted-foreground mt-2">Track phrase recording progress for your language.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <Card key={card.title} className="overflow-hidden border-2 shadow-sm transition-all hover:shadow-md">
+          <Card key={card.title} className="overflow-hidden border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {card.title}
               </CardTitle>
-              <card.icon className="h-5 w-5 text-primary" />
+              <div className="rounded-md bg-secondary p-2">
+                <card.icon className="h-5 w-5 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-black">{card.value}</div>
+              <div className="text-3xl font-semibold">{card.value}</div>
             </CardContent>
           </Card>
         ))}
