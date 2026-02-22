@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import mongoose from "mongoose";
+import LessonModel from "../../models/Lesson.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorLessonUseCases } from "../../application/use-cases/tutor/lesson/TutorLessonUseCases.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
@@ -12,6 +13,10 @@ import {
   isValidLessonLevel,
   isValidLessonStatus
 } from "../../interfaces/http/validators/lesson.validators.js";
+import {
+  getSearchQuery,
+  parsePaginationQuery
+} from "../../interfaces/http/utils/pagination.js";
 
 const lessonUseCases = new TutorLessonUseCases(
   new MongooseLessonRepository(),
@@ -19,6 +24,10 @@ const lessonUseCases = new TutorLessonUseCases(
   new MongooseQuestionRepository()
 );
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+
+function escapeRegex(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 export async function createLesson(req: AuthRequest, res: Response) {
   if (!req.user) {
@@ -62,6 +71,8 @@ export async function listLessons(req: AuthRequest, res: Response) {
   }
 
   const status = req.query.status ? String(req.query.status) : undefined;
+  const paginationInput = parsePaginationQuery(req.query);
+  const q = getSearchQuery(req.query);
   if (status && !isValidLessonStatus(status)) {
     return res.status(400).json({ error: "invalid_status" });
   }
@@ -71,8 +82,45 @@ export async function listLessons(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: "tutor_language_not_configured" });
   }
 
-  const lessons = await lessonUseCases.list(tutorLanguage as Language, status as Status | undefined);
-  return res.status(200).json({ total: lessons.length, lessons });
+  const query: Record<string, unknown> = {
+    isDeleted: { $ne: true },
+    language: tutorLanguage
+  };
+  if (status) query.status = status;
+  if (q) {
+    const regex = new RegExp(escapeRegex(q), "i");
+    query.$or = [
+      { title: regex },
+      { description: regex },
+      { level: regex },
+      { status: regex },
+      { topics: regex }
+    ];
+  }
+
+  const total = await LessonModel.countDocuments(query);
+  const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
+  const page = Math.min(paginationInput.page, totalPages);
+  const skip = (page - 1) * paginationInput.limit;
+
+  const lessons = await LessonModel.find(query)
+    .sort({ orderIndex: 1, createdAt: 1 })
+    .skip(skip)
+    .limit(paginationInput.limit)
+    .lean();
+
+  return res.status(200).json({
+    total,
+    lessons,
+    pagination: {
+      page,
+      limit: paginationInput.limit,
+      total,
+      totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages
+    }
+  });
 }
 
 export async function getLessonById(req: AuthRequest, res: Response) {
@@ -218,4 +266,22 @@ export async function reorderLessons(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "lesson_ids_out_of_scope" });
   }
   return res.status(200).json({ total: reordered.length, lessons: reordered });
+}
+
+export async function finishLesson(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid_id" });
+  }
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) {
+    return res.status(403).json({ error: "tutor_language_not_configured" });
+  }
+
+  const lesson = await lessonUseCases.finish(id, tutorLanguage as Language);
+  if (!lesson) {
+    return res.status(404).json({ error: "lesson_not_found" });
+  }
+  return res.status(200).json({ lesson });
 }

@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "";
 const TOKEN_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || "7d") as jwt.SignOptions["expiresIn"];
 
-export type AuthRole = "admin" | "learner" | "tutor";
+export type AuthRole = "admin" | "learner" | "tutor" | "voice_artist";
 
 export class AuthTokenService {
   sign(userId: string, email: string, role: AuthRole) {

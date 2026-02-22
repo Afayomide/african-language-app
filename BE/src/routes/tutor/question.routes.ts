@@ -2,9 +2,9 @@ import { Router } from "express";
 import {
   createQuestion,
   deleteQuestion,
+  finishQuestion,
   getQuestionById,
   listQuestions,
-  publishQuestion,
   updateQuestion
 } from "../../controllers/tutor/question.controller.js";
 import { requireAuth, requireTutor } from "../../utils/authMiddleware.js";
@@ -18,6 +18,6 @@ router.get("/", listQuestions);
 router.get("/:id", getQuestionById);
 router.put("/:id", updateQuestion);
 router.delete("/:id", deleteQuestion);
-router.put("/:id/publish", publishQuestion);
+router.put("/:id/finish", finishQuestion);
 
 export default router;

@@ -12,6 +12,7 @@ const menuItems = [
   { name: "Phrases", href: "/phrases", icon: MessageSquare },
   { name: "Questions", href: "/questions", icon: CircleHelp },
   { name: "Tutors", href: "/tutors", icon: Users },
+  { name: "Voice Artists", href: "/voice-artists", icon: Users },
 ]
 
 export default function Sidebar() {

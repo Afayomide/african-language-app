@@ -28,13 +28,13 @@ export class TutorQuestionUseCases {
     if (!lesson || lesson.language !== tutorLanguage) return "lesson_not_found" as const;
 
     const phrase = await this.phrases.findById(input.phraseId);
-    if (!phrase || phrase.lessonId !== lesson.id) return "phrase_not_found" as const;
+    if (!phrase || !phrase.lessonIds.includes(lesson.id)) return "phrase_not_found" as const;
 
     return this.questions.create({ ...input, status: "draft" });
   }
 
   async list(
-    filter: { lessonId?: string; type?: QuestionEntity["type"]; status?: "draft" | "published" },
+    filter: { lessonId?: string; type?: QuestionEntity["type"]; status?: "draft" | "finished" | "published" },
     tutorLanguage: Language
   ) {
     if (filter.lessonId) {
@@ -61,7 +61,7 @@ export class TutorQuestionUseCases {
 
     if (update.phraseId) {
       const phrase = await this.phrases.findById(update.phraseId);
-      if (!phrase || phrase.lessonId !== question.lessonId) return "phrase_not_found" as const;
+      if (!phrase || !phrase.lessonIds.includes(question.lessonId)) return "phrase_not_found" as const;
     }
 
     return this.questions.updateById(id, update);
@@ -73,13 +73,9 @@ export class TutorQuestionUseCases {
     return this.questions.softDeleteById(id, new Date());
   }
 
-  async publishInScope(id: string, tutorLanguage: Language) {
+  async finishInScope(id: string, tutorLanguage: Language) {
     const question = await this.getByIdInScope(id, tutorLanguage);
     if (!question) return "question_not_found" as const;
-
-    const phrase = await this.phrases.findById(question.phraseId);
-    if (!phrase || phrase.status !== "published") return "linked_phrase_must_be_published" as const;
-
-    return this.questions.publishById(id);
+    return this.questions.finishById(id);
   }
 }

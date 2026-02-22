@@ -22,23 +22,70 @@ import {
 } from "@/components/ui/select"
 import { CheckCircle, ShieldX, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { DataTableControls } from "@/components/common/data-table-controls"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 type TutorStatusFilter = "all" | "active" | "pending"
 
 export default function TutorsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [tutors, setTutors] = useState<Tutor[]>([])
   const [filter, setFilter] = useState<TutorStatusFilter>("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     fetchTutors(filter)
-  }, [filter])
+  }, [filter, page, search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, search])
+
+  useEffect(() => {
+    const q = searchParams.get("q") || ""
+    const qPage = Number(searchParams.get("page") || "1")
+    const qLimit = Number(searchParams.get("limit") || "20")
+    const qStatus = searchParams.get("status")
+    setSearch(q)
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1)
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20)
+    if (qStatus === "all" || qStatus === "active" || qStatus === "pending") {
+      setFilter(qStatus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("status", filter)
+    if (search) params.set("q", search)
+    else params.delete("q")
+    params.set("page", String(page))
+    params.set("limit", String(limit))
+    const nextQuery = params.toString()
+    if (nextQuery === searchParams.toString()) return
+    router.replace(`${pathname}?${nextQuery}`)
+  }, [filter, search, page, limit, pathname, router, searchParams])
 
   async function fetchTutors(status: TutorStatusFilter) {
     setIsLoading(true)
     try {
-      const data = await tutorService.listTutors(status)
-      setTutors(data)
+      const data = await tutorService.listTutorsPage({
+        status,
+        q: search || undefined,
+        page,
+        limit
+      })
+      setTutors(data.items)
+      setTotal(data.total)
+      setTotalPages(data.pagination.totalPages)
     } catch {
       toast.error("Failed to fetch tutors")
     } finally {
@@ -100,6 +147,23 @@ export default function TutorsPage() {
       </div>
 
       <div className="rounded-md border bg-white dark:bg-zinc-950">
+        <div className="px-6 pt-6">
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value)
+              setPage(1)
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search tutors"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>

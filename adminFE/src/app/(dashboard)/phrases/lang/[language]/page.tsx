@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, Suspense, use } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { phraseService, lessonService, aiService } from "@/services";
-import { Phrase, Lesson, Language } from "@/types";
+import { Phrase, Lesson, Language, Status } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataTableControls } from "@/components/common/data-table-controls";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -53,13 +54,10 @@ function PhrasesByLanguageContent({
   const { language: languageParam } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const lessonIdParam = searchParams.get("lessonId");
-
-  if (!isLanguage(languageParam)) {
-    return <div>Invalid language</div>;
-  }
-
-  const language = languageParam as Language;
+  const isValidLanguageParam = isLanguage(languageParam);
+  const language: Language = isValidLanguageParam ? (languageParam as Language) : "yoruba";
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string>(lessonIdParam || "all");
@@ -67,6 +65,12 @@ function PhrasesByLanguageContent({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedWords, setSeedWords] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
 
   useEffect(() => {
     fetchLessons();
@@ -74,7 +78,42 @@ function PhrasesByLanguageContent({
 
   useEffect(() => {
     fetchPhrases();
-  }, [selectedLessonId, language]);
+  }, [selectedLessonId, language, page, search, limit, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedLessonId, language, search, statusFilter]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    const qPage = Number(searchParams.get("page") || "1");
+    const qLimit = Number(searchParams.get("limit") || "20");
+    const qStatus = searchParams.get("status");
+    const lessonId = searchParams.get("lessonId") || "all";
+    setSearch(q);
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20);
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus);
+    }
+    setSelectedLessonId(lessonId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (selectedLessonId && selectedLessonId !== "all") params.set("lessonId", selectedLessonId);
+    else params.delete("lessonId");
+    if (search) params.set("q", search);
+    else params.delete("q");
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else params.delete("status");
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    const nextQuery = params.toString();
+    if (nextQuery === searchParams.toString()) return;
+    router.replace(`${pathname}?${nextQuery}`);
+  }, [selectedLessonId, search, statusFilter, page, limit, pathname, router, searchParams]);
 
   async function fetchLessons() {
     try {
@@ -91,12 +130,17 @@ function PhrasesByLanguageContent({
   async function fetchPhrases() {
     setIsLoading(true);
     try {
-      const data = await phraseService.listPhrases(
-        selectedLessonId === "all" ? undefined : selectedLessonId,
-        undefined,
-        language
-      );
-      setPhrases(data);
+      const data = await phraseService.listPhrasesPage({
+        lessonId: selectedLessonId === "all" ? undefined : selectedLessonId,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        language,
+        q: search || undefined,
+        page,
+        limit
+      });
+      setPhrases(data.items);
+      setTotal(data.total);
+      setTotalPages(data.pagination.totalPages);
     } catch {
       toast.error("Failed to fetch phrases");
     } finally {
@@ -125,14 +169,11 @@ function PhrasesByLanguageContent({
     }
   }
 
-  async function handleGeneratePhraseAudio(id: string) {
-    try {
-      await phraseService.generatePhraseAudio(id);
-      toast.success("Phrase audio generated");
-      fetchPhrases();
-    } catch {
-      toast.error("Failed to generate phrase audio");
-    }
+  function handlePlayAudio(url: string) {
+    const audio = new Audio(url);
+    void audio.play().catch(() => {
+      toast.error("Unable to play audio");
+    });
   }
 
   async function handleGenerateLessonAudio() {
@@ -152,18 +193,18 @@ function PhrasesByLanguageContent({
 
   async function handleGenerateAI(seedWordsList?: string[]) {
     if (selectedLessonId === "all") {
-      toast.error("Please select a lesson first");
-      return;
-    }
-
-    const lesson = lessons.find((item) => item._id === selectedLessonId);
-    if (!lesson) {
-      toast.error("Lesson not found");
+      toast.error("Select a lesson first");
       return;
     }
 
     setIsGenerating(true);
     try {
+      const lesson = lessons.find((item) => item._id === selectedLessonId);
+      if (!lesson) {
+        toast.error("Lesson not found");
+        setIsGenerating(false);
+        return;
+      }
       await aiService.generatePhrases(selectedLessonId, lesson.language, lesson.level, seedWordsList);
       toast.success("AI phrases generated successfully");
       fetchPhrases();
@@ -174,6 +215,10 @@ function PhrasesByLanguageContent({
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  if (!isValidLanguageParam) {
+    return <div>Invalid language</div>;
   }
 
   return (
@@ -207,7 +252,7 @@ function PhrasesByLanguageContent({
           {selectedLessonId !== "all" && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
+                <Button
                   variant="outline"
                   className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-all"
                 >
@@ -215,52 +260,52 @@ function PhrasesByLanguageContent({
                   AI Generate
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-3xl border-2">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">Generate Phrases with AI</DialogTitle>
-                  <DialogDescription className="font-medium">
-                    Enter keywords or topics to guide the AI, or leave blank for general phrases relevant to the lesson level.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="seedWords" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Seed Words / Topics</Label>
-                    <Input
-                      id="seedWords"
-                      placeholder="e.g. food, market, greetings"
-                      value={seedWords}
-                      onChange={(e) => setSeedWords(e.target.value)}
-                      className="h-12 border-2 rounded-xl"
-                    />
-                  </div>
+            <DialogContent className="rounded-3xl border-2">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">Generate Phrases with AI</DialogTitle>
+                <DialogDescription className="font-medium">
+                  Enter keywords/topics to guide generation, or leave blank for general phrases.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="seedWords" className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Seed Words / Topics</Label>
+                  <Input
+                    id="seedWords"
+                    placeholder="e.g. food, market, greetings"
+                    value={seedWords}
+                    onChange={(e) => setSeedWords(e.target.value)}
+                    className="h-12 border-2 rounded-xl"
+                  />
                 </div>
-                <DialogFooter className="gap-2">
-                  <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold">
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl font-bold px-8 shadow-lg shadow-primary/20"
-                    onClick={() =>
-                      handleGenerateAI(
-                        seedWords
-                          ? seedWords
-                              .split(",")
-                              .map((item) => item.trim())
-                              .filter(Boolean)
-                          : undefined
-                      )
-                    }
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Generating...
-                      </div>
-                    ) : "Generate Now"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl font-bold">
+                  Cancel
+                </Button>
+                <Button
+                  className="rounded-xl font-bold px-8 shadow-lg shadow-primary/20"
+                  onClick={() =>
+                    handleGenerateAI(
+                      seedWords
+                        ? seedWords
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        : undefined
+                    )
+                  }
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Generating...
+                    </div>
+                  ) : "Generate Now"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
             </Dialog>
           )}
           <Button
@@ -299,9 +344,40 @@ function PhrasesByLanguageContent({
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Status:</span>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
+            <SelectTrigger className="h-12 w-[220px] rounded-xl border-2 font-bold">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all" className="font-medium">All statuses</SelectItem>
+              <SelectItem value="draft" className="font-medium">Draft</SelectItem>
+              <SelectItem value="finished" className="font-medium">Finished</SelectItem>
+              <SelectItem value="published" className="font-medium">Published</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
+        <div className="px-6 pt-6">
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value);
+              setPage(1);
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search phrases"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+        </div>
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
@@ -342,7 +418,15 @@ function PhrasesByLanguageContent({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={phrase.status === "published" ? "bg-green-500 hover:bg-green-600" : "bg-zinc-400"}>
+                    <Badge
+                      className={
+                        phrase.status === "published"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : phrase.status === "finished"
+                            ? "bg-amber-500 hover:bg-amber-600"
+                            : "bg-zinc-400"
+                      }
+                    >
                       {phrase.status}
                     </Badge>
                   </TableCell>
@@ -360,15 +444,17 @@ function PhrasesByLanguageContent({
                   </TableCell>
                   <TableCell className="text-right pr-8">
                     <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleGeneratePhraseAudio(phrase._id)}
-                        title="Generate audio"
-                        className="rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                      >
-                        <Volume2 className="h-4 w-4" />
-                      </Button>
+                      {phrase.audio?.url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePlayAudio(phrase.audio.url)}
+                          title="Play audio"
+                          className="rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -378,7 +464,7 @@ function PhrasesByLanguageContent({
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {phrase.status === "draft" && (
+                      {phrase.status === "finished" && (
                         <Button
                           variant="ghost"
                           size="icon"

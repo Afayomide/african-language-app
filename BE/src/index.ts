@@ -8,6 +8,8 @@ import adminLessonRouter from "./routes/admin/lesson.routes.js";
 import adminPhraseRouter from "./routes/admin/phrase.routes.js";
 import adminQuestionRouter from "./routes/admin/question.routes.js";
 import adminTutorRouter from "./routes/admin/tutor.routes.js";
+import adminVoiceArtistRouter from "./routes/admin/voiceArtist.routes.js";
+import adminVoiceAudioReviewRouter from "./routes/admin/voiceAudioReview.routes.js";
 import adminLessonAiRouter from "./routes/admin/lessonAi.routes.js";
 import aiPhraseRouter from "./routes/ai/phrase.routes.js";
 import aiLessonRouter from "./routes/ai/lesson.routes.js";
@@ -19,6 +21,9 @@ import tutorLessonRouter from "./routes/tutor/lesson.routes.js";
 import tutorPhraseRouter from "./routes/tutor/phrase.routes.js";
 import tutorAiRouter from "./routes/tutor/ai.routes.js";
 import tutorQuestionRouter from "./routes/tutor/question.routes.js";
+import tutorVoiceAudioRouter from "./routes/tutor/voiceAudio.routes.js";
+import voiceAuthRouter from "./routes/voice/auth.routes.js";
+import voicePhraseRouter from "./routes/voice/phrase.routes.js";
 
 const app = express();
 
@@ -47,6 +52,8 @@ app.use("/api/admin/lessons", adminLessonRouter);
 app.use("/api/admin/phrases", adminPhraseRouter);
 app.use("/api/admin/questions", adminQuestionRouter);
 app.use("/api/admin/tutors", adminTutorRouter);
+app.use("/api/admin/voice-artists", adminVoiceArtistRouter);
+app.use("/api/admin/voice-audio", adminVoiceAudioReviewRouter);
 app.use("/api/admin/ai", adminLessonAiRouter);
 app.use("/api/ai", aiPhraseRouter);
 app.use("/api/ai", aiLessonRouter);
@@ -58,6 +65,9 @@ app.use("/api/tutor/lessons", tutorLessonRouter);
 app.use("/api/tutor/phrases", tutorPhraseRouter);
 app.use("/api/tutor/questions", tutorQuestionRouter);
 app.use("/api/tutor/ai", tutorAiRouter);
+app.use("/api/tutor/voice-audio", tutorVoiceAudioRouter);
+app.use("/api/voice/auth", voiceAuthRouter);
+app.use("/api/voice/phrases", voicePhraseRouter);
 
 app.get("/", (req, res) => {
   res.status(200).json({ name: "language-app-be" });

@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "learner" | "tutor";
+export type UserRole = "admin" | "learner" | "tutor" | "voice_artist";
 
 export type UserEntity = {
   id: string;

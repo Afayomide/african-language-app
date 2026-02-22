@@ -1,5 +1,5 @@
 export function isValidPhraseStatus(status: string) {
-  return status === "draft" || status === "published";
+  return status === "draft" || status === "finished" || status === "published";
 }
 
 export function isValidPhraseDifficulty(value: unknown) {

@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { lessonService } from "@/services";
-import { Lesson, Language } from "@/types";
+import { Lesson, Language, Status } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash, ExternalLink, CheckCircle, GripVertical, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { DataTableControls } from "@/components/common/data-table-controls";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -47,6 +48,8 @@ export default function LessonsByLanguagePage({
 }) {
   const { language: languageParam } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +59,12 @@ export default function LessonsByLanguagePage({
   const [bulkLevel, setBulkLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   const [bulkCount, setBulkCount] = useState(5);
   const [draggingLessonId, setDraggingLessonId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
 
   const isValidLanguageParam = isLanguage(languageParam);
   const language: Language = isValidLanguageParam ? (languageParam as Language) : "yoruba";
@@ -63,19 +72,58 @@ export default function LessonsByLanguagePage({
   const fetchLessons = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await lessonService.listLessons(undefined, language);
-      setLessons([...data].sort((a, b) => a.orderIndex - b.orderIndex));
+      const data = await lessonService.listLessonsPage({
+        language,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        q: search || undefined,
+        page,
+        limit
+      });
+      setLessons([...data.items].sort((a, b) => a.orderIndex - b.orderIndex));
+      setTotal(data.total);
+      setTotalPages(data.pagination.totalPages);
     } catch {
       toast.error("Failed to fetch lessons");
     } finally {
       setIsLoading(false);
     }
-  }, [language]);
+  }, [language, page, search, limit, statusFilter]);
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
     fetchLessons();
   }, [fetchLessons, isValidLanguageParam]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, language, statusFilter]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    const qPage = Number(searchParams.get("page") || "1");
+    const qLimit = Number(searchParams.get("limit") || "20");
+    const qStatus = searchParams.get("status");
+    setSearch(q);
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20);
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (search) params.set("q", search);
+    else params.delete("q");
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else params.delete("status");
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    const nextQuery = params.toString();
+    if (nextQuery === searchParams.toString()) return;
+    router.replace(`${pathname}?${nextQuery}`);
+  }, [search, statusFilter, page, limit, pathname, router, searchParams]);
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this lesson?")) return;
@@ -155,6 +203,11 @@ export default function LessonsByLanguagePage({
   }
 
   async function onDrop(targetLessonId: string) {
+    if (search || totalPages > 1) {
+      toast.error("Disable search and return to single page before reordering.");
+      setDraggingLessonId(null);
+      return;
+    }
     if (!draggingLessonId || draggingLessonId === targetLessonId) {
       setDraggingLessonId(null);
       return;
@@ -277,6 +330,36 @@ export default function LessonsByLanguagePage({
       </Dialog>
 
       <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
+        <div className="px-6 pt-6">
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value);
+              setPage(1);
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search lessons"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+          <div className="pb-4">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
+              <SelectTrigger className="h-10 w-[220px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="finished">Finished</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
@@ -333,7 +416,15 @@ export default function LessonsByLanguagePage({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={lesson.status === "published" ? "bg-green-500 hover:bg-green-600" : "bg-zinc-400"}>
+                    <Badge
+                      className={
+                        lesson.status === "published"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : lesson.status === "finished"
+                            ? "bg-amber-500 hover:bg-amber-600"
+                            : "bg-zinc-400"
+                      }
+                    >
                       {lesson.status}
                     </Badge>
                   </TableCell>
@@ -350,7 +441,7 @@ export default function LessonsByLanguagePage({
                           <ExternalLink className="h-4 w-4" />
                         </Link>
                       </Button>
-                      {lesson.status === "draft" && (
+                      {lesson.status === "finished" && (
                         <Button
                           variant="ghost"
                           size="icon"

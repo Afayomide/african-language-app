@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
+import crypto from "crypto";
 import mongoose from "mongoose";
+import PhraseModel from "../../models/Phrase.js";
 import { generatePhraseAudio } from "../../services/tts/index.js";
+import { uploadAudio } from "../../services/storage/s3.js";
 import { AdminPhraseUseCases } from "../../application/use-cases/admin/phrase/AdminPhraseUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
@@ -11,6 +14,10 @@ import {
   isValidPhraseDifficulty,
   isValidPhraseStatus
 } from "../../interfaces/http/validators/phrase.validators.js";
+import {
+  getSearchQuery,
+  parsePaginationQuery
+} from "../../interfaces/http/utils/pagination.js";
 
 const phraseUseCases = new AdminPhraseUseCases(
   new MongooseLessonRepository(),
@@ -20,19 +27,91 @@ const phraseUseCases = new AdminPhraseUseCases(
 const lessonRepo = new MongooseLessonRepository();
 const phraseRepo = new MongoosePhraseRepository();
 
+function escapeRegex(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildManualAudioMeta(input: {
+  lessonId: string;
+  mimeType: string;
+  buffer: Buffer;
+}) {
+  const extensionByMime: Record<string, string> = {
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/webm": "webm",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "aac"
+  };
+  const format = extensionByMime[input.mimeType] || "mp3";
+  const key = `phrases/${input.lessonId}/manual/${crypto.randomUUID()}.${format}`;
+
+  return uploadAudio(input.buffer, key, input.mimeType).then((url) => ({
+    provider: "manual_upload",
+    model: "",
+    voice: "",
+    locale: "",
+    format,
+    url,
+    s3Key: key
+  }));
+}
+
+function parseAudioUpload(audioUpload: unknown) {
+  if (audioUpload === undefined) return null;
+  if (typeof audioUpload !== "object" || audioUpload === null) return "invalid_audio_upload";
+
+  const payload = audioUpload as { base64?: unknown; mimeType?: unknown };
+  if (!payload.base64 || typeof payload.base64 !== "string") return "invalid_audio_upload";
+
+  const dataUrlMatch = payload.base64.match(/^data:([^;]+);base64,(.+)$/);
+  const base64Data = dataUrlMatch ? dataUrlMatch[2] : payload.base64;
+  const mimeTypeFromDataUrl = dataUrlMatch ? dataUrlMatch[1] : undefined;
+  const mimeType =
+    typeof payload.mimeType === "string" && payload.mimeType.startsWith("audio/")
+      ? payload.mimeType
+      : mimeTypeFromDataUrl && mimeTypeFromDataUrl.startsWith("audio/")
+        ? mimeTypeFromDataUrl
+        : "audio/mpeg";
+
+  try {
+    const buffer = Buffer.from(base64Data, "base64");
+    if (!buffer.length) return "invalid_audio_upload";
+    if (buffer.length > 15 * 1024 * 1024) return "audio_too_large";
+    return { buffer, mimeType };
+  } catch {
+    return "invalid_audio_upload";
+  }
+}
+
 export async function createPhrase(req: Request, res: Response) {
   const {
-    lessonId,
+    lessonIds,
     text,
     translation,
     pronunciation,
     explanation,
     examples,
     difficulty,
-    aiMeta
+    aiMeta,
+    language,
+    audioUpload
   } = req.body ?? {};
 
-  if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
+  const normalizedLessonIds = Array.isArray(lessonIds)
+    ? Array.from(new Set(lessonIds.map(String)))
+    : [];
+  if (!Array.isArray(lessonIds)) {
+    return res.status(400).json({ error: "invalid_lesson_id" });
+  }
+  if (normalizedLessonIds.length === 0) {
+    return res.status(400).json({ error: "lesson_ids_required" });
+  }
+  if (normalizedLessonIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
     return res.status(400).json({ error: "invalid_lesson_id" });
   }
   if (!text || String(text).trim().length === 0) {
@@ -55,9 +134,52 @@ export async function createPhrase(req: Request, res: Response) {
       return res.status(400).json({ error: "invalid_ai_meta" });
     }
   }
+  if (language !== undefined && !isValidLessonLanguage(String(language))) {
+    return res.status(400).json({ error: "invalid_language" });
+  }
+
+  let phraseLanguage: Language | null = null;
+  const lessons = await Promise.all(normalizedLessonIds.map((id) => lessonRepo.findById(id)));
+  if (lessons.some((lesson) => !lesson)) {
+    return res.status(404).json({ error: "lesson_not_found" });
+  }
+  const lessonLanguages = Array.from(
+    new Set(lessons.filter(Boolean).map((lesson) => (lesson as { language: Language }).language))
+  );
+  if (lessonLanguages.length !== 1) {
+    return res.status(400).json({ error: "lessons_must_share_same_language" });
+  }
+  phraseLanguage = lessonLanguages[0];
+  if (!phraseLanguage) {
+    if (!language) {
+      return res.status(400).json({ error: "language_required" });
+    }
+    phraseLanguage = String(language) as Language;
+  }
+  if (language && phraseLanguage !== String(language)) {
+    return res.status(400).json({ error: "language_mismatch_with_lessons" });
+  }
+
+  const parsedAudioUpload = parseAudioUpload(audioUpload);
+  if (parsedAudioUpload === "invalid_audio_upload") {
+    return res.status(400).json({ error: "invalid_audio_upload" });
+  }
+  if (parsedAudioUpload === "audio_too_large") {
+    return res.status(400).json({ error: "audio_too_large" });
+  }
+
+  let uploadedAudio: Awaited<ReturnType<typeof buildManualAudioMeta>> | undefined;
+  if (parsedAudioUpload) {
+    uploadedAudio = await buildManualAudioMeta({
+      lessonId: normalizedLessonIds[0] || "unassigned",
+      mimeType: parsedAudioUpload.mimeType,
+      buffer: parsedAudioUpload.buffer
+    });
+  }
 
   const phrase = await phraseUseCases.create({
-    lessonId: String(lessonId),
+    lessonIds: normalizedLessonIds,
+    language: phraseLanguage,
     text: String(text).trim(),
     translation: String(translation).trim(),
     pronunciation: pronunciation ? String(pronunciation).trim() : "",
@@ -65,6 +187,7 @@ export async function createPhrase(req: Request, res: Response) {
     examples: Array.isArray(examples) ? examples : undefined,
     difficulty: difficulty !== undefined ? Number(difficulty) : undefined,
     aiMeta: aiMeta !== undefined ? aiMeta : undefined,
+    audio: uploadedAudio,
     status: "draft"
   });
   if (!phrase) {
@@ -78,6 +201,8 @@ export async function listPhrases(req: Request, res: Response) {
   const status = req.query.status ? String(req.query.status) : undefined;
   const lessonId = req.query.lessonId ? String(req.query.lessonId) : undefined;
   const language = req.query.language ? String(req.query.language) : undefined;
+  const paginationInput = parsePaginationQuery(req.query);
+  const q = getSearchQuery(req.query);
 
   if (status && !isValidPhraseStatus(status)) {
     return res.status(400).json({ error: "invalid_status" });
@@ -89,12 +214,47 @@ export async function listPhrases(req: Request, res: Response) {
     return res.status(400).json({ error: "invalid_language" });
   }
 
-  const phrases = await phraseUseCases.list({
-    status: status as "draft" | "published" | undefined,
-    lessonId,
-    language: language as Language | undefined
+  const query: Record<string, unknown> = {
+    isDeleted: { $ne: true }
+  };
+  if (status) query.status = status;
+  if (lessonId) query.lessonIds = lessonId;
+  if (language) query.language = language;
+  if (q) {
+    const regex = new RegExp(escapeRegex(q), "i");
+    query.$or = [
+      { text: regex },
+      { translation: regex },
+      { pronunciation: regex },
+      { explanation: regex },
+      { status: regex },
+      { language: regex }
+    ];
+  }
+
+  const total = await PhraseModel.countDocuments(query);
+  const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
+  const page = Math.min(paginationInput.page, totalPages);
+  const skip = (page - 1) * paginationInput.limit;
+
+  const phrases = await PhraseModel.find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(paginationInput.limit)
+    .lean();
+
+  return res.status(200).json({
+    total,
+    phrases,
+    pagination: {
+      page,
+      limit: paginationInput.limit,
+      total,
+      totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages
+    }
   });
-  return res.status(200).json({ total: phrases.length, phrases });
 }
 
 export async function getPhraseById(req: Request, res: Response) {
@@ -113,7 +273,7 @@ export async function getPhraseById(req: Request, res: Response) {
 
 export async function updatePhrase(req: Request, res: Response) {
   const { id } = req.params;
-  const { text, translation, pronunciation, explanation, examples, difficulty, aiMeta } =
+  const { text, translation, pronunciation, explanation, examples, difficulty, aiMeta, audioUpload, lessonIds, language } =
     req.body ?? {};
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -158,6 +318,61 @@ export async function updatePhrase(req: Request, res: Response) {
     }
     update.aiMeta = aiMeta;
   }
+  if (language !== undefined) {
+    if (!isValidLessonLanguage(String(language))) {
+      return res.status(400).json({ error: "invalid_language" });
+    }
+    update.language = String(language) as Language;
+  }
+  if (lessonIds !== undefined) {
+    if (!Array.isArray(lessonIds)) {
+      return res.status(400).json({ error: "invalid_lesson_id" });
+    }
+    const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
+    if (normalizedLessonIds.some((lessonId) => !mongoose.Types.ObjectId.isValid(lessonId))) {
+      return res.status(400).json({ error: "invalid_lesson_id" });
+    }
+    if (normalizedLessonIds.length === 0) {
+      return res.status(400).json({ error: "lesson_ids_required" });
+    }
+    const lessons = await Promise.all(normalizedLessonIds.map((lessonId) => lessonRepo.findById(lessonId)));
+    if (lessons.some((lesson) => !lesson)) {
+      return res.status(404).json({ error: "lesson_not_found" });
+    }
+    const lessonLanguages = Array.from(
+      new Set(lessons.filter(Boolean).map((lesson) => (lesson as { language: Language }).language))
+    );
+    if (lessonLanguages.length !== 1) {
+      return res.status(400).json({ error: "lessons_must_share_same_language" });
+    }
+    if (update.language && update.language !== lessonLanguages[0]) {
+      return res.status(400).json({ error: "language_mismatch_with_lessons" });
+    }
+    update.language = lessonLanguages[0];
+    update.lessonIds = normalizedLessonIds;
+  }
+
+  const parsedAudioUpload = parseAudioUpload(audioUpload);
+  if (parsedAudioUpload === "invalid_audio_upload") {
+    return res.status(400).json({ error: "invalid_audio_upload" });
+  }
+  if (parsedAudioUpload === "audio_too_large") {
+    return res.status(400).json({ error: "audio_too_large" });
+  }
+  if (parsedAudioUpload) {
+    const currentPhrase = await phraseRepo.findById(id);
+    if (!currentPhrase) {
+      return res.status(404).json({ error: "phrase_not_found" });
+    }
+    const targetLessonIds = Array.isArray(update.lessonIds)
+      ? (update.lessonIds as string[])
+      : currentPhrase.lessonIds;
+    update.audio = await buildManualAudioMeta({
+      lessonId: targetLessonIds[0] || "unassigned",
+      mimeType: parsedAudioUpload.mimeType,
+      buffer: parsedAudioUpload.buffer
+    });
+  }
 
   const phrase = await phraseUseCases.update(id, update);
   if (!phrase) {
@@ -189,7 +404,9 @@ export async function publishPhrase(req: Request, res: Response) {
 
   const phrase = await phraseUseCases.publish(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    const current = await phraseUseCases.getById(id);
+    if (!current) return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(400).json({ error: "phrase_not_finished" });
   }
 
   return res.status(200).json({ phrase });
@@ -206,7 +423,11 @@ export async function generatePhraseAudioById(req: Request, res: Response) {
     return res.status(404).json({ error: "phrase_not_found" });
   }
 
-  const lesson = await lessonRepo.findById(phrase.lessonId);
+  const primaryLessonId = phrase.lessonIds[0];
+  if (!primaryLessonId) {
+    return res.status(400).json({ error: "phrase_has_no_lessons" });
+  }
+  const lesson = await lessonRepo.findById(primaryLessonId);
   if (!lesson) {
     return res.status(404).json({ error: "lesson_not_found" });
   }

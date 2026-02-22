@@ -29,6 +29,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
 
   useEffect(() => {
     Promise.all([fetchPhrase(), fetchLessons()])
@@ -38,7 +39,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
   async function fetchPhrase() {
     try {
       const data = await phraseService.getPhrase(id)
-      setPhrase(data)
+      setPhrase({ ...data, lessonIds: Array.isArray(data.lessonIds) ? data.lessonIds : [] })
     } catch (error) {
       toast.error("Failed to fetch phrase")
       router.push("/phrases")
@@ -54,18 +55,47 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  async function fileToBase64(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== "string") {
+          reject(new Error("invalid_file_data"))
+          return
+        }
+        const [, base64] = result.split(",")
+        resolve(base64 || result)
+      }
+      reader.onerror = () => reject(new Error("file_read_failed"))
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!phrase) return
+    if (phrase.lessonIds.length === 0) {
+      toast.error("Select at least one lesson")
+      return
+    }
     setIsSaving(true)
     try {
+      const audioUpload = audioFile
+        ? {
+            base64: await fileToBase64(audioFile),
+            mimeType: audioFile.type || undefined,
+            fileName: audioFile.name
+          }
+        : undefined
       await phraseService.updatePhrase(id, {
         text: phrase.text,
         translation: phrase.translation,
         pronunciation: phrase.pronunciation,
         explanation: phrase.explanation,
         difficulty: phrase.difficulty,
-        lessonId: phrase.lessonId,
+        lessonIds: phrase.lessonIds,
+        audioUpload
       })
       toast.success("Phrase updated")
     } catch (error: any) {
@@ -77,7 +107,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
 
   const handleEnhance = async () => {
     if (!phrase) return
-    const lesson = lessons.find(l => l._id === phrase.lessonId)
+    const lesson = lessons.find(l => l._id === phrase.lessonIds[0])
     if (!lesson) {
       toast.error("Lesson context not found")
       return
@@ -136,7 +166,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
             <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
             {isEnhancing ? "Enhancing..." : "Enhance with AI"}
           </Button>
-          {phrase.status === "draft" && (
+          {phrase.status === "finished" && (
             <Button variant="outline" onClick={handlePublish}>
               <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
               Publish
@@ -214,6 +244,16 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
                   rows={4}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="audioUpload">Upload Audio Recording</Label>
+                <Input
+                  id="audioUpload"
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -226,21 +266,29 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="lesson">Lesson</Label>
-                <Select 
-                  value={phrase.lessonId} 
-                  onValueChange={(v) => setPhrase({ ...phrase, lessonId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lessons.map((lesson) => (
-                      <SelectItem key={lesson._id} value={lesson._id}>
-                        {lesson.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                  {lessons.map((lesson) => (
+                    <label key={lesson._id} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={phrase.lessonIds.includes(lesson._id)}
+                        onChange={(e) =>
+                          setPhrase((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  lessonIds: e.target.checked
+                                    ? Array.from(new Set([...prev.lessonIds, lesson._id]))
+                                    : prev.lessonIds.filter((id) => id !== lesson._id)
+                                }
+                              : prev
+                          )
+                        }
+                      />
+                      <span>{lesson.title}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
               
               <div className="pt-2">

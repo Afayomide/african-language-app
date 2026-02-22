@@ -9,6 +9,12 @@ import {
   parseQuestionOptions,
   parseQuestionReviewData
 } from "../../interfaces/http/validators/question.validators.js";
+import {
+  getSearchQuery,
+  includesSearch,
+  paginate,
+  parsePaginationQuery
+} from "../../interfaces/http/utils/pagination.js";
 
 const questionUseCases = new AdminQuestionUseCases(
   new MongooseQuestionRepository(),
@@ -77,6 +83,8 @@ export async function createQuestion(req: Request, res: Response) {
 
 export async function listQuestions(req: Request, res: Response) {
   const { lessonId, type, status } = req.query;
+  const paginationInput = parsePaginationQuery(req.query);
+  const q = getSearchQuery(req.query);
 
   if (lessonId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(lessonId))) {
@@ -89,7 +97,7 @@ export async function listQuestions(req: Request, res: Response) {
     }
   }
   if (status !== undefined) {
-    if (!["draft", "published"].includes(String(status))) {
+    if (!["draft", "finished", "published"].includes(String(status))) {
       return res.status(400).json({ error: "invalid_status" });
     }
   }
@@ -97,7 +105,7 @@ export async function listQuestions(req: Request, res: Response) {
   const questions = await questionUseCases.list({
     lessonId: lessonId !== undefined ? String(lessonId) : undefined,
     type: type !== undefined ? (String(type) as "vocabulary" | "practice" | "listening" | "review") : undefined,
-    status: status !== undefined ? (String(status) as "draft" | "published") : undefined
+    status: status !== undefined ? (String(status) as "draft" | "finished" | "published") : undefined
   });
   const phrases = await phraseRepo.findByIds(questions.map((q) => q.phraseId));
   const phraseMap = new Map(phrases.map((p) => [p.id, p]));
@@ -113,7 +121,25 @@ export async function listQuestions(req: Request, res: Response) {
         }
       : q.phraseId
   }));
-  return res.status(200).json({ total: data.length, questions: data });
+  const filtered = q
+    ? data.filter((item) => {
+        const phrase = typeof item.phraseId === "string" ? null : item.phraseId;
+        return [
+          item.type,
+          item.status,
+          item.promptTemplate,
+          item.explanation,
+          phrase?.text,
+          phrase?.translation
+        ].some((value) => includesSearch(value, q));
+      })
+    : data;
+  const paginated = paginate(filtered, paginationInput);
+  return res.status(200).json({
+    total: filtered.length,
+    questions: paginated.items,
+    pagination: paginated.pagination
+  });
 }
 
 export async function getQuestionById(req: Request, res: Response) {
@@ -255,6 +281,9 @@ export async function publishQuestion(req: Request, res: Response) {
   }
   if (result === "linked_phrase_must_be_published") {
     return res.status(400).json({ error: "linked_phrase_must_be_published" });
+  }
+  if (result === "question_not_finished") {
+    return res.status(400).json({ error: "question_not_finished" });
   }
   return res.status(200).json({ question: result });
 }

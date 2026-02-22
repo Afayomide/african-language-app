@@ -25,20 +25,19 @@ export async function generatePhrases(req: Request, res: Response) {
     return res.status(400).json({ error: "invalid_seed_words" });
   }
 
-  const lesson = await lessons.findById(String(lessonId));
-  if (!lesson) {
-    return res.status(404).json({ error: "lesson_not_found" });
-  }
-  if (language && language !== lesson.language) {
-    return res.status(400).json({ error: "lesson_language_mismatch" });
-  }
-  if (level && level !== lesson.level) {
-    return res.status(400).json({ error: "lesson_level_mismatch" });
-  }
-
   const orchestrator = new AiPhraseOrchestrator(lessons, phrases, getLlmClient());
 
   try {
+    const lesson = await lessons.findById(String(lessonId));
+    if (!lesson) {
+      return res.status(404).json({ error: "lesson_not_found" });
+    }
+    if (language && language !== lesson.language) {
+      return res.status(400).json({ error: "lesson_language_mismatch" });
+    }
+    if (level && level !== lesson.level) {
+      return res.status(400).json({ error: "lesson_level_mismatch" });
+    }
     const created = await orchestrator.generateForLesson({
       lesson,
       seedWords: Array.isArray(seedWords) ? seedWords.map(String) : undefined
@@ -73,8 +72,8 @@ export async function enhancePhrase(req: Request, res: Response) {
   if (!phrase) {
     return res.status(404).json({ error: "phrase_not_found" });
   }
-  if (phrase.status === "published") {
-    return res.status(409).json({ error: "cannot_edit_published" });
+  if (phrase.status === "published" || phrase.status === "finished") {
+    return res.status(409).json({ error: "cannot_edit_non_draft" });
   }
 
   const orchestrator = new AiPhraseOrchestrator(lessons, phrases, getLlmClient());

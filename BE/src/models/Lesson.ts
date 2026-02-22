@@ -8,7 +8,7 @@ const LessonSchema = new Schema(
     orderIndex: { type: Number, default: 0, index: true },
     description: { type: String, default: "" },
     topics: { type: [String], default: [] },
-    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    status: { type: String, enum: ["draft", "finished", "published"], default: "draft" },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },

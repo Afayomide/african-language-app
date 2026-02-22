@@ -16,25 +16,17 @@ export class AdminPhraseUseCases {
   ) {}
 
   async create(input: PhraseCreateInput) {
-    const lesson = await this.lessons.findById(input.lessonId);
-    if (!lesson) return null;
+    if (!Array.isArray(input.lessonIds) || input.lessonIds.length === 0) return null;
+    const lessons = await Promise.all(input.lessonIds.map((lessonId) => this.lessons.findById(lessonId)));
+    if (lessons.some((lesson) => !lesson)) return null;
     return this.phrases.create(input);
   }
 
-  async list(filter: { status?: "draft" | "published"; lessonId?: string; language?: Language }) {
-    if (filter.language) {
-      const scopedLessons = await this.lessons.listByLanguage(filter.language);
-      return this.phrases.list({
-        status: filter.status,
-        lessonIds: filter.lessonId
-          ? scopedLessons.map((item) => item.id).filter((id) => id === filter.lessonId)
-          : scopedLessons.map((item) => item.id)
-      });
-    }
-
+  async list(filter: { status?: "draft" | "finished" | "published"; lessonId?: string; language?: Language }) {
     return this.phrases.list({
       status: filter.status,
-      lessonId: filter.lessonId
+      lessonId: filter.lessonId,
+      language: filter.language
     });
   }
 
@@ -57,6 +49,13 @@ export class AdminPhraseUseCases {
   async publish(id: string): Promise<PhraseEntity | null> {
     const phrase = await this.phrases.findById(id);
     if (!phrase) return null;
+    if (phrase.status !== "finished") return null;
     return this.phrases.publishById(id, true);
+  }
+
+  async finish(id: string): Promise<PhraseEntity | null> {
+    const phrase = await this.phrases.findById(id);
+    if (!phrase) return null;
+    return this.phrases.finishById(id);
   }
 }

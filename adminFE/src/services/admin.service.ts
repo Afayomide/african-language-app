@@ -1,13 +1,89 @@
 import api from "@/lib/api";
 import { feAdminRoutes } from "@/lib/apiRoutes";
-import { Lesson, Phrase, Language, Level, Status, ExerciseQuestion, QuestionType, Tutor } from "@/types";
+import {
+  Lesson,
+  Phrase,
+  Language,
+  Level,
+  Status,
+  ExerciseQuestion,
+  QuestionType,
+  Tutor,
+  VoiceArtist,
+  VoiceAudioSubmission
+} from "@/types";
+
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
+};
+
+type PaginatedResult<T> = {
+  items: T[];
+  total: number;
+  pagination: PaginationMeta;
+};
+
+type AudioUploadPayload = {
+  base64: string;
+  mimeType?: string;
+  fileName?: string;
+};
+
+async function fetchAllPages<T>(
+  path: string,
+  key: "lessons" | "phrases" | "questions",
+  params?: Record<string, unknown>
+) {
+  const all: T[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await api.get<{
+      lessons?: T[];
+      phrases?: T[];
+      questions?: T[];
+      pagination?: PaginationMeta;
+    }>(path, {
+      params: { ...params, page, limit: 100 }
+    });
+
+    const items = (response.data[key] || []) as T[];
+    all.push(...items);
+
+    if (!response.data.pagination?.hasNextPage) break;
+    page += 1;
+  }
+
+  return all;
+}
 
 export const lessonService = {
   async listLessons(status?: Status, language?: Language) {
-    const response = await api.get<{ lessons: Lesson[] }>(feAdminRoutes.lessons(), {
-      params: { status, language },
-    });
-    return response.data.lessons;
+    return fetchAllPages<Lesson>(feAdminRoutes.lessons(), "lessons", { status, language });
+  },
+
+  async listLessonsPage(params?: { status?: Status; language?: Language; q?: string; page?: number; limit?: number }) {
+    const response = await api.get<{ lessons: Lesson[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.lessons(),
+      { params }
+    );
+    return {
+      items: response.data.lessons,
+      total: response.data.total ?? response.data.lessons.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.lessons.length || 20,
+        total: response.data.lessons.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Lesson>;
   },
 
   async getLesson(id: string) {
@@ -64,10 +140,33 @@ export const lessonService = {
 
 export const phraseService = {
   async listPhrases(lessonId?: string, status?: Status, language?: Language) {
-    const response = await api.get<{ phrases: Phrase[] }>(feAdminRoutes.phrases(), {
-      params: { lessonId, status, language },
-    });
-    return response.data.phrases;
+    return fetchAllPages<Phrase>(feAdminRoutes.phrases(), "phrases", { lessonId, status, language });
+  },
+
+  async listPhrasesPage(params?: {
+    lessonId?: string;
+    status?: Status;
+    language?: Language;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ phrases: Phrase[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.phrases(),
+      { params }
+    );
+    return {
+      items: response.data.phrases,
+      total: response.data.total ?? response.data.phrases.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.phrases.length || 20,
+        total: response.data.phrases.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Phrase>;
   },
 
   async getPhrase(id: string) {
@@ -75,12 +174,12 @@ export const phraseService = {
     return response.data.phrase;
   },
 
-  async createPhrase(data: Partial<Phrase>) {
+  async createPhrase(data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
     const response = await api.post<{ phrase: Phrase }>(feAdminRoutes.phrases(), data);
     return response.data.phrase;
   },
 
-  async updatePhrase(id: string, data: Partial<Phrase>) {
+  async updatePhrase(id: string, data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
     const response = await api.put<{ phrase: Phrase }>(feAdminRoutes.phrase(id), data);
     return response.data.phrase;
   },
@@ -114,10 +213,33 @@ export const phraseService = {
 
 export const questionService = {
   async listQuestions(filters?: { lessonId?: string; type?: QuestionType; status?: Status }) {
-    const response = await api.get<{ questions: ExerciseQuestion[] }>(feAdminRoutes.questions(), {
-      params: filters,
-    });
-    return response.data.questions;
+    return fetchAllPages<ExerciseQuestion>(feAdminRoutes.questions(), "questions", filters as Record<string, unknown>);
+  },
+
+  async listQuestionsPage(filters?: {
+    lessonId?: string;
+    type?: QuestionType;
+    status?: Status;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ questions: ExerciseQuestion[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.questions(),
+      { params: filters }
+    );
+    return {
+      items: response.data.questions,
+      total: response.data.total ?? response.data.questions.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.questions.length || 20,
+        total: response.data.questions.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<ExerciseQuestion>;
   },
 
   async createQuestion(data: {
@@ -162,6 +284,30 @@ export const tutorService = {
     return response.data.tutors;
   },
 
+  async listTutorsPage(params?: {
+    status?: "all" | "active" | "pending";
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ tutors: Tutor[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.tutors(),
+      { params }
+    );
+    return {
+      items: response.data.tutors,
+      total: response.data.total ?? response.data.tutors.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.tutors.length || 20,
+        total: response.data.tutors.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Tutor>;
+  },
+
   async activateTutor(id: string) {
     const response = await api.put<{ tutor: Tutor }>(feAdminRoutes.activateTutor(id));
     return response.data.tutor;
@@ -174,5 +320,107 @@ export const tutorService = {
 
   async deleteTutor(id: string) {
     await api.delete(feAdminRoutes.deleteTutor(id));
+  }
+};
+
+export const voiceArtistService = {
+  async listVoiceArtists(status: "all" | "active" | "pending" = "all") {
+    const response = await api.get<{ voiceArtists: VoiceArtist[] }>(feAdminRoutes.voiceArtists(), {
+      params: { status }
+    });
+    return response.data.voiceArtists;
+  },
+
+  async listVoiceArtistsPage(params?: {
+    status?: "all" | "active" | "pending";
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ voiceArtists: VoiceArtist[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.voiceArtists(),
+      { params }
+    );
+    return {
+      items: response.data.voiceArtists,
+      total: response.data.total ?? response.data.voiceArtists.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.voiceArtists.length || 20,
+        total: response.data.voiceArtists.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<VoiceArtist>;
+  },
+
+  async activateVoiceArtist(id: string) {
+    const response = await api.put<{ voiceArtist: VoiceArtist }>(feAdminRoutes.activateVoiceArtist(id));
+    return response.data.voiceArtist;
+  },
+
+  async deactivateVoiceArtist(id: string) {
+    const response = await api.put<{ voiceArtist: VoiceArtist }>(feAdminRoutes.deactivateVoiceArtist(id));
+    return response.data.voiceArtist;
+  },
+
+  async deleteVoiceArtist(id: string) {
+    await api.delete(feAdminRoutes.deleteVoiceArtist(id));
+  }
+};
+
+export const voiceAudioService = {
+  async listSubmissions(filters?: {
+    status?: "pending" | "accepted" | "rejected";
+    language?: Language;
+    voiceArtistUserId?: string;
+  }) {
+    const response = await api.get<{ submissions: VoiceAudioSubmission[] }>(
+      feAdminRoutes.voiceAudioSubmissions(),
+      { params: filters }
+    );
+    return response.data.submissions;
+  },
+
+  async listSubmissionsPage(filters?: {
+    status?: "pending" | "accepted" | "rejected";
+    language?: Language;
+    voiceArtistUserId?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ submissions: VoiceAudioSubmission[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.voiceAudioSubmissions(),
+      { params: filters }
+    );
+    return {
+      items: response.data.submissions,
+      total: response.data.total ?? response.data.submissions.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.submissions.length || 20,
+        total: response.data.submissions.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<VoiceAudioSubmission>;
+  },
+
+  async acceptSubmission(id: string) {
+    const response = await api.put<{ submission: VoiceAudioSubmission }>(
+      feAdminRoutes.acceptVoiceAudioSubmission(id)
+    );
+    return response.data.submission;
+  },
+
+  async rejectSubmission(id: string, reason: string) {
+    const response = await api.put<{ submission: VoiceAudioSubmission }>(
+      feAdminRoutes.rejectVoiceAudioSubmission(id),
+      { reason }
+    );
+    return response.data.submission;
   }
 };

@@ -3,7 +3,12 @@ import { feAiRoutes } from "@/lib/apiRoutes";
 import { Lesson, Phrase, Language, Level } from "@/types";
 
 export const aiService = {
-  async generatePhrases(lessonId: string, language: Language, level: Level, seedWords?: string[]) {
+  async generatePhrases(
+    lessonId: string,
+    language: Language,
+    level: Level,
+    seedWords?: string[]
+  ) {
     const response = await api.post<{ phrases: Phrase[] }>(
       feAiRoutes.generatePhrases(),
       { lessonId, language, level, seedWords }

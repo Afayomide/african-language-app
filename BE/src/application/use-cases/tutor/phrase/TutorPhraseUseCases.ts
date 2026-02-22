@@ -15,29 +15,33 @@ export class TutorPhraseUseCases {
   ) {}
 
   async create(input: PhraseCreateInput, tutorLanguage: Language) {
-    const lesson = await this.lessons.findById(input.lessonId);
-    if (!lesson || lesson.language !== tutorLanguage) return null;
+    if (!Array.isArray(input.lessonIds) || input.lessonIds.length === 0) return null;
+    const lessons = await Promise.all(input.lessonIds.map((lessonId) => this.lessons.findById(lessonId)));
+    if (lessons.some((lesson) => !lesson || lesson.language !== tutorLanguage)) return null;
     return this.phrases.create(input);
   }
 
-  async list(filter: { status?: "draft" | "published"; lessonId?: string }, tutorLanguage: Language) {
-    const scopedLessons = await this.lessons.listByLanguage(tutorLanguage);
-    const scopedLessonIds = scopedLessons.map((item) => item.id);
-    if (filter.lessonId && !scopedLessonIds.includes(filter.lessonId)) return [];
-
+  async list(filter: { status?: "draft" | "finished" | "published"; lessonId?: string }, tutorLanguage: Language) {
+    if (filter.lessonId) {
+      const lesson = await this.lessons.findByIdAndLanguage(filter.lessonId, tutorLanguage);
+      if (!lesson) return [];
+      return this.phrases.list({
+        status: filter.status,
+        lessonId: filter.lessonId,
+        language: tutorLanguage
+      });
+    }
     return this.phrases.list({
       status: filter.status,
-      lessonId: filter.lessonId,
-      lessonIds: filter.lessonId ? undefined : scopedLessonIds
+      language: tutorLanguage
     });
   }
 
   async getByIdInScope(id: string, tutorLanguage: Language) {
     const phrase = await this.phrases.findById(id);
     if (!phrase) return null;
-    const lesson = await this.lessons.findById(phrase.lessonId);
-    if (!lesson || lesson.language !== tutorLanguage) return null;
-    return { phrase, lesson };
+    if (phrase.language !== tutorLanguage) return null;
+    return { phrase };
   }
 
   async updateInScope(
@@ -48,9 +52,10 @@ export class TutorPhraseUseCases {
     const current = await this.getByIdInScope(id, tutorLanguage);
     if (!current) return null;
 
-    if (update.lessonId) {
-      const targetLesson = await this.lessons.findById(update.lessonId);
-      if (!targetLesson || targetLesson.language !== tutorLanguage) {
+    if (update.lessonIds) {
+      if (update.lessonIds.length === 0) return "target_lesson_out_of_scope" as const;
+      const targetLessons = await Promise.all(update.lessonIds.map((lessonId) => this.lessons.findById(lessonId)));
+      if (targetLessons.some((lesson) => !lesson || lesson.language !== tutorLanguage)) {
         return "target_lesson_out_of_scope" as const;
       }
     }
@@ -66,5 +71,11 @@ export class TutorPhraseUseCases {
     if (!phrase) return null;
     await this.questions.softDeleteByPhraseId(phrase.id, now);
     return phrase;
+  }
+
+  async finishInScope(id: string, tutorLanguage: Language) {
+    const current = await this.getByIdInScope(id, tutorLanguage);
+    if (!current) return null;
+    return this.phrases.finishById(id);
   }
 }

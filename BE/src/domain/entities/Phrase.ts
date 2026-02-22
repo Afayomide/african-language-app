@@ -22,7 +22,8 @@ export type PhraseAiMeta = {
 export type PhraseEntity = {
   id: string;
   _id?: string;
-  lessonId: string;
+  lessonIds: string[];
+  language: "yoruba" | "igbo" | "hausa";
   text: string;
   translation: string;
   pronunciation: string;
@@ -31,7 +32,7 @@ export type PhraseEntity = {
   difficulty: number;
   aiMeta: PhraseAiMeta;
   audio: PhraseAudio;
-  status: "draft" | "published";
+  status: "draft" | "finished" | "published";
   createdAt: Date;
   updatedAt: Date;
 };

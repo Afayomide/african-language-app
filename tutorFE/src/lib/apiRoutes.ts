@@ -18,10 +18,15 @@ export const beTutorRoutes = {
   phrases: () => buildBePath("/tutor/phrases"),
   questions: () => buildBePath("/tutor/questions"),
   question: (id: string) => buildBePath(`/tutor/questions/${id}`),
-  publishQuestion: (id: string) => buildBePath(`/tutor/questions/${id}/publish`),
+  finishLesson: (id: string) => buildBePath(`/tutor/lessons/${id}/finish`),
+  finishPhrase: (id: string) => buildBePath(`/tutor/phrases/${id}/finish`),
+  finishQuestion: (id: string) => buildBePath(`/tutor/questions/${id}/finish`),
   bulkPhraseAudio: (lessonId: string) => buildBePath(`/tutor/phrases/bulk/${lessonId}/generate-audio`),
   phrase: (id: string) => buildBePath(`/tutor/phrases/${id}`),
-  generatePhraseAudio: (id: string) => buildBePath(`/tutor/phrases/${id}/generate-audio`)
+  generatePhraseAudio: (id: string) => buildBePath(`/tutor/phrases/${id}/generate-audio`),
+  voiceAudioSubmissions: () => buildBePath("/tutor/voice-audio/submissions"),
+  acceptVoiceAudioSubmission: (id: string) => buildBePath(`/tutor/voice-audio/submissions/${id}/accept`),
+  rejectVoiceAudioSubmission: (id: string) => buildBePath(`/tutor/voice-audio/submissions/${id}/reject`)
 };
 
 export const beTutorAiRoutes = {
@@ -40,10 +45,15 @@ export const feTutorRoutes = {
   phrases: () => "/api/tutor/phrases",
   questions: () => "/api/tutor/questions",
   question: (id: string) => `/api/tutor/questions/${id}`,
-  publishQuestion: (id: string) => `/api/tutor/questions/${id}/publish`,
+  finishLesson: (id: string) => `/api/tutor/lessons/${id}/finish`,
+  finishPhrase: (id: string) => `/api/tutor/phrases/${id}/finish`,
+  finishQuestion: (id: string) => `/api/tutor/questions/${id}/finish`,
   bulkPhraseAudio: (lessonId: string) => `/api/tutor/phrases/bulk/${lessonId}/generate-audio`,
   phrase: (id: string) => `/api/tutor/phrases/${id}`,
-  generatePhraseAudio: (id: string) => `/api/tutor/phrases/${id}/generate-audio`
+  generatePhraseAudio: (id: string) => `/api/tutor/phrases/${id}/generate-audio`,
+  voiceAudioSubmissions: () => "/api/tutor/voice-audio/submissions",
+  acceptVoiceAudioSubmission: (id: string) => `/api/tutor/voice-audio/submissions/${id}/accept`,
+  rejectVoiceAudioSubmission: (id: string) => `/api/tutor/voice-audio/submissions/${id}/reject`
 };
 
 export const feTutorAiRoutes = {

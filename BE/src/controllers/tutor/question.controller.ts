@@ -13,6 +13,12 @@ import {
   parseQuestionOptions,
   parseQuestionReviewData
 } from "../../interfaces/http/validators/question.validators.js";
+import {
+  getSearchQuery,
+  includesSearch,
+  paginate,
+  parsePaginationQuery
+} from "../../interfaces/http/utils/pagination.js";
 
 const questionUseCases = new TutorQuestionUseCases(
   new MongooseQuestionRepository(),
@@ -85,13 +91,15 @@ export async function listQuestions(req: AuthRequest, res: Response) {
   if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
 
   const { lessonId, type, status } = req.query;
+  const paginationInput = parsePaginationQuery(req.query);
+  const q = getSearchQuery(req.query);
   if (lessonId !== undefined && !mongoose.Types.ObjectId.isValid(String(lessonId))) {
     return res.status(400).json({ error: "invalid_lesson_id" });
   }
   if (type !== undefined && !isValidQuestionType(String(type))) {
     return res.status(400).json({ error: "invalid_type" });
   }
-  if (status !== undefined && !["draft", "published"].includes(String(status))) {
+  if (status !== undefined && !["draft", "finished", "published"].includes(String(status))) {
     return res.status(400).json({ error: "invalid_status" });
   }
 
@@ -99,7 +107,7 @@ export async function listQuestions(req: AuthRequest, res: Response) {
     {
       lessonId: lessonId !== undefined ? String(lessonId) : undefined,
       type: type !== undefined ? (String(type) as "vocabulary" | "practice" | "listening" | "review") : undefined,
-      status: status !== undefined ? (String(status) as "draft" | "published") : undefined
+      status: status !== undefined ? (String(status) as "draft" | "finished" | "published") : undefined
     },
     tutorLanguage as Language
   );
@@ -120,7 +128,25 @@ export async function listQuestions(req: AuthRequest, res: Response) {
         }
       : q.phraseId
   }));
-  return res.status(200).json({ total: data.length, questions: data });
+  const filtered = q
+    ? data.filter((item) => {
+        const phrase = typeof item.phraseId === "string" ? null : item.phraseId;
+        return [
+          item.type,
+          item.status,
+          item.promptTemplate,
+          item.explanation,
+          phrase?.text,
+          phrase?.translation
+        ].some((value) => includesSearch(value, q));
+      })
+    : data;
+  const paginated = paginate(filtered, paginationInput);
+  return res.status(200).json({
+    total: filtered.length,
+    questions: paginated.items,
+    pagination: paginated.pagination
+  });
 }
 
 export async function getQuestionById(req: AuthRequest, res: Response) {
@@ -187,7 +213,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: "invalid_phrase_id" });
     }
     const phrase = await phraseRepo.findById(String(phraseId));
-    if (phrase && phrase.lessonId !== question.lessonId) {
+    if (phrase && !phrase.lessonIds.includes(question.lessonId)) {
       return res.status(404).json({ error: "phrase_not_found" });
     }
     if (!phrase) return res.status(404).json({ error: "phrase_not_found" });
@@ -257,7 +283,7 @@ export async function deleteQuestion(req: AuthRequest, res: Response) {
   return res.status(200).json({ message: "question_deleted" });
 }
 
-export async function publishQuestion(req: AuthRequest, res: Response) {
+export async function finishQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -267,10 +293,7 @@ export async function publishQuestion(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
 
-  const published = await questionUseCases.publishInScope(id, tutorLanguage as Language);
-  if (published === "question_not_found") return res.status(404).json({ error: "question_not_found" });
-  if (published === "linked_phrase_must_be_published") {
-    return res.status(400).json({ error: "linked_phrase_must_be_published" });
-  }
-  return res.status(200).json({ question: published });
+  const finished = await questionUseCases.finishInScope(id, tutorLanguage as Language);
+  if (finished === "question_not_found") return res.status(404).json({ error: "question_not_found" });
+  return res.status(200).json({ question: finished });
 }

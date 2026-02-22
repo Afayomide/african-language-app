@@ -20,7 +20,7 @@ const ExerciseQuestionSchema = new Schema(
       meaning: { type: String, default: "" }
     },
     explanation: { type: String, default: "" },
-    status: { type: String, enum: ["draft", "published"], default: "draft", index: true },
+    status: { type: String, enum: ["draft", "finished", "published"], default: "draft", index: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null }
   },

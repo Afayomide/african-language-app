@@ -89,7 +89,63 @@ export class AiPhraseOrchestrator {
     const created: PhraseEntity[] = [];
     for (const phrase of sanitized) {
       const item = await this.phrases.create({
-        lessonId: input.lesson.id,
+        lessonIds: [input.lesson.id],
+        language: input.lesson.language,
+        text: phrase.text,
+        translation: phrase.translation,
+        pronunciation: phrase.pronunciation || "",
+        explanation: phrase.explanation || "",
+        examples: phrase.examples || [],
+        difficulty: phrase.difficulty ?? 1,
+        status: "draft",
+        aiMeta: {
+          generatedByAI: true,
+          model: this.llm.modelName,
+          reviewedByAdmin: false
+        }
+      });
+      created.push(item);
+    }
+    return created;
+  }
+
+  async generateForLanguage(input: {
+    language: LessonEntity["language"];
+    level: LessonEntity["level"];
+    seedWords?: string[];
+  }) {
+    const existingPhrases = await this.phrases.list({ language: input.language });
+    const existingKeys = new Set(
+      existingPhrases.map((phrase) => normalizePhraseKey(phrase.text, phrase.translation))
+    );
+
+    const phrases = await this.llm.generatePhrases({
+      language: input.language,
+      level: input.level,
+      seedWords: input.seedWords,
+      lessonTitle: "General phrases",
+      lessonDescription: "Phrases not attached to a lesson yet",
+      existingPhrases: existingPhrases.map((phrase) => phrase.text)
+    });
+
+    const uniqueInBatch = new Set<string>();
+    const sanitized = phrases
+      .map(sanitizePhrase)
+      .filter((item): item is LlmGeneratedPhrase => Boolean(item))
+      .filter((item) => {
+        const key = normalizePhraseKey(item.text, item.translation);
+        if (existingKeys.has(key) || uniqueInBatch.has(key)) return false;
+        uniqueInBatch.add(key);
+        return true;
+      });
+
+    if (sanitized.length === 0) return [];
+
+    const created: PhraseEntity[] = [];
+    for (const phrase of sanitized) {
+      const item = await this.phrases.create({
+        lessonIds: [],
+        language: input.language,
         text: phrase.text,
         translation: phrase.translation,
         pronunciation: phrase.pronunciation || "",

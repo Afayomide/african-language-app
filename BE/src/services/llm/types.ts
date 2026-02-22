@@ -22,7 +22,7 @@ export type LlmLessonSuggestion = {
 };
 
 export type GeneratePhrasesInput = {
-  lessonId: string;
+  lessonId?: string;
   language: "yoruba" | "igbo" | "hausa";
   level: "beginner" | "intermediate" | "advanced";
   lessonTitle?: string;

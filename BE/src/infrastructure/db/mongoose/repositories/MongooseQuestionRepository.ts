@@ -81,8 +81,17 @@ export class MongooseQuestionRepository implements QuestionRepository {
 
   async publishById(id: string): Promise<QuestionEntity | null> {
     const question = await ExerciseQuestionModel.findOneAndUpdate(
-      { _id: id, isDeleted: { $ne: true } },
+      { _id: id, status: "finished", isDeleted: { $ne: true } },
       { status: "published" },
+      { new: true }
+    );
+    return question ? toEntity(question) : null;
+  }
+
+  async finishById(id: string): Promise<QuestionEntity | null> {
+    const question = await ExerciseQuestionModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      { status: "finished" },
       { new: true }
     );
     return question ? toEntity(question) : null;

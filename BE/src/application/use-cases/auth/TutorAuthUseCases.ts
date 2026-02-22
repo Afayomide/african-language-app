@@ -79,7 +79,7 @@ export class TutorAuthUseCases {
     };
   }
 
-  async me(input: { userId: string; email: string; role: "admin" | "learner" | "tutor" }) {
+  async me(input: { userId: string; email: string; role: "admin" | "learner" | "tutor" | "voice_artist" }) {
     const tutor = await this.tutorProfiles.findByUserId(input.userId);
     if (!tutor) {
       throw new AuthError(404, "tutor_profile_not_found");

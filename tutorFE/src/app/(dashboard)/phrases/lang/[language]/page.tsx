@@ -2,9 +2,9 @@
 
 import { useEffect, useState, Suspense, use } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { aiService, phraseService, lessonService } from "@/services";
-import { Phrase, Lesson, Language } from "@/types";
+import { Phrase, Lesson, Language, Status } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -15,7 +15,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash, ArrowLeft, Volume2, Sparkles } from "lucide-react";
+import { Plus, Edit, Trash, ArrowLeft, Volume2, Sparkles, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataTableControls } from "@/components/common/data-table-controls";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -50,6 +51,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
   const { language: languageParam } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const lessonIdParam = searchParams.get("lessonId");
 
   const isValidLanguageParam = isLanguage(languageParam);
@@ -61,6 +63,12 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedWords, setSeedWords] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
@@ -70,7 +78,42 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
   useEffect(() => {
     if (!isValidLanguageParam) return;
     fetchPhrases();
-  }, [selectedLessonId, isValidLanguageParam]);
+  }, [selectedLessonId, isValidLanguageParam, page, search, limit, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedLessonId, search, statusFilter]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    const qPage = Number(searchParams.get("page") || "1");
+    const qLimit = Number(searchParams.get("limit") || "20");
+    const qStatus = searchParams.get("status");
+    const lessonId = searchParams.get("lessonId") || "all";
+    setSearch(q);
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20);
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus);
+    }
+    setSelectedLessonId(lessonId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (selectedLessonId && selectedLessonId !== "all") params.set("lessonId", selectedLessonId);
+    else params.delete("lessonId");
+    if (search) params.set("q", search);
+    else params.delete("q");
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else params.delete("status");
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    const nextQuery = params.toString();
+    if (nextQuery === searchParams.toString()) return;
+    router.replace(`${pathname}?${nextQuery}`);
+  }, [selectedLessonId, search, statusFilter, page, limit, pathname, router, searchParams]);
 
   async function fetchLessons() {
     try {
@@ -84,8 +127,16 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
   async function fetchPhrases() {
     setIsLoading(true);
     try {
-      const data = await phraseService.listPhrases(selectedLessonId === "all" ? undefined : selectedLessonId);
-      setPhrases(data);
+      const data = await phraseService.listPhrasesPage({
+        lessonId: selectedLessonId === "all" ? undefined : selectedLessonId,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        q: search || undefined,
+        page,
+        limit
+      });
+      setPhrases(data.items);
+      setTotal(data.total);
+      setTotalPages(data.pagination.totalPages);
     } catch {
       toast.error("Failed to fetch phrases");
     } finally {
@@ -108,14 +159,21 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
     }
   }
 
-  async function handleGeneratePhraseAudio(id: string) {
+  async function handleFinish(id: string) {
     try {
-      await phraseService.generatePhraseAudio(id);
-      toast.success("Phrase audio generated");
+      await phraseService.finishPhrase(id);
+      toast.success("Phrase sent to admin for publish");
       fetchPhrases();
     } catch {
-      toast.error("Failed to generate phrase audio");
+      toast.error("Failed to mark phrase as finished");
     }
+  }
+
+  function handlePlayAudio(url: string) {
+    const audio = new Audio(url);
+    void audio.play().catch(() => {
+      toast.error("Unable to play audio");
+    });
   }
 
   async function handleGenerateLessonAudio() {
@@ -248,9 +306,40 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
             </SelectContent>
           </Select>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Status:</span>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="finished">Finished</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="rounded-md border bg-white dark:bg-zinc-950">
+        <div className="px-6 pt-6">
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value);
+              setPage(1);
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search phrases"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -282,7 +371,11 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                   <TableCell>{phrase.translation}</TableCell>
                   <TableCell>{phrase.difficulty}/5</TableCell>
                   <TableCell>
-                    <Badge variant={phrase.status === "published" ? "default" : "secondary"}>
+                    <Badge
+                      variant={
+                        phrase.status === "published" ? "default" : phrase.status === "finished" ? "outline" : "secondary"
+                      }
+                    >
                       {phrase.status}
                     </Badge>
                   </TableCell>
@@ -291,14 +384,16 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleGeneratePhraseAudio(phrase._id)}
-                        title="Generate audio"
-                      >
-                        <Volume2 className="h-4 w-4 text-blue-600" />
-                      </Button>
+                      {phrase.audio?.url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePlayAudio(phrase.audio.url)}
+                          title="Play audio"
+                        >
+                          <Volume2 className="h-4 w-4 text-blue-600" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -307,6 +402,16 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {phrase.status === "draft" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleFinish(phrase._id)}
+                          title="Mark as finished"
+                        >
+                          <CheckCircle className="h-4 w-4 text-amber-600" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

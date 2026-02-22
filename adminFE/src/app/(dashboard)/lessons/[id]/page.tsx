@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, aiService } from "@/services"
-import { Lesson, Language, Level } from "@/types"
+import { lessonService, aiService, phraseService } from "@/services"
+import { Lesson, Language, Level, Phrase } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +18,16 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, CheckCircle, Sparkles } from "lucide-react"
+import { ArrowLeft, Save, CheckCircle, Sparkles, Edit, Trash, Volume2 } from "lucide-react"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table"
+import { DataTableControls } from "@/components/common/data-table-controls"
 
 export default function EditLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -30,10 +39,26 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [topicsInput, setTopicsInput] = useState("")
+  const [phrases, setPhrases] = useState<Phrase[]>([])
+  const [isLoadingPhrases, setIsLoadingPhrases] = useState(false)
+  const [phraseSearch, setPhraseSearch] = useState("")
+  const [phrasePage, setPhrasePage] = useState(1)
+  const [phraseLimit, setPhraseLimit] = useState(20)
+  const [phraseTotal, setPhraseTotal] = useState(0)
+  const [phraseTotalPages, setPhraseTotalPages] = useState(1)
 
   useEffect(() => {
     fetchLesson()
   }, [id])
+
+  useEffect(() => {
+    if (!lesson?._id) return
+    fetchLessonPhrases(lesson._id)
+  }, [lesson?._id, phraseSearch, phrasePage, phraseLimit])
+
+  useEffect(() => {
+    setPhrasePage(1)
+  }, [phraseSearch, lesson?._id])
 
   async function fetchLesson() {
     try {
@@ -45,6 +70,29 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       router.push("/lessons")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function fetchLessonPhrases(lessonId: string) {
+    setIsLoadingPhrases(true)
+    try {
+      const data = await phraseService.listPhrasesPage({
+        lessonId,
+        q: phraseSearch || undefined,
+        page: phrasePage,
+        limit: phraseLimit
+      })
+      setPhrases(
+        [...data.items].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      )
+      setPhraseTotal(data.total)
+      setPhraseTotalPages(data.pagination.totalPages)
+    } catch {
+      toast.error("Failed to fetch lesson phrases")
+    } finally {
+      setIsLoadingPhrases(false)
     }
   }
 
@@ -108,13 +156,40 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     if (!lesson) return
     setIsGenerating(true)
     try {
-      await aiService.generatePhrases(lesson._id, lesson.language, lesson.level)
+      await aiService.generatePhrases(lesson._id, lesson.language, lesson.level, undefined)
       toast.success("AI phrases generated")
+      fetchLessonPhrases(lesson._id)
     } catch (error) {
       toast.error("AI phrase generation failed")
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleDeletePhrase = async (phraseId: string) => {
+    if (!confirm("Delete this phrase?")) return
+    try {
+      await phraseService.deletePhrase(phraseId)
+      toast.success("Phrase deleted")
+      if (lesson) fetchLessonPhrases(lesson._id)
+    } catch {
+      toast.error("Failed to delete phrase")
+    }
+  }
+
+  const handlePublishPhrase = async (phraseId: string) => {
+    try {
+      await phraseService.publishPhrase(phraseId)
+      toast.success("Phrase published")
+      if (lesson) fetchLessonPhrases(lesson._id)
+    } catch {
+      toast.error("Failed to publish phrase")
+    }
+  }
+
+  const handlePlayAudio = (url: string) => {
+    const audio = new Audio(url)
+    void audio.play().catch(() => toast.error("Unable to play audio"))
   }
 
   if (isLoading) return <div>Loading...</div>
@@ -147,7 +222,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
             <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
             {isGenerating ? "Generating..." : "Generate Phrases"}
           </Button>
-          {lesson.status === "draft" && (
+          {lesson.status === "finished" && (
             <Button 
               variant="outline" 
               onClick={handlePublish}
@@ -309,6 +384,115 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
           </Card>
         </div>
       </div>
+
+      <Card className="border-2 border-primary/10 shadow-xl rounded-3xl overflow-hidden">
+        <CardHeader className="bg-primary/5">
+          <CardTitle className="text-xl font-bold text-primary">Lesson Phrases</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTableControls
+            search={phraseSearch}
+            onSearchChange={setPhraseSearch}
+            page={phrasePage}
+            limit={phraseLimit}
+            onLimitChange={(value) => {
+              setPhraseLimit(value)
+              setPhrasePage(1)
+            }}
+            totalPages={phraseTotalPages}
+            total={phraseTotal}
+            label="Search phrases"
+            onPrev={() => setPhrasePage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPhrasePage((prev) => Math.min(phraseTotalPages, prev + 1))}
+          />
+          <div className="mb-4 mt-4 flex justify-end">
+            <Button onClick={() => router.push(`/phrases/new?language=${lesson.language}&lessonId=${lesson._id}`)}>
+              Add Phrase
+            </Button>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Text</TableHead>
+                <TableHead>Translation</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created At</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingPhrases ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">Loading phrases...</TableCell>
+                </TableRow>
+              ) : phrases.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">No phrases for this lesson yet.</TableCell>
+                </TableRow>
+              ) : (
+                phrases.map((phrase) => (
+                  <TableRow key={phrase._id}>
+                    <TableCell className="font-medium">{phrase.text}</TableCell>
+                    <TableCell>{phrase.translation}</TableCell>
+                    <TableCell>
+                      <Badge className={phrase.status === "published" ? "bg-green-500" : "bg-zinc-400"}>
+                        {phrase.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(phrase.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                      {phrase.audio?.url ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePlayAudio(phrase.audio.url)}
+                          title="Play audio"
+                          className="rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => router.push(`/phrases/${phrase._id}`)}
+                          title="Edit"
+                          className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {phrase.status === "finished" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handlePublishPhrase(phrase._id)}
+                            title="Publish"
+                            className="rounded-full hover:bg-green-100 hover:text-green-600 transition-colors"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeletePhrase(phrase._id)}
+                          title="Delete"
+                          className="rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

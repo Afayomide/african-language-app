@@ -14,6 +14,8 @@ import { toast } from "sonner"
 import { BookOpen, MessageSquare, Trash2, CheckCircle } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { DataTableControls } from "@/components/common/data-table-controls"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
@@ -34,10 +36,15 @@ export default function QuestionsPage() {
     reviewMeaning: "",
   })
   const isReviewType = formData.type === "review"
-
-  useEffect(() => {
-    Promise.all([fetchLessons(), fetchQuestions()]).finally(() => setIsLoading(false))
-  }, [])
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all")
 
   async function fetchLessons() {
     try {
@@ -60,12 +67,58 @@ export default function QuestionsPage() {
 
   async function fetchQuestions(status?: Status) {
     try {
-      const data = await questionService.listQuestions(status ? { status } : undefined)
-      setQuestions(data)
+      const data = await questionService.listQuestionsPage({
+        ...(status ? { status } : {}),
+        q: search || undefined,
+        page,
+        limit
+      })
+      setQuestions(data.items)
+      setTotal(data.total)
+      setTotalPages(data.pagination.totalPages)
     } catch {
       toast.error("Failed to load questions")
     }
   }
+
+  useEffect(() => {
+    fetchLessons()
+  }, [])
+
+  useEffect(() => {
+    fetchQuestions(statusFilter === "all" ? undefined : statusFilter).finally(() => setIsLoading(false))
+  }, [page, search, limit, statusFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter])
+
+  useEffect(() => {
+    const q = searchParams.get("q") || ""
+    const qPage = Number(searchParams.get("page") || "1")
+    const qLimit = Number(searchParams.get("limit") || "20")
+    const qStatus = searchParams.get("status")
+    setSearch(q)
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1)
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20)
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (search) params.set("q", search)
+    else params.delete("q")
+    if (statusFilter !== "all") params.set("status", statusFilter)
+    else params.delete("status")
+    params.set("page", String(page))
+    params.set("limit", String(limit))
+    const nextQuery = params.toString()
+    if (nextQuery === searchParams.toString()) return
+    router.replace(`${pathname}?${nextQuery}`)
+  }, [search, statusFilter, page, limit, pathname, router, searchParams])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -330,6 +383,36 @@ export default function QuestionsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="px-8 pt-6">
+            <DataTableControls
+              search={search}
+              onSearchChange={setSearch}
+              page={page}
+              limit={limit}
+              onLimitChange={(value) => {
+                setLimit(value)
+                setPage(1)
+              }}
+              totalPages={totalPages}
+              total={total}
+              label="Search questions"
+              onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+              onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            />
+            <div className="pb-4">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
+                <SelectTrigger className="h-10 w-[220px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="finished">Finished</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
@@ -365,14 +448,18 @@ export default function QuestionsPage() {
                       <TableCell className="text-center">
                         <Badge className={cn(
                           "font-semibold rounded-md border-none px-3 py-1 text-xs",
-                          q.status === "published" ? "bg-green-500" : "bg-zinc-400"
+                          q.status === "published"
+                            ? "bg-green-500"
+                            : q.status === "finished"
+                              ? "bg-amber-500"
+                              : "bg-zinc-400"
                         )}>
                           {q.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end items-center gap-3">
-                          {q.status === "draft" && (
+                          {q.status === "finished" && (
                             <Button 
                               variant="ghost" 
                               size="icon" 

@@ -11,7 +11,12 @@ function toEntity(doc: any): PhraseEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
-    lessonId: doc.lessonId.toString(),
+    lessonIds: Array.isArray(doc.lessonIds) && doc.lessonIds.length > 0
+      ? doc.lessonIds.map((id: { toString(): string }) => id.toString())
+      : doc.lessonId
+        ? [doc.lessonId.toString()]
+        : [],
+    language: String(doc.language || "yoruba") as PhraseEntity["language"],
     text: doc.text,
     translation: doc.translation,
     pronunciation: doc.pronunciation || "",
@@ -43,15 +48,24 @@ function toEntity(doc: any): PhraseEntity {
 
 export class MongoosePhraseRepository implements PhraseRepository {
   async create(input: PhraseCreateInput): Promise<PhraseEntity> {
-    const created = await PhraseModel.create(input);
+    const lessonIds = Array.from(
+      new Set(
+        (input.lessonIds || []).map(String).filter(Boolean)
+      )
+    );
+    const created = await PhraseModel.create({
+      ...input,
+      lessonIds
+    });
     return toEntity(created);
   }
 
   async list(filter: PhraseListFilter): Promise<PhraseEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
     if (filter.status) query.status = filter.status;
-    if (filter.lessonId) query.lessonId = filter.lessonId;
-    if (filter.lessonIds) query.lessonId = { $in: filter.lessonIds };
+    if (filter.language) query.language = filter.language;
+    if (filter.lessonId) query.lessonIds = filter.lessonId;
+    if (filter.lessonIds) query.lessonIds = { $in: filter.lessonIds };
     const phrases = await PhraseModel.find(query).sort({ createdAt: -1 }).lean();
     return phrases.map(toEntity);
   }
@@ -70,21 +84,25 @@ export class MongoosePhraseRepository implements PhraseRepository {
   }
 
   async findByLessonId(lessonId: string): Promise<PhraseEntity[]> {
-    const phrases = await PhraseModel.find({ lessonId, isDeleted: { $ne: true } })
+    const phrases = await PhraseModel.find({ lessonIds: lessonId, isDeleted: { $ne: true } })
       .sort({ createdAt: 1 })
       .lean();
     return phrases.map(toEntity);
   }
 
   async findByIdAndLessonId(id: string, lessonId: string): Promise<PhraseEntity | null> {
-    const phrase = await PhraseModel.findOne({ _id: id, lessonId, isDeleted: { $ne: true } });
+    const phrase = await PhraseModel.findOne({ _id: id, lessonIds: lessonId, isDeleted: { $ne: true } });
     return phrase ? toEntity(phrase) : null;
   }
 
   async updateById(id: string, update: PhraseUpdateInput): Promise<PhraseEntity | null> {
+    const payload: PhraseUpdateInput = { ...update };
+    if (Array.isArray(update.lessonIds)) {
+      payload.lessonIds = Array.from(new Set(update.lessonIds.map(String).filter(Boolean)));
+    }
     const phrase = await PhraseModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
-      update,
+      payload,
       { new: true }
     );
     return phrase ? toEntity(phrase) : null;
@@ -101,7 +119,11 @@ export class MongoosePhraseRepository implements PhraseRepository {
 
   async softDeleteByLessonId(lessonId: string, now: Date): Promise<void> {
     await PhraseModel.updateMany(
-      { lessonId, isDeleted: { $ne: true } },
+      { lessonIds: lessonId, isDeleted: { $ne: true } },
+      { $pull: { lessonIds: lessonId } }
+    );
+    await PhraseModel.updateMany(
+      { lessonIds: { $size: 0 }, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: now }
     );
   }
@@ -109,6 +131,7 @@ export class MongoosePhraseRepository implements PhraseRepository {
   async publishById(id: string, reviewedByAdmin: boolean): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({ _id: id, isDeleted: { $ne: true } });
     if (!phrase) return null;
+    if (phrase.status !== "finished") return null;
 
     phrase.status = "published";
     if (phrase.aiMeta?.generatedByAI) {
@@ -116,5 +139,14 @@ export class MongoosePhraseRepository implements PhraseRepository {
     }
     await phrase.save();
     return toEntity(phrase);
+  }
+
+  async finishById(id: string): Promise<PhraseEntity | null> {
+    const phrase = await PhraseModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      { status: "finished" },
+      { new: true }
+    );
+    return phrase ? toEntity(phrase) : null;
   }
 }

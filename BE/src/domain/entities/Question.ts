@@ -18,7 +18,7 @@ export type QuestionEntity = {
   correctIndex: number;
   reviewData?: QuestionReviewData;
   explanation: string;
-  status: "draft" | "published";
+  status: "draft" | "finished" | "published";
   createdAt: Date;
   updatedAt: Date;
 };

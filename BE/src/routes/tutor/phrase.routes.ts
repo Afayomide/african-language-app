@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createPhrase,
   deletePhrase,
+  finishPhrase,
   generateLessonPhrasesAudio,
   generatePhraseAudioById,
   getPhraseById,
@@ -20,6 +21,7 @@ router.put("/bulk/:lessonId/generate-audio", generateLessonPhrasesAudio);
 router.put("/:id/generate-audio", generatePhraseAudioById);
 router.get("/:id", getPhraseById);
 router.put("/:id", updatePhrase);
+router.put("/:id/finish", finishPhrase);
 router.delete("/:id", deletePhrase);
 
 export default router;

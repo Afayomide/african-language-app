@@ -107,11 +107,15 @@ export async function enhancePhrase(req: AuthRequest, res: Response) {
   if (!phrase) {
     return res.status(404).json({ error: "phrase_not_found" });
   }
-  if (phrase.status === "published") {
-    return res.status(409).json({ error: "cannot_edit_published" });
+  if (phrase.status === "published" || phrase.status === "finished") {
+    return res.status(409).json({ error: "cannot_edit_non_draft" });
   }
 
-  const lesson = await lessons.findById(phrase.lessonId);
+  const primaryLessonId = phrase.lessonIds[0];
+  if (!primaryLessonId) {
+    return res.status(400).json({ error: "phrase_has_no_lessons" });
+  }
+  const lesson = await lessons.findById(primaryLessonId);
   if (!lesson || lesson.language !== tutorLanguage) {
     return res.status(404).json({ error: "phrase_not_found_or_out_of_scope" });
   }

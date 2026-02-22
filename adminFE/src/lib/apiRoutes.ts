@@ -24,6 +24,13 @@ export const beAdminRoutes = {
   activateTutor: (id: string) => `${BE_API_URL}/admin/tutors/${id}/activate`,
   deactivateTutor: (id: string) => `${BE_API_URL}/admin/tutors/${id}/deactivate`,
   deleteTutor: (id: string) => `${BE_API_URL}/admin/tutors/${id}`,
+  voiceArtists: () => `${BE_API_URL}/admin/voice-artists`,
+  activateVoiceArtist: (id: string) => `${BE_API_URL}/admin/voice-artists/${id}/activate`,
+  deactivateVoiceArtist: (id: string) => `${BE_API_URL}/admin/voice-artists/${id}/deactivate`,
+  deleteVoiceArtist: (id: string) => `${BE_API_URL}/admin/voice-artists/${id}`,
+  voiceAudioSubmissions: () => `${BE_API_URL}/admin/voice-audio/submissions`,
+  acceptVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/accept`,
+  rejectVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => `${BE_API_URL}/admin/ai/lessons/generate-bulk`,
 };
 
@@ -51,5 +58,12 @@ export const feAdminRoutes = {
   activateTutor: (id: string) => `/api/admin/tutors/${id}/activate`,
   deactivateTutor: (id: string) => `/api/admin/tutors/${id}/deactivate`,
   deleteTutor: (id: string) => `/api/admin/tutors/${id}`,
+  voiceArtists: () => "/api/admin/voice-artists",
+  activateVoiceArtist: (id: string) => `/api/admin/voice-artists/${id}/activate`,
+  deactivateVoiceArtist: (id: string) => `/api/admin/voice-artists/${id}/deactivate`,
+  deleteVoiceArtist: (id: string) => `/api/admin/voice-artists/${id}`,
+  voiceAudioSubmissions: () => "/api/admin/voice-audio/submissions",
+  acceptVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/accept`,
+  rejectVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => "/api/admin/ai/lessons/generate-bulk",
 };

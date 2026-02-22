@@ -1,6 +1,6 @@
 export type Language = "yoruba" | "igbo" | "hausa";
 export type Level = "beginner" | "intermediate" | "advanced";
-export type Status = "draft" | "published";
+export type Status = "draft" | "finished" | "published";
 
 export interface Lesson {
   _id: string;
@@ -38,9 +38,32 @@ export interface Audio {
   s3Key: string;
 }
 
+export interface VoiceAudioSubmission {
+  id: string;
+  phraseId: string;
+  voiceArtistUserId: string;
+  language: Language;
+  audio: Audio;
+  status: "pending" | "accepted" | "rejected";
+  rejectionReason: string;
+  createdAt: string;
+  updatedAt: string;
+  phrase?: {
+    id?: string;
+    _id?: string;
+    text: string;
+    translation: string;
+  } | null;
+  voiceArtist?: {
+    id?: string;
+    email?: string;
+  } | null;
+}
+
 export interface Phrase {
   _id: string;
-  lessonId: string;
+  lessonIds: string[];
+  language: Language;
   text: string;
   translation: string;
   pronunciation: string;

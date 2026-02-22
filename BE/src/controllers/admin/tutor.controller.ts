@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 import { AdminTutorUseCases } from "../../application/use-cases/admin/tutor/AdminTutorUseCases.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
 import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
+import {
+  getSearchQuery,
+  includesSearch,
+  paginate,
+  parsePaginationQuery
+} from "../../interfaces/http/utils/pagination.js";
 
 const tutorUseCases = new AdminTutorUseCases(
   new MongooseTutorProfileRepository(),
@@ -11,16 +17,27 @@ const tutorUseCases = new AdminTutorUseCases(
 
 export async function listTutors(req: Request, res: Response) {
   const status = req.query.status ? String(req.query.status) : "all";
+  const paginationInput = parsePaginationQuery(req.query);
+  const q = getSearchQuery(req.query);
 
   if (status !== "all" && status !== "active" && status !== "pending") {
     return res.status(400).json({ error: "invalid_status" });
   }
 
   const tutors = await tutorUseCases.list(status);
+  const filtered = q
+    ? tutors.filter((tutor) =>
+        [tutor.email, tutor.displayName, tutor.language, tutor.isActive ? "active" : "pending"].some((value) =>
+          includesSearch(value, q)
+        )
+      )
+    : tutors;
+  const paginated = paginate(filtered, paginationInput);
 
   return res.status(200).json({
-    total: tutors.length,
-    tutors
+    total: filtered.length,
+    tutors: paginated.items,
+    pagination: paginated.pagination
   });
 }
 

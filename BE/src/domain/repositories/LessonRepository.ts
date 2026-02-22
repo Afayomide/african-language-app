@@ -17,7 +17,7 @@ export type LessonCreateInput = {
 };
 
 export type LessonUpdateInput = Partial<
-  Pick<LessonEntity, "title" | "language" | "level" | "orderIndex" | "description" | "topics">
+  Pick<LessonEntity, "title" | "language" | "level" | "orderIndex" | "description" | "topics" | "status">
 >;
 
 export interface LessonRepository {
@@ -31,6 +31,7 @@ export interface LessonRepository {
   softDeleteById(id: string): Promise<LessonEntity | null>;
   softDeleteByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
   publishById(id: string, now: Date): Promise<LessonEntity | null>;
+  finishByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
   findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>>;
   reorderByIds(ids: string[]): Promise<void>;
   listByLanguage(language: Language): Promise<LessonEntity[]>;

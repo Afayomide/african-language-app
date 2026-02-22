@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createLesson,
   deleteLesson,
+  finishLesson,
   getLessonById,
   listLessons,
   reorderLessons,
@@ -18,6 +19,7 @@ router.get("/", listLessons);
 router.put("/reorder", reorderLessons);
 router.get("/:id", getLessonById);
 router.put("/:id", updateLesson);
+router.put("/:id/finish", finishLesson);
 router.delete("/:id", deleteLesson);
 
 export default router;

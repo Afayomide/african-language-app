@@ -25,7 +25,7 @@ export class AdminQuestionUseCases {
 
     const phrase = await this.phrases.findById(input.phraseId);
     if (!phrase) return "phrase_not_found" as const;
-    if (phrase.lessonId !== lesson.id) return "phrase_not_in_lesson" as const;
+    if (!phrase.lessonIds.includes(lesson.id)) return "phrase_not_in_lesson" as const;
 
     return this.questions.create({
       ...input,
@@ -36,7 +36,7 @@ export class AdminQuestionUseCases {
   async list(filter: {
     lessonId?: string;
     type?: QuestionEntity["type"];
-    status?: "draft" | "published";
+    status?: "draft" | "finished" | "published";
   }) {
     return this.questions.list(filter);
   }
@@ -56,10 +56,17 @@ export class AdminQuestionUseCases {
   async publish(id: string) {
     const question = await this.questions.findById(id);
     if (!question) return "question_not_found" as const;
+    if (question.status !== "finished") return "question_not_finished" as const;
 
     const phrase = await this.phrases.findById(question.phraseId);
     if (!phrase || phrase.status !== "published") return "linked_phrase_must_be_published" as const;
 
     return this.questions.publishById(id);
+  }
+
+  async finish(id: string) {
+    const question = await this.questions.findById(id);
+    if (!question) return "question_not_found" as const;
+    return this.questions.finishById(id);
   }
 }

@@ -1,6 +1,6 @@
 export const LANGUAGE_VALUES = ["yoruba", "igbo", "hausa"] as const;
 export const LEVEL_VALUES = ["beginner", "intermediate", "advanced"] as const;
-export const STATUS_VALUES = ["draft", "published"] as const;
+export const STATUS_VALUES = ["draft", "finished", "published"] as const;
 
 export type Language = (typeof LANGUAGE_VALUES)[number];
 export type Level = (typeof LEVEL_VALUES)[number];

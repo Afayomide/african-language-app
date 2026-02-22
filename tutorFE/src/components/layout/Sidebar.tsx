@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, BookOpen, MessageSquare, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, BookOpen, MessageSquare, Settings, LogOut, Mic } from "lucide-react"
 import { authService } from "@/services/auth"
 
 const menuItems = [
@@ -11,6 +11,7 @@ const menuItems = [
   { name: "Lessons", href: "/lessons", icon: BookOpen },
   { name: "Phrases", href: "/phrases", icon: MessageSquare },
   { name: "Questions", href: "/questions", icon: BookOpen },
+  { name: "Voice Audio", href: "/voice-audio", icon: Mic },
 ]
 
 export default function Sidebar() {

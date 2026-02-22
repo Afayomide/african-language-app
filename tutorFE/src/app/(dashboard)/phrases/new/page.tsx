@@ -40,17 +40,20 @@ function NewPhraseContent() {
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [formData, setFormData] = useState({
-    lessonId: lessonIdParam || "",
     text: "",
     translation: "",
     pronunciation: "",
     explanation: "",
     difficulty: 1
   });
+  const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>(
+    lessonIdParam ? [lessonIdParam] : []
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedWords, setSeedWords] = useState("");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchLessons();
@@ -66,20 +69,57 @@ function NewPhraseContent() {
     }
   }
 
+  async function fileToBase64(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          reject(new Error("invalid_file_data"));
+          return;
+        }
+        const [, base64] = result.split(",");
+        resolve(base64 || result);
+      };
+      reader.onerror = () => reject(new Error("file_read_failed"));
+      reader.readAsDataURL(file);
+    });
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.lessonId) {
-      toast.error("Please select a lesson");
+    if (selectedLessonIds.length === 0) {
+      toast.error("Please select at least one lesson");
       return;
     }
 
     setIsLoading(true);
     try {
-      await phraseService.createPhrase(formData);
+      const languageForPhrase =
+        selectedLanguage ||
+        lessons.find((item) => item._id === selectedLessonIds[0])?.language;
+      if (!languageForPhrase) {
+        toast.error("Select a lesson or open this page from a language context");
+        setIsLoading(false);
+        return;
+      }
+      const audioUpload = audioFile
+        ? {
+            base64: await fileToBase64(audioFile),
+            mimeType: audioFile.type || undefined,
+            fileName: audioFile.name
+          }
+        : undefined;
+      await phraseService.createPhrase({
+        ...formData,
+        lessonIds: selectedLessonIds,
+        language: languageForPhrase,
+        audioUpload
+      });
       toast.success("Phrase created");
-      const lesson = lessons.find((item) => item._id === formData.lessonId);
+      const lesson = lessons.find((item) => item._id === selectedLessonIds[0]);
       if (lesson) {
-        router.push(`/phrases/lang/${lesson.language}?lessonId=${formData.lessonId}`);
+        router.push(`/phrases/lang/${lesson.language}?lessonId=${selectedLessonIds[0]}`);
       } else {
         router.push("/phrases");
       }
@@ -91,20 +131,20 @@ function NewPhraseContent() {
   };
 
   const handleGenerateAI = async () => {
-    if (!formData.lessonId) {
+    if (selectedLessonIds.length === 0) {
       toast.error("Please select a lesson first");
       return;
     }
     setIsGenerating(true);
     try {
       await aiService.generatePhrases(
-        formData.lessonId,
+        selectedLessonIds[0],
         seedWords ? seedWords.split(",").map((s) => s.trim()).filter(Boolean) : undefined
       );
       toast.success("AI phrases generated");
       setIsDialogOpen(false);
       setSeedWords("");
-      const lesson = lessons.find((item) => item._id === formData.lessonId);
+      const lesson = lessons.find((item) => item._id === selectedLessonIds[0]);
       if (lesson) {
         router.push(`/phrases/lang/${lesson.language}?lessonId=${lesson._id}`);
       }
@@ -165,18 +205,26 @@ function NewPhraseContent() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="lesson">Lesson</Label>
-              <Select value={formData.lessonId} onValueChange={(v) => setFormData({ ...formData, lessonId: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select lesson" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lessons.map((lesson) => (
-                    <SelectItem key={lesson._id} value={lesson._id}>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                {lessons.map((lesson) => (
+                  <label key={lesson._id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedLessonIds.includes(lesson._id)}
+                      onChange={(e) =>
+                        setSelectedLessonIds((prev) =>
+                          e.target.checked
+                            ? Array.from(new Set([...prev, lesson._id]))
+                            : prev.filter((id) => id !== lesson._id)
+                        )
+                      }
+                    />
+                    <span>
                       {lesson.orderIndex + 1}. {lesson.title} ({lesson.language})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -234,6 +282,16 @@ function NewPhraseContent() {
                 value={formData.explanation}
                 onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
                 rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="audioUpload">Upload Audio Recording (Optional)</Label>
+              <Input
+                id="audioUpload"
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
               />
             </div>
           </CardContent>

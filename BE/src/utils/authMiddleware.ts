@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 export type AuthUser = {
   id: string;
   email: string;
-  role: "admin" | "learner" | "tutor";
+  role: "admin" | "learner" | "tutor" | "voice_artist";
 };
 
 export type AuthRequest = Request & { user?: AuthUser };
@@ -27,7 +27,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     const payload = jwt.verify(token, JWT_SECRET) as {
       sub: string;
       email: string;
-      role: "admin" | "learner" | "tutor";
+      role: "admin" | "learner" | "tutor" | "voice_artist";
     };
 
     req.user = { id: payload.sub, email: payload.email, role: payload.role };
@@ -54,6 +54,13 @@ export function requireLearner(req: AuthRequest, res: Response, next: NextFuncti
 export function requireTutor(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user || req.user.role !== "tutor") {
     return res.status(403).json({ error: "tutor_only" });
+  }
+  return next();
+}
+
+export function requireVoiceArtist(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user || req.user.role !== "voice_artist") {
+    return res.status(403).json({ error: "voice_artist_only" });
   }
   return next();
 }

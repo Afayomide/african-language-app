@@ -74,4 +74,8 @@ export class TutorLessonUseCases {
     await this.lessons.reorderByIds(lessonIds);
     return this.lessons.listByLanguage(language);
   }
+
+  async finish(id: string, language: Language) {
+    return this.lessons.finishByIdAndLanguage(id, language);
+  }
 }

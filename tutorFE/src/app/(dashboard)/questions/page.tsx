@@ -12,8 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { DataTableControls } from "@/components/common/data-table-controls"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 export default function TutorQuestionsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [phrases, setPhrases] = useState<{ _id: string; text: string; translation: string }[]>([])
@@ -33,10 +38,12 @@ export default function TutorQuestionsPage() {
   })
 
   const isReviewType = formData.type === "review"
-
-  useEffect(() => {
-    Promise.all([fetchLessons(), fetchQuestions()]).finally(() => setIsLoading(false))
-  }, [])
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all")
 
   async function fetchLessons() {
     try {
@@ -59,12 +66,58 @@ export default function TutorQuestionsPage() {
 
   async function fetchQuestions(status?: Status) {
     try {
-      const data = await questionService.listQuestions(status ? { status } : undefined)
-      setQuestions(data)
+      const data = await questionService.listQuestionsPage({
+        ...(status ? { status } : {}),
+        q: search || undefined,
+        page,
+        limit
+      })
+      setQuestions(data.items)
+      setTotal(data.total)
+      setTotalPages(data.pagination.totalPages)
     } catch {
       toast.error("Failed to load questions")
     }
   }
+
+  useEffect(() => {
+    fetchLessons()
+  }, [])
+
+  useEffect(() => {
+    fetchQuestions(statusFilter === "all" ? undefined : statusFilter).finally(() => setIsLoading(false))
+  }, [page, search, limit, statusFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter])
+
+  useEffect(() => {
+    const q = searchParams.get("q") || ""
+    const qPage = Number(searchParams.get("page") || "1")
+    const qLimit = Number(searchParams.get("limit") || "20")
+    const qStatus = searchParams.get("status")
+    setSearch(q)
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1)
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20)
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (search) params.set("q", search)
+    else params.delete("q")
+    if (statusFilter !== "all") params.set("status", statusFilter)
+    else params.delete("status")
+    params.set("page", String(page))
+    params.set("limit", String(limit))
+    const nextQuery = params.toString()
+    if (nextQuery === searchParams.toString()) return
+    router.replace(`${pathname}?${nextQuery}`)
+  }, [search, statusFilter, page, limit, pathname, router, searchParams])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -128,13 +181,13 @@ export default function TutorQuestionsPage() {
     }
   }
 
-  async function handlePublish(id: string) {
+  async function handleFinish(id: string) {
     try {
-      await questionService.publishQuestion(id)
-      toast.success("Question published")
+      await questionService.finishQuestion(id)
+      toast.success("Question sent to admin for publish")
       fetchQuestions()
     } catch {
-      toast.error("Failed to publish question")
+      toast.error("Failed to mark question as finished")
     }
   }
 
@@ -292,6 +345,34 @@ export default function TutorQuestionsPage() {
           <CardTitle>Questions</CardTitle>
         </CardHeader>
         <CardContent>
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value)
+              setPage(1)
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search questions"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+          <div className="px-6 pb-4">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
+              <SelectTrigger className="h-10 w-[220px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="finished">Finished</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -316,7 +397,7 @@ export default function TutorQuestionsPage() {
                     <TableCell><Badge>{q.status}</Badge></TableCell>
                     <TableCell className="text-right space-x-2">
                       {q.status === 'draft' ? (
-                        <Button variant="outline" size="sm" onClick={() => handlePublish(q._id)}>Publish</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleFinish(q._id)}>Mark finished</Button>
                       ) : null}
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(q._id)}>Delete</Button>
                     </TableCell>

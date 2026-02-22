@@ -2,7 +2,8 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 const PhraseSchema = new Schema(
   {
-    lessonId: { type: Schema.Types.ObjectId, ref: "Lesson", required: true },
+    lessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
+    language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
     text: { type: String, required: true, trim: true },
     translation: { type: String, required: true, trim: true },
     pronunciation: { type: String, default: "" },
@@ -28,7 +29,7 @@ const PhraseSchema = new Schema(
       url: { type: String, default: "" },
       s3Key: { type: String, default: "" }
     },
-    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    status: { type: String, enum: ["draft", "finished", "published"], default: "draft" },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null }
   },
@@ -36,8 +37,10 @@ const PhraseSchema = new Schema(
 );
 
 // Optimized for phrase listing/filtering paths used by admin/tutor/learner APIs.
-PhraseSchema.index({ lessonId: 1, isDeleted: 1, createdAt: -1 });
-PhraseSchema.index({ lessonId: 1, status: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ lessonIds: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ lessonIds: 1, status: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ language: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ language: 1, status: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ status: 1, isDeleted: 1, createdAt: -1 });
 
 export type PhraseDocument = InferSchemaType<typeof PhraseSchema> & {

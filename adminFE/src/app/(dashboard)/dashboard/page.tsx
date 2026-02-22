@@ -12,21 +12,28 @@ export default function DashboardPage() {
     totalPhrases: 0,
     publishedPhrases: 0,
   })
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     async function fetchStats() {
       try {
-        const lessons = await lessonService.listLessons()
-        const phrases = await phraseService.listPhrases()
+        const [lessonsTotal, lessonsPublished, phrasesTotal, phrasesPublished] = await Promise.all([
+          lessonService.listLessonsPage({ page: 1, limit: 1 }),
+          lessonService.listLessonsPage({ status: "published", page: 1, limit: 1 }),
+          phraseService.listPhrasesPage({ page: 1, limit: 1 }),
+          phraseService.listPhrasesPage({ status: "published", page: 1, limit: 1 }),
+        ])
         
         setStats({
-          totalLessons: lessons.length,
-          publishedLessons: lessons.filter(l => l.status === 'published').length,
-          totalPhrases: phrases.length,
-          publishedPhrases: phrases.filter(p => p.status === 'published').length,
+          totalLessons: lessonsTotal.total,
+          publishedLessons: lessonsPublished.total,
+          totalPhrases: phrasesTotal.total,
+          publishedPhrases: phrasesPublished.total,
         })
       } catch (error) {
         console.error("Failed to fetch stats", error)
+      } finally {
+        setIsLoading(false)
       }
     }
     fetchStats()
@@ -84,7 +91,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-black">{card.value}</div>
+              <div className="text-3xl font-black">{isLoading ? "..." : card.value}</div>
               <div className="mt-1 text-xs text-muted-foreground font-medium">Updated just now</div>
             </CardContent>
           </Card>

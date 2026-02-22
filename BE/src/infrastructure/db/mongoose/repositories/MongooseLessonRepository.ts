@@ -111,8 +111,17 @@ export class MongooseLessonRepository implements LessonRepository {
 
   async publishById(id: string, now: Date): Promise<LessonEntity | null> {
     const lesson = await LessonModel.findOneAndUpdate(
-      { _id: id, isDeleted: { $ne: true } },
+      { _id: id, status: "finished", isDeleted: { $ne: true } },
       { status: "published", publishedAt: now },
+      { new: true }
+    );
+    return lesson ? toEntity(lesson) : null;
+  }
+
+  async finishByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null> {
+    const lesson = await LessonModel.findOneAndUpdate(
+      { _id: id, language, isDeleted: { $ne: true } },
+      { status: "finished" },
       { new: true }
     );
     return lesson ? toEntity(lesson) : null;

@@ -1,13 +1,15 @@
 import type { PhraseEntity, PhraseExample } from "../entities/Phrase.js";
 
 export type PhraseListFilter = {
-  status?: "draft" | "published";
+  status?: "draft" | "finished" | "published";
+  language?: PhraseEntity["language"];
   lessonId?: string;
   lessonIds?: string[];
 };
 
 export type PhraseCreateInput = {
-  lessonId: string;
+  lessonIds?: string[];
+  language: PhraseEntity["language"];
   text: string;
   translation: string;
   pronunciation?: string;
@@ -15,11 +17,13 @@ export type PhraseCreateInput = {
   examples?: PhraseExample[];
   difficulty?: number;
   aiMeta?: Partial<PhraseEntity["aiMeta"]>;
-  status: "draft" | "published";
+  audio?: PhraseEntity["audio"];
+  status: "draft" | "finished" | "published";
 };
 
 export type PhraseUpdateInput = Partial<{
-  lessonId: string;
+  lessonIds: string[];
+  language: PhraseEntity["language"];
   text: string;
   translation: string;
   pronunciation: string;
@@ -28,7 +32,7 @@ export type PhraseUpdateInput = Partial<{
   difficulty: number;
   aiMeta: Partial<PhraseEntity["aiMeta"]>;
   audio: PhraseEntity["audio"];
-  status: "draft" | "published";
+  status: "draft" | "finished" | "published";
 }>;
 
 export interface PhraseRepository {
@@ -42,4 +46,5 @@ export interface PhraseRepository {
   softDeleteById(id: string, now: Date): Promise<PhraseEntity | null>;
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
   publishById(id: string, reviewedByAdmin: boolean): Promise<PhraseEntity | null>;
+  finishById(id: string): Promise<PhraseEntity | null>;
 }

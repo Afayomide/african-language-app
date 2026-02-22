@@ -39,4 +39,5 @@ export interface QuestionRepository {
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
   softDeleteByPhraseId(phraseId: string, now: Date): Promise<void>;
   publishById(id: string): Promise<QuestionEntity | null>;
+  finishById(id: string): Promise<QuestionEntity | null>;
 }
