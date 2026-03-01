@@ -38,6 +38,10 @@ type SubmissionItem = {
   rejectionReason: string;
   createdAt: string;
   phrase: Phrase | null;
+  audio: {
+    url: string;
+    format: string;
+  };
 };
 
 export const lessonService = {

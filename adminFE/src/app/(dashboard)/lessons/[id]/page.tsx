@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, aiService, phraseService } from "@/services"
-import { Lesson, Language, Level, Phrase } from "@/types"
+import { lessonService, aiService, phraseService, proverbService, questionService } from "@/services"
+import { Lesson, Language, Level, Phrase, LessonBlock, Proverb, ExerciseQuestion } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, CheckCircle, Sparkles, Edit, Trash, Volume2 } from "lucide-react"
+import { ArrowLeft, Save, CheckCircle, Sparkles, Edit, Trash, Volume2, Plus, ArrowUp, ArrowDown, LayoutList } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -28,6 +28,16 @@ import {
   TableRow
 } from "@/components/ui/table"
 import { DataTableControls } from "@/components/common/data-table-controls"
+import { workflowStatusBadgeClass } from "@/lib/status-badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog"
 
 export default function EditLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -38,8 +48,16 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const [isSaving, setIsSaving] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
+  const [extraInstructions, setExtraInstructions] = useState("")
   const [topicsInput, setTopicsInput] = useState("")
+  const [proverbs, setProverbs] = useState<Array<{ text: string; translation: string; contextNote: string }>>([])
+  const [blocks, setBlocks] = useState<LessonBlock[]>([])
   const [phrases, setPhrases] = useState<Phrase[]>([])
+  
+  const [allPhrases, setAllPhrases] = useState<Phrase[]>([])
+  const [allProverbs, setAllProverbs] = useState<Proverb[]>([])
+  const [allQuestions, setAllQuestions] = useState<ExerciseQuestion[]>([])
   const [isLoadingPhrases, setIsLoadingPhrases] = useState(false)
   const [phraseSearch, setPhraseSearch] = useState("")
   const [phrasePage, setPhrasePage] = useState(1)
@@ -60,11 +78,32 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     setPhrasePage(1)
   }, [phraseSearch, lesson?._id])
 
+  useEffect(() => {
+    if (!lesson?.language) return
+    const loadAllData = async () => {
+      try {
+        const [p, prv, q] = await Promise.all([
+          phraseService.listPhrases(undefined, undefined, lesson.language),
+          proverbService.listProverbs(undefined, undefined, lesson.language),
+          questionService.listQuestions({ lessonId: lesson._id })
+        ])
+        setAllPhrases(p)
+        setAllProverbs(prv)
+        setAllQuestions(q)
+      } catch (err) {
+        console.error("Failed to load selector data", err)
+      }
+    }
+    void loadAllData()
+  }, [lesson?.language, lesson?._id])
+
   async function fetchLesson() {
     try {
       const data = await lessonService.getLesson(id)
       setLesson({ ...data, topics: Array.isArray(data.topics) ? data.topics : [] })
       setTopicsInput(Array.isArray(data.topics) ? data.topics.join(", ") : "")
+      setProverbs(Array.isArray(data.proverbs) ? data.proverbs : [])
+      setBlocks(Array.isArray(data.blocks) ? data.blocks : [])
     } catch (error) {
       toast.error("Failed to fetch lesson")
       router.push("/lessons")
@@ -96,6 +135,52 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  const handleAddProverb = () => {
+    setProverbs([...proverbs, { text: "", translation: "", contextNote: "" }])
+  }
+
+  const handleProverbChange = (index: number, field: keyof typeof proverbs[0], value: string) => {
+    const updated = [...proverbs]
+    updated[index] = { ...updated[index], [field]: value }
+    setProverbs(updated)
+  }
+
+  const handleRemoveProverb = (index: number) => {
+    setProverbs(proverbs.filter((_, i) => i !== index))
+  }
+
+  const handleAddBlock = (type: LessonBlock["type"]) => {
+    if (type === "text") {
+      setBlocks([...blocks, { type: "text", content: "" }])
+    } else {
+      setBlocks([...blocks, { type, refId: "" }])
+    }
+  }
+
+  const handleBlockChange = (index: number, value: string) => {
+    const updated = [...blocks]
+    const block = updated[index]
+    if (block.type === "text") {
+      updated[index] = { ...block, content: value }
+    } else {
+      updated[index] = { ...block, refId: value }
+    }
+    setBlocks(updated)
+  }
+
+  const handleRemoveBlock = (index: number) => {
+    setBlocks(blocks.filter((_, i) => i !== index))
+  }
+
+  const handleMoveBlock = (index: number, direction: "up" | "down") => {
+    const updated = [...blocks]
+    const newIndex = direction === "up" ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= blocks.length) return
+    const [moved] = updated.splice(index, 1)
+    updated.splice(newIndex, 0, moved)
+    setBlocks(updated)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!lesson) return
@@ -105,12 +190,15 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean)
+      
       await lessonService.updateLesson(id, {
         title: lesson.title,
         language: lesson.language,
         level: lesson.level,
         description: lesson.description,
         topics,
+        proverbs,
+        blocks,
       })
       toast.success("Lesson updated")
     } catch (error: any) {
@@ -139,11 +227,24 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     setIsSuggesting(true)
     try {
       const suggestion = await aiService.suggestLesson(lesson.title, lesson.language, lesson.level)
+      console.log(suggestion)
       setLesson({
         ...lesson,
         title: suggestion.title || lesson.title,
         description: suggestion.description || lesson.description,
       })
+      if (Array.isArray(suggestion.proverbs)) {
+        const newProverbs = suggestion.proverbs.map((p: any) => {
+          if (typeof p === "string") return { text: p, translation: "", contextNote: "" };
+          return {
+            text: p.text || "",
+            translation: p.translation || "",
+            contextNote: p.contextNote || "",
+          };
+        });
+        setProverbs(newProverbs);
+      }
+      
       toast.success("AI suggestion applied")
     } catch (error) {
       toast.error("AI suggestion failed")
@@ -152,12 +253,20 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+
   const handleGeneratePhrases = async () => {
     if (!lesson) return
     setIsGenerating(true)
     try {
-      await aiService.generatePhrases(lesson._id, lesson.language, lesson.level, undefined)
+      await aiService.generatePhrases(
+        lesson._id,
+        lesson.language,
+        lesson.level,
+        undefined,
+        extraInstructions.trim() || undefined
+      )
       toast.success("AI phrases generated")
+      setIsGenerateDialogOpen(false)
       fetchLessonPhrases(lesson._id)
     } catch (error) {
       toast.error("AI phrase generation failed")
@@ -213,14 +322,50 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleGeneratePhrases} 
-            disabled={isGenerating}
-            className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 transition-all"
+          <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 transition-all"
+              >
+                <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
+                Generate Phrases
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate Phrases With AI</DialogTitle>
+                <DialogDescription>
+                  Add optional generation guidance before creating phrases.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="extraInstructions">Extra AI Description (Optional)</Label>
+                <Textarea
+                  id="extraInstructions"
+                  value={extraInstructions}
+                  onChange={(event) => setExtraInstructions(event.target.value)}
+                  placeholder='e.g. "Only single words for this lesson"'
+                  rows={4}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsGenerateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleGeneratePhrases} disabled={isGenerating}>
+                  {isGenerating ? "Generating..." : "Generate"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/lessons/${id}/flow`)}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-blue-50 hover:text-blue-600 transition-all border-blue-200 text-blue-600"
           >
-            <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
-            {isGenerating ? "Generating..." : "Generate Phrases"}
+            <LayoutList className="mr-2 h-5 w-5" />
+            Build Lesson Flow
           </Button>
           {lesson.status === "finished" && (
             <Button 
@@ -330,6 +475,75 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                   className="border-2 rounded-xl focus-visible:ring-primary font-medium"
                 />
               </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="font-bold text-xs uppercase tracking-wider text-muted-foreground ml-1">Proverbs</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddProverb}
+                    className="h-8 border-2 font-bold hover:bg-primary/5 text-primary"
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add Proverb
+                  </Button>
+                </div>
+                
+                {proverbs.map((proverb, index) => (
+                  <div key={index} className="p-4 border-2 rounded-xl space-y-3 relative group bg-muted/5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveProverb(index)}
+                      className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor={`proverb-text-${index}`} className="text-xs font-bold">Proverb Text</Label>
+                      <Input
+                        id={`proverb-text-${index}`}
+                        value={proverb.text}
+                        onChange={(e) => handleProverbChange(index, "text", e.target.value)}
+                        placeholder="Original text..."
+                        className="h-10 border-2 rounded-lg"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`proverb-trans-${index}`} className="text-xs font-bold">Translation</Label>
+                        <Input
+                          id={`proverb-trans-${index}`}
+                          value={proverb.translation}
+                          onChange={(e) => handleProverbChange(index, "translation", e.target.value)}
+                          placeholder="English translation..."
+                          className="h-10 border-2 rounded-lg"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`proverb-note-${index}`} className="text-xs font-bold">Context/Note</Label>
+                        <Input
+                          id={`proverb-note-${index}`}
+                          value={proverb.contextNote}
+                          onChange={(e) => handleProverbChange(index, "contextNote", e.target.value)}
+                          placeholder="Optional context..."
+                          className="h-10 border-2 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {proverbs.length === 0 && (
+                  <div className="text-center py-6 border-2 border-dashed rounded-xl text-muted-foreground">
+                    No proverbs added to this lesson yet.
+                  </div>
+                )}
+              </div>
             </CardContent>
             <CardFooter className="bg-muted/20 p-8">
               <p className="text-sm text-muted-foreground font-medium italic">
@@ -347,7 +561,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
             <CardContent className="pt-6 space-y-4">
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground font-bold text-sm uppercase">Current Status</span>
-                <Badge className={lesson.status === "published" ? "bg-green-500" : "bg-zinc-400"}>
+                <Badge className={workflowStatusBadgeClass(lesson.status)}>
                   {lesson.status}
                 </Badge>
               </div>
@@ -411,13 +625,13 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
             </Button>
           </div>
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-primary/5">
               <TableRow>
-                <TableHead>Text</TableHead>
-                <TableHead>Translation</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created At</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-bold text-primary pl-8">Text</TableHead>
+                <TableHead className="font-bold text-primary">Translation</TableHead>
+                <TableHead className="font-bold text-primary">Status</TableHead>
+                <TableHead className="font-bold text-primary">Created At</TableHead>
+                <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -431,18 +645,18 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                 </TableRow>
               ) : (
                 phrases.map((phrase) => (
-                  <TableRow key={phrase._id}>
-                    <TableCell className="font-medium">{phrase.text}</TableCell>
+                  <TableRow key={phrase._id} className="group transition-colors hover:bg-secondary/30">
+                    <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
                     <TableCell>{phrase.translation}</TableCell>
                     <TableCell>
-                      <Badge className={phrase.status === "published" ? "bg-green-500" : "bg-zinc-400"}>
+                      <Badge className={workflowStatusBadgeClass(phrase.status)}>
                         {phrase.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {new Date(phrase.createdAt).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="pr-8 text-right">
                       <div className="flex justify-end gap-1">
                       {phrase.audio?.url ? (
                         <Button

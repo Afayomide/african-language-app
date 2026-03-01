@@ -1,160 +1,183 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ChevronLeft, BookOpen, Zap, Headphones, RotateCw, Lock } from 'lucide-react'
+import { ChevronLeft, BookOpen, Zap, Headphones, RotateCw, Lock, Play, CheckCircle, Info, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { learnerLessonService } from '@/services'
+import { Lesson } from '@/types'
 
-const iconByKey = {
-  vocabulary: BookOpen,
-  practice: Zap,
-  listening: Headphones,
-  review: RotateCw
-} as const
-
-export default function LessonOverviewScreen() {
+function LessonOverviewContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const lessonIdParam = searchParams.get("lessonId")
+  
   const [progress, setProgress] = useState(0)
-  const [lesson, setLesson] = useState<{ id: string; title: string; description: string } | null>(null)
-  const [lessonSteps, setLessonSteps] = useState<
-    { id: number; key: string; title: string; description: string; status: "locked" | "available" | "completed"; route: string }[]
-  >([])
-  const [futureLessons, setFutureLessons] = useState<{ id: string; title: string }[]>([])
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [status, setStatus] = useState<"locked" | "available" | "completed">("available")
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     async function loadLesson() {
+      setIsLoading(true)
       try {
         const lessonId = lessonIdParam || (await learnerLessonService.getNextLesson())?.lesson?.id;
-        if (!lessonId) return;
+        if (!lessonId) {
+          router.push('/dashboard')
+          return
+        }
         const overview = await learnerLessonService.getLessonOverview(lessonId);
         setLesson(overview.lesson);
         setProgress(overview.lesson.progressPercent || 0);
-        setLessonSteps(overview.steps || []);
-        setFutureLessons(overview.comingNext || []);
+        setStatus(overview.lesson.status === "completed" ? "completed" : "available");
       } catch (error) {
         console.error("Failed to load lesson overview", error);
+      } finally {
+        setIsLoading(false)
       }
     }
     loadLesson();
-  }, [lessonIdParam])
+  }, [lessonIdParam, router])
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading Lesson...</div>
+  if (!lesson) return <div className="min-h-screen flex items-center justify-center">Lesson not found.</div>
+
+  const isCompleted = status === "completed"
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/20 bg-background/95 px-4 py-4 backdrop-blur-sm sticky top-0 z-40">
+      {/* Dynamic Header */}
+      <header className="border-b border-border/10 bg-background/95 px-4 py-6 backdrop-blur-sm sticky top-0 z-40">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <Link href="/dashboard">
-            <Button variant="ghost" size="icon">
-              <ChevronLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <ChevronLeft className="h-6 w-6" />
             </Button>
           </Link>
           <div className="text-center flex-1">
-            <p className="text-sm text-foreground/60">Lesson Overview</p>
-            <h1 className="text-xl font-bold text-foreground">{lesson?.title || "Loading..."}</h1>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/40">Unit Overview</p>
+            <h1 className="text-2xl font-black text-foreground tracking-tight">{lesson.title}</h1>
           </div>
           <div className="w-10" />
         </div>
       </header>
 
       {/* Content */}
-      <section className="px-4 py-8">
-        <div className="mx-auto max-w-4xl space-y-8">
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">Lesson Progress</p>
-              <p className="text-sm text-foreground/60">{progress}%</p>
+      <section className="px-4 py-8 md:py-12">
+        <div className="mx-auto max-w-2xl space-y-10">
+          
+          {/* Progress Card */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <p className="text-sm font-black uppercase tracking-widest text-foreground/60">Lesson Progress</p>
+              <p className="text-sm font-black text-primary">{progress}%</p>
             </div>
-            <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+            <div className="h-4 w-full rounded-full bg-muted overflow-hidden border-2 border-muted relative">
               <div
-                className="h-full bg-primary transition-all duration-300"
+                className="h-full bg-primary transition-all duration-1000 cubic-bezier(0.65, 0, 0.35, 1)"
                 style={{ width: `${progress}%` }}
               />
+              <div className="absolute inset-0 bg-white/10 h-1/2" />
             </div>
           </div>
 
-          {/* Lesson Description */}
-          <Card className="border border-border/50 p-6">
-            <h2 className="text-lg font-bold text-foreground mb-2">
-              {lesson?.title || "Lesson"}
-            </h2>
-            <p className="text-foreground/70">
-              {lesson?.description || "Lesson content and steps load from backend."}
-            </p>
+          {/* Main Action Card */}
+          <Card className={cn(
+            "p-10 rounded-[3rem] border-4 shadow-2xl transition-all relative overflow-hidden",
+            isCompleted ? "border-green-100 bg-green-50/30" : "border-primary/10 bg-primary/5 shadow-primary/5"
+          )}>
+            <div className="relative z-10 space-y-8 text-center">
+              <div className="mx-auto h-20 w-20 rounded-3xl bg-white shadow-xl flex items-center justify-center">
+                {isCompleted ? (
+                  <CheckCircle className="h-10 w-10 text-green-500" />
+                ) : (
+                  <Play className="h-10 w-10 text-primary fill-primary" />
+                )}
+              </div>
+              
+              <div className="space-y-3">
+                <h2 className="text-3xl font-black text-foreground leading-tight">
+                  {isCompleted ? "Unit Mastered!" : "Ready to Start?"}
+                </h2>
+                <p className="text-lg text-foreground/60 font-medium leading-relaxed">
+                  {lesson.description || "Master essential phrases and cultural context in this bite-sized unit."}
+                </p>
+              </div>
+
+              <Link href={`/study?lessonId=${lesson.id}`} className="block">
+                <Button size="lg" className="w-full h-16 rounded-[1.5rem] text-xl font-black shadow-xl border-b-8 border-primary-foreground/30 active:translate-y-1 active:border-b-4 transition-all">
+                  {isCompleted ? "Review Lesson" : "Start Learning"}
+                  <ArrowRight className="ml-2 h-6 w-6" />
+                </Button>
+              </Link>
+            </div>
+            
+            {/* Background Decoration */}
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
+            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 h-64 w-64 rounded-full bg-accent/5 blur-3xl" />
           </Card>
 
-          {/* Lesson Steps */}
-          <div className="space-y-4">
-            <h3 className="font-bold text-foreground">Lesson Steps</h3>
-            {lessonSteps.map((step, index) => {
-              const Icon = iconByKey[step.key as keyof typeof iconByKey] || BookOpen
-              const locked = step.status === "locked"
-              const separator = step.route.includes("?") ? "&" : "?"
-              return (
-                <Link key={step.id} href={locked ? '#' : `${step.route}${separator}step=${step.id}&lessonId=${lesson?.id || ""}`}>
-                  <Card
-                    className={`border p-4 transition-all cursor-pointer flex items-center justify-between ${
-                      locked
-                        ? 'border-border/20 opacity-50 cursor-not-allowed'
-                        : 'border-border/50 hover:border-primary/50 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        {locked ? (
-                          <Lock className="h-5 w-5 text-foreground/40" />
-                        ) : (
-                          <Icon className="h-5 w-5 text-primary" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{step.title}</p>
-                        <p className="text-sm text-foreground/60">{step.description}</p>
-                      </div>
+          {/* Resource Library (Always accessible, but highlighted when completed) */}
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 px-2">Study Materials</h3>
+            <div className="grid gap-4">
+              <Link href={`/lesson-phrases?lessonId=${lesson.id}`}>
+                <Card className="p-6 border-4 border-muted hover:border-primary/30 transition-all rounded-[2rem] flex items-center justify-between group bg-white shadow-sm">
+                  <div className="flex items-center gap-5">
+                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                      <BookOpen className="h-7 w-7" />
                     </div>
-                    {!locked && (
-                      <div className="h-6 w-6 rounded-full border-2 border-primary bg-primary/20" />
-                    )}
-                  </Card>
-                </Link>
-              )
-            })}
-          </div>
-
-          {/* Future Lessons Preview */}
-          <div className="space-y-4">
-            <h3 className="font-bold text-foreground">Phrase Audio Library</h3>
-            <Link href={lesson?.id ? `/lesson-phrases?lessonId=${lesson.id}` : "/lesson-phrases"}>
-              <Card className="border border-border/50 p-4 hover:border-primary/50 transition-all">
-                <p className="font-medium text-foreground">Review all lesson phrases with audio and meanings</p>
-                <p className="text-sm text-foreground/60 mt-1">Open anytime after listening practice.</p>
-              </Card>
-            </Link>
-          </div>
-
-          {/* Future Lessons Preview */}
-          <div className="space-y-4">
-            <h3 className="font-bold text-foreground">Coming Next</h3>
-            {futureLessons.map((lesson) => (
-              <Card
-                key={lesson.id}
-                className="border border-border/20 p-4 opacity-60"
-              >
-                <div className="flex items-center gap-3">
-                  <Lock className="h-5 w-5 text-foreground/30" />
-                  <div>
-                    <p className="font-medium text-foreground">{lesson.title}</p>
+                    <div>
+                      <p className="text-lg font-black text-foreground">Phrase Audio Library</p>
+                      <p className="text-sm text-muted-foreground font-medium">Listen to all pronunciations</p>
+                    </div>
                   </div>
+                  <div className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center text-foreground/20 group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                </Card>
+              </Link>
+
+              {/* Topics / Tags */}
+              {lesson.topics && lesson.topics.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-4 justify-center">
+                  {lesson.topics.map(topic => (
+                    <span key={topic} className="px-4 py-2 rounded-full bg-secondary/10 border-2 border-secondary/20 text-xs font-black uppercase tracking-widest text-secondary-foreground/60">
+                      #{topic}
+                    </span>
+                  ))}
                 </div>
-              </Card>
-            ))}
+              )}
+            </div>
           </div>
+
+          {/* Motivational Footer */}
+          {!isCompleted && (
+            <div className="flex gap-4 p-6 bg-amber-50 rounded-[2rem] border-2 border-amber-100 items-center">
+              <div className="h-12 w-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                <Zap className="h-6 w-6 fill-current" />
+              </div>
+              <p className="text-sm font-bold text-amber-900/70 leading-relaxed">
+                Completing this unit earns you <span className="text-amber-600 font-black">50+ XP</span> and extends your learning streak!
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </main>
   )
+}
+
+export default function LessonOverviewScreen() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-muted-foreground">Loading unit...</div>}>
+      <LessonOverviewContent />
+    </Suspense>
+  )
+}
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(" ")
 }

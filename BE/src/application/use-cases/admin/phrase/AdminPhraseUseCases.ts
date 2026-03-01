@@ -19,6 +19,13 @@ export class AdminPhraseUseCases {
     if (!Array.isArray(input.lessonIds) || input.lessonIds.length === 0) return null;
     const lessons = await Promise.all(input.lessonIds.map((lessonId) => this.lessons.findById(lessonId)));
     if (lessons.some((lesson) => !lesson)) return null;
+
+    // Validation: Cannot add draft items to a published lesson
+    if (input.status !== "published") {
+      const anyPublished = lessons.some(l => l?.status === "published");
+      if (anyPublished) return "cannot_add_draft_to_published_lesson" as const;
+    }
+
     return this.phrases.create(input);
   }
 
@@ -44,6 +51,15 @@ export class AdminPhraseUseCases {
     if (!phrase) return null;
     await this.questions.softDeleteByPhraseId(phrase.id, now);
     return phrase;
+  }
+
+  async bulkDelete(ids: string[]) {
+    const deleted: PhraseEntity[] = [];
+    for (const id of ids) {
+      const phrase = await this.delete(id);
+      if (phrase) deleted.push(phrase);
+    }
+    return deleted;
   }
 
   async publish(id: string): Promise<PhraseEntity | null> {

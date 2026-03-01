@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash, ExternalLink, CheckCircle, GripVertical, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
+import { workflowStatusBadgeClass } from "@/lib/status-badge";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -65,6 +66,7 @@ export default function LessonsByLanguagePage({
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>([]);
 
   const isValidLanguageParam = isLanguage(languageParam);
   const language: Language = isValidLanguageParam ? (languageParam as Language) : "yoruba";
@@ -80,6 +82,7 @@ export default function LessonsByLanguagePage({
         limit
       });
       setLessons([...data.items].sort((a, b) => a.orderIndex - b.orderIndex));
+      setSelectedLessonIds([]);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
     } catch {
@@ -133,6 +136,21 @@ export default function LessonsByLanguagePage({
       fetchLessons();
     } catch {
       toast.error("Failed to delete lesson");
+    }
+  }
+
+  async function handleBulkDeleteLessons() {
+    if (selectedLessonIds.length === 0) {
+      toast.error("Select at least one lesson");
+      return;
+    }
+    try {
+      const result = await lessonService.bulkDeleteLessons(selectedLessonIds);
+      toast.success(`${result.deletedCount} lesson(s) deleted`);
+      setSelectedLessonIds([]);
+      fetchLessons();
+    } catch {
+      toast.error("Failed to bulk delete lessons");
     }
   }
 
@@ -253,6 +271,15 @@ export default function LessonsByLanguagePage({
         <div className="flex items-center gap-3">
           <Button
             type="button"
+            variant="destructive"
+            onClick={handleBulkDeleteLessons}
+            disabled={selectedLessonIds.length === 0}
+            className="h-12 rounded-xl px-6 font-semibold"
+          >
+            Delete Selected ({selectedLessonIds.length})
+          </Button>
+          <Button
+            type="button"
             variant="outline"
             onClick={() => setIsBulkDialogOpen(true)}
             className="h-12 rounded-xl px-6 font-semibold"
@@ -363,6 +390,7 @@ export default function LessonsByLanguagePage({
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
+              <TableHead className="w-12" />
               <TableHead className="w-24 font-bold text-primary pl-8">Order</TableHead>
               <TableHead className="font-bold text-primary">Title</TableHead>
               <TableHead className="font-bold text-primary">Level</TableHead>
@@ -374,7 +402,7 @@ export default function LessonsByLanguagePage({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     Loading lessons...
@@ -383,7 +411,7 @@ export default function LessonsByLanguagePage({
               </TableRow>
             ) : lessons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">
                   No lessons found for this language.
                 </TableCell>
               </TableRow>
@@ -401,6 +429,19 @@ export default function LessonsByLanguagePage({
                     draggingLessonId === lesson._id ? "opacity-30 bg-primary/10" : ""
                   )}
                 >
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selectedLessonIds.includes(lesson._id)}
+                      onChange={(event) =>
+                        setSelectedLessonIds((prev) =>
+                          event.target.checked
+                            ? Array.from(new Set([...prev, lesson._id]))
+                            : prev.filter((id) => id !== lesson._id)
+                        )
+                      }
+                    />
+                  </TableCell>
                   <TableCell className="pl-8">
                     <div className="flex items-center gap-3">
                       <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -416,15 +457,7 @@ export default function LessonsByLanguagePage({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      className={
-                        lesson.status === "published"
-                          ? "bg-green-500 hover:bg-green-600"
-                          : lesson.status === "finished"
-                            ? "bg-amber-500 hover:bg-amber-600"
-                            : "bg-zinc-400"
-                      }
-                    >
+                    <Badge className={workflowStatusBadgeClass(lesson.status)}>
                       {lesson.status}
                     </Badge>
                   </TableCell>

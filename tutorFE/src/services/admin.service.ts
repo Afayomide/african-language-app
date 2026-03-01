@@ -3,6 +3,7 @@ import { feTutorRoutes } from "@/lib/apiRoutes";
 import {
   Lesson,
   Phrase,
+  Proverb,
   Language,
   Level,
   Status,
@@ -34,7 +35,7 @@ type AudioUploadPayload = {
 
 async function fetchAllPages<T>(
   path: string,
-  key: "lessons" | "phrases" | "questions",
+  key: "lessons" | "phrases" | "proverbs" | "questions",
   params?: Record<string, unknown>
 ) {
   const all: T[] = [];
@@ -44,6 +45,7 @@ async function fetchAllPages<T>(
     const response = await api.get<{
       lessons?: T[];
       phrases?: T[];
+      proverbs?: T[];
       questions?: T[];
       pagination?: PaginationMeta;
     }>(path, {
@@ -182,6 +184,50 @@ export const phraseService = {
   }
 };
 
+export const proverbService = {
+  async listProverbs(lessonId?: string, status?: Status) {
+    return fetchAllPages<Proverb>(feTutorRoutes.proverbs(), "proverbs", { lessonId, status });
+  },
+
+  async listProverbsPage(params?: { lessonId?: string; status?: Status; page?: number; limit?: number }) {
+    const response = await api.get<{ proverbs: Proverb[]; total: number; pagination?: PaginationMeta }>(
+      feTutorRoutes.proverbs(),
+      { params }
+    );
+    return {
+      items: response.data.proverbs,
+      total: response.data.total ?? response.data.proverbs.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.proverbs.length || 20,
+        total: response.data.proverbs.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Proverb>;
+  },
+
+  async createProverb(data: Partial<Proverb> & { lessonIds: string[]; text: string }) {
+    const response = await api.post<{ proverb: Proverb }>(feTutorRoutes.proverbs(), data);
+    return response.data.proverb;
+  },
+
+  async updateProverb(id: string, data: Partial<Proverb>) {
+    const response = await api.put<{ proverb: Proverb }>(feTutorRoutes.proverb(id), data);
+    return response.data.proverb;
+  },
+
+  async deleteProverb(id: string) {
+    await api.delete(feTutorRoutes.proverb(id));
+  },
+
+  async finishProverb(id: string) {
+    const response = await api.put<{ proverb: Proverb }>(feTutorRoutes.finishProverb(id));
+    return response.data.proverb;
+  }
+};
+
 export const questionService = {
   async listQuestions(filters?: { lessonId?: string; type?: QuestionType; status?: Status }) {
     return fetchAllPages<ExerciseQuestion>(feTutorRoutes.questions(), "questions", filters as Record<string, unknown>);
@@ -217,6 +263,7 @@ export const questionService = {
     lessonId: string;
     phraseId: string;
     type: QuestionType;
+    subtype: string;
     promptTemplate: string;
     options?: string[];
     correctIndex?: number;

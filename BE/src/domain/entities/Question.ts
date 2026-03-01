@@ -1,4 +1,19 @@
-export type QuestionType = "vocabulary" | "practice" | "listening" | "review";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+
+export type QuestionSubtype =
+  // Multiple Choice Interactions (Text-based)
+  | "mc-select-translation"
+  | "mc-select-missing-word"
+  // Fill in the Gap Interactions (Text-based)
+  | "fg-word-order"
+  | "fg-gap-fill"
+  // Listening Interactions (Audio-based, nested from MC and FG)
+  | "ls-mc-select-translation"
+  | "ls-mc-select-missing-word"
+  | "ls-fg-word-order"
+  | "ls-fg-gap-fill"
+  | "ls-dictation"
+  | "ls-tone-recognition";
 
 export type QuestionReviewData = {
   sentence: string;
@@ -13,6 +28,7 @@ export type QuestionEntity = {
   lessonId: string;
   phraseId: string;
   type: QuestionType;
+  subtype: QuestionSubtype;
   promptTemplate: string;
   options: string[];
   correctIndex: number;

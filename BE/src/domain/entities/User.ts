@@ -5,5 +5,5 @@ export type UserEntity = {
   _id?: string;
   email: string;
   passwordHash: string;
-  role: UserRole;
+  roles: UserRole[];
 };

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  bulkDeleteLessons,
   createLesson,
   deleteLesson,
   finishLesson,
@@ -15,6 +16,7 @@ const router = Router();
 router.use(requireAuth, requireTutor);
 
 router.post("/", createLesson);
+router.delete("/bulk-delete", bulkDeleteLessons);
 router.get("/", listLessons);
 router.put("/reorder", reorderLessons);
 router.get("/:id", getLessonById);

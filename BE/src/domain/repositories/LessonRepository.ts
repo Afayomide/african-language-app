@@ -1,4 +1,4 @@
-import type { Language, LessonEntity, Status } from "../entities/Lesson.js";
+import type { Language, LessonBlock, LessonEntity, Status } from "../entities/Lesson.js";
 
 export type LessonListFilter = {
   language?: Language;
@@ -12,12 +12,14 @@ export type LessonCreateInput = {
   orderIndex: number;
   description: string;
   topics?: string[];
+  proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
+  blocks?: LessonBlock[];
   status: LessonEntity["status"];
   createdBy: string;
 };
 
 export type LessonUpdateInput = Partial<
-  Pick<LessonEntity, "title" | "language" | "level" | "orderIndex" | "description" | "topics" | "status">
+  Pick<LessonEntity, "title" | "language" | "level" | "orderIndex" | "description" | "topics" | "proverbs" | "blocks" | "status">
 >;
 
 export interface LessonRepository {

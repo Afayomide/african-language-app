@@ -19,6 +19,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, Save, Sparkles, CheckCircle, Volume2 } from "lucide-react"
+import { workflowStatusBadgeClass } from "@/lib/status-badge"
 
 export default function EditPhrasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -294,7 +295,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
               <div className="pt-2">
                 <Label>Status</Label>
                 <div className="mt-1">
-                  <Badge variant={phrase.status === "published" ? "default" : "secondary"}>
+                  <Badge className={workflowStatusBadgeClass(phrase.status)}>
                     {phrase.status}
                   </Badge>
                 </div>

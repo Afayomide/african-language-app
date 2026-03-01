@@ -4,6 +4,7 @@ export type QuestionListFilter = {
   lessonId?: string;
   lessonIds?: string[];
   type?: QuestionEntity["type"];
+  subtype?: QuestionEntity["subtype"];
   status?: QuestionEntity["status"];
 };
 
@@ -11,6 +12,7 @@ export type QuestionCreateInput = {
   lessonId: string;
   phraseId: string;
   type: QuestionEntity["type"];
+  subtype: QuestionEntity["subtype"];
   promptTemplate: string;
   options: string[];
   correctIndex: number;
@@ -22,6 +24,7 @@ export type QuestionCreateInput = {
 export type QuestionUpdateInput = Partial<{
   phraseId: string;
   type: QuestionEntity["type"];
+  subtype: QuestionEntity["subtype"];
   promptTemplate: string;
   options: string[];
   correctIndex: number;
@@ -40,4 +43,5 @@ export interface QuestionRepository {
   softDeleteByPhraseId(phraseId: string, now: Date): Promise<void>;
   publishById(id: string): Promise<QuestionEntity | null>;
   finishById(id: string): Promise<QuestionEntity | null>;
+  sendBackToTutorById(id: string): Promise<QuestionEntity | null>;
 }

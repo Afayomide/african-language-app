@@ -1,7 +1,23 @@
-export const QUESTION_TYPES = ["vocabulary", "practice", "listening", "review"] as const;
+export const QUESTION_TYPES = ["multiple-choice", "fill-in-the-gap", "listening"] as const;
+export const QUESTION_SUBTYPES = [
+  "mc-select-translation",
+  "mc-select-missing-word",
+  "fg-word-order",
+  "fg-gap-fill",
+  "ls-mc-select-translation",
+  "ls-mc-select-missing-word",
+  "ls-fg-word-order",
+  "ls-fg-gap-fill",
+  "ls-dictation",
+  "ls-tone-recognition"
+] as const;
 
 export function isValidQuestionType(value: string) {
   return QUESTION_TYPES.includes(value as (typeof QUESTION_TYPES)[number]);
+}
+
+export function isValidQuestionSubtype(value: string) {
+  return QUESTION_SUBTYPES.includes(value as (typeof QUESTION_SUBTYPES)[number]);
 }
 
 export function parseQuestionOptions(options: unknown) {

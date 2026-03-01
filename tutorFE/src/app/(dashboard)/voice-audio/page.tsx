@@ -19,6 +19,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { reviewStatusBadgeClass } from "@/lib/status-badge"
 
 export default function TutorVoiceAudioPage() {
   const [items, setItems] = useState<VoiceAudioSubmission[]>([])
@@ -132,14 +133,14 @@ export default function TutorVoiceAudioPage() {
           />
 
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-primary/5">
               <TableRow>
-                <TableHead>Phrase</TableHead>
-                <TableHead>Meaning</TableHead>
-                <TableHead>Voice Artist</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-bold text-primary pl-8">Phrase</TableHead>
+                <TableHead className="font-bold text-primary">Meaning</TableHead>
+                <TableHead className="font-bold text-primary">Voice Artist</TableHead>
+                <TableHead className="font-bold text-primary">Status</TableHead>
+                <TableHead className="font-bold text-primary">Created</TableHead>
+                <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -153,17 +154,17 @@ export default function TutorVoiceAudioPage() {
                 </TableRow>
               ) : (
                 items.map((submission) => (
-                  <TableRow key={submission.id}>
-                    <TableCell>{submission.phrase?.text || "-"}</TableCell>
+                  <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
+                    <TableCell className="pl-8 font-bold text-foreground">{submission.phrase?.text || "-"}</TableCell>
                     <TableCell>{submission.phrase?.translation || "-"}</TableCell>
                     <TableCell>{submission.voiceArtist?.email || "-"}</TableCell>
                     <TableCell>
-                      <Badge variant={submission.status === "accepted" ? "default" : submission.status === "rejected" ? "destructive" : "secondary"}>
+                      <Badge className={reviewStatusBadgeClass(submission.status)}>
                         {submission.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(submission.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="pr-8 text-right space-x-2">
                       <Button variant="outline" size="sm" onClick={() => playAudio(submission.audio.url)}>
                         Play
                       </Button>

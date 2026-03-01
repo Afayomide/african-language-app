@@ -14,6 +14,7 @@ function toEntity(doc: any): QuestionEntity {
     lessonId: doc.lessonId.toString(),
     phraseId: doc.phraseId.toString(),
     type: doc.type,
+    subtype: doc.subtype,
     promptTemplate: doc.promptTemplate,
     options: doc.options || [],
     correctIndex: doc.correctIndex,
@@ -92,6 +93,15 @@ export class MongooseQuestionRepository implements QuestionRepository {
     const question = await ExerciseQuestionModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
       { status: "finished" },
+      { new: true }
+    );
+    return question ? toEntity(question) : null;
+  }
+
+  async sendBackToTutorById(id: string): Promise<QuestionEntity | null> {
+    const question = await ExerciseQuestionModel.findOneAndUpdate(
+      { _id: id, status: "finished", isDeleted: { $ne: true } },
+      { status: "draft" },
       { new: true }
     );
     return question ? toEntity(question) : null;

@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import UserModel from "../models/User.js";
 
 const mongoUri = process.env.MONGODB_URI || "";
-const adminEmail = process.env.ADMIN_EMAIL || "admin@gmail.com";
+const adminEmail = process.env.ADMIN_EMAIL || "daraseyi086@gmail.com";
 const adminPassword = process.env.ADMIN_PASSWORD || "Vestord33";
 
 function isValidEmail(value: string) {
@@ -25,11 +25,20 @@ async function seed() {
     throw new Error("ADMIN_PASSWORD must be at least 8 chars");
   }
 
+
   await mongoose.connect(mongoUri);
+
+  
 
   const existing = await UserModel.findOne({ email: adminEmail.toLowerCase() });
   if (existing) {
-    console.log("Admin user already exists");
+    if (!Array.isArray(existing.roles) || !existing.roles.includes("admin")) {
+      existing.roles = Array.from(new Set([...(existing.roles || []), "admin", "learner"]));
+      await existing.save();
+      console.log("Admin role added to existing user");
+    } else {
+      console.log("Admin user already exists");
+    }
     await mongoose.disconnect();
     return;
   }
@@ -38,7 +47,7 @@ async function seed() {
   const user = await UserModel.create({
     email: adminEmail.toLowerCase(),
     passwordHash,
-    role: "admin"
+    roles: ["admin", "learner"]
   });
 
   console.log(`Created admin user: ${user.email}`);

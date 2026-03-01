@@ -71,7 +71,7 @@ function parseAudioUpload(audioUpload: unknown) {
   const payload = audioUpload as { base64?: unknown; mimeType?: unknown };
   if (!payload.base64 || typeof payload.base64 !== "string") return "invalid_audio_upload";
 
-  const dataUrlMatch = payload.base64.match(/^data:([^;]+);base64,(.+)$/);
+  const dataUrlMatch = payload.base64.match(/^data:([^;]+).*?base64,(.+)$/);
   const base64Data = dataUrlMatch ? dataUrlMatch[2] : payload.base64;
   const mimeTypeFromDataUrl = dataUrlMatch ? dataUrlMatch[1] : undefined;
   const mimeType =
@@ -384,6 +384,28 @@ export async function deletePhrase(req: AuthRequest, res: Response) {
     return res.status(404).json({ error: "phrase_not_found" });
   }
   return res.status(200).json({ message: "phrase_deleted" });
+}
+
+export async function bulkDeletePhrases(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const { ids } = req.body ?? {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "phrase_ids_required" });
+  }
+  const normalizedIds = Array.from(new Set(ids.map(String)));
+  if (normalizedIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+    return res.status(400).json({ error: "invalid_phrase_id" });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) {
+    return res.status(403).json({ error: "tutor_language_not_configured" });
+  }
+
+  const deletedIds = await phraseUseCases.bulkDeleteInScope(normalizedIds, tutorLanguage as Language);
+  return res.status(200).json({ deletedCount: deletedIds.length, deletedIds });
 }
 
 export async function finishPhrase(req: AuthRequest, res: Response) {

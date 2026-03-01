@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { activeStatusBadgeClass, reviewStatusBadgeClass } from "@/lib/status-badge";
 
 export default function VoiceArtistsPage() {
   const router = useRouter();
@@ -207,13 +208,13 @@ export default function VoiceArtistsPage() {
           />
         </div>
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Display Name</TableHead>
-              <TableHead>Language</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="font-bold text-primary pl-8">Email</TableHead>
+              <TableHead className="font-bold text-primary">Display Name</TableHead>
+              <TableHead className="font-bold text-primary">Language</TableHead>
+              <TableHead className="font-bold text-primary">Status</TableHead>
+              <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -227,16 +228,16 @@ export default function VoiceArtistsPage() {
               </TableRow>
             ) : (
               voiceArtists.map((artist) => (
-                <TableRow key={artist.id}>
-                  <TableCell>{artist.email}</TableCell>
+                <TableRow key={artist.id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell className="pl-8 font-bold text-foreground">{artist.email}</TableCell>
                   <TableCell>{artist.displayName || "-"}</TableCell>
                   <TableCell className="capitalize">{artist.language}</TableCell>
                   <TableCell>
-                    <Badge className={artist.isActive ? "bg-green-500" : "bg-zinc-400"}>
+                    <Badge className={artist.isActive ? activeStatusBadgeClass("active") : reviewStatusBadgeClass("pending")}>
                       {artist.isActive ? "active" : "pending"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="pr-8 text-right space-x-2">
                     {artist.isActive ? (
                       <Button variant="outline" size="sm" onClick={() => handleDeactivate(artist.id)}>
                         Deactivate
@@ -277,14 +278,14 @@ export default function VoiceArtistsPage() {
           />
         </div>
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead>Phrase</TableHead>
-              <TableHead>Voice Artist</TableHead>
-              <TableHead>Language</TableHead>
-              <TableHead>Audio</TableHead>
-              <TableHead>Reject Reason</TableHead>
-              <TableHead className="text-right">Review</TableHead>
+              <TableHead className="font-bold text-primary pl-8">Phrase</TableHead>
+              <TableHead className="font-bold text-primary">Voice Artist</TableHead>
+              <TableHead className="font-bold text-primary">Language</TableHead>
+              <TableHead className="font-bold text-primary">Audio</TableHead>
+              <TableHead className="font-bold text-primary">Reject Reason</TableHead>
+              <TableHead className="text-right font-bold text-primary pr-8">Review</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,8 +299,8 @@ export default function VoiceArtistsPage() {
               </TableRow>
             ) : (
               submissions.map((submission) => (
-                <TableRow key={submission.id}>
-                  <TableCell>
+                <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell className="pl-8">
                     <div className="font-semibold">{submission.phrase?.text || "-"}</div>
                     <div className="text-xs text-muted-foreground">{submission.phrase?.translation || ""}</div>
                   </TableCell>
@@ -319,7 +320,7 @@ export default function VoiceArtistsPage() {
                       }
                     />
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="pr-8 text-right space-x-2">
                     <Button size="sm" onClick={() => handleAccept(submission.id)}>Accept</Button>
                     <Button variant="destructive" size="sm" onClick={() => handleReject(submission.id)}>
                       Reject

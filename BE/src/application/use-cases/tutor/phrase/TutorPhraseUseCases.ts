@@ -73,6 +73,15 @@ export class TutorPhraseUseCases {
     return phrase;
   }
 
+  async bulkDeleteInScope(ids: string[], tutorLanguage: Language) {
+    const deleted: string[] = [];
+    for (const id of ids) {
+      const phrase = await this.deleteInScope(id, tutorLanguage);
+      if (phrase) deleted.push(phrase.id);
+    }
+    return deleted;
+  }
+
   async finishInScope(id: string, tutorLanguage: Language) {
     const current = await this.getByIdInScope(id, tutorLanguage);
     if (!current) return null;

@@ -8,7 +8,7 @@ export type AuthRole = "admin" | "learner" | "tutor" | "voice_artist";
 export class AuthTokenService {
   sign(userId: string, email: string, role: AuthRole) {
     if (!JWT_SECRET) {
-      throw new Error("server_misconfigured_jwt_secret");
+      throw new Error("Server configuration is incomplete.");
     }
 
     return jwt.sign({ sub: userId, email, role }, JWT_SECRET, {

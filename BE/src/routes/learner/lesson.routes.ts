@@ -3,6 +3,7 @@ import {
   completeLesson,
   completeStep,
   getLessonOverview,
+  getLessonFlow,
   getLessonPhrases,
   getLessonReviewExercises,
   getLessonQuestions,
@@ -16,6 +17,7 @@ const router = Router();
 router.use(requireAuth, requireLearner);
 
 router.get("/next", getNextLesson);
+router.get("/:id/flow", getLessonFlow);
 router.get("/:id/overview", getLessonOverview);
 router.get("/:id/steps", getLessonSteps);
 router.get("/:id/phrases", getLessonPhrases);

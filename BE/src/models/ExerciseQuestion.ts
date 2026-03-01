@@ -6,7 +6,24 @@ const ExerciseQuestionSchema = new Schema(
     phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true, index: true },
     type: {
       type: String,
-      enum: ["vocabulary", "practice", "listening", "review"],
+      enum: ["multiple-choice", "fill-in-the-gap", "listening"],
+      required: true,
+      index: true
+    },
+    subtype: {
+      type: String,
+      enum: [
+        "mc-select-translation",
+        "mc-select-missing-word",
+        "fg-word-order",
+        "fg-gap-fill",
+        "ls-mc-select-translation",
+        "ls-mc-select-missing-word",
+        "ls-fg-word-order",
+        "ls-fg-gap-fill",
+        "ls-dictation",
+        "ls-tone-recognition"
+      ],
       required: true,
       index: true
     },

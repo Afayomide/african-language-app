@@ -17,10 +17,16 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("voiceArtistToken");
-        localStorage.removeItem("voiceArtistUser");
-        localStorage.removeItem("voiceArtistProfile");
-        window.location.href = "/login";
+        const token = localStorage.getItem("voiceArtistToken");
+        const requestUrl = String(error.config?.url || "");
+        const isAuthRequest = requestUrl.includes("/api/voice/auth");
+
+        if (token && !isAuthRequest) {
+          localStorage.removeItem("voiceArtistToken");
+          localStorage.removeItem("voiceArtistUser");
+          localStorage.removeItem("voiceArtistProfile");
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

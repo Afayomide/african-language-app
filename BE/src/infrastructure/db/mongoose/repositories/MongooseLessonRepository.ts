@@ -15,6 +15,12 @@ function toEntity(doc: {
   orderIndex: number;
   description: string;
   topics?: string[];
+  proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
+  blocks?: Array<{
+    type: "text" | "phrase" | "proverb" | "question";
+    content?: string;
+    refId?: { toString(): string };
+  }>;
   status: LessonEntity["status"];
   createdBy: { toString(): string };
   publishedAt?: Date | null;
@@ -30,6 +36,20 @@ function toEntity(doc: {
     orderIndex: doc.orderIndex,
     description: doc.description,
     topics: Array.isArray(doc.topics) ? doc.topics.map(String) : [],
+    proverbs: Array.isArray(doc.proverbs) 
+      ? doc.proverbs.map(p => ({ 
+          text: String(p.text || ""), 
+          translation: String(p.translation || ""),
+          contextNote: String(p.contextNote || "")
+        })) 
+      : [],
+    blocks: Array.isArray(doc.blocks)
+      ? doc.blocks.map(b => ({
+          type: b.type,
+          content: b.content || "",
+          refId: b.refId ? b.refId.toString() : ""
+        }))
+      : [],
     status: doc.status,
     createdBy: doc.createdBy.toString(),
     publishedAt: doc.publishedAt || null,

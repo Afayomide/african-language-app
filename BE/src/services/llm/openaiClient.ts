@@ -4,6 +4,7 @@ import type {
   GeneratePhrasesInput,
   LlmClient,
   LlmGeneratedPhrase,
+  LlmGeneratedProverb,
   LlmLessonSuggestion
 } from "./types.js";
 
@@ -28,6 +29,7 @@ function parseJson<T>(value: string, errorCode: string): T {
 
 function buildPhrasesPrompt(input: GeneratePhrasesInput) {
   const seedWords = input.seedWords?.length ? input.seedWords.join(", ") : "";
+  const extraInstructions = input.extraInstructions?.trim() || "";
   return [
     "You are generating phrases for a language lesson.",
     "Return ONLY valid JSON with this shape:",
@@ -38,7 +40,8 @@ function buildPhrasesPrompt(input: GeneratePhrasesInput) {
     "- Keep phrasing culturally accurate.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
-    seedWords ? `Seed words: ${seedWords}` : ""
+    seedWords ? `Seed words: ${seedWords}` : "",
+    extraInstructions ? `Extra generation instructions: ${extraInstructions}` : ""
   ]
     .filter(Boolean)
     .join("\n");
@@ -59,13 +62,48 @@ function buildEnhancePrompt(input: EnhancePhraseInput) {
   ].join("\n");
 }
 
+function buildProverbsPrompt(input: {
+  language: string;
+  level: string;
+  lessonTitle?: string;
+  lessonDescription?: string;
+  count?: number;
+  extraInstructions?: string;
+  existingProverbs?: string[];
+}) {
+  const existingProverbs = input.existingProverbs?.length
+    ? input.existingProverbs.slice(0, 40).join(" | ")
+    : "";
+  return [
+    "You are generating proverbs for a language lesson.",
+    "Return ONLY valid JSON with this shape:",
+    "{\"proverbs\":[{\"text\":string,\"translation\":string,\"contextNote\":string?}]}",
+    "Rules:",
+    "- text must be in the target language.",
+    "- translation must be English and concise.",
+    "- contextNote should be short and practical.",
+    "- Avoid duplicates against existing proverbs list.",
+    `Language: ${input.language}`,
+    `Level: ${input.level}`,
+    input.lessonTitle ? `Lesson title: ${input.lessonTitle}` : "",
+    input.lessonDescription ? `Lesson description: ${input.lessonDescription}` : "",
+    input.count ? `Generate exactly ${input.count} items.` : "",
+    input.extraInstructions ? `Extra generation instructions: ${input.extraInstructions}` : "",
+    existingProverbs ? `Existing proverbs to avoid: ${existingProverbs}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function buildLessonSuggestPrompt(input: { language: string; level: string; topic?: string }) {
   return [
     "Suggest a lesson outline.",
     "Return ONLY valid JSON with this shape:",
-    "{\"title\":string,\"description\":string?,\"language\":string,\"level\":string,\"objectives\":[string],\"seedPhrases\":[string]}",
+    "{\"title\":string,\"description\":string?,\"language\":string,\"level\":string,\"objectives\":[string],\"seedPhrases\":[string],\"proverbs\":[{\"text\":string,\"translation\":string,\"contextNote\":string?}]}",
     "Rules:",
     "- Use the target language for seedPhrases.",
+    "- proverbs.text should be in the target language with short culturally authentic entries.",
+    "- proverbs.translation should be in English.",
     "- Keep objectives short and measurable.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
@@ -98,6 +136,24 @@ export function createOpenAiClient(): LlmClient {
 
       const text = response.output_text?.trim() || "";
       return parseJson<Partial<LlmGeneratedPhrase>>(text, "invalid_llm_json");
+    },
+    async generateProverbs(input: {
+      language: "yoruba" | "igbo" | "hausa";
+      level: "beginner" | "intermediate" | "advanced";
+      lessonTitle?: string;
+      lessonDescription?: string;
+      count?: number;
+      extraInstructions?: string;
+      existingProverbs?: string[];
+    }): Promise<LlmGeneratedProverb[]> {
+      const response = await client.responses.create({
+        model: OPENAI_MODEL,
+        input: buildProverbsPrompt(input)
+      });
+
+      const text = response.output_text?.trim() || "";
+      const payload = parseJson<{ proverbs: LlmGeneratedProverb[] }>(text, "invalid_llm_json");
+      return Array.isArray(payload.proverbs) ? payload.proverbs : [];
     },
     async suggestLesson(input: { language: string; level: string; topic?: string }): Promise<LlmLessonSuggestion> {
       const response = await client.responses.create({

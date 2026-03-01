@@ -24,6 +24,7 @@ import { CheckCircle, ShieldX, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { activeStatusBadgeClass, reviewStatusBadgeClass } from "@/lib/status-badge"
 
 type TutorStatusFilter = "all" | "active" | "pending"
 
@@ -146,7 +147,7 @@ export default function TutorsPage() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-white">
+      <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
         <div className="px-6 pt-6">
           <DataTableControls
             search={search}
@@ -165,14 +166,14 @@ export default function TutorsPage() {
           />
         </div>
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Display Name</TableHead>
-              <TableHead>Language</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="font-bold text-primary pl-8">Email</TableHead>
+              <TableHead className="font-bold text-primary">Display Name</TableHead>
+              <TableHead className="font-bold text-primary">Language</TableHead>
+              <TableHead className="font-bold text-primary">Status</TableHead>
+              <TableHead className="font-bold text-primary">Created</TableHead>
+              <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -186,19 +187,19 @@ export default function TutorsPage() {
               </TableRow>
             ) : (
               tutors.map((tutor) => (
-                <TableRow key={tutor.id}>
-                  <TableCell className="font-medium">{tutor.email}</TableCell>
+                <TableRow key={tutor.id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell className="pl-8 font-bold text-foreground">{tutor.email}</TableCell>
                   <TableCell>{tutor.displayName || "-"}</TableCell>
                   <TableCell className="capitalize">{tutor.language}</TableCell>
                   <TableCell>
-                    <Badge variant={tutor.isActive ? "default" : "secondary"}>
+                    <Badge className={tutor.isActive ? activeStatusBadgeClass("active") : reviewStatusBadgeClass("pending")}>
                       {tutor.isActive ? "active" : "pending"}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     {tutor.createdAt ? new Date(tutor.createdAt).toLocaleDateString() : "-"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="pr-8 text-right">
                     <div className="flex justify-end gap-2">
                       {tutor.isActive ? (
                         <Button

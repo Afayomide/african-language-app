@@ -2,6 +2,12 @@ export type Language = "yoruba" | "igbo" | "hausa";
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Status = "draft" | "finished" | "published";
 
+export type LessonBlock = 
+  | { type: "text"; content: string }
+  | { type: "phrase"; refId: string }
+  | { type: "proverb"; refId: string }
+  | { type: "question"; refId: string };
+
 export interface Lesson {
   _id: string;
   title: string;
@@ -10,6 +16,8 @@ export interface Lesson {
   orderIndex: number;
   description: string;
   topics: string[];
+  proverbs: Array<{ text: string; translation: string; contextNote: string }>;
+  blocks: LessonBlock[];
   status: Status;
   createdBy: string;
   publishedAt?: string;
@@ -55,7 +63,32 @@ export interface Phrase {
   updatedAt: string;
 }
 
-export type QuestionType = "vocabulary" | "practice" | "listening" | "review";
+export interface Proverb {
+  _id: string;
+  lessonIds: string[];
+  language: Language;
+  text: string;
+  translation: string;
+  contextNote: string;
+  aiMeta: AIMeta;
+  status: Status;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+
+export type QuestionSubtype =
+  | "mc-select-translation"
+  | "mc-select-missing-word"
+  | "fg-word-order"
+  | "fg-gap-fill"
+  | "ls-mc-select-translation"
+  | "ls-mc-select-missing-word"
+  | "ls-fg-word-order"
+  | "ls-fg-gap-fill"
+  | "ls-dictation"
+  | "ls-tone-recognition";
 
 export interface ExerciseQuestion {
   _id: string;
@@ -67,6 +100,7 @@ export interface ExerciseQuestion {
     status: Status;
   };
   type: QuestionType;
+  subtype: QuestionSubtype;
   promptTemplate: string;
   options: string[];
   correctIndex: number;

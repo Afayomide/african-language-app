@@ -3,12 +3,15 @@ import { feAdminRoutes } from "@/lib/apiRoutes";
 import {
   Lesson,
   Phrase,
+  Proverb,
   Language,
   Level,
   Status,
   ExerciseQuestion,
   QuestionType,
   Tutor,
+  AdminUserRecord,
+  UserRole,
   VoiceArtist,
   VoiceAudioSubmission
 } from "@/types";
@@ -36,7 +39,7 @@ type AudioUploadPayload = {
 
 async function fetchAllPages<T>(
   path: string,
-  key: "lessons" | "phrases" | "questions",
+  key: "lessons" | "phrases" | "proverbs" | "questions",
   params?: Record<string, unknown>
 ) {
   const all: T[] = [];
@@ -46,6 +49,7 @@ async function fetchAllPages<T>(
     const response = await api.get<{
       lessons?: T[];
       phrases?: T[];
+      proverbs?: T[];
       questions?: T[];
       pagination?: PaginationMeta;
     }>(path, {
@@ -211,6 +215,61 @@ export const phraseService = {
   },
 };
 
+export const proverbService = {
+  async listProverbs(lessonId?: string, status?: Status, language?: Language) {
+    return fetchAllPages<Proverb>(feAdminRoutes.proverbs(), "proverbs", { lessonId, status, language });
+  },
+
+  async listProverbsPage(params?: {
+    lessonId?: string;
+    status?: Status;
+    language?: Language;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ proverbs: Proverb[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.proverbs(),
+      { params }
+    );
+    return {
+      items: response.data.proverbs,
+      total: response.data.total ?? response.data.proverbs.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.proverbs.length || 20,
+        total: response.data.proverbs.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Proverb>;
+  },
+
+  async createProverb(data: Partial<Proverb> & { lessonIds: string[]; language: Language; text: string }) {
+    const response = await api.post<{ proverb: Proverb }>(feAdminRoutes.proverbs(), data);
+    return response.data.proverb;
+  },
+
+  async updateProverb(id: string, data: Partial<Proverb>) {
+    const response = await api.put<{ proverb: Proverb }>(feAdminRoutes.proverb(id), data);
+    return response.data.proverb;
+  },
+
+  async deleteProverb(id: string) {
+    await api.delete(feAdminRoutes.proverb(id));
+  },
+
+  async finishProverb(id: string) {
+    const response = await api.put<{ proverb: Proverb }>(feAdminRoutes.finishProverb(id));
+    return response.data.proverb;
+  },
+
+  async publishProverb(id: string) {
+    const response = await api.put<{ proverb: Proverb }>(feAdminRoutes.publishProverb(id));
+    return response.data.proverb;
+  }
+};
+
 export const questionService = {
   async listQuestions(filters?: { lessonId?: string; type?: QuestionType; status?: Status }) {
     return fetchAllPages<ExerciseQuestion>(feAdminRoutes.questions(), "questions", filters as Record<string, unknown>);
@@ -246,6 +305,7 @@ export const questionService = {
     lessonId: string;
     phraseId: string;
     type: QuestionType;
+    subtype: string;
     promptTemplate: string;
     options?: string[];
     correctIndex?: number;
@@ -272,6 +332,11 @@ export const questionService = {
 
   async publishQuestion(id: string) {
     const response = await api.put<{ question: ExerciseQuestion }>(feAdminRoutes.publishQuestion(id));
+    return response.data.question;
+  },
+
+  async sendBackToTutorQuestion(id: string) {
+    const response = await api.put<{ question: ExerciseQuestion }>(feAdminRoutes.sendBackToTutorQuestion(id));
     return response.data.question;
   },
 };
@@ -320,6 +385,50 @@ export const tutorService = {
 
   async deleteTutor(id: string) {
     await api.delete(feAdminRoutes.deleteTutor(id));
+  }
+};
+
+export const userService = {
+  async listUsersPage(params?: {
+    role?: "all" | UserRole;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ users: AdminUserRecord[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.users(),
+      { params }
+    );
+    return {
+      items: response.data.users,
+      total: response.data.total ?? response.data.users.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.users.length || 20,
+        total: response.data.users.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<AdminUserRecord>;
+  },
+
+  async assignUserRole(
+    id: string,
+    data: { role: UserRole; language?: Language; displayName?: string }
+  ) {
+    const response = await api.put<{ user: AdminUserRecord }>(feAdminRoutes.assignUserRole(id), data);
+    return response.data.user;
+  },
+
+  async activateUser(id: string, data: { role: UserRole; language?: Language }) {
+    const response = await api.put<{ user: AdminUserRecord }>(feAdminRoutes.activateUser(id), data);
+    return response.data.user;
+  },
+
+  async deactivateUser(id: string, data: { role: UserRole }) {
+    const response = await api.put<{ user: AdminUserRecord }>(feAdminRoutes.deactivateUser(id), data);
+    return response.data.user;
   }
 };
 

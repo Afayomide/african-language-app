@@ -38,7 +38,7 @@ export class AdminVoiceArtistUseCases {
     const profile = await this.voiceProfiles.deleteById(id);
     if (!profile) return false;
 
-    await this.users.deleteByIdAndRole(profile.userId, "voice_artist");
+    await this.users.removeRole(profile.userId, "voice_artist");
     return true;
   }
 }

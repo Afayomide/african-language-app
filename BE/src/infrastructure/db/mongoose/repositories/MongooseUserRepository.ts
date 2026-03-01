@@ -6,14 +6,15 @@ function toEntity(doc: {
   _id: { toString(): string };
   email: string;
   passwordHash: string;
-  role: UserRole;
+  roles?: UserRole[];
 }): UserEntity {
+  const roles = (Array.isArray(doc.roles) && doc.roles.length > 0 ? doc.roles : ["learner"]) as UserRole[];
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     email: doc.email,
     passwordHash: doc.passwordHash,
-    role: doc.role
+    roles
   };
 }
 
@@ -33,12 +34,26 @@ export class MongooseUserRepository implements UserRepository {
     return users.map(toEntity);
   }
 
-  async create(input: { email: string; passwordHash: string; role: UserRole }): Promise<UserEntity> {
+  async create(input: { email: string; passwordHash: string; roles: UserRole[] }): Promise<UserEntity> {
     const created = await UserModel.create(input);
     return toEntity(created);
   }
 
-  async deleteByIdAndRole(id: string, role: UserRole): Promise<void> {
-    await UserModel.deleteOne({ _id: id, role });
+  async addRole(userId: string, role: UserRole): Promise<UserEntity | null> {
+    const updated = await UserModel.findByIdAndUpdate(
+      userId,
+      { $addToSet: { roles: role } },
+      { new: true }
+    );
+    return updated ? toEntity(updated) : null;
+  }
+
+  async removeRole(userId: string, role: UserRole): Promise<UserEntity | null> {
+    const updated = await UserModel.findByIdAndUpdate(
+      userId,
+      { $pull: { roles: role } },
+      { new: true }
+    );
+    return updated ? toEntity(updated) : null;
   }
 }

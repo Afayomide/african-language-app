@@ -16,9 +16,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("learnerToken");
-      localStorage.removeItem("learnerUser");
-      window.location.href = "/auth/login";
+      const token = localStorage.getItem("learnerToken");
+      const requestUrl = String(error.config?.url || "");
+      const isAuthRequest = requestUrl.includes("/api/learner/auth");
+
+      if (token && !isAuthRequest) {
+        localStorage.removeItem("learnerToken");
+        localStorage.removeItem("learnerUser");
+        window.location.href = "/auth/login";
+      }
     }
     return Promise.reject(error);
   }

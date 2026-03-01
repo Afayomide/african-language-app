@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import UserModel from "../models/User.js";
 import TutorProfileModel from "../models/tutor/TutorProfile.js";
+import type { UserRole } from "../domain/entities/User.js";
 
 const mongoUri = process.env.MONGODB_URI || "";
 const tutorEmail = process.env.TUTOR_EMAIL || "tutor@gmail.com";
@@ -40,19 +41,22 @@ async function seed() {
   const normalizedEmail = tutorEmail.toLowerCase();
   let user = await UserModel.findOne({ email: normalizedEmail });
 
-  if (user && user.role !== "tutor") {
-    throw new Error(`User exists with non-tutor role: ${user.role}`);
-  }
-
   if (!user) {
     const passwordHash = await bcrypt.hash(tutorPassword, 10);
     user = await UserModel.create({
       email: normalizedEmail,
       passwordHash,
-      role: "tutor"
+      roles: ["tutor", "learner"]
     });
     console.log(`Created tutor user: ${user.email}`);
   } else {
+    const roles = (Array.isArray(user.roles) ? user.roles : []) as UserRole[];
+    const nextRoles = Array.from(new Set<UserRole>([...roles, "tutor", "learner"]));
+    if (nextRoles.length !== roles.length) {
+      user.roles = nextRoles;
+      await user.save();
+      console.log("Updated existing user roles for tutor access");
+    }
     console.log("Tutor user already exists");
   }
 

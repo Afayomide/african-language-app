@@ -7,14 +7,35 @@ import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repos
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
 import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
+import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import type { QuestionType } from "../../domain/entities/Question.js";
 
 const useCases = new LearnerLessonUseCases(
   new MongooseLessonRepository(),
   new MongoosePhraseRepository(),
+  new MongooseProverbRepository(),
   new MongooseQuestionRepository(),
   new MongooseLessonProgressRepository(),
   new MongooseLearnerProfileRepository()
 );
+
+export async function getLessonFlow(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid_lesson_id" });
+  }
+
+  const result = await useCases.getLessonFlow(id);
+  if (!result) {
+    return res.status(404).json({ error: "lesson_not_found" });
+  }
+
+  return res.status(200).json(result);
+}
 
 export async function getNextLesson(req: AuthRequest, res: Response) {
   if (!req.user) {
@@ -185,13 +206,13 @@ export async function getLessonQuestions(req: AuthRequest, res: Response) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "invalid_lesson_id" });
   }
-  if (!type || !["vocabulary", "practice", "listening", "review"].includes(String(type))) {
+  if (!type || !["multiple-choice", "fill-in-the-gap", "listening"].includes(String(type))) {
     return res.status(400).json({ error: "invalid_type" });
   }
 
   const questions = await useCases.getLessonQuestions(
     id,
-    String(type) as "vocabulary" | "practice" | "listening" | "review"
+    String(type) as QuestionType
   );
   if (!questions) {
     return res.status(404).json({ error: "lesson_not_found" });

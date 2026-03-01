@@ -4,7 +4,9 @@ import { AdminQuestionUseCases } from "../../application/use-cases/admin/questio
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
+import type { QuestionType, QuestionSubtype } from "../../domain/entities/Question.js";
 import {
+  isValidQuestionSubtype,
   isValidQuestionType,
   parseQuestionOptions,
   parseQuestionReviewData
@@ -25,13 +27,16 @@ const phraseRepo = new MongoosePhraseRepository();
 
 
 export async function createQuestion(req: Request, res: Response) {
-  const { lessonId, phraseId, type, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const { lessonId, phraseId, type, subtype, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
 
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
     return res.status(400).json({ error: "invalid_lesson_id" });
   }
   if (!type || !isValidQuestionType(String(type))) {
     return res.status(400).json({ error: "invalid_type" });
+  }
+  if (!subtype || !isValidQuestionSubtype(String(subtype))) {
+    return res.status(400).json({ error: "invalid_subtype" });
   }
   if (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId))) {
     return res.status(400).json({ error: "invalid_phrase_id" });
@@ -43,7 +48,7 @@ export async function createQuestion(req: Request, res: Response) {
   let parsedOptions = parseQuestionOptions(options);
   let answerIndex = Number(correctIndex);
   let parsedReviewData: ReturnType<typeof parseQuestionReviewData> = null;
-  if (String(type) === "review") {
+  if (String(type) === "fill-in-the-gap") {
     parsedReviewData = parseQuestionReviewData(reviewData);
     if (!parsedReviewData) {
       return res.status(400).json({ error: "invalid_review_data" });
@@ -62,13 +67,17 @@ export async function createQuestion(req: Request, res: Response) {
   const created = await questionUseCases.create({
     lessonId: String(lessonId),
     phraseId: String(phraseId),
-    type: String(type) as "vocabulary" | "practice" | "listening" | "review",
+    type: String(type) as QuestionType,
+    subtype: String(subtype) as QuestionSubtype,
     promptTemplate: String(promptTemplate).trim(),
     options: parsedOptions,
     correctIndex: answerIndex,
     reviewData: parsedReviewData || undefined,
     explanation: explanation ? String(explanation).trim() : ""
   });
+  if (created === "cannot_add_draft_to_published_lesson") {
+    return res.status(400).json({ error: "cannot_add_draft_to_published_lesson" });
+  }
   if (created === "lesson_not_found") {
     return res.status(404).json({ error: "lesson_not_found" });
   }
@@ -82,7 +91,7 @@ export async function createQuestion(req: Request, res: Response) {
 }
 
 export async function listQuestions(req: Request, res: Response) {
-  const { lessonId, type, status } = req.query;
+  const { lessonId, type, subtype, status } = req.query;
   const paginationInput = parsePaginationQuery(req.query);
   const q = getSearchQuery(req.query);
 
@@ -96,6 +105,11 @@ export async function listQuestions(req: Request, res: Response) {
       return res.status(400).json({ error: "invalid_type" });
     }
   }
+  if (subtype !== undefined) {
+    if (!isValidQuestionSubtype(String(subtype))) {
+      return res.status(400).json({ error: "invalid_subtype" });
+    }
+  }
   if (status !== undefined) {
     if (!["draft", "finished", "published"].includes(String(status))) {
       return res.status(400).json({ error: "invalid_status" });
@@ -104,7 +118,8 @@ export async function listQuestions(req: Request, res: Response) {
 
   const questions = await questionUseCases.list({
     lessonId: lessonId !== undefined ? String(lessonId) : undefined,
-    type: type !== undefined ? (String(type) as "vocabulary" | "practice" | "listening" | "review") : undefined,
+    type: type !== undefined ? (String(type) as QuestionType) : undefined,
+    subtype: subtype !== undefined ? (String(subtype) as QuestionSubtype) : undefined,
     status: status !== undefined ? (String(status) as "draft" | "finished" | "published") : undefined
   });
   const phrases = await phraseRepo.findByIds(questions.map((q) => q.phraseId));
@@ -176,7 +191,7 @@ export async function updateQuestion(req: Request, res: Response) {
     return res.status(400).json({ error: "invalid_id" });
   }
 
-  const { type, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const { type, subtype, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const currentQuestion = await questionUseCases.getById(id);
   if (!currentQuestion) {
@@ -188,7 +203,13 @@ export async function updateQuestion(req: Request, res: Response) {
     if (!isValidQuestionType(String(type))) {
       return res.status(400).json({ error: "invalid_type" });
     }
-    update.type = String(type);
+    update.type = String(type) as QuestionType;
+  }
+  if (subtype !== undefined) {
+    if (!isValidQuestionSubtype(String(subtype))) {
+      return res.status(400).json({ error: "invalid_subtype" });
+    }
+    update.subtype = String(subtype) as QuestionSubtype;
   }
   if (promptTemplate !== undefined) {
     if (!String(promptTemplate).trim()) {
@@ -206,8 +227,8 @@ export async function updateQuestion(req: Request, res: Response) {
     }
     update.phraseId = phrase.id;
   }
-  if (effectiveType === "review") {
-    if (type !== undefined && String(type) === "review" && reviewData === undefined && !currentQuestion.reviewData?.sentence) {
+  if (effectiveType === "fill-in-the-gap") {
+    if (type !== undefined && String(type) === "fill-in-the-gap" && reviewData === undefined && !currentQuestion.reviewData?.sentence) {
       return res.status(400).json({ error: "invalid_review_data" });
     }
     if (reviewData !== undefined) {
@@ -284,6 +305,22 @@ export async function publishQuestion(req: Request, res: Response) {
   }
   if (result === "question_not_finished") {
     return res.status(400).json({ error: "question_not_finished" });
+  }
+  return res.status(200).json({ question: result });
+}
+
+export async function sendBackToTutorQuestion(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid_id" });
+  }
+
+  const result = await questionUseCases.sendBackToTutor(id);
+  if (result === "question_not_found") {
+    return res.status(404).json({ error: "question_not_found" });
+  }
+  if (result === "question_must_be_finished") {
+    return res.status(400).json({ error: "question_must_be_finished" });
   }
   return res.status(200).json({ question: result });
 }

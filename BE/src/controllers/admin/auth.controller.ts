@@ -11,7 +11,7 @@ export async function login(req: Request, res: Response) {
   const { email, password } = req.body ?? {};
 
   if (!email || !password) {
-    return res.status(400).json({ error: "email_and_password_required" });
+    return res.status(400).json({ error: "Email and password are required." });
   }
 
   try {
@@ -23,9 +23,9 @@ export async function login(req: Request, res: Response) {
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AuthError) {
-      return res.status(error.status).json({ error: error.code });
+      return res.status(error.status).json({ error: error.message });
     }
 
-    return res.status(500).json({ error: "internal_server_error" });
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

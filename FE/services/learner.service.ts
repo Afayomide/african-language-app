@@ -66,6 +66,11 @@ export const learnerLessonService = {
     return response.data;
   },
 
+  async getLessonFlow(lessonId: string) {
+    const response = await api.get(feLearnerRoutes.lessonFlow(lessonId));
+    return response.data;
+  },
+
   async getLessonSteps(lessonId: string) {
     const response = await api.get(feLearnerRoutes.lessonSteps(lessonId));
     return response.data;

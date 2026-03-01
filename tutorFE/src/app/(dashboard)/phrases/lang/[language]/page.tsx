@@ -36,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTableControls } from "@/components/common/data-table-controls";
+import { workflowStatusBadgeClass } from "@/lib/status-badge";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -63,12 +64,14 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedWords, setSeedWords] = useState("");
+  const [extraInstructions, setExtraInstructions] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const [selectedPhraseIds, setSelectedPhraseIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
@@ -135,6 +138,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         limit
       });
       setPhrases(data.items);
+      setSelectedPhraseIds([]);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
     } catch {
@@ -156,6 +160,21 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       fetchPhrases();
     } catch {
       toast.error("Failed to delete phrase");
+    }
+  }
+
+  async function handleBulkDeletePhrases() {
+    if (selectedPhraseIds.length === 0) {
+      toast.error("Select at least one phrase");
+      return;
+    }
+    try {
+      const result = await phraseService.bulkDeletePhrases(selectedPhraseIds);
+      toast.success(`${result.deletedCount} phrase(s) deleted`);
+      setSelectedPhraseIds([]);
+      fetchPhrases();
+    } catch {
+      toast.error("Failed to bulk delete phrases");
     }
   }
 
@@ -191,7 +210,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
     }
   }
 
-  async function handleGenerateAI(seedWordsList?: string[]) {
+  async function handleGenerateAI(seedWordsList?: string[], extraText?: string) {
     if (selectedLessonId === "all") {
       toast.error("Please select a lesson first");
       return;
@@ -199,11 +218,16 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
 
     setIsGenerating(true);
     try {
-      await aiService.generatePhrases(selectedLessonId, seedWordsList);
+      await aiService.generatePhrases(
+        selectedLessonId,
+        seedWordsList,
+        extraText?.trim() || undefined
+      );
       toast.success("AI phrases generated successfully");
       fetchPhrases();
       setIsDialogOpen(false);
       setSeedWords("");
+      setExtraInstructions("");
     } catch {
       toast.error("AI generation failed");
     } finally {
@@ -221,6 +245,13 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
           <h1 className="text-3xl font-bold">{LANGUAGE_LABELS[language]} Phrases</h1>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="destructive"
+            onClick={handleBulkDeletePhrases}
+            disabled={selectedPhraseIds.length === 0}
+          >
+            Delete Selected ({selectedPhraseIds.length})
+          </Button>
           {selectedLessonId !== "all" && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -246,6 +277,15 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                       onChange={(e) => setSeedWords(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="extraInstructions">Extra Description (Optional)</Label>
+                    <Input
+                      id="extraInstructions"
+                      placeholder='e.g. "Generate only single words"'
+                      value={extraInstructions}
+                      onChange={(e) => setExtraInstructions(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -259,7 +299,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                               .split(",")
                               .map((item) => item.trim())
                               .filter(Boolean)
-                          : undefined
+                          : undefined,
+                        extraInstructions
                       )
                     }
                     disabled={isGenerating}
@@ -343,6 +384,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
+              <TableHead className="w-12" />
               <TableHead className="pl-8 font-bold text-primary">Text</TableHead>
               <TableHead className="font-bold text-primary">Translation</TableHead>
               <TableHead className="font-bold text-primary">Difficulty</TableHead>
@@ -354,32 +396,37 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : phrases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   No phrases found.
                 </TableCell>
               </TableRow>
             ) : (
               phrases.map((phrase) => (
                 <TableRow key={phrase._id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selectedPhraseIds.includes(phrase._id)}
+                      onChange={(event) =>
+                        setSelectedPhraseIds((prev) =>
+                          event.target.checked
+                            ? Array.from(new Set([...prev, phrase._id]))
+                            : prev.filter((id) => id !== phrase._id)
+                        )
+                      }
+                    />
+                  </TableCell>
                   <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
                   <TableCell className="font-medium text-muted-foreground italic">{phrase.translation}</TableCell>
                   <TableCell>{phrase.difficulty}/5</TableCell>
                   <TableCell>
-                    <Badge
-                      className={
-                        phrase.status === "published"
-                          ? "bg-green-500 hover:bg-green-600"
-                          : phrase.status === "finished"
-                            ? "bg-amber-500 hover:bg-amber-600"
-                            : "bg-zinc-400"
-                      }
-                    >
+                    <Badge className={workflowStatusBadgeClass(phrase.status)}>
                       {phrase.status}
                     </Badge>
                   </TableCell>

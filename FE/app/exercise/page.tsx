@@ -25,7 +25,7 @@ type ExerciseQuestion = {
 function ExerciseContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get("lessonId")
-  const stepType = searchParams.get("type") || "vocabulary"
+  const stepType = searchParams.get("type") || "multiple-choice"
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentQuestion, setCurrentQuestion] = useState(0)

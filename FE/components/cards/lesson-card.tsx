@@ -77,7 +77,7 @@ export function LessonCard({
         )}
 
         {!isLocked && (
-          <Link href={`/exercise?lesson=${id}&language=${language}`}>
+          <Link href={`/lesson-overview?lessonId=${id}`}>
             <Button
               size="sm"
               className="mt-4 w-full"

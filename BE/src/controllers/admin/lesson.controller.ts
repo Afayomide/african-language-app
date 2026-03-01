@@ -6,7 +6,8 @@ import { AdminLessonUseCases } from "../../application/use-cases/admin/lesson/Ad
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import type { Language, Level, Status } from "../../domain/entities/Lesson.js";
+import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import type { Language, Level, LessonBlock, Status } from "../../domain/entities/Lesson.js";
 import {
   isValidLessonLanguage,
   isValidLessonLevel,
@@ -20,15 +21,46 @@ import {
 const lessonUseCases = new AdminLessonUseCases(
   new MongooseLessonRepository(),
   new MongoosePhraseRepository(),
+  new MongooseProverbRepository(),
   new MongooseQuestionRepository()
 );
+
+const proverbRepo = new MongooseProverbRepository();
 
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+async function upsertLessonProverbs(
+  lessonId: string, 
+  language: Language, 
+  proverbs: Array<{ text: string; translation: string; contextNote: string }>
+) {
+  for (const item of proverbs) {
+    const reusable = await proverbRepo.findReusable(language, item.text);
+    if (reusable) {
+      const mergedLessonIds = Array.from(new Set([...reusable.lessonIds, lessonId]));
+      await proverbRepo.updateById(reusable.id, { 
+        lessonIds: mergedLessonIds,
+        translation: item.translation || reusable.translation,
+        contextNote: item.contextNote || reusable.contextNote
+      });
+      continue;
+    }
+
+    await proverbRepo.create({
+      lessonIds: [lessonId],
+      language,
+      text: item.text,
+      translation: item.translation,
+      contextNote: item.contextNote,
+      status: "draft"
+    });
+  }
+}
+
 export async function createLesson(req: AuthRequest, res: Response) {
-  const { title, description, language, level, topics } = req.body ?? {};
+  const { title, description, language, level, topics, proverbs, blocks } = req.body ?? {};
 
   if (!title || String(title).trim().length === 0) {
     return res.status(400).json({ error: "title_required" });
@@ -45,9 +77,35 @@ export async function createLesson(req: AuthRequest, res: Response) {
   if (topics !== undefined && !Array.isArray(topics)) {
     return res.status(400).json({ error: "invalid_topics" });
   }
+  if (proverbs !== undefined && !Array.isArray(proverbs)) {
+    return res.status(400).json({ error: "invalid_proverbs" });
+  }
+  if (blocks !== undefined && !Array.isArray(blocks)) {
+    return res.status(400).json({ error: "invalid_blocks" });
+  }
 
   const normalizedTopics = Array.isArray(topics)
     ? topics.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  
+  const normalizedProverbs = Array.isArray(proverbs)
+    ? proverbs
+        .map((item: any) => ({
+          text: String(item?.text || "").trim(),
+          translation: String(item?.translation || "").trim(),
+          contextNote: String(item?.contextNote || "").trim(),
+        }))
+        .filter((p) => p.text)
+    : [];
+
+  const normalizedBlocks = Array.isArray(blocks)
+    ? blocks
+        .map((b: any) => ({
+          type: String(b?.type || ""),
+          content: String(b?.content || ""),
+          refId: b?.refId ? String(b.refId) : undefined
+        }))
+        .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type))
     : [];
 
   const lesson = await lessonUseCases.create({
@@ -56,8 +114,14 @@ export async function createLesson(req: AuthRequest, res: Response) {
     level: String(level) as Level,
     description: description ? String(description).trim() : "",
     topics: normalizedTopics,
+    proverbs: normalizedProverbs,
+    blocks: normalizedBlocks,
     createdBy: req.user.id
   });
+
+  if (normalizedProverbs.length > 0) {
+    await upsertLessonProverbs(lesson.id, lesson.language, normalizedProverbs);
+  }
 
   return res.status(201).json({ lesson });
 }
@@ -86,7 +150,8 @@ export async function listLessons(req: Request, res: Response) {
       { description: regex },
       { level: regex },
       { status: regex },
-      { topics: regex }
+      { topics: regex },
+      { proverbs: regex }
     ];
   }
 
@@ -131,7 +196,9 @@ export async function getLessonById(req: Request, res: Response) {
 
 export async function updateLesson(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  const { title, description, language, level, orderIndex, topics } = req.body ?? {};
+  const { title, description, language, level, orderIndex, topics, proverbs, blocks } = req.body ?? {};
+  let normalizedProverbs: Array<{ text: string; translation: string; contextNote: string }> = [];
+  let normalizedBlocks: LessonBlock[] = [];
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "invalid_id" });
@@ -173,6 +240,32 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     const normalizedTopics: string[] = topics.map((item) => String(item || "").trim()).filter(Boolean);
     update.topics = normalizedTopics;
   }
+  if (proverbs !== undefined) {
+    if (!Array.isArray(proverbs)) {
+      return res.status(400).json({ error: "invalid_proverbs" });
+    }
+    normalizedProverbs = proverbs
+      .map((item: any) => ({
+        text: String(item?.text || "").trim(),
+        translation: String(item?.translation || "").trim(),
+        contextNote: String(item?.contextNote || "").trim(),
+      }))
+      .filter((p) => p.text);
+    update.proverbs = normalizedProverbs;
+  }
+  if (blocks !== undefined) {
+    if (!Array.isArray(blocks)) {
+      return res.status(400).json({ error: "invalid_blocks" });
+    }
+    normalizedBlocks = blocks
+      .map((b: any) => ({
+        type: String(b?.type || ""),
+        content: String(b?.content || ""),
+        refId: b?.refId ? String(b.refId) : undefined
+      }))
+      .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type));
+    update.blocks = normalizedBlocks;
+  }
 
   const lesson = await lessonUseCases.update(id, update as Partial<{
     title: string;
@@ -181,12 +274,35 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     level: Level;
     orderIndex: number;
     topics: string[];
+    proverbs: Array<{ text: string; translation: string; contextNote: string }>;
+    blocks: LessonBlock[];
   }>);
   if (!lesson) {
     return res.status(404).json({ error: "lesson_not_found" });
   }
 
+  if (proverbs !== undefined) {
+    await proverbRepo.softDeleteByLessonId(lesson.id, new Date());
+    if (normalizedProverbs.length > 0) {
+      await upsertLessonProverbs(lesson.id, lesson.language, normalizedProverbs);
+    }
+  }
+
   return res.status(200).json({ lesson });
+}
+
+export async function bulkDeleteLessons(req: Request, res: Response) {
+  const { ids } = req.body ?? {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "lesson_ids_required" });
+  }
+  const normalizedIds = Array.from(new Set(ids.map(String)));
+  if (normalizedIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+    return res.status(400).json({ error: "invalid_lesson_id" });
+  }
+
+  const deleted = await lessonUseCases.bulkDelete(normalizedIds);
+  return res.status(200).json({ deletedCount: deleted.length, deletedIds: deleted.map((item) => item.id) });
 }
 
 export async function deleteLesson(req: Request, res: Response) {
@@ -219,12 +335,18 @@ export async function publishLesson(req: Request, res: Response) {
     return res.status(400).json({ error: "lesson_not_finished" });
   }
 
-  const lesson = await lessonUseCases.publish(id);
-  if (!lesson) {
+  const result = await lessonUseCases.publish(id);
+  if (!result) {
     return res.status(404).json({ error: "lesson_not_found" });
   }
+  if (result === "phrases_not_published") {
+    return res.status(400).json({ error: "phrases_not_published" });
+  }
+  if (result === "questions_not_published") {
+    return res.status(400).json({ error: "questions_not_published" });
+  }
 
-  return res.status(200).json({ lesson });
+  return res.status(200).json({ lesson: result });
 }
 
 export async function reorderLessons(req: Request, res: Response) {

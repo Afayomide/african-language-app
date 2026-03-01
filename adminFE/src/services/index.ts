@@ -3,8 +3,10 @@
 export {
   lessonService,
   phraseService,
+  proverbService,
   questionService,
   tutorService,
+  userService,
   voiceArtistService,
   voiceAudioService
 } from "./admin.service";

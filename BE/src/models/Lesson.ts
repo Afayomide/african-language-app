@@ -8,6 +8,22 @@ const LessonSchema = new Schema(
     orderIndex: { type: Number, default: 0, index: true },
     description: { type: String, default: "" },
     topics: { type: [String], default: [] },
+    proverbs: {
+      type: [{
+        text: { type: String, required: true },
+        translation: { type: String, default: "" },
+        contextNote: { type: String, default: "" }
+      }],
+      default: []
+    },
+    blocks: {
+      type: [{
+        type: { type: String, enum: ["text", "phrase", "proverb", "question"], required: true },
+        content: { type: String }, // For 'text' blocks
+        refId: { type: Schema.Types.ObjectId } // Generic ref, logic handled in controller/service
+      }],
+      default: []
+    },
     status: { type: String, enum: ["draft", "finished", "published"], default: "draft" },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },

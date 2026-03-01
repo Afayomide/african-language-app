@@ -1,17 +1,18 @@
 import api from "@/lib/api";
-import { feAiRoutes } from "@/lib/apiRoutes";
-import { Lesson, Phrase, Language, Level } from "@/types";
+import { feAdminRoutes, feAiRoutes } from "@/lib/apiRoutes";
+import { Lesson, Phrase, Proverb, Language, Level } from "@/types";
 
 export const aiService = {
   async generatePhrases(
     lessonId: string,
     language: Language,
     level: Level,
-    seedWords?: string[]
+    seedWords?: string[],
+    extraInstructions?: string
   ) {
     const response = await api.post<{ phrases: Phrase[] }>(
       feAiRoutes.generatePhrases(),
-      { lessonId, language, level, seedWords }
+      { lessonId, language, level, seedWords, extraInstructions }
     );
     return response.data.phrases;
   },
@@ -31,4 +32,12 @@ export const aiService = {
     );
     return response.data.suggestion;
   },
+
+  async generateProverbs(lessonId: string, count?: number, extraInstructions?: string) {
+    const response = await api.post<{ proverbs: Proverb[] }>(
+      feAdminRoutes.generateLessonProverbs(),
+      { lessonId, count, extraInstructions }
+    );
+    return response.data.proverbs;
+  }
 };

@@ -38,7 +38,7 @@ export class AdminTutorUseCases {
     const tutor = await this.tutorProfiles.deleteById(id);
     if (!tutor) return false;
 
-    await this.users.deleteByIdAndRole(tutor.userId, "tutor");
+    await this.users.removeRole(tutor.userId, "tutor");
     return true;
   }
 }

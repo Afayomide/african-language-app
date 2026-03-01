@@ -1,14 +1,33 @@
 import type { Language, Level, LessonEntity } from "../../../../domain/entities/Lesson.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
+import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
 import type { LlmClient } from "../../../../services/llm/types.js";
 
 function normalizeTitle(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeSuggestedProverb(item: unknown) {
+  if (typeof item === "string") {
+    const text = item.trim();
+    if (!text) return null;
+    return { text, translation: "", contextNote: "" };
+  }
+  if (!item || typeof item !== "object") return null;
+  const payload = item as { text?: unknown; translation?: unknown; contextNote?: unknown };
+  const text = String(payload.text || "").trim();
+  if (!text) return null;
+  return {
+    text,
+    translation: String(payload.translation || "").trim(),
+    contextNote: String(payload.contextNote || "").trim()
+  };
+}
+
 export class AdminLessonAiUseCases {
   constructor(
     private readonly lessons: LessonRepository,
+    private readonly proverbs: ProverbRepository,
     private readonly llm: LlmClient
   ) {}
 
@@ -75,10 +94,38 @@ export class AdminLessonAiUseCases {
           level: input.level,
           description: suggestion.description ? String(suggestion.description).trim() : "",
           topics: lessonTopic ? [lessonTopic] : [],
+          proverbs: [],
           status: "draft",
           createdBy: input.createdBy,
           orderIndex: nextOrderIndex
         });
+
+        const suggestedProverbs = Array.isArray(suggestion.proverbs)
+          ? suggestion.proverbs.map(normalizeSuggestedProverb).filter((item): item is { text: string; translation: string; contextNote: string } => Boolean(item))
+          : [];
+        for (const proverbItem of suggestedProverbs) {
+          const reusable = await this.proverbs.findReusable(input.language, proverbItem.text);
+          if (reusable) {
+            const mergedLessonIds = Array.from(new Set([...reusable.lessonIds, lesson.id]));
+            await this.proverbs.updateById(reusable.id, {
+              lessonIds: mergedLessonIds,
+              translation: proverbItem.translation || reusable.translation,
+              contextNote: proverbItem.contextNote || reusable.contextNote,
+              aiMeta: { generatedByAI: true, model: "", reviewedByAdmin: false }
+            });
+            continue;
+          }
+
+          await this.proverbs.create({
+            lessonIds: [lesson.id],
+            language: input.language,
+            text: proverbItem.text,
+            translation: proverbItem.translation,
+            contextNote: proverbItem.contextNote,
+            aiMeta: { generatedByAI: true, model: "", reviewedByAdmin: false },
+            status: "draft"
+          });
+        }
 
         nextOrderIndex += 1;
         existingTitleSet.add(titleKey);

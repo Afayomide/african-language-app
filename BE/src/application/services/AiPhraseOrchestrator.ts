@@ -57,6 +57,7 @@ export class AiPhraseOrchestrator {
   async generateForLesson(input: {
     lesson: LessonEntity;
     seedWords?: string[];
+    extraInstructions?: string;
   }) {
     const existingPhrases = await this.phrases.findByLessonId(input.lesson.id);
     const existingKeys = new Set(
@@ -68,6 +69,7 @@ export class AiPhraseOrchestrator {
       language: input.lesson.language,
       level: input.lesson.level,
       seedWords: input.seedWords,
+      extraInstructions: input.extraInstructions,
       lessonTitle: input.lesson.title,
       lessonDescription: input.lesson.description,
       existingPhrases: existingPhrases.map((phrase) => phrase.text)
@@ -113,6 +115,7 @@ export class AiPhraseOrchestrator {
     language: LessonEntity["language"];
     level: LessonEntity["level"];
     seedWords?: string[];
+    extraInstructions?: string;
   }) {
     const existingPhrases = await this.phrases.list({ language: input.language });
     const existingKeys = new Set(
@@ -123,6 +126,7 @@ export class AiPhraseOrchestrator {
       language: input.language,
       level: input.level,
       seedWords: input.seedWords,
+      extraInstructions: input.extraInstructions,
       lessonTitle: "General phrases",
       lessonDescription: "Phrases not attached to a lesson yet",
       existingPhrases: existingPhrases.map((phrase) => phrase.text)

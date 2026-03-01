@@ -17,10 +17,16 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("tutorToken");
-        localStorage.removeItem("tutorUser");
-        localStorage.removeItem("tutorProfile");
-        window.location.href = "/login";
+        const token = localStorage.getItem("tutorToken");
+        const requestUrl = String(error.config?.url || "");
+        const isAuthRequest = requestUrl.includes("/api/tutor/auth");
+
+        if (token && !isAuthRequest) {
+          localStorage.removeItem("tutorToken");
+          localStorage.removeItem("tutorUser");
+          localStorage.removeItem("tutorProfile");
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

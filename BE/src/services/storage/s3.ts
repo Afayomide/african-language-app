@@ -12,9 +12,7 @@ function getClient() {
   if (!client) {
     if (!R2_ACCOUNT_ID) {
       console.error("Missing R2_ACCOUNT_ID");
-      throw new Error(
-        "Missin15aa8a51c11445b784c88e3ecaf3b84cc8d7e7ad05b5d818c0bac50c5bbab28eg R2_ACCOUNT_ID",
-      );
+      throw new Error("Missing R2_ACCOUNT_ID");
     }
     if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
       console.error("Missing R2_ACCESS_KEY_ID or R2_SECRET_ACCESS_KEY");

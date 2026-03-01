@@ -10,7 +10,7 @@ const lessons = new MongooseLessonRepository();
 const phrases = new MongoosePhraseRepository();
 
 export async function generatePhrases(req: Request, res: Response) {
-  const { lessonId, language, level, seedWords } = req.body ?? {};
+  const { lessonId, language, level, seedWords, extraInstructions } = req.body ?? {};
 
   if (!validateLessonId(lessonId)) {
     return res.status(400).json({ error: "invalid_lesson_id" });
@@ -23,6 +23,9 @@ export async function generatePhrases(req: Request, res: Response) {
   }
   if (seedWords !== undefined && !Array.isArray(seedWords)) {
     return res.status(400).json({ error: "invalid_seed_words" });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "invalid_extra_instructions" });
   }
 
   const orchestrator = new AiPhraseOrchestrator(lessons, phrases, getLlmClient());
@@ -40,7 +43,8 @@ export async function generatePhrases(req: Request, res: Response) {
     }
     const created = await orchestrator.generateForLesson({
       lesson,
-      seedWords: Array.isArray(seedWords) ? seedWords.map(String) : undefined
+      seedWords: Array.isArray(seedWords) ? seedWords.map(String) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
     });
 
     if (created.length === 0) {

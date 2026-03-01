@@ -16,6 +16,7 @@ export class TutorQuestionUseCases {
       lessonId: string;
       phraseId: string;
       type: QuestionEntity["type"];
+      subtype: QuestionEntity["subtype"];
       promptTemplate: string;
       options: string[];
       correctIndex: number;

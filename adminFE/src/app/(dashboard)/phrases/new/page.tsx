@@ -53,6 +53,7 @@ function NewPhraseContent() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [seedWords, setSeedWords] = useState("")
+  const [extraInstructions, setExtraInstructions] = useState("")
   const [audioFile, setAudioFile] = useState<File | null>(null)
 
   useEffect(() => {
@@ -144,11 +145,13 @@ function NewPhraseContent() {
         lesson._id,
         lesson.language,
         lesson.level,
-        seedWords ? seedWords.split(",").map((s) => s.trim()).filter(Boolean) : undefined
+        seedWords ? seedWords.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+        extraInstructions.trim() || undefined
       )
       toast.success("AI phrases generated")
       setIsDialogOpen(false)
       setSeedWords("")
+      setExtraInstructions("")
       router.push(`/phrases/lang/${lesson.language}?lessonId=${lesson._id}`)
     } catch (error) {
       toast.error("AI generation failed")
@@ -186,6 +189,15 @@ function NewPhraseContent() {
                   placeholder="e.g. greetings, market, family"
                   value={seedWords}
                   onChange={(e) => setSeedWords(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="extraInstructions">Extra Description (Optional)</Label>
+                <Textarea
+                  id="extraInstructions"
+                  placeholder='e.g. "Only single words for this lesson"'
+                  value={extraInstructions}
+                  onChange={(e) => setExtraInstructions(e.target.value)}
                 />
               </div>
             </div>

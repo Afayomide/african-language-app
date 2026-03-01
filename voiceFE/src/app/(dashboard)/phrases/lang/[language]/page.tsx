@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, use } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { phraseService } from "@/services";
 import { Language, Phrase } from "@/types";
@@ -14,7 +14,15 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Upload, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { ArrowLeft, Upload, Loader2, Mic, Square, Send, RotateCcw, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
 
@@ -37,6 +45,15 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("audio_read_failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 type QueueItem = {
   phrase: Phrase;
   latestSubmission: null | {
@@ -53,6 +70,10 @@ type SubmissionItem = {
   rejectionReason: string;
   createdAt: string;
   phrase: Phrase | null;
+  audio: {
+    url: string;
+    format: string;
+  };
 };
 
 export default function VoicePhrasesPage({ params }: { params: Promise<{ language: string }> }) {
@@ -75,9 +96,33 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
   const [submissionLimit, setSubmissionLimit] = useState(20);
   const [submissionTotal, setSubmissionTotal] = useState(0);
   const [submissionTotalPages, setSubmissionTotalPages] = useState(1);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [recordingPhrase, setRecordingPhrase] = useState<Phrase | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [inputLevel, setInputLevel] = useState(0);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const levelRafRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isValidLanguageParam = isLanguage(languageParam);
   const language: Language = isValidLanguageParam ? languageParam : "yoruba";
+
+  const playAudio = useCallback((url?: string) => {
+    if (!url) return;
+    const audio = new Audio(url);
+    audio.play().catch((e) => {
+      console.error("Audio playback failed", e);
+      toast.error("Failed to play audio");
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -195,7 +240,159 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
     }
   }
 
+  function cleanupRecorderResources() {
+    if (levelRafRef.current) {
+      cancelAnimationFrame(levelRafRef.current);
+      levelRafRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+  }
+
+  function resetRecordedAudio() {
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl);
+    }
+    setRecordedBlob(null);
+    setRecordedAudioUrl(null);
+  }
+
+  async function openRecorder(phrase: Phrase) {
+    resetRecordedAudio();
+    cleanupRecorderResources();
+    setRecordingPhrase(phrase);
+    setRecorderOpen(true);
+  }
+
+  async function startRecording() {
+    if (!recordingPhrase) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Audio recording is not supported in this browser.");
+      return;
+    }
+
+    try {
+      resetRecordedAudio();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      setRecordingSeconds(0);
+      setInputLevel(0);
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      const levelData = new Uint8Array(analyser.frequencyBinCount);
+      const tickLevel = () => {
+        const node = analyserRef.current;
+        if (!node) return;
+        node.getByteTimeDomainData(levelData);
+        let sum = 0;
+        for (let i = 0; i < levelData.length; i += 1) {
+          const normalized = (levelData[i] - 128) / 128;
+          sum += normalized * normalized;
+        }
+        const rms = Math.sqrt(sum / levelData.length);
+        const scaled = Math.min(100, Math.max(0, Math.round(rms * 260)));
+        setInputLevel(scaled);
+        levelRafRef.current = requestAnimationFrame(tickLevel);
+      };
+      levelRafRef.current = requestAnimationFrame(tickLevel);
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm"
+        });
+        chunksRef.current = [];
+        setRecordedBlob(blob);
+        setRecordedAudioUrl(URL.createObjectURL(blob));
+        setIsRecording(false);
+        setInputLevel(0);
+        cleanupRecorderResources();
+      };
+
+      recorder.start(1000);
+      setIsRecording(true);
+    } catch {
+      cleanupRecorderResources();
+      setIsRecording(false);
+      setInputLevel(0);
+      toast.error("Could not access microphone.");
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  async function submitRecording() {
+    if (!recordingPhrase || !recordedBlob) return;
+    try {
+      setUploadingPhraseId(recordingPhrase._id);
+      const base64 = await blobToBase64(recordedBlob);
+      await phraseService.createSubmission(recordingPhrase._id, {
+        base64,
+        mimeType: recordedBlob.type || "audio/webm"
+      });
+      toast.success("Recorded audio submitted for review");
+      setRecorderOpen(false);
+      resetRecordedAudio();
+      await fetchData();
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : "Upload failed";
+      toast.error(message);
+    } finally {
+      setUploadingPhraseId(null);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      cleanupRecorderResources();
+      if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+    };
+  }, [recordedAudioUrl]);
+
   if (!isValidLanguageParam) return <div>Invalid language</div>;
+
+  const minutes = Math.floor(recordingSeconds / 60);
+  const seconds = recordingSeconds % 60;
+  const timerLabel = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   return (
     <div className="space-y-8">
@@ -238,7 +435,7 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
               <TableHead>Phrase</TableHead>
               <TableHead>Translation</TableHead>
               <TableHead>Last Submission</TableHead>
-              <TableHead className="text-right">Upload</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -275,29 +472,40 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) {
-                            handleUpload(item.phrase._id, file);
-                          }
-                          event.target.value = "";
-                        }}
+                    <div className="inline-flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
                         disabled={uploadingPhraseId === item.phrase._id}
-                      />
-                      <Button type="button" variant="outline" disabled={uploadingPhraseId === item.phrase._id}>
-                        {uploadingPhraseId === item.phrase._id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                        Upload Audio
+                        onClick={() => openRecorder(item.phrase)}
+                      >
+                        <Mic className="h-4 w-4" />
+                        Record
                       </Button>
-                    </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) {
+                              handleUpload(item.phrase._id, file);
+                            }
+                            event.target.value = "";
+                          }}
+                          disabled={uploadingPhraseId === item.phrase._id}
+                        />
+                        <Button type="button" variant="outline" disabled={uploadingPhraseId === item.phrase._id}>
+                          {uploadingPhraseId === item.phrase._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                          Upload
+                        </Button>
+                      </label>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -330,6 +538,7 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
             <TableRow>
               <TableHead>Phrase</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Audio</TableHead>
               <TableHead>Rejection Reason</TableHead>
               <TableHead>Submitted</TableHead>
             </TableRow>
@@ -337,11 +546,11 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">Loading...</TableCell>
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Loading...</TableCell>
               </TableRow>
             ) : scopedSubmissions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                   No submissions yet.
                 </TableCell>
               </TableRow>
@@ -362,6 +571,16 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
                       {submission.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-primary"
+                      onClick={() => playAudio(submission.audio?.url)}
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                   <TableCell>{submission.rejectionReason || "-"}</TableCell>
                   <TableCell>{new Date(submission.createdAt).toLocaleString()}</TableCell>
                 </TableRow>
@@ -370,6 +589,85 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        open={recorderOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (isRecording) stopRecording();
+            cleanupRecorderResources();
+            resetRecordedAudio();
+          }
+          setRecorderOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Phrase Audio</DialogTitle>
+            <DialogDescription>
+              {recordingPhrase ? `${recordingPhrase.text} — ${recordingPhrase.translation}` : "Record and submit audio."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Status: {isRecording ? "Recording..." : recordedBlob ? "Recorded" : "Ready"}
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Timer: {timerLabel}</div>
+              <div className="h-2 w-full rounded bg-secondary">
+                <div
+                  className="h-2 rounded bg-primary transition-all"
+                  style={{ width: `${inputLevel}%` }}
+                />
+              </div>
+            </div>
+
+            {recordedAudioUrl && (
+              <audio controls className="w-full" src={recordedAudioUrl}>
+                Your browser does not support audio playback.
+              </audio>
+            )}
+          </div>
+
+          <DialogFooter>
+            {!isRecording ? (
+              <Button type="button" variant="outline" onClick={startRecording}>
+                <Mic className="h-4 w-4" />
+                Start
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={stopRecording}>
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetRecordedAudio}
+              disabled={!recordedBlob || isRecording}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retake
+            </Button>
+
+            <Button
+              type="button"
+              onClick={submitRecording}
+              disabled={!recordedBlob || isRecording || !recordingPhrase || uploadingPhraseId === recordingPhrase._id}
+            >
+              {recordingPhrase && uploadingPhraseId === recordingPhrase._id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

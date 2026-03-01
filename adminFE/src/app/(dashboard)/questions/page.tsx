@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { questionService, lessonService, phraseService } from "@/services"
-import { ExerciseQuestion, Lesson, QuestionType, Status } from "@/types"
+import { ExerciseQuestion, Lesson, QuestionType, QuestionSubtype, Status } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { BookOpen, MessageSquare, Trash2, CheckCircle } from "lucide-react"
+import { BookOpen, MessageSquare, Trash2, CheckCircle, RotateCcw } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { workflowStatusBadgeClass } from "@/lib/status-badge"
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
@@ -25,7 +26,8 @@ export default function QuestionsPage() {
   const [formData, setFormData] = useState({
     lessonId: "",
     phraseId: "",
-    type: "vocabulary" as QuestionType,
+    type: "multiple-choice" as QuestionType,
+    subtype: "mc-select-translation" as QuestionSubtype,
     promptTemplate: "What is {phrase} in English?",
     optionsCsv: "",
     correctIndex: 0,
@@ -35,7 +37,22 @@ export default function QuestionsPage() {
     reviewCorrectOrderCsv: "",
     reviewMeaning: "",
   })
-  const isReviewType = formData.type === "review"
+
+  const subtypeTemplates: Record<QuestionSubtype, string> = {
+    "mc-select-translation": "What is {phrase} in English?",
+    "mc-select-missing-word": "Select the missing word for {phrase}",
+    "fg-word-order": "Arrange the words to mean: {meaning}",
+    "fg-gap-fill": "Fill in the blank for {phrase}",
+    "ls-mc-select-translation": "Listen and select the correct translation",
+    "ls-mc-select-missing-word": "Listen and select the missing word",
+    "ls-fg-word-order": "Listen and arrange the words",
+    "ls-fg-gap-fill": "Listen and fill in the blank",
+    "ls-dictation": "Listen and type what you hear",
+    "tone-recognition": "Which syllable has the rising tone?"
+  }
+
+  const isFillInGapType = formData.type === "fill-in-the-gap"
+  const isListeningType = formData.type === "listening"
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -132,7 +149,7 @@ export default function QuestionsPage() {
     }
 
     try {
-      if (isReviewType) {
+      if (isFillInGapType) {
         const words = formData.reviewWordsCsv.split(",").map((v) => v.trim()).filter(Boolean)
         const correctOrder = formData.reviewCorrectOrderCsv
           .split(",")
@@ -143,6 +160,7 @@ export default function QuestionsPage() {
           lessonId: formData.lessonId,
           phraseId: formData.phraseId,
           type: formData.type,
+          subtype: formData.subtype,
           promptTemplate: formData.promptTemplate,
           reviewData: {
             sentence: formData.reviewSentence,
@@ -163,6 +181,7 @@ export default function QuestionsPage() {
           lessonId: formData.lessonId,
           phraseId: formData.phraseId,
           type: formData.type,
+          subtype: formData.subtype,
           promptTemplate: formData.promptTemplate,
           options,
           correctIndex: Number(formData.correctIndex),
@@ -174,7 +193,8 @@ export default function QuestionsPage() {
         lessonId: formData.lessonId,
         phraseId: "",
         type: formData.type,
-        promptTemplate: "What is {phrase} in English?",
+        subtype: formData.subtype,
+        promptTemplate: subtypeTemplates[formData.subtype],
         optionsCsv: "",
         correctIndex: 0,
         explanation: "",
@@ -196,6 +216,16 @@ export default function QuestionsPage() {
       fetchQuestions()
     } catch {
       toast.error("Failed to publish question")
+    }
+  }
+
+  async function handleSendBackToTutor(id: string) {
+    try {
+      await questionService.sendBackToTutorQuestion(id)
+      toast.success("Question sent back to tutor")
+      fetchQuestions()
+    } catch {
+      toast.error("Failed to send question back")
     }
   }
 
@@ -259,30 +289,72 @@ export default function QuestionsPage() {
 
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Question Type</Label>
-                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as QuestionType })}>
+                <Select value={formData.type} onValueChange={(v) => {
+                  const newType = v as QuestionType
+                  let newSubtype = formData.subtype
+                  if (newType === "multiple-choice") newSubtype = "mc-select-translation"
+                  if (newType === "fill-in-the-gap") newSubtype = "fg-word-order"
+                  if (newType === "listening") newSubtype = "ls-mc-select-translation"
+                  setFormData({ ...formData, type: newType, subtype: newSubtype, promptTemplate: subtypeTemplates[newSubtype] })
+                }}>
                   <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent className="rounded-2xl border-2 shadow-xl">
-                    <SelectItem value="vocabulary" className="py-2 text-orange-600">Vocabulary</SelectItem>
-                    <SelectItem value="practice" className="py-2 text-purple-600">Practice</SelectItem>
+                    <SelectItem value="multiple-choice" className="py-2 text-orange-600">Multiple Choice</SelectItem>
+                    <SelectItem value="fill-in-the-gap" className="py-2 text-emerald-600">Fill in the Gap</SelectItem>
                     <SelectItem value="listening" className="py-2 text-blue-600">Listening</SelectItem>
-                    <SelectItem value="review" className="py-2 text-emerald-600">Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Question Subtype</Label>
+                <Select value={formData.subtype} onValueChange={(v) => {
+                  const newSubtype = v as QuestionSubtype
+                  setFormData({ ...formData, subtype: newSubtype, promptTemplate: subtypeTemplates[newSubtype] })
+                }}>
+                  <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-2xl border-2 shadow-xl">
+                    {formData.type === "multiple-choice" && (
+                      <>
+                        <SelectItem value="mc-select-translation" className="py-2">Select Translation</SelectItem>
+                        <SelectItem value="mc-select-missing-word" className="py-2">Select Missing Word</SelectItem>
+                      </>
+                    )}
+                    {formData.type === "fill-in-the-gap" && (
+                      <>
+                        <SelectItem value="fg-word-order" className="py-2">Word Order</SelectItem>
+                        <SelectItem value="fg-gap-fill" className="py-2">Gap Fill</SelectItem>
+                      </>
+                    )}
+                    {formData.type === "listening" && (
+                      <>
+                        <SelectItem value="ls-mc-select-translation" className="py-2">Listen & Pick Translation</SelectItem>
+                        <SelectItem value="ls-mc-select-missing-word" className="py-2">Listen & Pick Word</SelectItem>
+                        <SelectItem value="ls-fg-word-order" className="py-2">Listen & Order Sentence</SelectItem>
+                        <SelectItem value="ls-fg-gap-fill" className="py-2">Listen & Gap Fill</SelectItem>
+                        <SelectItem value="ls-dictation" className="py-2">Listen & Dictation</SelectItem>
+                        <SelectItem value="ls-tone-recognition" className="py-2">Tone Recognition</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Prompt Template</Label>
-              <Input 
-                value={formData.promptTemplate} 
-                onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })} 
-                placeholder={isReviewType ? "Arrange the words to form a sentence:" : "e.g. What is {phrase} in English?"} 
-                required 
-                className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
-              />
-            </div>
+            {!isFillInGapType && (
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Prompt Template</Label>
+                <Input
+                  value={formData.promptTemplate}
+                  onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })}
+                  placeholder="e.g. What is {phrase} in English?"
+                  required
+                  className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                />
+              </div>
+            )}
 
-            {!isReviewType ? (
+            {!isFillInGapType ? (
               <>
                 <div className="grid gap-8 md:grid-cols-2">
                   <div className="space-y-3">
@@ -415,13 +487,13 @@ export default function QuestionsPage() {
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow className="hover:bg-transparent border-b-2 border-muted/50">
-                  <TableHead className="font-semibold h-12 pl-6 uppercase tracking-wide text-xs">Type</TableHead>
-                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs">Prompt Template</TableHead>
-                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs">Target Phrase</TableHead>
-                  <TableHead className="font-semibold h-12 uppercase tracking-wide text-xs text-center">Status</TableHead>
-                  <TableHead className="text-right font-semibold h-12 pr-6 uppercase tracking-wide text-xs">Actions</TableHead>
+              <TableHeader className="bg-primary/5">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="font-bold text-primary h-12 pl-6 uppercase tracking-wide text-xs">Type</TableHead>
+                  <TableHead className="font-bold text-primary h-12 uppercase tracking-wide text-xs">Prompt Template</TableHead>
+                  <TableHead className="font-bold text-primary h-12 uppercase tracking-wide text-xs">Target Phrase</TableHead>
+                  <TableHead className="font-bold text-primary h-12 uppercase tracking-wide text-xs text-center">Status</TableHead>
+                  <TableHead className="text-right font-bold text-primary h-12 pr-6 uppercase tracking-wide text-xs">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -431,44 +503,47 @@ export default function QuestionsPage() {
                   <TableRow><TableCell colSpan={5} className="h-40 text-center text-muted-foreground text-sm">Empty Question Bank</TableCell></TableRow>
                 ) : (
                   questions.map((q) => (
-                    <TableRow key={q._id} className="hover:bg-secondary/20 transition-colors border-b-2 border-muted/30 group">
+                    <TableRow key={q._id} className="hover:bg-secondary/20 transition-colors group">
                       <TableCell className="pl-6 h-16">
                         <Badge className={cn(
-                          "capitalize font-semibold px-3 py-1 rounded-md border-none text-xs",
-                          q.type === 'vocabulary' && "bg-orange-100 text-orange-700",
-                          q.type === 'practice' && "bg-purple-100 text-purple-700",
+                          "capitalize font-semibold px-3 py-1 rounded-md border-none text-[10px] tracking-tight",
+                          q.type === 'multiple-choice' && "bg-orange-100 text-orange-700",
+                          q.type === 'fill-in-the-gap' && "bg-emerald-100 text-emerald-700",
                           q.type === 'listening' && "bg-blue-100 text-blue-700",
-                          q.type === 'review' && "bg-emerald-100 text-emerald-700",
                         )}>
-                          {q.type}
+                          {q.type.replaceAll("-", " ")}: {q.subtype.replaceAll("-", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[300px] text-foreground text-sm truncate group-hover:text-primary transition-colors">{q.promptTemplate}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{typeof q.phraseId === "string" ? q.phraseId : q.phraseId.text}</TableCell>
                       <TableCell className="text-center">
-                        <Badge className={cn(
-                          "font-semibold rounded-md border-none px-3 py-1 text-xs",
-                          q.status === "published"
-                            ? "bg-green-500"
-                            : q.status === "finished"
-                              ? "bg-amber-500"
-                              : "bg-zinc-400"
-                        )}>
+                        <Badge className={cn("font-semibold rounded-md border-none px-3 py-1 text-xs", workflowStatusBadgeClass(q.status))}>
                           {q.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end items-center gap-3">
                           {q.status === "finished" && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handlePublish(q._id)} 
-                              className="h-12 w-12 text-accent hover:text-accent hover:bg-accent/10 rounded-2xl transition-all"
-                              title="Publish"
-                            >
-                              <CheckCircle className="h-6 w-6" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleSendBackToTutor(q._id)}
+                                className="h-12 w-12 text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-2xl transition-all"
+                                title="Send back to tutor"
+                              >
+                                <RotateCcw className="h-6 w-6" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handlePublish(q._id)}
+                                className="h-12 w-12 text-accent hover:text-accent hover:bg-accent/10 rounded-2xl transition-all"
+                                title="Publish"
+                              >
+                                <CheckCircle className="h-6 w-6" />
+                              </Button>
+                            </>
                           )}
                           <Button 
                             variant="ghost" 

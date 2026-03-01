@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  bulkDeletePhrases,
   createPhrase,
   deletePhrase,
   finishPhrase,
@@ -16,6 +17,7 @@ const router = Router();
 router.use(requireAuth, requireTutor);
 
 router.post("/", createPhrase);
+router.delete("/bulk-delete", bulkDeletePhrases);
 router.get("/", listPhrases);
 router.put("/bulk/:lessonId/generate-audio", generateLessonPhrasesAudio);
 router.put("/:id/generate-audio", generatePhraseAudioById);

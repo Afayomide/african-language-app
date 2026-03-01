@@ -28,7 +28,7 @@ function parseAudioUpload(audioUpload: unknown) {
   const payload = audioUpload as { base64?: unknown; mimeType?: unknown };
   if (!payload.base64 || typeof payload.base64 !== "string") return "invalid_audio_upload";
 
-  const dataUrlMatch = payload.base64.match(/^data:([^;]+);base64,(.+)$/);
+  const dataUrlMatch = payload.base64.match(/^data:([^;]+).*?base64,(.+)$/);
   const base64Data = dataUrlMatch ? dataUrlMatch[2] : payload.base64;
   const mimeTypeFromDataUrl = dataUrlMatch ? dataUrlMatch[1] : undefined;
   const mimeType =
