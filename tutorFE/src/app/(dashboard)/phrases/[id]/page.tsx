@@ -40,8 +40,8 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     try {
       const data = await phraseService.getPhrase(id);
       setPhrase({ ...data, lessonIds: Array.isArray(data.lessonIds) ? data.lessonIds : [] });
-    } catch {
-      toast.error("Failed to fetch phrase");
+    } catch (error) {
+      toast.error("Failed to fetch phrase")
       router.push("/phrases");
     }
   }
@@ -99,8 +99,8 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
         audioUpload
       });
       toast.success("Phrase updated");
-    } catch {
-      toast.error("Failed to update phrase");
+    } catch (error) {
+      toast.error("Failed to update phrase")
     } finally {
       setIsSaving(false);
     }
@@ -111,8 +111,8 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
       const updated = await phraseService.generatePhraseAudio(id);
       setPhrase(updated);
       toast.success("Phrase audio generated");
-    } catch {
-      toast.error("Failed to generate audio");
+    } catch (error) {
+      toast.error("Failed to generate audio")
     }
   };
 
@@ -122,8 +122,8 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
       const updated = await aiService.enhancePhrase(id);
       setPhrase(updated);
       toast.success("Phrase enhanced with AI");
-    } catch {
-      toast.error("AI enhancement failed");
+    } catch (error) {
+      toast.error("AI enhancement failed")
     } finally {
       setIsEnhancing(false);
     }

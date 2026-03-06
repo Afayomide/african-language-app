@@ -3,11 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, BookOpen, MessageSquare, CircleHelp, Users, Settings, LogOut, MessageSquareQuote } from "lucide-react"
+import { LayoutDashboard, BookOpen, MessageSquare, CircleHelp, Users, Settings, LogOut, MessageSquareQuote, FolderTree } from "lucide-react"
 import { authService } from "@/services/auth"
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Units", href: "/units", icon: FolderTree },
   { name: "Lessons", href: "/lessons", icon: BookOpen },
   { name: "Phrases", href: "/phrases", icon: MessageSquare },
   { name: "Proverbs", href: "/proverbs", icon: MessageSquareQuote },

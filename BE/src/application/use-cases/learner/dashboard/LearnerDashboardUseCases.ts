@@ -1,6 +1,7 @@
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
 import type { LessonProgressRepository } from "../../../../domain/repositories/LessonProgressRepository.js";
+import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
 import type { Language } from "../../../../domain/entities/Lesson.js";
 
 function isoDay(date: Date) {
@@ -29,6 +30,7 @@ function weekDays() {
 export class LearnerDashboardUseCases {
   constructor(
     private readonly lessons: LessonRepository,
+    private readonly units: UnitRepository,
     private readonly learnerProfiles: LearnerProfileRepository,
     private readonly progress: LessonProgressRepository
   ) {}
@@ -38,6 +40,10 @@ export class LearnerDashboardUseCases {
     if (!profile) return null;
 
     const publishedLessons = await this.lessons.list({
+      status: "published",
+      language: profile.currentLanguage
+    });
+    const publishedUnits = await this.units.list({
       status: "published",
       language: profile.currentLanguage
     });
@@ -51,12 +57,16 @@ export class LearnerDashboardUseCases {
     const progressByLessonId = new Map(progresses.map((p) => [p.lessonId, p]));
 
     const nextLesson = publishedLessons.find((lesson) => !completed.has(lesson.id)) || null;
+    const unitsById = new Map(publishedUnits.map((unit) => [unit.id, unit]));
     const completedLessons = publishedLessons
       .filter((lesson) => completed.has(lesson.id))
       .map((lesson) => {
         const item = progressByLessonId.get(lesson.id);
+        const unit = unitsById.get(lesson.unitId);
         return {
           id: lesson.id,
+          unitId: lesson.unitId,
+          unitTitle: unit?.title || "Unit",
           title: lesson.title,
           description: lesson.description,
           level: lesson.level,
@@ -91,6 +101,40 @@ export class LearnerDashboardUseCases {
           profile.totalXp >= 100 ? "Perfect Score" : ""
         ].filter(Boolean);
 
+    const units = publishedUnits.map((unit) => {
+      const unitLessons = publishedLessons
+        .filter((lesson) => lesson.unitId === unit.id)
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((lesson) => {
+          const lessonProgress = progressByLessonId.get(lesson.id);
+          return {
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            level: lesson.level,
+            orderIndex: lesson.orderIndex,
+            status: lessonProgress?.status || "not_started",
+            progressPercent: lessonProgress?.progressPercent || 0
+          };
+        });
+
+      const completedCount = unitLessons.filter((lesson) => lesson.status === "completed").length;
+      const totalLessons = unitLessons.length;
+      const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+
+      return {
+        id: unit.id,
+        title: unit.title,
+        description: unit.description,
+        level: unit.level,
+        orderIndex: unit.orderIndex,
+        progressPercent,
+        completedLessons: completedCount,
+        totalLessons,
+        lessons: unitLessons
+      };
+    });
+
     return {
       stats: {
         currentLanguage: profile.currentLanguage,
@@ -103,11 +147,14 @@ export class LearnerDashboardUseCases {
       nextLesson: nextLesson
         ? {
             id: nextLesson.id,
+            unitId: nextLesson.unitId,
+            unitTitle: unitsById.get(nextLesson.unitId)?.title || "Unit",
             title: nextLesson.title,
             description: nextLesson.description,
             level: nextLesson.level
           }
         : null,
+      units,
       completedLessons,
       weeklyOverview,
       achievements

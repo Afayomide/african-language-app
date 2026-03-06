@@ -125,8 +125,8 @@ function PhrasesByLanguageContent({
       if (lessonIdParam && !data.some((lesson) => lesson._id === lessonIdParam)) {
         setSelectedLessonId("all");
       }
-    } catch {
-      toast.error("Failed to fetch lessons");
+    } catch (error) {
+      toast.error("Failed to fetch lessons")
     }
   }
 
@@ -145,8 +145,8 @@ function PhrasesByLanguageContent({
       setSelectedPhraseIds([]);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
-    } catch {
-      toast.error("Failed to fetch phrases");
+    } catch (error) {
+      toast.error("Failed to fetch phrases")
     } finally {
       setIsLoading(false);
     }
@@ -158,8 +158,8 @@ function PhrasesByLanguageContent({
       await phraseService.deletePhrase(id);
       toast.success("Phrase deleted");
       fetchPhrases();
-    } catch {
-      toast.error("Failed to delete phrase");
+    } catch (error) {
+      toast.error("Failed to delete phrase")
     }
   }
 
@@ -173,8 +173,8 @@ function PhrasesByLanguageContent({
       toast.success(`${result.deletedCount} phrase(s) deleted`);
       setSelectedPhraseIds([]);
       fetchPhrases();
-    } catch {
-      toast.error("Failed to bulk delete phrases");
+    } catch (error) {
+      toast.error("Failed to bulk delete phrases")
     }
   }
 
@@ -183,8 +183,8 @@ function PhrasesByLanguageContent({
       await phraseService.publishPhrase(id);
       toast.success("Phrase published");
       fetchPhrases();
-    } catch {
-      toast.error("Failed to publish phrase");
+    } catch (error) {
+      toast.error("Failed to publish phrase")
     }
   }
 
@@ -205,8 +205,8 @@ function PhrasesByLanguageContent({
       const result = await phraseService.generateLessonPhraseAudio(selectedLessonId);
       toast.success(`Audio generated for ${result.updatedCount} phrases`);
       fetchPhrases();
-    } catch {
-      toast.error("Failed to generate lesson audio");
+    } catch (error) {
+      toast.error("Failed to generate lesson audio")
     }
   }
 
@@ -236,8 +236,8 @@ function PhrasesByLanguageContent({
       setIsDialogOpen(false);
       setSeedWords("");
       setExtraInstructions("");
-    } catch {
-      toast.error("AI generation failed");
+    } catch (error) {
+      toast.error("AI generation failed")
     } finally {
       setIsGenerating(false);
     }

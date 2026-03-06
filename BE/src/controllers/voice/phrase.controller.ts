@@ -87,7 +87,7 @@ export async function getQueue(req: AuthRequest, res: Response) {
 
   const result = await useCases.listQueuePhrases(req.user.id);
   if (!result) {
-    return res.status(403).json({ error: "voice_artist_profile_inactive_or_missing" });
+    return res.status(403).json({ error: "voice artist profile inactive or missing" });
   }
 
   const filtered = q
@@ -116,15 +116,15 @@ export async function createSubmission(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_phrase_id" });
+    return res.status(400).json({ error: "invalid phrase id" });
   }
 
   const parsed = parseAudioUpload(req.body?.audioUpload);
   if (parsed === "invalid_audio_upload") {
-    return res.status(400).json({ error: "invalid_audio_upload" });
+    return res.status(400).json({ error: "invalid audio upload" });
   }
   if (parsed === "audio_too_large") {
-    return res.status(400).json({ error: "audio_too_large" });
+    return res.status(400).json({ error: "audio too large" });
   }
 
   const audio = await buildManualAudioMeta({
@@ -140,13 +140,13 @@ export async function createSubmission(req: AuthRequest, res: Response) {
   });
 
   if (submission === "profile_inactive") {
-    return res.status(403).json({ error: "voice_artist_profile_inactive_or_missing" });
+    return res.status(403).json({ error: "voice artist profile inactive or missing" });
   }
   if (submission === "phrase_not_found") {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   if (submission === "phrase_out_of_scope") {
-    return res.status(403).json({ error: "phrase_out_of_scope" });
+    return res.status(403).json({ error: "phrase out of scope" });
   }
 
   return res.status(201).json({ submission });
@@ -159,7 +159,7 @@ export async function listOwnSubmissions(req: AuthRequest, res: Response) {
   const paginationInput = parsePaginationQuery(req.query);
   const q = getSearchQuery(req.query);
   if (status && !["pending", "accepted", "rejected"].includes(status)) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
 
   const result = await useCases.listOwnSubmissions(
@@ -168,7 +168,7 @@ export async function listOwnSubmissions(req: AuthRequest, res: Response) {
   );
 
   if (!result) {
-    return res.status(403).json({ error: "voice_artist_profile_inactive_or_missing" });
+    return res.status(403).json({ error: "voice artist profile inactive or missing" });
   }
 
   const filtered = q

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { phraseService, lessonService, aiService } from "@/services"
 import { Phrase, Lesson } from "@/types"
@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Sparkles, CheckCircle, Volume2 } from "lucide-react"
+import { ArrowLeft, Save, Sparkles, CheckCircle, Volume2, Mic, Square } from "lucide-react"
 import { workflowStatusBadgeClass } from "@/lib/status-badge"
 
 export default function EditPhrasePage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,11 +31,27 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
   const [isSaving, setIsSaving] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
   const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     Promise.all([fetchPhrase(), fetchLessons()])
       .finally(() => setIsLoading(false))
   }, [id])
+
+  useEffect(() => {
+    return () => {
+      if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl)
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+    }
+  }, [recordedAudioUrl])
 
   async function fetchPhrase() {
     try {
@@ -71,6 +87,74 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
       reader.onerror = () => reject(new Error("file_read_failed"))
       reader.readAsDataURL(file)
     })
+  }
+
+  function cleanupRecorderResources() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+      mediaStreamRef.current = null
+    }
+    mediaRecorderRef.current = null
+    chunksRef.current = []
+  }
+
+  function resetRecordedAudio() {
+    if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl)
+    setRecordedAudioUrl(null)
+    setRecordingSeconds(0)
+  }
+
+  async function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Audio recording is not supported in this browser.")
+      return
+    }
+
+    try {
+      resetRecordedAudio()
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+      chunksRef.current = []
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      setRecordingSeconds(0)
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunksRef.current.push(event.data)
+      }
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm"
+        })
+        const ext = blob.type.includes("ogg") ? "ogg" : "webm"
+        const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: blob.type })
+        setAudioFile(file)
+        setRecordedAudioUrl(URL.createObjectURL(blob))
+        setIsRecording(false)
+        cleanupRecorderResources()
+      }
+
+      recorder.start(1000)
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1)
+      }, 1000)
+      setIsRecording(true)
+    } catch {
+      cleanupRecorderResources()
+      setIsRecording(false)
+      toast.error("Could not access microphone.")
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop()
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -248,14 +332,40 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
 
               <div className="space-y-2">
                 <Label htmlFor="audioUpload">Upload Audio Recording</Label>
-                <Input
-                  id="audioUpload"
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                />
+              <Input
+                id="audioUpload"
+                type="file"
+                accept="audio/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  setAudioFile(file)
+                  if (file) resetRecordedAudio()
+                }}
+              />
+              <div className="flex flex-wrap gap-2">
+                {!isRecording ? (
+                  <Button type="button" variant="outline" onClick={startRecording}>
+                    <Mic className="mr-2 h-4 w-4" />
+                    Record Audio
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={stopRecording}>
+                    <Square className="mr-2 h-4 w-4" />
+                    Stop Recording ({Math.floor(recordingSeconds / 60).toString().padStart(2, "0")}:
+                    {(recordingSeconds % 60).toString().padStart(2, "0")})
+                  </Button>
+                )}
               </div>
-            </CardContent>
+              {recordedAudioUrl && (
+                <audio controls src={recordedAudioUrl} className="w-full" />
+              )}
+              {audioFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected file: {audioFile.name}
+                </p>
+              )}
+            </div>
+          </CardContent>
           </Card>
         </div>
 

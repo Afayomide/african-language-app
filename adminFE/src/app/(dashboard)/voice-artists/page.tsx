@@ -61,8 +61,8 @@ export default function VoiceArtistsPage() {
       setArtistTotalPages(artistsData.pagination.totalPages);
       setSubmissionTotal(submissionsData.total);
       setSubmissionTotalPages(submissionsData.pagination.totalPages);
-    } catch {
-      toast.error("Failed to load voice artist data");
+    } catch (error) {
+      toast.error("Failed to load voice artist data")
     } finally {
       setIsLoading(false);
     }
@@ -126,8 +126,8 @@ export default function VoiceArtistsPage() {
       await voiceArtistService.activateVoiceArtist(id);
       toast.success("Voice artist activated");
       fetchData();
-    } catch {
-      toast.error("Failed to activate voice artist");
+    } catch (error) {
+      toast.error("Failed to activate voice artist")
     }
   }
 
@@ -136,8 +136,8 @@ export default function VoiceArtistsPage() {
       await voiceArtistService.deactivateVoiceArtist(id);
       toast.success("Voice artist deactivated");
       fetchData();
-    } catch {
-      toast.error("Failed to deactivate voice artist");
+    } catch (error) {
+      toast.error("Failed to deactivate voice artist")
     }
   }
 
@@ -146,8 +146,8 @@ export default function VoiceArtistsPage() {
       await voiceArtistService.deleteVoiceArtist(id);
       toast.success("Voice artist deleted");
       fetchData();
-    } catch {
-      toast.error("Failed to delete voice artist");
+    } catch (error) {
+      toast.error("Failed to delete voice artist")
     }
   }
 
@@ -156,8 +156,8 @@ export default function VoiceArtistsPage() {
       await voiceAudioService.acceptSubmission(id);
       toast.success("Submission accepted");
       fetchData();
-    } catch {
-      toast.error("Failed to accept submission");
+    } catch (error) {
+      toast.error("Failed to accept submission")
     }
   }
 
@@ -172,8 +172,8 @@ export default function VoiceArtistsPage() {
       await voiceAudioService.rejectSubmission(id, reason);
       toast.success("Submission rejected");
       fetchData();
-    } catch {
-      toast.error("Failed to reject submission");
+    } catch (error) {
+      toast.error("Failed to reject submission")
     }
   }
 

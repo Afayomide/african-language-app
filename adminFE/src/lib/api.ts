@@ -15,6 +15,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const backendError =
+      typeof error?.response?.data?.error === "string"
+        ? error.response.data.error
+        : typeof error?.response?.data?.message === "string"
+          ? error.response.data.message
+          : "";
+    if (backendError) {
+      error.message = backendError;
+    }
+
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
         const token = localStorage.getItem("adminToken");

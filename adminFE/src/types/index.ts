@@ -11,6 +11,7 @@ export type LessonBlock =
 export interface Lesson {
   _id: string;
   title: string;
+  unitId: string;
   language: Language;
   level: Level;
   orderIndex: number;
@@ -18,6 +19,20 @@ export interface Lesson {
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
   blocks: LessonBlock[];
+  status: Status;
+  createdBy: string;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Unit {
+  _id: string;
+  title: string;
+  description: string;
+  language: Language;
+  level: Level;
+  orderIndex: number;
   status: Status;
   createdBy: string;
   publishedAt?: string;

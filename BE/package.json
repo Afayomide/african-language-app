@@ -11,6 +11,7 @@
     "db:clear": "node --enable-source-maps --import tsx src/scripts/clearDatabase.ts",
     "backfill:soft-delete": "node --enable-source-maps --import tsx src/scripts/backfillSoftDelete.ts",
     "migrate:phrase-lesson-ids": "node --enable-source-maps --import tsx src/scripts/migratePhraseLessonIds.ts",
+    "migrate:lessons-to-unit": "node --enable-source-maps --import tsx src/scripts/migrateLessonsToUnit.ts",
     "lint": "eslint ."
   },
   "dependencies": {

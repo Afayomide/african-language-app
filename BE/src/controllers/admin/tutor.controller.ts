@@ -21,7 +21,7 @@ export async function listTutors(req: Request, res: Response) {
   const q = getSearchQuery(req.query);
 
   if (status !== "all" && status !== "active" && status !== "pending") {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
 
   const tutors = await tutorUseCases.list(status);
@@ -44,13 +44,13 @@ export async function listTutors(req: Request, res: Response) {
 export async function activateTutor(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutor = await tutorUseCases.activate(id);
 
   if (!tutor) {
-    return res.status(404).json({ error: "tutor_not_found" });
+    return res.status(404).json({ error: "tutor not found" });
   }
 
   return res.status(200).json({ tutor });
@@ -59,13 +59,13 @@ export async function activateTutor(req: Request, res: Response) {
 export async function deactivateTutor(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutor = await tutorUseCases.deactivate(id);
 
   if (!tutor) {
-    return res.status(404).json({ error: "tutor_not_found" });
+    return res.status(404).json({ error: "tutor not found" });
   }
 
   return res.status(200).json({ tutor });
@@ -74,12 +74,12 @@ export async function deactivateTutor(req: Request, res: Response) {
 export async function deleteTutor(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const deleted = await tutorUseCases.delete(id);
   if (!deleted) {
-    return res.status(404).json({ error: "tutor_not_found" });
+    return res.status(404).json({ error: "tutor not found" });
   }
 
   return res.status(200).json({ message: "tutor_deleted" });

@@ -25,7 +25,7 @@ const useCases = new AdminVoiceAudioReviewUseCases(
 export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const status = req.query.status ? String(req.query.status) : undefined;
   const phraseId = req.query.phraseId ? String(req.query.phraseId) : undefined;
@@ -33,10 +33,10 @@ export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response)
   const q = getSearchQuery(req.query);
 
   if (status && !["pending", "accepted", "rejected"].includes(status)) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
   if (phraseId && !mongoose.Types.ObjectId.isValid(phraseId)) {
-    return res.status(400).json({ error: "invalid_phrase_id" });
+    return res.status(400).json({ error: "invalid phrase id" });
   }
 
   const submissions = await useCases.list({
@@ -68,42 +68,42 @@ export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response)
 export async function acceptVoiceAudioSubmission(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
   const submission = await submissionRepo.findById(id);
   if (!submission || submission.language !== tutorLanguage) {
-    return res.status(404).json({ error: "submission_not_found" });
+    return res.status(404).json({ error: "submission not found" });
   }
 
   const reviewed = await useCases.accept(id, req.user.id);
-  if (!reviewed) return res.status(404).json({ error: "submission_not_found" });
+  if (!reviewed) return res.status(404).json({ error: "submission not found" });
   return res.status(200).json({ submission: reviewed });
 }
 
 export async function rejectVoiceAudioSubmission(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const { id } = req.params;
   const reason = req.body?.reason ? String(req.body.reason).trim() : "";
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
   if (!reason) {
-    return res.status(400).json({ error: "reason_required" });
+    return res.status(400).json({ error: "reason required" });
   }
   const submission = await submissionRepo.findById(id);
   if (!submission || submission.language !== tutorLanguage) {
-    return res.status(404).json({ error: "submission_not_found" });
+    return res.status(404).json({ error: "submission not found" });
   }
 
   const reviewed = await useCases.reject(id, req.user.id, reason);
-  if (!reviewed) return res.status(404).json({ error: "submission_not_found" });
+  if (!reviewed) return res.status(404).json({ error: "submission not found" });
   return res.status(200).json({ submission: reviewed });
 }

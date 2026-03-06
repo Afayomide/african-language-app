@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { lessonService } from "@/services";
-import { Lesson, Language, Status } from "@/types";
+import { lessonService, unitService } from "@/services";
+import { Lesson, Language, Status, Unit } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,8 @@ export default function LessonsByLanguagePage({
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [unitFilter, setUnitFilter] = useState<"all" | string>("all");
 
   const isValidLanguageParam = isLanguage(languageParam);
   const language: Language = isValidLanguageParam ? (languageParam as Language) : "yoruba";
@@ -60,6 +62,7 @@ export default function LessonsByLanguagePage({
     setIsLoading(true);
     try {
       const data = await lessonService.listLessonsPage({
+        unitId: unitFilter === "all" ? undefined : unitFilter,
         status: statusFilter === "all" ? undefined : statusFilter,
         q: search || undefined,
         page,
@@ -69,21 +72,31 @@ export default function LessonsByLanguagePage({
       setSelectedLessonIds([]);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
-    } catch {
-      toast.error("Failed to fetch lessons");
+    } catch (error) {
+      toast.error("Failed to fetch lessons")
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, limit, statusFilter]);
+  }, [page, search, limit, statusFilter, unitFilter]);
+
+  const fetchUnits = useCallback(async () => {
+    try {
+      const data = await unitService.listUnits()
+      setUnits(data)
+    } catch (error) {
+      toast.error("Failed to fetch units")
+    }
+  }, []);
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
+    fetchUnits();
     fetchLessons();
-  }, [fetchLessons, isValidLanguageParam]);
+  }, [fetchLessons, fetchUnits, isValidLanguageParam]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, language, statusFilter]);
+  }, [search, language, statusFilter, unitFilter]);
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
@@ -105,12 +118,14 @@ export default function LessonsByLanguagePage({
     else params.delete("q");
     if (statusFilter !== "all") params.set("status", statusFilter);
     else params.delete("status");
+    if (unitFilter !== "all") params.set("unitId", unitFilter);
+    else params.delete("unitId");
     params.set("page", String(page));
     params.set("limit", String(limit));
     const nextQuery = params.toString();
     if (nextQuery === searchParams.toString()) return;
     router.replace(`${pathname}?${nextQuery}`);
-  }, [search, statusFilter, page, limit, pathname, router, searchParams]);
+  }, [search, statusFilter, unitFilter, page, limit, pathname, router, searchParams]);
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this lesson?")) return;
@@ -118,8 +133,8 @@ export default function LessonsByLanguagePage({
       await lessonService.deleteLesson(id);
       toast.success("Lesson deleted");
       fetchLessons();
-    } catch {
-      toast.error("Failed to delete lesson");
+    } catch (error) {
+      toast.error("Failed to delete lesson")
     }
   }
 
@@ -133,8 +148,8 @@ export default function LessonsByLanguagePage({
       toast.success(`${result.deletedCount} lesson(s) deleted`);
       setSelectedLessonIds([]);
       fetchLessons();
-    } catch {
-      toast.error("Failed to bulk delete lessons");
+    } catch (error) {
+      toast.error("Failed to bulk delete lessons")
     }
   }
 
@@ -143,20 +158,24 @@ export default function LessonsByLanguagePage({
       await lessonService.finishLesson(id);
       toast.success("Lesson sent to admin for publish");
       fetchLessons();
-    } catch {
-      toast.error("Failed to mark lesson as finished");
+    } catch (error) {
+      toast.error("Failed to mark lesson as finished")
     }
   }
 
   async function reorderLessonsByIds(orderedIds: string[]) {
     if (orderedIds.length !== lessons.length) return;
+    if (unitFilter === "all") {
+      toast.error("Select a unit before reordering.");
+      return;
+    }
 
     try {
-      const updated = await lessonService.reorderLessons(orderedIds);
+      const updated = await lessonService.reorderLessons(unitFilter, orderedIds);
       setLessons([...updated].sort((a, b) => a.orderIndex - b.orderIndex));
       toast.success("Lesson order updated");
-    } catch {
-      toast.error("Failed to reorder lessons");
+    } catch (error) {
+      toast.error("Failed to reorder lessons")
     }
   }
 
@@ -226,7 +245,7 @@ export default function LessonsByLanguagePage({
             Delete Selected ({selectedLessonIds.length})
           </Button>
           <Button asChild className="h-12 rounded-xl px-6 font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
-            <Link href={`/lessons/new?language=${language}`}>
+            <Link href={`/lessons/new?language=${language}${unitFilter !== "all" ? `&unitId=${unitFilter}` : ""}`}>
               <Plus className="mr-2 h-5 w-5" />
               Create New Lesson
             </Link>
@@ -251,6 +270,21 @@ export default function LessonsByLanguagePage({
             onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
             onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           />
+          <div className="pb-4">
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="h-10 w-[280px]">
+                <SelectValue placeholder="Filter by unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All units</SelectItem>
+                {units.map((unit) => (
+                  <SelectItem key={unit._id} value={unit._id}>
+                    {unit.orderIndex + 1}. {unit.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="pb-4">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
               <SelectTrigger className="h-10 w-[220px]">

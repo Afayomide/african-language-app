@@ -29,7 +29,10 @@ function LessonOverviewContent() {
           return
         }
         const overview = await learnerLessonService.getLessonOverview(lessonId);
-        setLesson(overview.lesson);
+        setLesson({
+          ...overview.lesson,
+          _id: overview.lesson.id ?? overview.lesson._id
+        });
         setProgress(overview.lesson.progressPercent || 0);
         setStatus(overview.lesson.status === "completed" ? "completed" : "available");
       } catch (error) {
@@ -106,7 +109,7 @@ function LessonOverviewContent() {
                 </p>
               </div>
 
-              <Link href={`/study?lessonId=${lesson.id}`} className="block">
+              <Link href={`/study?lessonId=${lesson._id}`} className="block">
                 <Button size="lg" className="w-full h-16 rounded-[1.5rem] text-xl font-black shadow-xl border-b-8 border-primary-foreground/30 active:translate-y-1 active:border-b-4 transition-all">
                   {isCompleted ? "Review Lesson" : "Start Learning"}
                   <ArrowRight className="ml-2 h-6 w-6" />
@@ -123,7 +126,7 @@ function LessonOverviewContent() {
           <div className="space-y-6">
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 px-2">Study Materials</h3>
             <div className="grid gap-4">
-              <Link href={`/lesson-phrases?lessonId=${lesson.id}`}>
+              <Link href={`/lesson-phrases?lessonId=${lesson._id}`}>
                 <Card className="p-6 border-4 border-muted hover:border-primary/30 transition-all rounded-[2rem] flex items-center justify-between group bg-white shadow-sm">
                   <div className="flex items-center gap-5">
                     <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">

@@ -44,7 +44,10 @@ export function parseQuestionReviewData(reviewData: unknown) {
   if (words.length < 2) return null;
 
   if (!Array.isArray(payload.correctOrder)) return null;
-  const correctOrder = payload.correctOrder.map((item) => Number(item));
+  const rawOrder = payload.correctOrder.map((item) => Number(item));
+  // Accept both 0-based and 1-based order indices from clients.
+  const allOneBased = rawOrder.length > 0 && rawOrder.every((idx) => !Number.isNaN(idx) && idx >= 1 && idx <= words.length);
+  const correctOrder = allOneBased ? rawOrder.map((idx) => idx - 1) : rawOrder;
   if (
     correctOrder.length !== words.length ||
     correctOrder.some((idx) => Number.isNaN(idx) || idx < 0 || idx >= words.length) ||

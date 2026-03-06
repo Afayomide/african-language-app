@@ -4,41 +4,49 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AdminLessonAiUseCases } from "../../application/use-cases/admin/lesson-ai/AdminLessonAiUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { isValidLanguage, isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
-import type { Language, Level } from "../../domain/entities/Lesson.js";
+import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
+import type { Level } from "../../domain/entities/Lesson.js";
 
 const lessons = new MongooseLessonRepository();
 const proverbs = new MongooseProverbRepository();
+const units = new MongooseUnitRepository();
 const useCases = new AdminLessonAiUseCases(lessons, new MongooseProverbRepository(), getLlmClient());
 
 export async function generateLessonsBulk(req: AuthRequest, res: Response) {
   if (!req.user) {
-    return res.status(401).json({ error: "unauthorized" });
+    return res.status(401).json({ error: "Unauthorized." });
   }
 
-  const { language, level, title, topics, count } = req.body ?? {};
+  const { unitId, title, topics, count } = req.body ?? {};
 
-  if (!language || !isValidLanguage(String(language))) {
-    return res.status(400).json({ error: "invalid_language" });
-  }
-  if (!level || !isValidLevel(String(level))) {
-    return res.status(400).json({ error: "invalid_level" });
+  if (!unitId || typeof unitId !== "string") {
+    return res.status(400).json({ error: "Unit id is required." });
   }
   if (title !== undefined && String(title).trim().length === 0) {
-    return res.status(400).json({ error: "invalid_title" });
+    return res.status(400).json({ error: "Title is invalid." });
   }
   if (topics !== undefined && !Array.isArray(topics)) {
-    return res.status(400).json({ error: "invalid_topics" });
+    return res.status(400).json({ error: "Topics must be an array." });
   }
 
   const requestedCount = Number(count ?? (Array.isArray(topics) ? topics.length : 5));
   if (Number.isNaN(requestedCount) || requestedCount < 1 || requestedCount > 20) {
-    return res.status(400).json({ error: "invalid_count" });
+    return res.status(400).json({ error: "Count must be between 1 and 20." });
+  }
+
+  const unit = await units.findById(String(unitId));
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found." });
+  }
+  if (!isValidLevel(String(unit.level))) {
+    return res.status(400).json({ error: "Unit level is invalid." });
   }
 
   const result = await useCases.generateLessonsBulk({
-    language: String(language) as Language,
-    level: String(level) as Level,
+    unitId: unit.id,
+    language: unit.language,
+    level: String(unit.level) as Level,
     title: title ? String(title) : undefined,
     topics: Array.isArray(topics) ? topics.map(String) : undefined,
     count: requestedCount,
@@ -48,20 +56,104 @@ export async function generateLessonsBulk(req: AuthRequest, res: Response) {
   return res.status(201).json(result);
 }
 
+export async function generateUnitsBulk(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { language, level, count, topic } = req.body ?? {};
+
+  if (!language || !["yoruba", "igbo", "hausa"].includes(String(language))) {
+    return res.status(400).json({ error: "Language is invalid." });
+  }
+  if (!level || !isValidLevel(String(level))) {
+    return res.status(400).json({ error: "Level is invalid." });
+  }
+
+  const requestedCount = Number(count ?? 5);
+  if (Number.isNaN(requestedCount) || requestedCount < 1 || requestedCount > 20) {
+    return res.status(400).json({ error: "Count must be between 1 and 20." });
+  }
+  if (topic !== undefined && typeof topic !== "string") {
+    return res.status(400).json({ error: "Topic is invalid." });
+  }
+
+  const llm = getLlmClient();
+  const existingUnits = await units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa");
+  let lastOrderIndex = existingUnits.reduce((max, unit) => Math.max(max, unit.orderIndex), -1);
+  const seenTitles = new Set(existingUnits.map((unit) => unit.title.trim().toLowerCase()));
+
+  const created = [];
+  const skipped: Array<{ reason: string; title?: string }> = [];
+  const errors: Array<{ index: number; error: string }> = [];
+
+  for (let index = 0; index < requestedCount; index += 1) {
+    const variationTopic = typeof topic === "string" && topic.trim()
+      ? `${topic.trim()} variation ${index + 1}`
+      : undefined;
+
+    try {
+      const suggestion = await llm.suggestLesson({
+        language: String(language),
+        level: String(level),
+        topic: variationTopic
+      });
+
+      const rawTitle = String(suggestion.title || "").trim();
+      if (!rawTitle) {
+        errors.push({ index: index + 1, error: "AI returned an empty title." });
+        continue;
+      }
+
+      const titleKey = rawTitle.toLowerCase();
+      if (seenTitles.has(titleKey)) {
+        skipped.push({ reason: "duplicate_title", title: rawTitle });
+        continue;
+      }
+
+      seenTitles.add(titleKey);
+      lastOrderIndex += 1;
+      const createdUnit = await units.create({
+        title: rawTitle,
+        description: String(suggestion.description || "").trim(),
+        language: String(language) as "yoruba" | "igbo" | "hausa",
+        level: String(level) as Level,
+        orderIndex: lastOrderIndex,
+        status: "draft",
+        createdBy: req.user.id
+      });
+      created.push(createdUnit);
+    } catch (error) {
+      console.error("Admin AI generateUnitsBulk error", error);
+      errors.push({ index: index + 1, error: "Failed to generate this unit." });
+    }
+  }
+
+  return res.status(201).json({
+    totalRequested: requestedCount,
+    createdCount: created.length,
+    skippedCount: skipped.length,
+    errorCount: errors.length,
+    units: created,
+    skipped,
+    errors
+  });
+}
+
 export async function generateProverbs(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { lessonId, count, extraInstructions } = req.body ?? {};
-  if (!lessonId) return res.status(400).json({ error: "lesson_id_required" });
+  if (!lessonId) return res.status(400).json({ error: "lesson id required" });
   const lesson = await lessons.findById(String(lessonId));
-  if (!lesson) return res.status(404).json({ error: "lesson_not_found" });
+  if (!lesson) return res.status(404).json({ error: "lesson not found" });
 
   const requestedCount = Number(count ?? 5);
   if (Number.isNaN(requestedCount) || requestedCount < 1 || requestedCount > 20) {
-    return res.status(400).json({ error: "invalid_count" });
+    return res.status(400).json({ error: "invalid count" });
   }
   if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
-    return res.status(400).json({ error: "invalid_extra_instructions" });
+    return res.status(400).json({ error: "invalid extra instructions" });
   }
 
   const llm = getLlmClient();
@@ -113,11 +205,11 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
     }
 
     if (created.length === 0) {
-      return res.status(409).json({ error: "no_new_proverbs_generated" });
+      return res.status(409).json({ error: "no new proverbs generated" });
     }
     return res.status(201).json({ total: created.length, proverbs: created });
   } catch (error) {
     console.error("Admin AI generateProverbs LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }

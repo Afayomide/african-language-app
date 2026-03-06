@@ -2,6 +2,7 @@
 // These call Next.js API routes under /api/*.
 export {
   lessonService,
+  unitService,
   phraseService,
   proverbService,
   questionService,

@@ -67,7 +67,7 @@ export default function TutorQuestionsPage() {
     try {
       const data = await lessonService.listLessons()
       setLessons(data)
-    } catch {
+    } catch (error) {
       toast.error("Failed to load lessons")
     }
   }
@@ -76,7 +76,7 @@ export default function TutorQuestionsPage() {
     try {
       const data = await phraseService.listPhrases(lessonId)
       setPhrases(data.map((p) => ({ _id: p._id, text: p.text, translation: p.translation })))
-    } catch {
+    } catch (error) {
       toast.error("Failed to load phrases")
       setPhrases([])
     }
@@ -93,7 +93,7 @@ export default function TutorQuestionsPage() {
       setQuestions(data.items)
       setTotal(data.total)
       setTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to load questions")
     }
   }
@@ -207,7 +207,7 @@ export default function TutorQuestionsPage() {
       await questionService.finishQuestion(id)
       toast.success("Question sent to admin for publish")
       fetchQuestions()
-    } catch {
+    } catch (error) {
       toast.error("Failed to mark question as finished")
     }
   }
@@ -218,7 +218,7 @@ export default function TutorQuestionsPage() {
       await questionService.deleteQuestion(id)
       toast.success("Question deleted")
       fetchQuestions()
-    } catch {
+    } catch (error) {
       toast.error("Failed to delete question")
     }
   }

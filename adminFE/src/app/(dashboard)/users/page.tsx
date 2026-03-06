@@ -117,7 +117,7 @@ export default function UsersPage() {
       setUsers(data.items)
       setTotal(data.total)
       setTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to fetch users")
     } finally {
       setIsLoading(false)

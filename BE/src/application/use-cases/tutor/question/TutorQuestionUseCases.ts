@@ -35,7 +35,12 @@ export class TutorQuestionUseCases {
   }
 
   async list(
-    filter: { lessonId?: string; type?: QuestionEntity["type"]; status?: "draft" | "finished" | "published" },
+    filter: {
+      lessonId?: string;
+      type?: QuestionEntity["type"];
+      subtype?: QuestionEntity["subtype"];
+      status?: "draft" | "finished" | "published";
+    },
     tutorLanguage: Language
   ) {
     if (filter.lessonId) {

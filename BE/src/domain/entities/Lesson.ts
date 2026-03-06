@@ -16,6 +16,7 @@ export type LessonEntity = {
   id: string;
   _id?: string;
   title: string;
+  unitId: string;
   language: Language;
   level: Level;
   orderIndex: number;

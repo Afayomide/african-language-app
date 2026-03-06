@@ -22,15 +22,15 @@ export async function suggestLesson(req: AuthRequest, res: Response) {
 
   const { level, topic } = req.body ?? {};
   if (!level || !isValidLevel(String(level))) {
-    return res.status(400).json({ error: "invalid_level" });
+    return res.status(400).json({ error: "invalid level" });
   }
   if (topic !== undefined && String(topic).trim().length === 0) {
-    return res.status(400).json({ error: "invalid_topic" });
+    return res.status(400).json({ error: "invalid topic" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) {
-    return res.status(403).json({ error: "tutor_language_not_configured" });
+    return res.status(403).json({ error: "tutor language not configured" });
   }
 
   const llm = getLlmClient();
@@ -44,7 +44,7 @@ export async function suggestLesson(req: AuthRequest, res: Response) {
     return res.status(200).json({ suggestion });
   } catch (error) {
     console.error("Tutor AI suggestLesson LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }
 
@@ -55,23 +55,23 @@ export async function generatePhrases(req: AuthRequest, res: Response) {
 
   const { lessonId, seedWords, extraInstructions } = req.body ?? {};
   if (!validateLessonId(lessonId)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (seedWords !== undefined && !Array.isArray(seedWords)) {
-    return res.status(400).json({ error: "invalid_seed_words" });
+    return res.status(400).json({ error: "invalid seed words" });
   }
   if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
-    return res.status(400).json({ error: "invalid_extra_instructions" });
+    return res.status(400).json({ error: "invalid extra instructions" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) {
-    return res.status(403).json({ error: "tutor_language_not_configured" });
+    return res.status(403).json({ error: "tutor language not configured" });
   }
 
   const lesson = await lessons.findById(String(lessonId));
   if (!lesson || lesson.language !== tutorLanguage) {
-    return res.status(404).json({ error: "lesson_not_found_or_out_of_scope" });
+    return res.status(404).json({ error: "lesson not found or out of scope" });
   }
 
   const orchestrator = new AiPhraseOrchestrator(lessons, phrases, getLlmClient());
@@ -84,13 +84,13 @@ export async function generatePhrases(req: AuthRequest, res: Response) {
     });
 
     if (created.length === 0) {
-      return res.status(409).json({ error: "no_new_phrases_generated" });
+      return res.status(409).json({ error: "no new phrases generated" });
     }
 
     return res.status(201).json({ total: created.length, phrases: created });
   } catch (error) {
     console.error("Tutor AI generatePhrases LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }
 
@@ -101,29 +101,29 @@ export async function enhancePhrase(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) {
-    return res.status(403).json({ error: "tutor_language_not_configured" });
+    return res.status(403).json({ error: "tutor language not configured" });
   }
 
   const phrase = await phrases.findById(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   if (phrase.status === "published" || phrase.status === "finished") {
-    return res.status(409).json({ error: "cannot_edit_non_draft" });
+    return res.status(409).json({ error: "cannot edit non draft" });
   }
 
   const primaryLessonId = phrase.lessonIds[0];
   if (!primaryLessonId) {
-    return res.status(400).json({ error: "phrase_has_no_lessons" });
+    return res.status(400).json({ error: "phrase has no lessons" });
   }
   const lesson = await lessons.findById(primaryLessonId);
   if (!lesson || lesson.language !== tutorLanguage) {
-    return res.status(404).json({ error: "phrase_not_found_or_out_of_scope" });
+    return res.status(404).json({ error: "phrase not found or out of scope" });
   }
 
   const orchestrator = new AiPhraseOrchestrator(lessons, phrases, getLlmClient());
@@ -136,13 +136,13 @@ export async function enhancePhrase(req: AuthRequest, res: Response) {
     });
 
     if (!updated) {
-      return res.status(422).json({ error: "no_valid_phrase_updates" });
+      return res.status(422).json({ error: "no valid phrase updates" });
     }
 
     return res.status(200).json({ phrase: updated });
   } catch (error) {
     console.error("Tutor AI enhancePhrase LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }
 
@@ -151,22 +151,22 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
 
   const { lessonId, count, extraInstructions } = req.body ?? {};
   if (!validateLessonId(lessonId)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   const requestedCount = Number(count ?? 5);
   if (Number.isNaN(requestedCount) || requestedCount < 1 || requestedCount > 20) {
-    return res.status(400).json({ error: "invalid_count" });
+    return res.status(400).json({ error: "invalid count" });
   }
   if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
-    return res.status(400).json({ error: "invalid_extra_instructions" });
+    return res.status(400).json({ error: "invalid extra instructions" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const lesson = await lessons.findById(String(lessonId));
   if (!lesson || lesson.language !== tutorLanguage) {
-    return res.status(404).json({ error: "lesson_not_found_or_out_of_scope" });
+    return res.status(404).json({ error: "lesson not found or out of scope" });
   }
 
   const llm = getLlmClient();
@@ -218,11 +218,11 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
     }
 
     if (created.length === 0) {
-      return res.status(409).json({ error: "no_new_proverbs_generated" });
+      return res.status(409).json({ error: "no new proverbs generated" });
     }
     return res.status(201).json({ total: created.length, proverbs: created });
   } catch (error) {
     console.error("Tutor AI generateProverbs LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }

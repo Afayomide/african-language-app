@@ -70,9 +70,18 @@ export class LearnerLessonUseCases {
     if (!lesson || lesson.status !== "published") return null;
 
     // 1. Identify all question/proverb/phrase refs in the blocks
-    const questionIds = lesson.blocks.filter(b => b.type === "question" || b.type === "listening").map(b => (b as any).refId);
-    const proverbIds = lesson.blocks.filter(b => b.type === "proverb").map(b => (b as any).refId);
-    const manualPhraseIds = lesson.blocks.filter(b => b.type === "phrase").map(b => (b as any).refId);
+    const questionIds = lesson.blocks
+      .filter((b) => b.type === "question")
+      .map((b) => (b as any).refId)
+      .filter(Boolean);
+    const proverbIds = lesson.blocks
+      .filter((b) => b.type === "proverb")
+      .map((b) => (b as any).refId)
+      .filter(Boolean);
+    const manualPhraseIds = lesson.blocks
+      .filter((b) => b.type === "phrase")
+      .map((b) => (b as any).refId)
+      .filter(Boolean);
 
     // 2. Fetch questions and proverbs first to see what phrases they reference
     const [questions, proverbs] = await Promise.all([
@@ -104,7 +113,7 @@ export class LearnerLessonUseCases {
         const data = proverbMap.get(refId);
         return data ? { ...block, data } : null;
       }
-      if (block.type === "question" || block.type === "listening") {
+      if (block.type === "question") {
         const q = questionMap.get(refId);
         if (!q) return null;
         
@@ -319,7 +328,7 @@ export class LearnerLessonUseCases {
 
     // 2. Get phrases referenced in questions within the block flow
     const questionIds = lesson.blocks
-      .filter(b => b.type === "question" || b.type === "listening")
+      .filter(b => b.type === "question")
       .map(b => (b as any).refId);
     
     let referencedPhrases: PhraseEntity[] = [];

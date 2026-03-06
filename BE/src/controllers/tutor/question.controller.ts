@@ -34,24 +34,25 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { lessonId, phraseId, type, subtype, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  console.log(req.body)
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId))) {
-    return res.status(400).json({ error: "invalid_phrase_id" });
+    return res.status(400).json({ error: "invalid phrase id" });
   }
   if (!type || !isValidQuestionType(String(type))) {
-    return res.status(400).json({ error: "invalid_type" });
+    return res.status(400).json({ error: "invalid type" });
   }
   if (!subtype || !isValidQuestionSubtype(String(subtype))) {
-    return res.status(400).json({ error: "invalid_subtype" });
+    return res.status(400).json({ error: "invalid subtype" });
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
-    return res.status(400).json({ error: "prompt_template_required" });
+    return res.status(400).json({ error: "prompt template required" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   let parsedOptions = parseQuestionOptions(options);
   let answerIndex = Number(correctIndex);
@@ -59,14 +60,14 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   if (String(type) === "fill-in-the-gap") {
     parsedReviewData = parseQuestionReviewData(reviewData);
     if (!parsedReviewData) {
-      return res.status(400).json({ error: "invalid_review_data" });
+      return res.status(400).json({ error: "invalid review data" });
     }
     parsedOptions = parsedReviewData.words;
     answerIndex = 0;
   } else {
-    if (!parsedOptions) return res.status(400).json({ error: "invalid_options" });
+    if (!parsedOptions) return res.status(400).json({ error: "invalid options" });
     if (Number.isNaN(answerIndex) || answerIndex < 0 || answerIndex >= parsedOptions.length) {
-      return res.status(400).json({ error: "invalid_correct_index" });
+      return res.status(400).json({ error: "invalid correct index" });
     }
   }
 
@@ -84,8 +85,8 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     },
     tutorLanguage as Language
   );
-  if (created === "lesson_not_found") return res.status(404).json({ error: "lesson_not_found" });
-  if (created === "phrase_not_found") return res.status(404).json({ error: "phrase_not_found" });
+  if (created === "lesson_not_found") return res.status(404).json({ error: "lesson not found" });
+  if (created === "phrase_not_found") return res.status(404).json({ error: "phrase not found" });
 
   return res.status(201).json({ question: created });
 }
@@ -94,22 +95,22 @@ export async function listQuestions(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const { lessonId, type, subtype, status } = req.query;
   const paginationInput = parsePaginationQuery(req.query);
   const q = getSearchQuery(req.query);
   if (lessonId !== undefined && !mongoose.Types.ObjectId.isValid(String(lessonId))) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (type !== undefined && !isValidQuestionType(String(type))) {
-    return res.status(400).json({ error: "invalid_type" });
+    return res.status(400).json({ error: "invalid type" });
   }
   if (subtype !== undefined && !isValidQuestionSubtype(String(subtype))) {
-    return res.status(400).json({ error: "invalid_subtype" });
+    return res.status(400).json({ error: "invalid subtype" });
   }
   if (status !== undefined && !["draft", "finished", "published"].includes(String(status))) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
 
   const listed = await questionUseCases.list(
@@ -121,7 +122,7 @@ export async function listQuestions(req: AuthRequest, res: Response) {
     },
     tutorLanguage as Language
   );
-  if (listed === "lesson_not_found") return res.status(404).json({ error: "lesson_not_found" });
+  if (listed === "lesson_not_found") return res.status(404).json({ error: "lesson not found" });
 
   const questions = listed;
   const phrases = await phraseRepo.findByIds(questions.map((q) => q.phraseId));
@@ -163,14 +164,14 @@ export async function getQuestionById(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
-  if (!question) return res.status(404).json({ error: "question_not_found" });
+  if (!question) return res.status(404).json({ error: "question not found" });
   const phrase = await phraseRepo.findById(question.phraseId);
   return res.status(200).json({
     question: {
@@ -193,14 +194,14 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
-  if (!question) return res.status(404).json({ error: "question_not_found" });
+  if (!question) return res.status(404).json({ error: "question not found" });
 
   const { type, subtype, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
   const update: Record<string, unknown> = {};
@@ -208,42 +209,42 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
 
   if (type !== undefined) {
     if (!isValidQuestionType(String(type))) {
-      return res.status(400).json({ error: "invalid_type" });
+      return res.status(400).json({ error: "invalid type" });
     }
     update.type = String(type) as QuestionType;
   }
   if (subtype !== undefined) {
     if (!isValidQuestionSubtype(String(subtype))) {
-      return res.status(400).json({ error: "invalid_subtype" });
+      return res.status(400).json({ error: "invalid subtype" });
     }
     update.subtype = String(subtype) as QuestionSubtype;
   }
   if (promptTemplate !== undefined) {
     if (!String(promptTemplate).trim()) {
-      return res.status(400).json({ error: "prompt_template_required" });
+      return res.status(400).json({ error: "prompt template required" });
     }
     update.promptTemplate = String(promptTemplate).trim();
   }
   if (phraseId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
-      return res.status(400).json({ error: "invalid_phrase_id" });
+      return res.status(400).json({ error: "invalid phrase id" });
     }
     const phrase = await phraseRepo.findById(String(phraseId));
     if (phrase && !phrase.lessonIds.includes(question.lessonId)) {
-      return res.status(404).json({ error: "phrase_not_found" });
+      return res.status(404).json({ error: "phrase not found" });
     }
-    if (!phrase) return res.status(404).json({ error: "phrase_not_found" });
+    if (!phrase) return res.status(404).json({ error: "phrase not found" });
     update.phraseId = phrase.id;
   }
 
   if (effectiveType === "fill-in-the-gap") {
     if (type !== undefined && String(type) === "fill-in-the-gap" && reviewData === undefined && !question.reviewData?.sentence) {
-      return res.status(400).json({ error: "invalid_review_data" });
+      return res.status(400).json({ error: "invalid review data" });
     }
     if (reviewData !== undefined) {
       const parsedReviewData = parseQuestionReviewData(reviewData);
       if (!parsedReviewData) {
-        return res.status(400).json({ error: "invalid_review_data" });
+        return res.status(400).json({ error: "invalid review data" });
       }
       update.reviewData = parsedReviewData;
       update.options = parsedReviewData.words;
@@ -253,20 +254,20 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (options !== undefined) {
       const parsedOptions = parseQuestionOptions(options);
       if (!parsedOptions) {
-        return res.status(400).json({ error: "invalid_options" });
+        return res.status(400).json({ error: "invalid options" });
       }
       update.options = parsedOptions;
       if (correctIndex !== undefined) {
         const idx = Number(correctIndex);
         if (Number.isNaN(idx) || idx < 0 || idx >= parsedOptions.length) {
-          return res.status(400).json({ error: "invalid_correct_index" });
+          return res.status(400).json({ error: "invalid correct index" });
         }
         update.correctIndex = idx;
       }
     } else if (correctIndex !== undefined) {
       const idx = Number(correctIndex);
       if (Number.isNaN(idx) || idx < 0 || idx >= question.options.length) {
-        return res.status(400).json({ error: "invalid_correct_index" });
+        return res.status(400).json({ error: "invalid correct index" });
       }
       update.correctIndex = idx;
     }
@@ -279,8 +280,8 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     tutorLanguage as Language,
     update
   );
-  if (updated === "phrase_not_found") return res.status(404).json({ error: "phrase_not_found" });
-  if (updated === "question_not_found" || !updated) return res.status(404).json({ error: "question_not_found" });
+  if (updated === "phrase_not_found") return res.status(404).json({ error: "phrase not found" });
+  if (updated === "question_not_found" || !updated) return res.status(404).json({ error: "question not found" });
   return res.status(200).json({ question: updated });
 }
 
@@ -288,14 +289,14 @@ export async function deleteQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const deleted = await questionUseCases.deleteInScope(id, tutorLanguage as Language);
-  if (!deleted) return res.status(404).json({ error: "question_not_found" });
+  if (!deleted) return res.status(404).json({ error: "question not found" });
   return res.status(200).json({ message: "question_deleted" });
 }
 
@@ -303,13 +304,13 @@ export async function finishQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const finished = await questionUseCases.finishInScope(id, tutorLanguage as Language);
-  if (finished === "question_not_found") return res.status(404).json({ error: "question_not_found" });
+  if (finished === "question_not_found") return res.status(404).json({ error: "question not found" });
   return res.status(200).json({ question: finished });
 }

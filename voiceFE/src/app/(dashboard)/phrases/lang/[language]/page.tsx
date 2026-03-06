@@ -145,8 +145,8 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
       setQueueTotalPages(queueData.pagination.totalPages);
       setSubmissionTotal(submissionData.total);
       setSubmissionTotalPages(submissionData.pagination.totalPages);
-    } catch {
-      toast.error("Failed to load phrases/audio submissions");
+    } catch (error) {
+      toast.error("Failed to load phrases/audio submissions")
     } finally {
       setIsLoading(false);
     }

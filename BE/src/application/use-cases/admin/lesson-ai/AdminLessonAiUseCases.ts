@@ -32,6 +32,7 @@ export class AdminLessonAiUseCases {
   ) {}
 
   async generateLessonsBulk(input: {
+    unitId: string;
     language: Language;
     level: Level;
     title?: string;
@@ -39,7 +40,7 @@ export class AdminLessonAiUseCases {
     count: number;
     createdBy: string;
   }) {
-    const existingLessons = await this.lessons.list({ language: input.language });
+    const existingLessons = await this.lessons.list({ unitId: input.unitId });
     const existingTitleSet = new Set(
       existingLessons
         .filter((item) => item.level === input.level)
@@ -64,7 +65,7 @@ export class AdminLessonAiUseCases {
     const skipped: { reason: string; topic?: string; title?: string }[] = [];
     const errors: { topic?: string; error: string }[] = [];
 
-    const lastOrder = await this.lessons.findLastOrderIndex(input.language);
+    const lastOrder = await this.lessons.findLastOrderIndex(input.unitId);
     let nextOrderIndex = (lastOrder ?? -1) + 1;
 
     for (let idx = 0; idx < input.count; idx += 1) {
@@ -90,6 +91,7 @@ export class AdminLessonAiUseCases {
 
         const lesson = await this.lessons.create({
           title,
+          unitId: input.unitId,
           language: input.language,
           level: input.level,
           description: suggestion.description ? String(suggestion.description).trim() : "",

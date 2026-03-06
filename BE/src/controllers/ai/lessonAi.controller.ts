@@ -6,13 +6,13 @@ export async function suggestLesson(req: Request, res: Response) {
   const { language, level, topic } = req.body ?? {};
 
   if (!language || !isValidLanguage(String(language))) {
-    return res.status(400).json({ error: "invalid_language" });
+    return res.status(400).json({ error: "invalid language" });
   }
   if (!level || !isValidLevel(String(level))) {
-    return res.status(400).json({ error: "invalid_level" });
+    return res.status(400).json({ error: "invalid level" });
   }
   if (topic !== undefined && String(topic).trim().length === 0) {
-    return res.status(400).json({ error: "invalid_topic" });
+    return res.status(400).json({ error: "invalid topic" });
   }
 
   const llm = getLlmClient();
@@ -27,6 +27,6 @@ export async function suggestLesson(req: Request, res: Response) {
     return res.status(200).json({ suggestion });
   } catch (error) {
     console.error("AI suggestLesson LLM error", error);
-    return res.status(502).json({ error: "llm_generation_failed" });
+    return res.status(502).json({ error: "llm generation failed" });
   }
 }

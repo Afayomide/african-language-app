@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { lessonService, authService, aiService } from "@/services";
-import { Level } from "@/types";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { lessonService, authService, aiService, unitService } from "@/services";
+import { Level, Unit } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +20,11 @@ import { toast } from "sonner";
 import { ArrowLeft, Sparkles, Plus, Trash } from "lucide-react";
 
 export default function NewLessonPage() {
+  const searchParams = useSearchParams();
+  const initialUnitId = searchParams.get("unitId") || "";
   const [title, setTitle] = useState("");
-  const [level, setLevel] = useState<Level>("beginner");
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [unitId, setUnitId] = useState(initialUnitId);
   const [description, setDescription] = useState("");
   const [topicsInput, setTopicsInput] = useState("");
   const [proverbs, setProverbs] = useState<Array<{ text: string; translation: string; contextNote: string }>>([]);
@@ -29,6 +32,21 @@ export default function NewLessonPage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        const data = await unitService.listUnits();
+        setUnits(data);
+        if (!unitId && data.length > 0) {
+          setUnitId(data[0]._id);
+        }
+      } catch (error) {
+        toast.error("Failed to fetch units")
+      }
+    };
+    void loadUnits();
+  }, [unitId]);
 
   const handleAddProverb = () => {
     setProverbs([...proverbs, { text: "", translation: "", contextNote: "" }]);
@@ -53,12 +71,16 @@ export default function NewLessonPage() {
         .map((item) => item.trim())
         .filter(Boolean);
       
-      await lessonService.createLesson({ title, level, description, topics, proverbs });
+      if (!unitId) {
+        toast.error("Select a unit");
+        return;
+      }
+      await lessonService.createLesson({ title, unitId, description, topics, proverbs });
       const tutor = authService.getTutorProfile();
       toast.success("Lesson created");
       router.push(`/lessons/lang/${tutor?.language || "yoruba"}`);
-    } catch {
-      toast.error("Failed to create lesson");
+    } catch (error) {
+      toast.error("Failed to create lesson")
     } finally {
       setIsLoading(false);
     }
@@ -73,6 +95,8 @@ export default function NewLessonPage() {
     setIsSuggesting(true);
     try {
       const tutor = authService.getTutorProfile();
+      const selectedUnit = units.find((unit) => unit._id === unitId);
+      const level = (selectedUnit?.level || "beginner") as Level;
       const suggestion = await aiService.suggestLesson(title, tutor?.language || "yoruba", level);
       if (suggestion.title) setTitle(suggestion.title);
       if (suggestion.description) setDescription(suggestion.description);
@@ -88,8 +112,8 @@ export default function NewLessonPage() {
         setProverbs(newProverbs);
       }
       toast.success("AI suggestion applied");
-    } catch {
-      toast.error("AI suggestion failed");
+    } catch (error) {
+      toast.error("AI suggestion failed")
     } finally {
       setIsSuggesting(false);
     }
@@ -128,15 +152,17 @@ export default function NewLessonPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="level">Level</Label>
-              <Select value={level} onValueChange={(v) => setLevel(v as Level)}>
+              <Label htmlFor="unit">Unit</Label>
+              <Select value={unitId} onValueChange={setUnitId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select level" />
+                  <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
+                  {units.map((unit) => (
+                    <SelectItem key={unit._id} value={unit._id}>
+                      {unit.orderIndex + 1}. {unit.title} ({unit.level})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

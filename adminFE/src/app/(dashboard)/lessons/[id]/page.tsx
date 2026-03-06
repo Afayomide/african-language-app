@@ -128,7 +128,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       )
       setPhraseTotal(data.total)
       setPhraseTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to fetch lesson phrases")
     } finally {
       setIsLoadingPhrases(false)
@@ -213,8 +213,9 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await lessonService.publishLesson(id)
       toast.success("Lesson published")
       fetchLesson()
-    } catch (error) {
-      toast.error("Failed to publish lesson")
+    } catch (error:any) {
+      console.log(error)
+      toast.error(error.error)
     }
   }
 
@@ -281,7 +282,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await phraseService.deletePhrase(phraseId)
       toast.success("Phrase deleted")
       if (lesson) fetchLessonPhrases(lesson._id)
-    } catch {
+    } catch (error) {
       toast.error("Failed to delete phrase")
     }
   }
@@ -291,7 +292,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await phraseService.publishPhrase(phraseId)
       toast.success("Phrase published")
       if (lesson) fetchLessonPhrases(lesson._id)
-    } catch {
+    } catch (error) {
       toast.error("Failed to publish phrase")
     }
   }

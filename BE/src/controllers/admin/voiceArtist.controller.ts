@@ -21,7 +21,7 @@ export async function listVoiceArtists(req: Request, res: Response) {
   const q = getSearchQuery(req.query);
 
   if (status !== "all" && status !== "active" && status !== "pending") {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
 
   const voiceArtists = await useCases.list(status);
@@ -43,12 +43,12 @@ export async function listVoiceArtists(req: Request, res: Response) {
 export async function activateVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const voiceArtist = await useCases.activate(id);
   if (!voiceArtist) {
-    return res.status(404).json({ error: "voice_artist_not_found" });
+    return res.status(404).json({ error: "voice artist not found" });
   }
 
   return res.status(200).json({ voiceArtist });
@@ -57,12 +57,12 @@ export async function activateVoiceArtist(req: Request, res: Response) {
 export async function deactivateVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const voiceArtist = await useCases.deactivate(id);
   if (!voiceArtist) {
-    return res.status(404).json({ error: "voice_artist_not_found" });
+    return res.status(404).json({ error: "voice artist not found" });
   }
 
   return res.status(200).json({ voiceArtist });
@@ -71,12 +71,12 @@ export async function deactivateVoiceArtist(req: Request, res: Response) {
 export async function deleteVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const deleted = await useCases.delete(id);
   if (!deleted) {
-    return res.status(404).json({ error: "voice_artist_not_found" });
+    return res.status(404).json({ error: "voice artist not found" });
   }
 
   return res.status(200).json({ message: "voice_artist_deleted" });

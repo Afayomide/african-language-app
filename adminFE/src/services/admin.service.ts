@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import { feAdminRoutes } from "@/lib/apiRoutes";
 import {
   Lesson,
+  Unit,
   Phrase,
   Proverb,
   Language,
@@ -71,7 +72,7 @@ export const lessonService = {
     return fetchAllPages<Lesson>(feAdminRoutes.lessons(), "lessons", { status, language });
   },
 
-  async listLessonsPage(params?: { status?: Status; language?: Language; q?: string; page?: number; limit?: number }) {
+  async listLessonsPage(params?: { status?: Status; language?: Language; unitId?: string; q?: string; page?: number; limit?: number }) {
     const response = await api.get<{ lessons: Lesson[]; total: number; pagination?: PaginationMeta }>(
       feAdminRoutes.lessons(),
       { params }
@@ -95,7 +96,13 @@ export const lessonService = {
     return response.data.lesson;
   },
 
-  async createLesson(data: { title: string; language: Language; level: Level; description?: string; topics?: string[] }) {
+  async createLesson(data: {
+    title: string;
+    unitId: string;
+    description?: string;
+    topics?: string[];
+    proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
+  }) {
     const response = await api.post<{ lesson: Lesson }>(feAdminRoutes.lessons(), data);
     return response.data.lesson;
   },
@@ -111,20 +118,20 @@ export const lessonService = {
 
   async publishLesson(id: string) {
     const response = await api.put<{ lesson: Lesson }>(feAdminRoutes.publishLesson(id));
+    console.log("response",response)
     return response.data.lesson;
   },
 
-  async reorderLessons(language: Language, lessonIds: string[]) {
+  async reorderLessons(unitId: string, lessonIds: string[]) {
     const response = await api.put<{ lessons: Lesson[] }>(feAdminRoutes.reorderLessons(), {
-      language,
+      unitId,
       lessonIds,
     });
     return response.data.lessons;
   },
 
   async generateBulkLessons(data: {
-    language: Language;
-    level: Level;
+    unitId: string;
     count?: number;
     title?: string;
     topics?: string[];
@@ -140,6 +147,70 @@ export const lessonService = {
     }>(feAdminRoutes.generateBulkLessons(), data);
     return response.data;
   },
+};
+
+export const unitService = {
+  async listUnits(status?: Status, language?: Language) {
+    const response = await api.get<{ units: Unit[] }>(feAdminRoutes.units(), {
+      params: { status, language }
+    });
+    return response.data.units || [];
+  },
+
+  async getUnit(id: string) {
+    const response = await api.get<{ unit: Unit }>(feAdminRoutes.unit(id));
+    return response.data.unit;
+  },
+
+  async createUnit(data: { title: string; description?: string; language: Language; level: Level }) {
+    const response = await api.post<{ unit: Unit }>(feAdminRoutes.units(), data);
+    return response.data.unit;
+  },
+
+  async updateUnit(id: string, data: Partial<Unit>) {
+    const response = await api.put<{ unit: Unit }>(feAdminRoutes.unit(id), data);
+    return response.data.unit;
+  },
+
+  async deleteUnit(id: string) {
+    await api.delete(feAdminRoutes.unit(id));
+  },
+
+  async finishUnit(id: string) {
+    const response = await api.put<{ unit: Unit }>(feAdminRoutes.finishUnit(id));
+    return response.data.unit;
+  },
+
+  async publishUnit(id: string) {
+    const response = await api.put<{ unit: Unit }>(feAdminRoutes.publishUnit(id));
+    return response.data.unit;
+  },
+
+  async reorderUnits(language: Language, unitIds: string[]) {
+    const response = await api.put<{ units: Unit[] }>(feAdminRoutes.reorderUnits(), {
+      language,
+      unitIds
+    });
+    return response.data.units || [];
+  },
+
+  async generateBulkUnits(data: {
+    language: Language;
+    level: Level;
+    count?: number;
+    topic?: string;
+  }) {
+    const response = await api.post<{
+      totalRequested: number;
+      createdCount: number;
+      skippedCount: number;
+      errorCount: number;
+      units: Unit[];
+      skipped: Array<{ reason: string; title?: string }>;
+      errors: Array<{ index: number; error: string }>;
+    }>(feAdminRoutes.generateBulkUnits(), data);
+    return response.data;
+  }
 };
 
 export const phraseService = {

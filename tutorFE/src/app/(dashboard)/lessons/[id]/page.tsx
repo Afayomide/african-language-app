@@ -93,7 +93,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       setLesson({ ...data, topics: Array.isArray(data.topics) ? data.topics : [] })
       setTopicsInput(Array.isArray(data.topics) ? data.topics.join(", ") : "")
       setProverbs(Array.isArray(data.proverbs) ? data.proverbs : [])
-    } catch {
+    } catch (error) {
       toast.error("Failed to fetch lesson")
       router.push("/lessons")
     } finally {
@@ -117,7 +117,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       )
       setPhraseTotal(data.total)
       setPhraseTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to fetch lesson phrases")
     } finally {
       setIsLoadingPhrases(false)
@@ -143,7 +143,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
         proverbs,
       })
       toast.success("Lesson updated")
-    } catch {
+    } catch (error) {
       toast.error("Failed to update lesson")
     } finally {
       setIsSaving(false)
@@ -155,7 +155,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await lessonService.finishLesson(id)
       toast.success("Lesson sent to admin for publish")
       fetchLesson()
-    } catch {
+    } catch (error) {
       toast.error("Failed to mark lesson as finished")
     }
   }
@@ -186,7 +186,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
         setProverbs(newProverbs);
       }
       toast.success("AI suggestion applied")
-    } catch {
+    } catch (error) {
       toast.error("AI suggestion failed")
     } finally {
       setIsSuggesting(false)
@@ -205,7 +205,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       toast.success("AI phrases generated")
       setIsGenerateDialogOpen(false)
       fetchLessonPhrases(lesson._id)
-    } catch {
+    } catch (error) {
       toast.error("AI phrase generation failed")
     } finally {
       setIsGenerating(false)
@@ -218,7 +218,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await phraseService.deletePhrase(phraseId)
       toast.success("Phrase deleted")
       if (lesson) fetchLessonPhrases(lesson._id)
-    } catch {
+    } catch (error) {
       toast.error("Failed to delete phrase")
     }
   }
@@ -228,7 +228,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await phraseService.finishPhrase(phraseId)
       toast.success("Phrase sent to admin for publish")
       if (lesson) fetchLessonPhrases(lesson._id)
-    } catch {
+    } catch (error) {
       toast.error("Failed to mark phrase as finished")
     }
   }

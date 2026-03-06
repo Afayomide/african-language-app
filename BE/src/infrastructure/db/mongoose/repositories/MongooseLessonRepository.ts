@@ -7,51 +7,63 @@ import type {
   LessonUpdateInput
 } from "../../../../domain/repositories/LessonRepository.js";
 
-function toEntity(doc: {
+type LessonPersistenceDoc = {
   _id: { toString(): string };
   title: string;
+  unitId?: { toString(): string } | string | null;
   language: LessonEntity["language"];
   level: LessonEntity["level"];
   orderIndex: number;
-  description: string;
-  topics?: string[];
-  proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
+  description?: string | null;
+  topics?: string[] | null;
+  proverbs?: Array<{ text?: string | null; translation?: string | null; contextNote?: string | null }> | null;
   blocks?: Array<{
-    type: "text" | "phrase" | "proverb" | "question";
-    content?: string;
-    refId?: { toString(): string };
-  }>;
+    type?: "text" | "phrase" | "proverb" | "question" | null;
+    content?: string | null;
+    refId?: { toString(): string } | string | null;
+  }> | null;
   status: LessonEntity["status"];
-  createdBy: { toString(): string };
+  createdBy: { toString(): string } | string;
   publishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
-}): LessonEntity {
+};
+
+function toEntity(doc: LessonPersistenceDoc): LessonEntity {
+  const proverbRows = Array.isArray(doc.proverbs)
+    ? doc.proverbs.map((row) => {
+        return {
+          text: String(row.text || ""),
+          translation: String(row.translation || ""),
+          contextNote: String(row.contextNote || "")
+        };
+      })
+    : [];
+
+  const blockRows = Array.isArray(doc.blocks)
+    ? doc.blocks.map((row) => {
+        return {
+          type: String(row.type || "") as "text" | "phrase" | "proverb" | "question",
+          content: String(row.content || ""),
+          refId: row.refId ? String(row.refId) : ""
+        };
+      })
+    : [];
+
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     title: doc.title,
+    unitId: doc.unitId ? String(doc.unitId) : "",
     language: doc.language,
     level: doc.level,
     orderIndex: doc.orderIndex,
-    description: doc.description,
+    description: String(doc.description || ""),
     topics: Array.isArray(doc.topics) ? doc.topics.map(String) : [],
-    proverbs: Array.isArray(doc.proverbs) 
-      ? doc.proverbs.map(p => ({ 
-          text: String(p.text || ""), 
-          translation: String(p.translation || ""),
-          contextNote: String(p.contextNote || "")
-        })) 
-      : [],
-    blocks: Array.isArray(doc.blocks)
-      ? doc.blocks.map(b => ({
-          type: b.type,
-          content: b.content || "",
-          refId: b.refId ? b.refId.toString() : ""
-        }))
-      : [],
+    proverbs: proverbRows,
+    blocks: blockRows,
     status: doc.status,
-    createdBy: doc.createdBy.toString(),
+    createdBy: String(doc.createdBy),
     publishedAt: doc.publishedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
@@ -59,8 +71,8 @@ function toEntity(doc: {
 }
 
 export class MongooseLessonRepository implements LessonRepository {
-  async findLastOrderIndex(language: Language): Promise<number | null> {
-    const last = await LessonModel.findOne({ language, isDeleted: { $ne: true } }).sort({
+  async findLastOrderIndex(unitId: string): Promise<number | null> {
+    const last = await LessonModel.findOne({ unitId, isDeleted: { $ne: true } }).sort({
       orderIndex: -1,
       createdAt: -1
     });
@@ -73,8 +85,9 @@ export class MongooseLessonRepository implements LessonRepository {
   }
 
   async list(filter: LessonListFilter): Promise<LessonEntity[]> {
-    const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    const query: Record<string, string | object> = { isDeleted: { $ne: true } };
     if (filter.language) query.language = filter.language;
+    if (filter.unitId) query.unitId = filter.unitId;
     if (filter.status) query.status = filter.status;
 
     const lessons = await LessonModel.find(query)
@@ -180,6 +193,40 @@ export class MongooseLessonRepository implements LessonRepository {
 
   async compactOrderIndexes(language: Language): Promise<void> {
     const lessons = await LessonModel.find({ language, isDeleted: { $ne: true } })
+      .sort({ orderIndex: 1, createdAt: 1 })
+      .select("_id");
+
+    if (lessons.length === 0) return;
+
+    await LessonModel.bulkWrite(
+      lessons.map((lesson, index) => ({
+        updateOne: {
+          filter: { _id: lesson._id, isDeleted: { $ne: true } },
+          update: { $set: { orderIndex: index } }
+        }
+      }))
+    );
+  }
+
+  async findByIdsAndUnit(ids: string[], unitId: string): Promise<Array<{ id: string }>> {
+    const lessons = await LessonModel.find({
+      _id: { $in: ids },
+      unitId,
+      isDeleted: { $ne: true }
+    }).select("_id");
+
+    return lessons.map((lesson) => ({ id: lesson._id.toString() }));
+  }
+
+  async listByUnitId(unitId: string): Promise<LessonEntity[]> {
+    const lessons = await LessonModel.find({ unitId, isDeleted: { $ne: true } })
+      .sort({ orderIndex: 1, createdAt: 1 })
+      .lean();
+    return lessons.map(toEntity);
+  }
+
+  async compactOrderIndexesByUnit(unitId: string): Promise<void> {
+    const lessons = await LessonModel.find({ unitId, isDeleted: { $ne: true } })
       .sort({ orderIndex: 1, createdAt: 1 })
       .select("_id");
 

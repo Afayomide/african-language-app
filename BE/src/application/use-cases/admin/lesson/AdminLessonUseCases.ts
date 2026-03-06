@@ -14,6 +14,7 @@ export class AdminLessonUseCases {
 
   async create(input: {
     title: string;
+    unitId: string;
     language: Language;
     level: Level;
     description?: string;
@@ -22,11 +23,12 @@ export class AdminLessonUseCases {
     blocks?: LessonBlock[];
     createdBy: string;
   }) {
-    const lastOrderIndex = await this.lessons.findLastOrderIndex(input.language);
+    const lastOrderIndex = await this.lessons.findLastOrderIndex(input.unitId);
     const orderIndex = (lastOrderIndex ?? -1) + 1;
 
     return this.lessons.create({
       title: input.title,
+      unitId: input.unitId,
       language: input.language,
       level: input.level,
       orderIndex,
@@ -52,6 +54,7 @@ export class AdminLessonUseCases {
     update: Partial<{
       title: string;
       description: string;
+      unitId: string;
       language: Language;
       level: Level;
       orderIndex: number;
@@ -64,8 +67,8 @@ export class AdminLessonUseCases {
     if (!current) return null;
 
     const payload = { ...update };
-    if (payload.language && payload.language !== current.language && payload.orderIndex === undefined) {
-      const lastOrderIndex = await this.lessons.findLastOrderIndex(payload.language);
+    if (payload.unitId && payload.unitId !== current.unitId && payload.orderIndex === undefined) {
+      const lastOrderIndex = await this.lessons.findLastOrderIndex(payload.unitId);
       payload.orderIndex = (lastOrderIndex ?? -1) + 1;
     }
 
@@ -80,7 +83,7 @@ export class AdminLessonUseCases {
     await this.phrases.softDeleteByLessonId(lesson.id, now);
     await this.proverbs.softDeleteByLessonId(lesson.id, now);
     await this.questions.softDeleteByLessonId(lesson.id, now);
-    await this.lessons.compactOrderIndexes(lesson.language);
+    await this.lessons.compactOrderIndexesByUnit(lesson.unitId);
 
     return lesson;
   }
@@ -95,27 +98,37 @@ export class AdminLessonUseCases {
   }
 
   async publish(id: string) {
-    const phrases = await this.phrases.list({ lessonId: id });
-    const draftPhrases = phrases.filter(p => p.status !== "published");
-    if (draftPhrases.length > 0) {
-      return "phrases_not_published" as const;
-    }
-
-    const questions = await this.questions.list({ lessonId: id });
-    const draftQuestions = questions.filter(q => q.status !== "published");
-    if (draftQuestions.length > 0) {
-      return "questions_not_published" as const;
-    }
-
+    const lesson = await this.getById(id);
+    console.log(lesson)
+    for (const block of lesson?.blocks || []) {
+      if (block.type === "phrase" && block.refId) {
+        const phrase = await this.phrases.findById(block.refId);
+        if (phrase?.status !== "published") {
+          return "phrases_not_published" as const;
+        }
+      } 
+      if (block.type === "proverb" && block.refId) {
+        const proverb = await this.proverbs.findById(block.refId);
+        if (proverb?.status !== "published") {
+          return "proverbs_not_published" as const;
+        }
+      }
+      if (block.type === "question" && block.refId) {
+        const question = await this.questions.findById(block.refId);
+        if (question?.status !== "published") {
+          return "questions_not_published" as const;
+        }
+      }
+    } 
     const published = await this.lessons.publishById(id, new Date());
     return published;
   }
 
-  async reorder(language: Language, lessonIds: string[]): Promise<LessonEntity[] | null> {
-    const scoped = await this.lessons.findByIdsAndLanguage(lessonIds, language);
+  async reorder(unitId: string, lessonIds: string[]): Promise<LessonEntity[] | null> {
+    const scoped = await this.lessons.findByIdsAndUnit(lessonIds, unitId);
     if (scoped.length !== lessonIds.length) return null;
 
     await this.lessons.reorderByIds(lessonIds);
-    return this.lessons.listByLanguage(language);
+    return this.lessons.listByUnitId(unitId);
   }
 }

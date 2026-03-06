@@ -122,8 +122,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
     try {
       const data = await lessonService.listLessons();
       setLessons(data.sort((a, b) => a.orderIndex - b.orderIndex));
-    } catch {
-      toast.error("Failed to fetch lessons");
+    } catch (error) {
+      toast.error("Failed to fetch lessons")
     }
   }
 
@@ -141,8 +141,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       setSelectedPhraseIds([]);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
-    } catch {
-      toast.error("Failed to fetch phrases");
+    } catch (error) {
+      toast.error("Failed to fetch phrases")
     } finally {
       setIsLoading(false);
     }
@@ -158,8 +158,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       await phraseService.deletePhrase(id);
       toast.success("Phrase deleted");
       fetchPhrases();
-    } catch {
-      toast.error("Failed to delete phrase");
+    } catch (error) {
+      toast.error("Failed to delete phrase")
     }
   }
 
@@ -173,8 +173,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       toast.success(`${result.deletedCount} phrase(s) deleted`);
       setSelectedPhraseIds([]);
       fetchPhrases();
-    } catch {
-      toast.error("Failed to bulk delete phrases");
+    } catch (error) {
+      toast.error("Failed to bulk delete phrases")
     }
   }
 
@@ -183,8 +183,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       await phraseService.finishPhrase(id);
       toast.success("Phrase sent to admin for publish");
       fetchPhrases();
-    } catch {
-      toast.error("Failed to mark phrase as finished");
+    } catch (error) {
+      toast.error("Failed to mark phrase as finished")
     }
   }
 
@@ -205,8 +205,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       const result = await phraseService.generateLessonPhraseAudio(selectedLessonId);
       toast.success(`Audio generated for ${result.updatedCount} phrases`);
       fetchPhrases();
-    } catch {
-      toast.error("Failed to generate lesson audio");
+    } catch (error) {
+      toast.error("Failed to generate lesson audio")
     }
   }
 
@@ -228,8 +228,8 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
       setIsDialogOpen(false);
       setSeedWords("");
       setExtraInstructions("");
-    } catch {
-      toast.error("AI generation failed");
+    } catch (error) {
+      toast.error("AI generation failed")
     } finally {
       setIsGenerating(false);
     }

@@ -87,7 +87,7 @@ export default function TutorsPage() {
       setTutors(data.items)
       setTotal(data.total)
       setTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to fetch tutors")
     } finally {
       setIsLoading(false)
@@ -99,7 +99,7 @@ export default function TutorsPage() {
       await tutorService.activateTutor(id)
       toast.success("Tutor activated")
       fetchTutors(filter)
-    } catch {
+    } catch (error) {
       toast.error("Failed to activate tutor")
     }
   }
@@ -109,7 +109,7 @@ export default function TutorsPage() {
       await tutorService.deactivateTutor(id)
       toast.success("Tutor deactivated")
       fetchTutors(filter)
-    } catch {
+    } catch (error) {
       toast.error("Failed to deactivate tutor")
     }
   }
@@ -121,7 +121,7 @@ export default function TutorsPage() {
       await tutorService.deleteTutor(id)
       toast.success("Tutor deleted")
       fetchTutors(filter)
-    } catch {
+    } catch (error) {
       toast.error("Failed to delete tutor")
     }
   }

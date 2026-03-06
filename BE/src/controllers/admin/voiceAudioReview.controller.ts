@@ -28,16 +28,16 @@ export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response)
   const q = getSearchQuery(req.query);
 
   if (status && !["pending", "accepted", "rejected"].includes(status)) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
   if (voiceArtistUserId && !mongoose.Types.ObjectId.isValid(voiceArtistUserId)) {
-    return res.status(400).json({ error: "invalid_voice_artist_user_id" });
+    return res.status(400).json({ error: "invalid voice artist user id" });
   }
   if (phraseId && !mongoose.Types.ObjectId.isValid(phraseId)) {
-    return res.status(400).json({ error: "invalid_phrase_id" });
+    return res.status(400).json({ error: "invalid phrase id" });
   }
   if (language && !isValidLessonLanguage(language)) {
-    return res.status(400).json({ error: "invalid_language" });
+    return res.status(400).json({ error: "invalid language" });
   }
 
   const submissions = await useCases.list({
@@ -73,12 +73,12 @@ export async function acceptVoiceAudioSubmission(req: AuthRequest, res: Response
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const submission = await useCases.accept(id, req.user.id);
   if (!submission) {
-    return res.status(404).json({ error: "submission_not_found" });
+    return res.status(404).json({ error: "submission not found" });
   }
 
   return res.status(200).json({ submission });
@@ -91,15 +91,15 @@ export async function rejectVoiceAudioSubmission(req: AuthRequest, res: Response
   const reason = req.body?.reason ? String(req.body.reason).trim() : "";
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
   if (!reason) {
-    return res.status(400).json({ error: "reason_required" });
+    return res.status(400).json({ error: "reason required" });
   }
 
   const submission = await useCases.reject(id, req.user.id, reason);
   if (!submission) {
-    return res.status(404).json({ error: "submission_not_found" });
+    return res.status(404).json({ error: "submission not found" });
   }
 
   return res.status(200).json({ submission });

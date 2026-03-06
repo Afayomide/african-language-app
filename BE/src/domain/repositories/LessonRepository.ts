@@ -2,11 +2,13 @@ import type { Language, LessonBlock, LessonEntity, Status } from "../entities/Le
 
 export type LessonListFilter = {
   language?: Language;
+  unitId?: string;
   status?: Status;
 };
 
 export type LessonCreateInput = {
   title: string;
+  unitId: string;
   language: Language;
   level: LessonEntity["level"];
   orderIndex: number;
@@ -19,11 +21,11 @@ export type LessonCreateInput = {
 };
 
 export type LessonUpdateInput = Partial<
-  Pick<LessonEntity, "title" | "language" | "level" | "orderIndex" | "description" | "topics" | "proverbs" | "blocks" | "status">
+  Pick<LessonEntity, "title" | "unitId" | "language" | "level" | "orderIndex" | "description" | "topics" | "proverbs" | "blocks" | "status">
 >;
 
 export interface LessonRepository {
-  findLastOrderIndex(language: Language): Promise<number | null>;
+  findLastOrderIndex(unitId: string): Promise<number | null>;
   create(input: LessonCreateInput): Promise<LessonEntity>;
   list(filter: LessonListFilter): Promise<LessonEntity[]>;
   findById(id: string): Promise<LessonEntity | null>;
@@ -35,7 +37,10 @@ export interface LessonRepository {
   publishById(id: string, now: Date): Promise<LessonEntity | null>;
   finishByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
   findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>>;
+  findByIdsAndUnit(ids: string[], unitId: string): Promise<Array<{ id: string }>>;
   reorderByIds(ids: string[]): Promise<void>;
   listByLanguage(language: Language): Promise<LessonEntity[]>;
+  listByUnitId(unitId: string): Promise<LessonEntity[]>;
   compactOrderIndexes(language: Language): Promise<void>;
+  compactOrderIndexesByUnit(unitId: string): Promise<void>;
 }

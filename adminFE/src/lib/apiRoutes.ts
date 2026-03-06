@@ -8,6 +8,11 @@ export const beAiRoutes = {
 
 export const beAdminRoutes = {
   login: () => `${BE_API_URL}/admin/auth/login`,
+  units: () => `${BE_API_URL}/admin/units`,
+  reorderUnits: () => `${BE_API_URL}/admin/units/reorder`,
+  unit: (id: string) => `${BE_API_URL}/admin/units/${id}`,
+  finishUnit: (id: string) => `${BE_API_URL}/admin/units/${id}/finish`,
+  publishUnit: (id: string) => `${BE_API_URL}/admin/units/${id}/publish`,
   lessons: () => `${BE_API_URL}/admin/lessons`,
   bulkDeleteLessons: () => `${BE_API_URL}/admin/lessons/bulk-delete`,
   reorderLessons: () => `${BE_API_URL}/admin/lessons/reorder`,
@@ -44,6 +49,7 @@ export const beAdminRoutes = {
   acceptVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/accept`,
   rejectVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => `${BE_API_URL}/admin/ai/lessons/generate-bulk`,
+  generateBulkUnits: () => `${BE_API_URL}/admin/ai/units/generate-bulk`,
   generateLessonProverbs: () => `${BE_API_URL}/admin/ai/proverbs/generate`,
 };
 
@@ -55,6 +61,11 @@ export const feAiRoutes = {
 
 export const feAdminRoutes = {
   login: () => "/api/admin/auth",
+  units: () => "/api/admin/units",
+  reorderUnits: () => "/api/admin/units/reorder",
+  unit: (id: string) => `/api/admin/units/${id}`,
+  finishUnit: (id: string) => `/api/admin/units/${id}/finish`,
+  publishUnit: (id: string) => `/api/admin/units/${id}/publish`,
   lessons: () => "/api/admin/lessons",
   bulkDeleteLessons: () => "/api/admin/lessons/bulk-delete",
   reorderLessons: () => "/api/admin/lessons/reorder",
@@ -91,5 +102,6 @@ export const feAdminRoutes = {
   acceptVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/accept`,
   rejectVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => "/api/admin/ai/lessons/generate-bulk",
+  generateBulkUnits: () => "/api/admin/ai/units/generate-bulk",
   generateLessonProverbs: () => "/api/admin/ai/proverbs/generate",
 };

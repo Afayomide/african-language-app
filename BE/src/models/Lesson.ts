@@ -3,6 +3,7 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 const LessonSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
+    unitId: { type: Schema.Types.ObjectId, ref: "Unit", required: true, index: true },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true },
     level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true },
     orderIndex: { type: Number, default: 0, index: true },
@@ -34,6 +35,7 @@ const LessonSchema = new Schema(
 );
 
 // Supports language-scoped listing and ordering.
+LessonSchema.index({ unitId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 LessonSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 
 export type LessonDocument = InferSchemaType<typeof LessonSchema> & {

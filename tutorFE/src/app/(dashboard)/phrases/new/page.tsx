@@ -65,8 +65,8 @@ function NewPhraseContent() {
       const data = await lessonService.listLessons();
       const filtered = selectedLanguage ? data.filter((lesson) => lesson.language === selectedLanguage) : data;
       setLessons(filtered);
-    } catch {
-      toast.error("Failed to fetch lessons");
+    } catch (error) {
+      toast.error("Failed to fetch lessons")
     }
   }
 
@@ -151,8 +151,8 @@ function NewPhraseContent() {
       if (lesson) {
         router.push(`/phrases/lang/${lesson.language}?lessonId=${lesson._id}`);
       }
-    } catch {
-      toast.error("AI generation failed");
+    } catch (error) {
+      toast.error("AI generation failed")
     } finally {
       setIsGenerating(false);
     }

@@ -1,56 +1,92 @@
 'use client'
 
-import { useEffect, useState } from "react"
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { ArrowRight, Flame, Target, BookOpen, Settings, LogOut } from 'lucide-react'
-import Link from 'next/link'
-import { learnerDashboardService, learnerAuthService } from "@/services"
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ArrowRight, Flame, Target, BookOpen, Settings, LogOut, Layers, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { learnerDashboardService, learnerAuthService } from "@/services";
+
+type UnitLesson = {
+  id: string;
+  title: string;
+  description: string;
+  level: string;
+  orderIndex: number;
+  status: "not_started" | "in_progress" | "completed";
+  progressPercent: number;
+};
 
 type DashboardData = {
   stats: {
-    currentLanguage: string
-    streakDays: number
-    totalXp: number
-    dailyGoalMinutes: number
-    todayMinutes: number
-  }
+    currentLanguage: string;
+    streakDays: number;
+    totalXp: number;
+    dailyGoalMinutes: number;
+    todayMinutes: number;
+  };
   nextLesson: {
-    id: string
-    title: string
-    description: string
-  } | null
+    id: string;
+    unitId?: string;
+    unitTitle?: string;
+    title: string;
+    description: string;
+  } | null;
+  units?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    level: string;
+    orderIndex: number;
+    progressPercent: number;
+    completedLessons: number;
+    totalLessons: number;
+    lessons: UnitLesson[];
+  }>;
   completedLessons: {
-    id: string
-    title: string
-    description: string
-    level: string
-    completedAt: string | null
-  }[]
-  weeklyOverview: { day: string; completed: boolean; minutes: number }[]
-  achievements: string[]
-}
+    id: string;
+    unitId?: string;
+    unitTitle?: string;
+    title: string;
+    description: string;
+    level: string;
+    completedAt: string | null;
+  }[];
+  weeklyOverview: { day: string; completed: boolean; minutes: number }[];
+  achievements: string[];
+};
 
 export default function DashboardScreen() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [expandedUnitId, setExpandedUnitId] = useState<string>("");
 
   useEffect(() => {
     learnerDashboardService
       .getOverview()
       .then((payload) => setData(payload))
-      .catch((error) => console.error("Failed to load dashboard", error))
-  }, [])
+      .catch((error) => console.error("Failed to load dashboard", error));
+  }, []);
+
+  useEffect(() => {
+    if (!data?.units || data.units.length === 0) return;
+    if (expandedUnitId && data.units.some((unit) => unit.id === expandedUnitId)) return;
+    setExpandedUnitId(data.units[0].id);
+  }, [data?.units, expandedUnitId]);
 
   const dailyPercent = data
-    ? Math.min(100, Math.round((data.stats.todayMinutes / data.stats.dailyGoalMinutes) * 100))
-    : 0
+    ? Math.min(100, Math.round((data.stats.todayMinutes / Math.max(1, data.stats.dailyGoalMinutes)) * 100))
+    : 0;
+
+  const activeUnit = useMemo(() => {
+    if (!data?.units?.length) return null;
+    return data.units.find((unit) => unit.id === expandedUnitId) || data.units[0];
+  }, [data?.units, expandedUnitId]);
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/20 bg-background/95 px-4 py-6 backdrop-blur-sm sticky top-0 z-40">
-        <div className="mx-auto max-w-4xl">
-          <div className="flex items-center justify-between mb-4">
+      <header className="sticky top-0 z-40 border-b border-border/20 bg-background/95 px-4 py-6 backdrop-blur-sm">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-sm text-foreground/60">Welcome back!</p>
               <h1 className="text-2xl font-bold text-foreground">Learning Dashboard</h1>
@@ -67,12 +103,9 @@ export default function DashboardScreen() {
         </div>
       </header>
 
-      {/* Content */}
       <section className="px-4 py-8">
-        <div className="mx-auto max-w-4xl space-y-8">
-          {/* Quick Stats */}
+        <div className="mx-auto max-w-5xl space-y-8">
           <div className="grid gap-4 md:grid-cols-3">
-            {/* Current Language */}
             <Card className="border border-border/50 p-6">
               <div className="space-y-2">
                 <p className="text-sm text-foreground/60">Current Language</p>
@@ -80,9 +113,8 @@ export default function DashboardScreen() {
               </div>
             </Card>
 
-            {/* Streak */}
             <Card className="border border-border/50 p-6">
-              <div className="space-y-2 flex items-center gap-2">
+              <div className="flex items-center gap-2 space-y-2">
                 <Flame className="h-6 w-6 text-accent" />
                 <div>
                   <p className="text-sm text-foreground/60">Streak</p>
@@ -91,7 +123,6 @@ export default function DashboardScreen() {
               </div>
             </Card>
 
-            {/* Total XP */}
             <Card className="border border-border/50 p-6">
               <div className="space-y-2">
                 <p className="text-sm text-foreground/60">Total XP</p>
@@ -100,35 +131,97 @@ export default function DashboardScreen() {
             </Card>
           </div>
 
-          {/* Today's Goal Progress */}
           <Card className="border border-border/50 p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-foreground flex items-center gap-2">
+                <h3 className="flex items-center gap-2 font-bold text-foreground">
                   <Target className="h-5 w-5 text-primary" />
-                  Today's Goal
+                  Today&apos;s Goal
                 </h3>
-                <span className="text-sm text-foreground/60">{data?.stats.todayMinutes || 0} min / {data?.stats.dailyGoalMinutes || 0} min</span>
+                <span className="text-sm text-foreground/60">
+                  {data?.stats.todayMinutes || 0} min / {data?.stats.dailyGoalMinutes || 0} min
+                </span>
               </div>
               <div className="space-y-2">
-                <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${dailyPercent}%` }}
-                  />
+                <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full bg-primary transition-all duration-300" style={{ width: `${dailyPercent}%` }} />
                 </div>
-                <p className="text-xs text-foreground/60">
-                  Keep going. Your progress updates as you complete lessons.
-                </p>
+                <p className="text-xs text-foreground/60">Keep going. Your progress updates as you complete lessons.</p>
               </div>
             </div>
           </Card>
 
-          {/* Continue Learning */}
+          <div className="space-y-4">
+            <h2 className="flex items-center gap-2 font-bold text-foreground">
+              <Layers className="h-5 w-5 text-primary" />
+              Unit Learning Path
+            </h2>
+
+            {data?.units && data.units.length > 0 ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  {data.units.map((unit) => (
+                    <button
+                      key={unit.id}
+                      type="button"
+                      onClick={() => setExpandedUnitId(unit.id)}
+                      className={`rounded-xl border p-4 text-left transition-all ${
+                        activeUnit?.id === unit.id ? "border-primary bg-primary/5" : "border-border/50 hover:border-primary/40"
+                      }`}
+                    >
+                      <p className="text-xs uppercase tracking-wide text-foreground/50">Unit {unit.orderIndex + 1}</p>
+                      <h3 className="font-bold text-foreground">{unit.title}</h3>
+                      <p className="text-xs text-foreground/60">{unit.completedLessons}/{unit.totalLessons} lessons completed</p>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full bg-primary" style={{ width: `${unit.progressPercent}%` }} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {activeUnit ? (
+                  <Card className="border border-border/50 p-6">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-foreground/50">{activeUnit.level}</p>
+                        <h3 className="text-xl font-bold text-foreground">{activeUnit.title}</h3>
+                        <p className="text-sm text-foreground/70">{activeUnit.description || "Unit curriculum"}</p>
+                      </div>
+                      <BadgeProgress value={activeUnit.progressPercent} />
+                    </div>
+
+                    <div className="space-y-3">
+                      {activeUnit.lessons.map((lesson) => (
+                        <div key={lesson.id} className="flex items-center justify-between rounded-lg border border-border/40 p-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{lesson.orderIndex + 1}. {lesson.title}</p>
+                            <p className="text-xs text-foreground/60">{lesson.description || "Lesson"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {lesson.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : null}
+                            <Link href={`/lesson-overview?lessonId=${lesson.id}`}>
+                              <Button size="sm" variant={lesson.status === "completed" ? "outline" : "default"}>
+                                {lesson.status === "completed" ? "Review" : lesson.status === "in_progress" ? "Continue" : "Start"}
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ) : null}
+              </div>
+            ) : (
+              <Card className="border border-border/50 p-6 text-sm text-foreground/70">
+                No published units are available yet.
+              </Card>
+            )}
+          </div>
+
           <div className="space-y-4">
             <h2 className="font-bold text-foreground">Continue Learning</h2>
-            <Link href={data?.nextLesson ? `/lesson-overview?lessonId=${data.nextLesson.id}` : "/lesson-overview"}>
-              <Card className="border border-border/50 p-6 cursor-pointer hover:border-primary/50 transition-all hover:shadow-md group">
+            <Link href={data?.nextLesson ? `/lesson-overview?lessonId=${data.nextLesson.id}` : "/dashboard"}>
+              <Card className="group cursor-pointer border border-border/50 p-6 transition-all hover:border-primary/50 hover:shadow-md">
                 <div className="flex items-center justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -136,11 +229,12 @@ export default function DashboardScreen() {
                       <span className="text-sm text-foreground/60">Next Lesson</span>
                     </div>
                     <h3 className="text-lg font-bold text-foreground">{data?.nextLesson?.title || "No lesson available"}</h3>
-                    <p className="text-sm text-foreground/70">
-                      {data?.nextLesson?.description || "You've completed available lessons. Retake from Completed Lessons below."}
-                    </p>
+                    <p className="text-sm text-foreground/70">{data?.nextLesson?.description || "You are up to date for now."}</p>
+                    {data?.nextLesson?.unitTitle ? (
+                      <p className="text-xs uppercase tracking-wide text-foreground/50">{data.nextLesson.unitTitle}</p>
+                    ) : null}
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
                     <ArrowRight className="h-5 w-5 text-primary" />
                   </div>
                 </div>
@@ -148,94 +242,32 @@ export default function DashboardScreen() {
             </Link>
           </div>
 
-          {/* Completed Lessons */}
-          <div className="space-y-4">
-            <h2 className="font-bold text-foreground">Completed Lessons</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {(data?.completedLessons || []).map((lesson) => (
-                <Card key={lesson.id} className="border border-border/50 p-5">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-foreground/60">{lesson.level}</p>
-                      <h3 className="text-base font-bold text-foreground">{lesson.title}</h3>
-                      <p className="text-sm text-foreground/70">{lesson.description || "Review lesson phrases and retake exercises."}</p>
-                    </div>
-                    <Link href={`/lesson-overview?lessonId=${lesson.id}`}>
-                      <Button variant="outline" size="sm">Retake Lesson</Button>
-                    </Link>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            {data && (!data.completedLessons || data.completedLessons.length === 0) ? (
-              <Card className="border border-border/50 p-5 text-sm text-foreground/70">
-                Complete your first lesson to unlock quick retakes here.
-              </Card>
-            ) : null}
-          </div>
-
-          {/* Weekly Overview */}
           <div className="space-y-4">
             <h2 className="font-bold text-foreground">Weekly Overview</h2>
             <Card className="border border-border/50 p-6">
               <div className="space-y-4">
                 {(data?.weeklyOverview || []).map((day) => (
                   <div key={day.day} className="flex items-center gap-3">
-                    <div className="text-sm font-medium text-foreground w-10">
-                      {day.day}
+                    <div className="w-10 text-sm font-medium text-foreground">{day.day}</div>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className={`h-full ${day.completed ? "bg-primary" : "bg-muted"} transition-all`} style={{ width: day.completed ? "100%" : "0%" }} />
                     </div>
-                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={`h-full ${
-                          day.completed ? 'bg-primary' : 'bg-muted'
-                        } transition-all`}
-                        style={{ width: day.completed ? '100%' : '0%' }}
-                      />
-                    </div>
-                    <span className="text-xs text-foreground/60">
-                      {day.completed ? `${day.minutes} min` : '-'}
-                    </span>
+                    <span className="text-xs text-foreground/60">{day.completed ? `${day.minutes} min` : "-"}</span>
                   </div>
                 ))}
               </div>
             </Card>
           </div>
-
-          {/* Recent Achievements */}
-          <div className="space-y-4">
-            <h2 className="font-bold text-foreground">Recent Achievements</h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              {(data?.achievements || []).map((achievement, index) => (
-                <Card
-                  key={index}
-                  className="border border-border/50 p-6 text-center space-y-2"
-                >
-                  <div className="text-4xl">🏅</div>
-                  <h4 className="font-bold text-foreground">{achievement}</h4>
-                  <p className="text-xs text-foreground/60">Unlocked by learner progress</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Switch Language */}
-          <Card className="border border-border/50 p-6 bg-secondary/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-foreground">Want to learn another language?</h3>
-                <p className="text-sm text-foreground/70">
-                  Switch or add a new language to your learning path
-                </p>
-              </div>
-              <Link href="/language-selection">
-                <Button variant="outline" size="sm">
-                  Browse Languages
-                </Button>
-              </Link>
-            </div>
-          </Card>
         </div>
       </section>
     </main>
-  )
+  );
+}
+
+function BadgeProgress({ value }: { value: number }) {
+  return (
+    <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+      {value}% complete
+    </div>
+  );
 }

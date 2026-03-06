@@ -42,6 +42,7 @@ export class AdminQuestionUseCases {
   async list(filter: {
     lessonId?: string;
     type?: QuestionEntity["type"];
+    subtype?: QuestionEntity["subtype"];
     status?: "draft" | "finished" | "published";
   }) {
     return this.questions.list(filter);

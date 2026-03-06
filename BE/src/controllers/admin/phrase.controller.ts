@@ -93,25 +93,25 @@ export async function createPhrase(req: Request, res: Response) {
   const { lessonIds, language, text, translation, pronunciation, explanation, examples, difficulty, audioUpload } = req.body ?? {};
 
   if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
-    return res.status(400).json({ error: "lesson_ids_required" });
+    return res.status(400).json({ error: "lesson ids required" });
   }
   if (lessonIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
-  if (!language) return res.status(400).json({ error: "language_required" });
+  if (!language) return res.status(400).json({ error: "language required" });
   if (!text || String(text).trim().length === 0) {
-    return res.status(400).json({ error: "text_required" });
+    return res.status(400).json({ error: "text required" });
   }
   if (!translation || String(translation).trim().length === 0) {
-    return res.status(400).json({ error: "translation_required" });
+    return res.status(400).json({ error: "translation required" });
   }
 
   const parsedAudioUpload = parseAudioUpload(audioUpload);
   if (parsedAudioUpload === "invalid_audio_upload") {
-    return res.status(400).json({ error: "invalid_audio_upload" });
+    return res.status(400).json({ error: "invalid audio upload" });
   }
   if (parsedAudioUpload === "audio_too_large") {
-    return res.status(400).json({ error: "audio_too_large" });
+    return res.status(400).json({ error: "audio too large" });
   }
 
   let uploadedAudio: Awaited<ReturnType<typeof buildManualAudioMeta>> | undefined;
@@ -141,7 +141,7 @@ export async function createPhrase(req: Request, res: Response) {
   }
 
   if (!phrase) {
-    return res.status(400).json({ error: "failed_to_create_phrase" });
+    return res.status(400).json({ error: "failed to create phrase" });
   }
 
   return res.status(201).json({ phrase });
@@ -155,10 +155,10 @@ export async function listPhrases(req: Request, res: Response) {
   const q = getSearchQuery(req.query);
 
   if (status && !isValidPhraseStatus(status)) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
   if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const query: Record<string, unknown> = { isDeleted: { $ne: true } };
@@ -205,12 +205,12 @@ export async function listPhrases(req: Request, res: Response) {
 export async function getPhraseById(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const phrase = await phraseUseCases.getById(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
 
   return res.status(200).json({ phrase });
@@ -221,7 +221,7 @@ export async function updatePhrase(req: Request, res: Response) {
   const { text, translation, pronunciation, explanation, examples, difficulty, lessonIds, language, audioUpload } = req.body ?? {};
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const update: Partial<{
@@ -237,7 +237,7 @@ export async function updatePhrase(req: Request, res: Response) {
   }> = {};
 
   if (lessonIds !== undefined) {
-    if (!Array.isArray(lessonIds)) return res.status(400).json({ error: "invalid_lesson_id" });
+    if (!Array.isArray(lessonIds)) return res.status(400).json({ error: "invalid lesson id" });
     update.lessonIds = lessonIds.map(String);
   }
   if (language !== undefined) update.language = String(language) as Language;
@@ -250,10 +250,10 @@ export async function updatePhrase(req: Request, res: Response) {
 
   const parsedAudioUpload = parseAudioUpload(audioUpload);
   if (parsedAudioUpload === "invalid_audio_upload") {
-    return res.status(400).json({ error: "invalid_audio_upload" });
+    return res.status(400).json({ error: "invalid audio upload" });
   }
   if (parsedAudioUpload === "audio_too_large") {
-    return res.status(400).json({ error: "audio_too_large" });
+    return res.status(400).json({ error: "audio too large" });
   }
   if (parsedAudioUpload) {
     update.audio = await buildManualAudioMeta({
@@ -265,7 +265,7 @@ export async function updatePhrase(req: Request, res: Response) {
 
   const updated = await phraseUseCases.update(id, update);
   if (!updated) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   return res.status(200).json({ phrase: updated });
 }
@@ -273,12 +273,12 @@ export async function updatePhrase(req: Request, res: Response) {
 export async function deletePhrase(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const deleted = await phraseUseCases.delete(id);
   if (!deleted) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   return res.status(200).json({ message: "phrase_deleted" });
 }
@@ -286,7 +286,7 @@ export async function deletePhrase(req: Request, res: Response) {
 export async function bulkDeletePhrases(req: Request, res: Response) {
   const { ids } = req.body ?? {};
   if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: "phrase_ids_required" });
+    return res.status(400).json({ error: "phrase ids required" });
   }
 
   const deleted = await phraseUseCases.bulkDelete(ids.map(String));
@@ -296,11 +296,11 @@ export async function bulkDeletePhrases(req: Request, res: Response) {
 export async function publishPhrase(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
   const phrase = await phraseUseCases.publish(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found_or_not_finished" });
+    return res.status(404).json({ error: "phrase not found or not finished" });
   }
   return res.status(200).json({ phrase });
 }
@@ -308,11 +308,11 @@ export async function publishPhrase(req: Request, res: Response) {
 export async function finishPhrase(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
   const phrase = await phraseUseCases.finish(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   return res.status(200).json({ phrase });
 }
@@ -320,20 +320,20 @@ export async function finishPhrase(req: Request, res: Response) {
 export async function generatePhraseAudioById(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const phrase = await phraseRepo.findById(id);
   if (!phrase) {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   const primaryLessonId = phrase.lessonIds[0];
   if (!primaryLessonId) {
-    return res.status(400).json({ error: "phrase_has_no_lessons" });
+    return res.status(400).json({ error: "phrase has no lessons" });
   }
   const lesson = await lessonRepo.findById(primaryLessonId);
   if (!lesson) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   try {
@@ -345,24 +345,24 @@ export async function generatePhraseAudioById(req: Request, res: Response) {
 
     const updated = await phraseRepo.updateById(phrase.id, { audio });
     if (!updated) {
-      return res.status(404).json({ error: "phrase_not_found" });
+      return res.status(404).json({ error: "phrase not found" });
     }
     return res.status(200).json({ phrase: updated });
   } catch (error) {
     console.error("Admin generatePhraseAudioById TTS error", error);
-    return res.status(502).json({ error: "tts_generation_failed" });
+    return res.status(502).json({ error: "tts generation failed" });
   }
 }
 
 export async function generateLessonPhrasesAudio(req: Request, res: Response) {
   const { lessonId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(lessonId)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const lesson = await lessonRepo.findById(lessonId);
   if (!lesson) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   const phrases = await phraseRepo.findByLessonId(lesson.id);

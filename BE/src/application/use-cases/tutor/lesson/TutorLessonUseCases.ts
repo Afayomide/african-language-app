@@ -14,6 +14,7 @@ export class TutorLessonUseCases {
 
   async create(input: {
     title: string;
+    unitId: string;
     language: Language;
     level: Level;
     description?: string;
@@ -22,11 +23,12 @@ export class TutorLessonUseCases {
     blocks?: LessonBlock[];
     createdBy: string;
   }) {
-    const lastOrderIndex = await this.lessons.findLastOrderIndex(input.language);
+    const lastOrderIndex = await this.lessons.findLastOrderIndex(input.unitId);
     const orderIndex = (lastOrderIndex ?? -1) + 1;
 
     return this.lessons.create({
       title: input.title,
+      unitId: input.unitId,
       language: input.language,
       level: input.level,
       orderIndex,
@@ -53,6 +55,7 @@ export class TutorLessonUseCases {
     update: Partial<{
       title: string;
       description: string;
+      unitId: string;
       level: Level;
       orderIndex: number;
       topics: string[];
@@ -71,7 +74,7 @@ export class TutorLessonUseCases {
     await this.phrases.softDeleteByLessonId(lesson.id, now);
     await this.proverbs.softDeleteByLessonId(lesson.id, now);
     await this.questions.softDeleteByLessonId(lesson.id, now);
-    await this.lessons.compactOrderIndexes(language);
+    await this.lessons.compactOrderIndexesByUnit(lesson.unitId);
 
     return lesson;
   }
@@ -85,12 +88,12 @@ export class TutorLessonUseCases {
     return deleted;
   }
 
-  async reorder(language: Language, lessonIds: string[]): Promise<LessonEntity[] | null> {
-    const scoped = await this.lessons.findByIdsAndLanguage(lessonIds, language);
+  async reorder(unitId: string, lessonIds: string[]): Promise<LessonEntity[] | null> {
+    const scoped = await this.lessons.findByIdsAndUnit(lessonIds, unitId);
     if (scoped.length !== lessonIds.length) return null;
 
     await this.lessons.reorderByIds(lessonIds);
-    return this.lessons.listByLanguage(language);
+    return this.lessons.listByUnitId(unitId);
   }
 
   async finish(id: string, language: Language) {

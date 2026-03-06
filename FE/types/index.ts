@@ -6,15 +6,13 @@ export type LessonBlock =
   | { type: "text"; content: string }
   | { type: "phrase"; refId: string }
   | { type: "proverb"; refId: string }
-  | { type: "question"; refId: string }
-  | { type: "listening"; refId: string };
+  | { type: "question"; refId: string };
 
 export type PopulatedLessonBlock = 
   | { type: "text"; content: string }
   | { type: "phrase"; data: Phrase }
   | { type: "proverb"; data: Proverb }
-  | { type: "question"; data: ExerciseQuestion & { interactionData?: any } }
-  | { type: "listening"; data: ExerciseQuestion & { interactionData?: any } };
+  | { type: "question"; data: ExerciseQuestion };
 
 export interface Phrase {
   _id: string;
@@ -55,6 +53,7 @@ export interface ExerciseQuestion {
   type: QuestionType;
   subtype: QuestionSubtype;
   promptTemplate: string;
+  text: string;
   options: string[];
   correctIndex: number;
   reviewData?: {
@@ -63,6 +62,14 @@ export interface ExerciseQuestion {
     correctOrder: number[];
     meaning: string;
   };
+  interactionData?: {
+    sentence: string;
+    words: string[];
+    correctOrder: number[];
+    meaning: string;
+  };
+  prompt?: string;
+  phrase?: Phrase | null;
   explanation: string;
 }
 

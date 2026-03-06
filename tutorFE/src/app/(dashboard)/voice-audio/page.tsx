@@ -45,7 +45,7 @@ export default function TutorVoiceAudioPage() {
       setItems(data.items)
       setTotal(data.total)
       setTotalPages(data.pagination.totalPages)
-    } catch {
+    } catch (error) {
       toast.error("Failed to load submissions")
     } finally {
       setIsLoading(false)
@@ -65,7 +65,7 @@ export default function TutorVoiceAudioPage() {
       await tutorVoiceAudioService.acceptSubmission(id)
       toast.success("Submission accepted")
       fetchSubmissions()
-    } catch {
+    } catch (error) {
       toast.error("Failed to accept submission")
     }
   }
@@ -83,7 +83,7 @@ export default function TutorVoiceAudioPage() {
       setRejectingId(null)
       setRejectReason("")
       fetchSubmissions()
-    } catch {
+    } catch (error) {
       toast.error("Failed to reject submission")
     }
   }

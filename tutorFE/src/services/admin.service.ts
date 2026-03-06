@@ -2,6 +2,7 @@ import api from "@/lib/api";
 import { feTutorRoutes } from "@/lib/apiRoutes";
 import {
   Lesson,
+  Unit,
   Phrase,
   Proverb,
   Language,
@@ -67,7 +68,7 @@ export const lessonService = {
     return fetchAllPages<Lesson>(feTutorRoutes.lessons(), "lessons", { status });
   },
 
-  async listLessonsPage(params?: { status?: Status; q?: string; page?: number; limit?: number }) {
+  async listLessonsPage(params?: { status?: Status; unitId?: string; q?: string; page?: number; limit?: number }) {
     const response = await api.get<{ lessons: Lesson[]; total: number; pagination?: PaginationMeta }>(
       feTutorRoutes.lessons(),
       { params }
@@ -91,7 +92,13 @@ export const lessonService = {
     return response.data.lesson;
   },
 
-  async createLesson(data: { title: string; level: Level; description?: string; language?: Language; topics?: string[] }) {
+  async createLesson(data: {
+    title: string;
+    unitId: string;
+    description?: string;
+    topics?: string[];
+    proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
+  }) {
     const response = await api.post<{ lesson: Lesson }>(feTutorRoutes.lessons(), data);
     return response.data.lesson;
   },
@@ -105,8 +112,9 @@ export const lessonService = {
     await api.delete(feTutorRoutes.lesson(id));
   },
 
-  async reorderLessons(lessonIds: string[]) {
+  async reorderLessons(unitId: string, lessonIds: string[]) {
     const response = await api.put<{ lessons: Lesson[] }>(feTutorRoutes.reorderLessons(), {
+      unitId,
       lessonIds
     });
     return response.data.lessons;
@@ -115,6 +123,46 @@ export const lessonService = {
   async finishLesson(id: string) {
     const response = await api.put<{ lesson: Lesson }>(feTutorRoutes.finishLesson(id));
     return response.data.lesson;
+  }
+};
+
+export const unitService = {
+  async listUnits(status?: Status) {
+    const response = await api.get<{ units: Unit[] }>(feTutorRoutes.units(), {
+      params: { status }
+    });
+    return response.data.units || [];
+  },
+
+  async getUnit(id: string) {
+    const response = await api.get<{ unit: Unit }>(feTutorRoutes.unit(id));
+    return response.data.unit;
+  },
+
+  async createUnit(data: { title: string; description?: string; level: Level }) {
+    const response = await api.post<{ unit: Unit }>(feTutorRoutes.units(), data);
+    return response.data.unit;
+  },
+
+  async updateUnit(id: string, data: Partial<Unit>) {
+    const response = await api.put<{ unit: Unit }>(feTutorRoutes.unit(id), data);
+    return response.data.unit;
+  },
+
+  async deleteUnit(id: string) {
+    await api.delete(feTutorRoutes.unit(id));
+  },
+
+  async finishUnit(id: string) {
+    const response = await api.put<{ unit: Unit }>(feTutorRoutes.finishUnit(id));
+    return response.data.unit;
+  },
+
+  async reorderUnits(unitIds: string[]) {
+    const response = await api.put<{ units: Unit[] }>(feTutorRoutes.reorderUnits(), {
+      unitIds
+    });
+    return response.data.units || [];
   }
 };
 

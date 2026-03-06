@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { lessonService, aiService } from "@/services"
-import { Language, Level } from "@/types"
+import { lessonService, aiService, unitService } from "@/services"
+import { Language, Level, Unit } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,13 +22,15 @@ import { Sparkles, ArrowLeft, Plus, Trash } from "lucide-react"
 export default function NewLessonPage() {
   const searchParams = useSearchParams()
   const initialLanguage = searchParams.get("language")
+  const initialUnitId = searchParams.get("unitId") || ""
   const [title, setTitle] = useState("")
   const [language, setLanguage] = useState<Language>(
     initialLanguage === "igbo" || initialLanguage === "hausa" || initialLanguage === "yoruba"
       ? initialLanguage
       : "yoruba"
   )
-  const [level, setLevel] = useState<Level>("beginner")
+  const [unitId, setUnitId] = useState(initialUnitId)
+  const [units, setUnits] = useState<Unit[]>([])
   const [description, setDescription] = useState("")
   const [topicsInput, setTopicsInput] = useState("")
   const [proverbs, setProverbs] = useState<Array<{ text: string; translation: string; contextNote: string }>>([])
@@ -36,6 +38,21 @@ export default function NewLessonPage() {
   const [isSuggesting, setIsSuggesting] = useState(false)
   
   const router = useRouter()
+
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        const data = await unitService.listUnits(undefined, language)
+        setUnits(data)
+        if (!unitId && data.length > 0) {
+          setUnitId(data[0]._id)
+        }
+      } catch (error) {
+        toast.error("Failed to fetch units")
+      }
+    }
+    void loadUnits()
+  }, [language, unitId])
 
   const handleAddProverb = () => {
     setProverbs([...proverbs, { text: "", translation: "", contextNote: "" }])
@@ -60,7 +77,11 @@ export default function NewLessonPage() {
         .map((item) => item.trim())
         .filter(Boolean)
       
-      await lessonService.createLesson({ title, language, level, description, topics, proverbs })
+      if (!unitId) {
+        toast.error("Select a unit")
+        return
+      }
+      await lessonService.createLesson({ title, unitId, description, topics, proverbs })
       toast.success("Lesson created")
       router.push(`/lessons/lang/${language}`)
     } catch (error: any) {
@@ -77,6 +98,8 @@ export default function NewLessonPage() {
     }
     setIsSuggesting(true)
     try {
+      const selectedUnit = units.find((unit) => unit._id === unitId)
+      const level = (selectedUnit?.level || "beginner") as Level
       const suggestion = await aiService.suggestLesson(title, language, level)
       if (suggestion.title) setTitle(suggestion.title)
       if (suggestion.description) setDescription(suggestion.description)
@@ -152,15 +175,17 @@ export default function NewLessonPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="level">Level</Label>
-                <Select value={level} onValueChange={(v) => setLevel(v as Level)}>
+                <Label htmlFor="unit">Unit</Label>
+                <Select value={unitId} onValueChange={setUnitId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select level" />
+                    <SelectValue placeholder="Select unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
+                    {units.map((unit) => (
+                      <SelectItem key={unit._id} value={unit._id}>
+                        {unit.orderIndex + 1}. {unit.title} ({unit.level})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

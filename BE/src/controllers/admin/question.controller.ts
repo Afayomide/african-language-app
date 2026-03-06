@@ -30,19 +30,19 @@ export async function createQuestion(req: Request, res: Response) {
   const { lessonId, phraseId, type, subtype, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
 
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!type || !isValidQuestionType(String(type))) {
-    return res.status(400).json({ error: "invalid_type" });
+    return res.status(400).json({ error: "invalid type" });
   }
   if (!subtype || !isValidQuestionSubtype(String(subtype))) {
-    return res.status(400).json({ error: "invalid_subtype" });
+    return res.status(400).json({ error: "invalid subtype" });
   }
   if (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId))) {
-    return res.status(400).json({ error: "invalid_phrase_id" });
+    return res.status(400).json({ error: "invalid phrase id" });
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
-    return res.status(400).json({ error: "prompt_template_required" });
+    return res.status(400).json({ error: "prompt template required" });
   }
 
   let parsedOptions = parseQuestionOptions(options);
@@ -51,16 +51,16 @@ export async function createQuestion(req: Request, res: Response) {
   if (String(type) === "fill-in-the-gap") {
     parsedReviewData = parseQuestionReviewData(reviewData);
     if (!parsedReviewData) {
-      return res.status(400).json({ error: "invalid_review_data" });
+      return res.status(400).json({ error: "invalid review data" });
     }
     parsedOptions = parsedReviewData.words;
     answerIndex = 0;
   } else {
     if (!parsedOptions) {
-      return res.status(400).json({ error: "invalid_options" });
+      return res.status(400).json({ error: "invalid options" });
     }
     if (Number.isNaN(answerIndex) || answerIndex < 0 || answerIndex >= parsedOptions.length) {
-      return res.status(400).json({ error: "invalid_correct_index" });
+      return res.status(400).json({ error: "invalid correct index" });
     }
   }
 
@@ -76,16 +76,16 @@ export async function createQuestion(req: Request, res: Response) {
     explanation: explanation ? String(explanation).trim() : ""
   });
   if (created === "cannot_add_draft_to_published_lesson") {
-    return res.status(400).json({ error: "cannot_add_draft_to_published_lesson" });
+    return res.status(400).json({ error: "cannot add draft to published lesson" });
   }
   if (created === "lesson_not_found") {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
   if (created === "phrase_not_found") {
-    return res.status(404).json({ error: "phrase_not_found" });
+    return res.status(404).json({ error: "phrase not found" });
   }
   if (created === "phrase_not_in_lesson") {
-    return res.status(400).json({ error: "phrase_not_in_lesson" });
+    return res.status(400).json({ error: "phrase not in lesson" });
   }
   return res.status(201).json({ question: created });
 }
@@ -97,22 +97,22 @@ export async function listQuestions(req: Request, res: Response) {
 
   if (lessonId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(lessonId))) {
-      return res.status(400).json({ error: "invalid_lesson_id" });
+      return res.status(400).json({ error: "invalid lesson id" });
     }
   }
   if (type !== undefined) {
     if (!isValidQuestionType(String(type))) {
-      return res.status(400).json({ error: "invalid_type" });
+      return res.status(400).json({ error: "invalid type" });
     }
   }
   if (subtype !== undefined) {
     if (!isValidQuestionSubtype(String(subtype))) {
-      return res.status(400).json({ error: "invalid_subtype" });
+      return res.status(400).json({ error: "invalid subtype" });
     }
   }
   if (status !== undefined) {
     if (!["draft", "finished", "published"].includes(String(status))) {
-      return res.status(400).json({ error: "invalid_status" });
+      return res.status(400).json({ error: "invalid status" });
     }
   }
 
@@ -160,12 +160,12 @@ export async function listQuestions(req: Request, res: Response) {
 export async function getQuestionById(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const question = await questionUseCases.getById(id);
   if (!question) {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
   const phrase = await phraseRepo.findById(question.phraseId);
   return res.status(200).json({
@@ -188,53 +188,53 @@ export async function getQuestionById(req: Request, res: Response) {
 export async function updateQuestion(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const { type, subtype, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const currentQuestion = await questionUseCases.getById(id);
   if (!currentQuestion) {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
   const effectiveType = String(type || currentQuestion.type);
 
   if (type !== undefined) {
     if (!isValidQuestionType(String(type))) {
-      return res.status(400).json({ error: "invalid_type" });
+      return res.status(400).json({ error: "invalid type" });
     }
     update.type = String(type) as QuestionType;
   }
   if (subtype !== undefined) {
     if (!isValidQuestionSubtype(String(subtype))) {
-      return res.status(400).json({ error: "invalid_subtype" });
+      return res.status(400).json({ error: "invalid subtype" });
     }
     update.subtype = String(subtype) as QuestionSubtype;
   }
   if (promptTemplate !== undefined) {
     if (!String(promptTemplate).trim()) {
-      return res.status(400).json({ error: "prompt_template_required" });
+      return res.status(400).json({ error: "prompt template required" });
     }
     update.promptTemplate = String(promptTemplate).trim();
   }
   if (phraseId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
-      return res.status(400).json({ error: "invalid_phrase_id" });
+      return res.status(400).json({ error: "invalid phrase id" });
     }
     const phrase = await phraseRepo.findById(String(phraseId));
     if (!phrase) {
-      return res.status(404).json({ error: "phrase_not_found" });
+      return res.status(404).json({ error: "phrase not found" });
     }
     update.phraseId = phrase.id;
   }
   if (effectiveType === "fill-in-the-gap") {
     if (type !== undefined && String(type) === "fill-in-the-gap" && reviewData === undefined && !currentQuestion.reviewData?.sentence) {
-      return res.status(400).json({ error: "invalid_review_data" });
+      return res.status(400).json({ error: "invalid review data" });
     }
     if (reviewData !== undefined) {
       const parsedReviewData = parseQuestionReviewData(reviewData);
       if (!parsedReviewData) {
-        return res.status(400).json({ error: "invalid_review_data" });
+        return res.status(400).json({ error: "invalid review data" });
       }
       update.reviewData = parsedReviewData;
       update.options = parsedReviewData.words;
@@ -244,21 +244,21 @@ export async function updateQuestion(req: Request, res: Response) {
     if (options !== undefined) {
       const parsedOptions = parseQuestionOptions(options);
       if (!parsedOptions) {
-        return res.status(400).json({ error: "invalid_options" });
+        return res.status(400).json({ error: "invalid options" });
       }
       update.options = parsedOptions;
 
       if (correctIndex !== undefined) {
         const idx = Number(correctIndex);
         if (Number.isNaN(idx) || idx < 0 || idx >= parsedOptions.length) {
-          return res.status(400).json({ error: "invalid_correct_index" });
+          return res.status(400).json({ error: "invalid correct index" });
         }
         update.correctIndex = idx;
       }
     } else if (correctIndex !== undefined) {
       const idx = Number(correctIndex);
       if (Number.isNaN(idx) || idx < 0 || idx >= (currentQuestion.options || []).length) {
-        return res.status(400).json({ error: "invalid_correct_index" });
+        return res.status(400).json({ error: "invalid correct index" });
       }
       update.correctIndex = idx;
     }
@@ -270,7 +270,7 @@ export async function updateQuestion(req: Request, res: Response) {
 
   const question = await questionUseCases.update(id, update);
   if (!question) {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
 
   return res.status(200).json({ question });
@@ -279,12 +279,12 @@ export async function updateQuestion(req: Request, res: Response) {
 export async function deleteQuestion(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const question = await questionUseCases.delete(id);
   if (!question) {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
 
   return res.status(200).json({ message: "question_deleted" });
@@ -293,18 +293,18 @@ export async function deleteQuestion(req: Request, res: Response) {
 export async function publishQuestion(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const result = await questionUseCases.publish(id);
   if (result === "question_not_found") {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
   if (result === "linked_phrase_must_be_published") {
-    return res.status(400).json({ error: "linked_phrase_must_be_published" });
+    return res.status(400).json({ error: "linked phrase must be published" });
   }
   if (result === "question_not_finished") {
-    return res.status(400).json({ error: "question_not_finished" });
+    return res.status(400).json({ error: "question not finished" });
   }
   return res.status(200).json({ question: result });
 }
@@ -312,15 +312,15 @@ export async function publishQuestion(req: Request, res: Response) {
 export async function sendBackToTutorQuestion(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const result = await questionUseCases.sendBackToTutor(id);
   if (result === "question_not_found") {
-    return res.status(404).json({ error: "question_not_found" });
+    return res.status(404).json({ error: "question not found" });
   }
   if (result === "question_must_be_finished") {
-    return res.status(400).json({ error: "question_must_be_finished" });
+    return res.status(400).json({ error: "question must be finished" });
   }
   return res.status(200).json({ question: result });
 }

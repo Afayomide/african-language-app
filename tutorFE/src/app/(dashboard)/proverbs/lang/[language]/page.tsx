@@ -113,8 +113,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       if (selectedLessonId !== "all" && !data.some((lesson) => lesson._id === selectedLessonId)) {
         setSelectedLessonId("all");
       }
-    } catch {
-      toast.error("Failed to load lessons");
+    } catch (error) {
+      toast.error("Failed to load lessons")
     }
   }
 
@@ -130,8 +130,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       setProverbs(data.items);
       setTotal(data.total);
       setTotalPages(data.pagination.totalPages);
-    } catch {
-      toast.error("Failed to load proverbs");
+    } catch (error) {
+      toast.error("Failed to load proverbs")
     } finally {
       setIsLoading(false);
     }
@@ -186,8 +186,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       }
       setDialogOpen(false);
       void loadProverbs();
-    } catch {
-      toast.error("Failed to save proverb");
+    } catch (error) {
+      toast.error("Failed to save proverb")
     }
   }
 
@@ -197,8 +197,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       await proverbService.deleteProverb(id);
       toast.success("Proverb deleted");
       void loadProverbs();
-    } catch {
-      toast.error("Failed to delete proverb");
+    } catch (error) {
+      toast.error("Failed to delete proverb")
     }
   }
 
@@ -207,8 +207,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       await proverbService.finishProverb(id);
       toast.success("Proverb sent to admin for publish");
       void loadProverbs();
-    } catch {
-      toast.error("Failed to mark as finished");
+    } catch (error) {
+      toast.error("Failed to mark as finished")
     }
   }
 
@@ -223,8 +223,8 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
       setAiDialogOpen(false);
       setAiExtraInstructions("");
       void loadProverbs();
-    } catch {
-      toast.error("Failed to generate AI proverbs");
+    } catch (error) {
+      toast.error("Failed to generate AI proverbs")
     }
   }
 

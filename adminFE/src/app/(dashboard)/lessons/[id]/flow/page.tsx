@@ -57,12 +57,19 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleAddBlock = (type: LessonBlock["type"]) => {
+  const handleAddBlock = (type: LessonBlock["type"] | "listening") => {
     if (type === "text") {
       setBlocks([...blocks, { type: "text", content: "" }])
-    } else {
-      setBlocks([...blocks, { type, refId: "" }])
+      return
     }
+
+    if (type === "listening") {
+      const listeningQuestion = allQuestions.find((q) => q.type === "listening")
+      setBlocks([...blocks, { type: "question", refId: listeningQuestion?._id || "" }])
+      return
+    }
+
+    setBlocks([...blocks, { type, refId: "" }])
   }
 
   const handleBlockChange = (index: number, value: string) => {
@@ -196,16 +203,14 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                           {block.type === "proverb" && allProverbs.map(p => (
                             <SelectItem key={p._id} value={p._id}>{p.text}</SelectItem>
                           ))}
-                          {block.type === "question" && allQuestions.filter(q => q.type !== "listening").map(q => (
-                            <SelectItem key={q._id} value={q._id}>{q.promptTemplate} ({q.type.replaceAll("-", " ")})</SelectItem>
-                          ))}
-                          {block.type === "listening" && allQuestions.filter(q => q.type === "listening").map(q => (
-                            <SelectItem key={q._id} value={q._id}>{q.promptTemplate} ({q.subtype.replaceAll("-", " ")})</SelectItem>
+                          {block.type === "question" && allQuestions.map(q => (
+                            <SelectItem key={q._id} value={q._id}>
+                              {q.promptTemplate} ({q.type === "listening" ? "listening" : q.type.replaceAll("-", " ")})
+                            </SelectItem>
                           ))}
                           {((block.type === "phrase" && allPhrases.length === 0) ||
                             (block.type === "proverb" && allProverbs.length === 0) ||
-                            (block.type === "question" && allQuestions.filter(q => q.type !== "listening").length === 0) ||
-                            (block.type === "listening" && allQuestions.filter(q => q.type === "listening").length === 0)) && (
+                            (block.type === "question" && allQuestions.length === 0)) && (
                             <SelectItem value="none" disabled>No {block.type}s found for this lesson</SelectItem>
                           )}
                         </SelectContent>

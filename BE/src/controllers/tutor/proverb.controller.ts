@@ -19,18 +19,18 @@ export async function createProverb(req: AuthRequest, res: Response) {
   const { lessonIds, text, translation, contextNote, aiMeta } = req.body ?? {};
 
   if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
-    return res.status(400).json({ error: "lesson_ids_required" });
+    return res.status(400).json({ error: "lesson ids required" });
   }
   const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
   if (normalizedLessonIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!text || !String(text).trim()) {
-    return res.status(400).json({ error: "text_required" });
+    return res.status(400).json({ error: "text required" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverb = await proverbUseCases.create(
     {
@@ -44,7 +44,7 @@ export async function createProverb(req: AuthRequest, res: Response) {
   );
 
   if (proverb === "lesson_not_found") {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
   return res.status(201).json({ proverb });
 }
@@ -55,14 +55,14 @@ export async function listProverbs(req: AuthRequest, res: Response) {
   const status = req.query.status ? String(req.query.status) : undefined;
 
   if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (status && !["draft", "finished", "published"].includes(status)) {
-    return res.status(400).json({ error: "invalid_status" });
+    return res.status(400).json({ error: "invalid status" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverbs = await proverbUseCases.list(
     {
@@ -73,7 +73,7 @@ export async function listProverbs(req: AuthRequest, res: Response) {
   );
 
   if (proverbs === "lesson_not_found") {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
   return res.status(200).json({ total: proverbs.length, proverbs });
 }
@@ -82,14 +82,14 @@ export async function getProverbById(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverb = await proverbUseCases.getByIdInScope(id, tutorLanguage as Language);
-  if (!proverb) return res.status(404).json({ error: "proverb_not_found" });
+  if (!proverb) return res.status(404).json({ error: "proverb not found" });
   return res.status(200).json({ proverb });
 }
 
@@ -98,22 +98,22 @@ export async function updateProverb(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { lessonIds, text, translation, contextNote, aiMeta } = req.body ?? {};
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const update: Record<string, unknown> = {};
   if (lessonIds !== undefined) {
     if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
-      return res.status(400).json({ error: "lesson_ids_required" });
+      return res.status(400).json({ error: "lesson ids required" });
     }
     const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
     if (normalizedLessonIds.some((lessonId) => !mongoose.Types.ObjectId.isValid(lessonId))) {
-      return res.status(400).json({ error: "invalid_lesson_id" });
+      return res.status(400).json({ error: "invalid lesson id" });
     }
     update.lessonIds = normalizedLessonIds;
   }
   if (text !== undefined) {
-    if (!String(text).trim()) return res.status(400).json({ error: "text_required" });
+    if (!String(text).trim()) return res.status(400).json({ error: "text required" });
     update.text = String(text).trim();
   }
   if (translation !== undefined) update.translation = String(translation).trim();
@@ -121,15 +121,15 @@ export async function updateProverb(req: AuthRequest, res: Response) {
   if (aiMeta !== undefined) update.aiMeta = aiMeta;
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverb = await proverbUseCases.updateInScope(
     id,
     tutorLanguage as Language,
     update
   );
-  if (proverb === "lesson_not_found") return res.status(404).json({ error: "lesson_not_found" });
-  if (proverb === "proverb_not_found" || !proverb) return res.status(404).json({ error: "proverb_not_found" });
+  if (proverb === "lesson_not_found") return res.status(404).json({ error: "lesson not found" });
+  if (proverb === "proverb_not_found" || !proverb) return res.status(404).json({ error: "proverb not found" });
   return res.status(200).json({ proverb });
 }
 
@@ -137,14 +137,14 @@ export async function deleteProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverb = await proverbUseCases.deleteInScope(id, tutorLanguage as Language);
-  if (!proverb) return res.status(404).json({ error: "proverb_not_found" });
+  if (!proverb) return res.status(404).json({ error: "proverb not found" });
   return res.status(200).json({ message: "proverb_deleted" });
 }
 
@@ -152,14 +152,14 @@ export async function finishProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_id" });
+    return res.status(400).json({ error: "invalid id" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
-  if (!tutorLanguage) return res.status(403).json({ error: "tutor_language_not_configured" });
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
 
   const proverb = await proverbUseCases.finishInScope(id, tutorLanguage as Language);
-  if (!proverb) return res.status(404).json({ error: "proverb_not_found" });
+  if (!proverb) return res.status(404).json({ error: "proverb not found" });
   return res.status(200).json({ proverb });
 }
 

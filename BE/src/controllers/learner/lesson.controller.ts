@@ -26,12 +26,12 @@ export async function getLessonFlow(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const result = await useCases.getLessonFlow(id);
   if (!result) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json(result);
@@ -44,10 +44,10 @@ export async function getNextLesson(req: AuthRequest, res: Response) {
 
   const next = await useCases.getNextLesson(req.user.id);
   if (next === "profile_not_found") {
-    return res.status(404).json({ error: "learner_profile_not_found" });
+    return res.status(404).json({ error: "learner profile not found" });
   }
   if (!next) {
-    return res.status(404).json({ error: "no_published_lessons" });
+    return res.status(404).json({ error: "no published lessons" });
   }
 
   return res.status(200).json({
@@ -68,12 +68,12 @@ export async function getLessonOverview(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const result = await useCases.getLessonOverview(req.user.id, id);
   if (!result) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json({
@@ -98,12 +98,12 @@ export async function getLessonSteps(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const result = await useCases.getLessonSteps(req.user.id, id);
   if (!result) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json(result);
@@ -118,7 +118,7 @@ export async function completeStep(req: AuthRequest, res: Response) {
   const { score } = req.body ?? {};
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const result = await useCases.completeStep({
@@ -129,13 +129,13 @@ export async function completeStep(req: AuthRequest, res: Response) {
   });
 
   if (result === "lesson_not_found") {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
   if (result === "invalid_step_key") {
-    return res.status(400).json({ error: "invalid_step_key" });
+    return res.status(400).json({ error: "invalid step key" });
   }
   if (result === "step_not_found") {
-    return res.status(404).json({ error: "step_not_found" });
+    return res.status(404).json({ error: "step not found" });
   }
 
   return res.status(200).json(result);
@@ -150,7 +150,7 @@ export async function completeLesson(req: AuthRequest, res: Response) {
   const { xpEarned, minutesSpent } = req.body ?? {};
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const result = await useCases.completeLesson({
@@ -161,7 +161,7 @@ export async function completeLesson(req: AuthRequest, res: Response) {
   });
 
   if (result === "lesson_not_found") {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json(result);
@@ -174,12 +174,12 @@ export async function getLessonPhrases(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const phrases = await useCases.getLessonPhrases(id);
   if (!phrases) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json({
@@ -204,10 +204,10 @@ export async function getLessonQuestions(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { type } = req.query;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!type || !["multiple-choice", "fill-in-the-gap", "listening"].includes(String(type))) {
-    return res.status(400).json({ error: "invalid_type" });
+    return res.status(400).json({ error: "invalid type" });
   }
 
   const questions = await useCases.getLessonQuestions(
@@ -215,7 +215,7 @@ export async function getLessonQuestions(req: AuthRequest, res: Response) {
     String(type) as QuestionType
   );
   if (!questions) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json({
@@ -231,12 +231,12 @@ export async function getLessonReviewExercises(req: AuthRequest, res: Response) 
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "invalid_lesson_id" });
+    return res.status(400).json({ error: "invalid lesson id" });
   }
 
   const exercises = await useCases.getLessonReviewExercises(id);
   if (!exercises) {
-    return res.status(404).json({ error: "lesson_not_found" });
+    return res.status(404).json({ error: "lesson not found" });
   }
 
   return res.status(200).json({
