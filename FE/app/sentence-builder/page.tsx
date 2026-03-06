@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ChevronLeft, RotateCcw, Check, X } from 'lucide-react'
@@ -17,7 +17,7 @@ type ReviewExercise = {
   meaning: string
 }
 
-export default function SentenceBuilderScreen() {
+function SentenceBuilderContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get('lessonId')
 
@@ -227,5 +227,13 @@ export default function SentenceBuilderScreen() {
         </div>
       </section>
     </main>
+  )
+}
+
+export default function SentenceBuilderScreen() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <SentenceBuilderContent />
+    </Suspense>
   )
 }
