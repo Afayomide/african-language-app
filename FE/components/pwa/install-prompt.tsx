@@ -25,8 +25,10 @@ export function InstallPrompt() {
   const [showIosHelp, setShowIosHelp] = useState(false);
 
   const isMobile = useMemo(() => {
-    if (typeof navigator === "undefined") return false;
-    return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (typeof window === "undefined") return false;
+    const uaMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    const smallViewport = window.innerWidth < 768;
+    return uaMobile || smallViewport;
   }, []);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function InstallPrompt() {
 
   if (!isMobile || isStandalone || dismissed) return null;
 
-  const iosManualInstall = isIosUserAgent() && isSafariBrowser();
+  const iosManualInstall = isIosUserAgent();
 
   async function onInstall() {
     if (iosManualInstall) {
@@ -82,4 +84,3 @@ export function InstallPrompt() {
     </div>
   );
 }
-
