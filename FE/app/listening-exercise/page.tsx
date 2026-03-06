@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ChevronLeft, Play, RotateCcw, Check, X } from 'lucide-react'
@@ -35,7 +35,7 @@ const listeningExercises = [
   },
 ]
 
-export default function ListeningExerciseScreen() {
+function ListeningExerciseContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get("lessonId")
   const [currentExercise, setCurrentExercise] = useState(0)
@@ -264,5 +264,13 @@ export default function ListeningExerciseScreen() {
         </div>
       </section>
     </main>
+  )
+}
+
+export default function ListeningExerciseScreen() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <ListeningExerciseContent />
+    </Suspense>
   )
 }
