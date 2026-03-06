@@ -8,14 +8,11 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
+const PWA_INSTALLED_KEY = "pwa_installed";
+
 function isIosUserAgent() {
   if (typeof navigator === "undefined") return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
-function isSafariBrowser() {
-  if (typeof navigator === "undefined") return false;
-  return /safari/i.test(navigator.userAgent) && !/chrome|android|crios|fxios/i.test(navigator.userAgent);
 }
 
 export function InstallPrompt() {
@@ -33,17 +30,35 @@ export function InstallPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(PWA_INSTALLED_KEY) === "1") {
+      setDismissed(true);
+      return;
+    }
 
     const standalone = window.matchMedia("(display-mode: standalone)").matches || ((window.navigator as Navigator & { standalone?: boolean }).standalone === true);
     setIsStandalone(standalone);
+    if (standalone) {
+      window.localStorage.setItem(PWA_INSTALLED_KEY, "1");
+      setDismissed(true);
+      return;
+    }
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
+    const onInstalled = () => {
+      window.localStorage.setItem(PWA_INSTALLED_KEY, "1");
+      setDismissed(true);
+      setDeferredPrompt(null);
+    };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   if (!isMobile || isStandalone || dismissed) return null;
@@ -60,6 +75,7 @@ export function InstallPrompt() {
     await deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
     if (choice.outcome === "accepted") {
+      window.localStorage.setItem(PWA_INSTALLED_KEY, "1");
       setDismissed(true);
     }
     setDeferredPrompt(null);
