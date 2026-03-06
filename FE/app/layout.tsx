@@ -2,6 +2,7 @@ import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Quicksand } from 'next/font/google'
 import { PwaRegister } from "@/components/pwa/register-sw"
+import { InstallPrompt } from "@/components/pwa/install-prompt"
 
 import './globals.css'
 
@@ -36,6 +37,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         <PwaRegister />
+        <InstallPrompt />
         {children}
       </body>
     </html>
