@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ArrowRight, Flame, Gift, TrendingUp, RotateCcw } from 'lucide-react'
@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { learnerLessonService } from '@/services'
 
-export default function LessonCompleteScreen() {
+function LessonCompleteContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get("lessonId")
   const [xpEarned, setXpEarned] = useState(50)
@@ -132,5 +132,13 @@ export default function LessonCompleteScreen() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function LessonCompleteScreen() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <LessonCompleteContent />
+    </Suspense>
   )
 }
