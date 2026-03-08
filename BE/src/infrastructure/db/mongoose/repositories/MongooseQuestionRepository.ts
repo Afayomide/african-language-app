@@ -1,4 +1,5 @@
 import ExerciseQuestionModel from "../../../../models/ExerciseQuestion.js";
+import LessonModel from "../../../../models/Lesson.js";
 import type { QuestionEntity } from "../../../../domain/entities/Question.js";
 import type {
   QuestionCreateInput,
@@ -67,8 +68,39 @@ export class MongooseQuestionRepository implements QuestionRepository {
   }
 
   async softDeleteByLessonId(lessonId: string, now: Date): Promise<void> {
+    const candidates = await ExerciseQuestionModel.find({
+      lessonId,
+      isDeleted: { $ne: true }
+    }).select("_id");
+    if (candidates.length === 0) return;
+
+    const candidateIds = candidates.map((item) => item._id);
+    const reusedByOtherLessons = await LessonModel.find({
+      _id: { $ne: lessonId },
+      isDeleted: { $ne: true },
+      blocks: {
+        $elemMatch: {
+          type: "question",
+          refId: { $in: candidateIds }
+        }
+      }
+    }).select("blocks.refId");
+
+    const preserved = new Set<string>();
+    for (const lesson of reusedByOtherLessons) {
+      const blocks = Array.isArray(lesson.blocks) ? lesson.blocks : [];
+      for (const block of blocks) {
+        if (block?.type === "question" && block.refId) {
+          preserved.add(String(block.refId));
+        }
+      }
+    }
+
+    const deletableIds = candidateIds.filter((id) => !preserved.has(String(id)));
+    if (deletableIds.length === 0) return;
+
     await ExerciseQuestionModel.updateMany(
-      { lessonId, isDeleted: { $ne: true } },
+      { _id: { $in: deletableIds }, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: now }
     );
   }

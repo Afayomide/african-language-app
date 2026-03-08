@@ -47,6 +47,72 @@ function normalizePhraseKey(text: string, translation: string) {
   return `${text.trim().toLowerCase()}::${translation.trim().toLowerCase()}`;
 }
 
+function normalizeTranslationKey(translation: string) {
+  return translation.trim().toLowerCase();
+}
+
+function wordCount(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
+
+function isSentenceLike(value: string) {
+  return /[.!?]/.test(value.trim());
+}
+
+function tokenize(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function rankByBeginnerOverlap(
+  phrases: LlmGeneratedPhrase[],
+  beginnerLexicon: Set<string>
+) {
+  if (beginnerLexicon.size === 0) return phrases;
+
+  return [...phrases].sort((a, b) => {
+    const aTokens = tokenize(a.text);
+    const bTokens = tokenize(b.text);
+    const aOverlap = aTokens.some((token) => beginnerLexicon.has(token)) ? 1 : 0;
+    const bOverlap = bTokens.some((token) => beginnerLexicon.has(token)) ? 1 : 0;
+    if (aOverlap !== bOverlap) return bOverlap - aOverlap;
+    return wordCount(a.text) - wordCount(b.text);
+  });
+}
+
+function applyLevelPhrasePolicy(
+  level: LessonEntity["level"],
+  phrases: LlmGeneratedPhrase[]
+) {
+  if (level === "advanced") return phrases;
+
+  if (level === "beginner") {
+    const strict = phrases.filter((item) => {
+      const words = wordCount(item.text);
+      return words >= 1 && words <= 2 && !isSentenceLike(item.text);
+    });
+    if (strict.length > 0) return strict;
+  }
+
+  if (level === "intermediate") {
+    const strict = phrases.filter((item) => {
+      const words = wordCount(item.text);
+      return words >= 1 && words <= 5;
+    });
+    if (strict.length > 0) return strict;
+  }
+
+  return [...phrases].sort((a, b) => wordCount(a.text) - wordCount(b.text));
+}
+
 export class AiPhraseOrchestrator {
   constructor(
     private readonly lessons: LessonRepository,
@@ -60,23 +126,47 @@ export class AiPhraseOrchestrator {
     extraInstructions?: string;
   }) {
     const existingPhrases = await this.phrases.findByLessonId(input.lesson.id);
+    const allLanguagePhrases = await this.phrases.list({ language: input.lesson.language });
     const existingKeys = new Set(
       existingPhrases.map((phrase) => normalizePhraseKey(phrase.text, phrase.translation))
     );
+    const translationMap = new Map<string, PhraseEntity>();
+    for (const phrase of allLanguagePhrases) {
+      const translationKey = normalizeTranslationKey(phrase.translation);
+      if (!translationMap.has(translationKey)) {
+        translationMap.set(translationKey, phrase);
+      }
+    }
+
+    const beginnerWordBank = await this.getBeginnerWordBank(input.lesson.language);
+    const progressionInstructions =
+      input.lesson.level === "beginner"
+        ? ""
+        : beginnerWordBank.length > 0
+          ? [
+              "Build on beginner vocabulary as much as possible.",
+              "Use at least one beginner word in most generated items when natural.",
+              `Beginner vocabulary to reuse: ${beginnerWordBank.slice(0, 80).join(", ")}`
+            ].join(" ")
+          : "";
 
     const phrases = await this.llm.generatePhrases({
       lessonId: input.lesson.id,
       language: input.lesson.language,
       level: input.lesson.level,
       seedWords: input.seedWords,
-      extraInstructions: input.extraInstructions,
+      extraInstructions: [input.extraInstructions || "", progressionInstructions]
+        .filter(Boolean)
+        .join(" "),
       lessonTitle: input.lesson.title,
       lessonDescription: input.lesson.description,
       existingPhrases: existingPhrases.map((phrase) => phrase.text)
     });
 
+    const levelAdjusted = applyLevelPhrasePolicy(input.lesson.level, phrases);
+    const ranked = rankByBeginnerOverlap(levelAdjusted, new Set(beginnerWordBank.map((item) => item.toLowerCase())));
     const uniqueInBatch = new Set<string>();
-    const sanitized = phrases
+    const sanitized = ranked
       .map(sanitizePhrase)
       .filter((item): item is LlmGeneratedPhrase => Boolean(item))
       .filter((item) => {
@@ -88,8 +178,26 @@ export class AiPhraseOrchestrator {
 
     if (sanitized.length === 0) return [];
 
-    const created: PhraseEntity[] = [];
+    const createdOrLinked: PhraseEntity[] = [];
     for (const phrase of sanitized) {
+      const translationKey = normalizeTranslationKey(phrase.translation);
+      const existingByTranslation = translationMap.get(translationKey);
+      if (existingByTranslation) {
+        if (!existingByTranslation.lessonIds.includes(input.lesson.id)) {
+          const lessonIds = Array.from(new Set([...existingByTranslation.lessonIds, input.lesson.id]));
+          const updated = await this.phrases.updateById(existingByTranslation.id, { lessonIds });
+          if (updated) {
+            createdOrLinked.push(updated);
+            translationMap.set(translationKey, updated);
+          } else {
+            createdOrLinked.push(existingByTranslation);
+          }
+        } else {
+          createdOrLinked.push(existingByTranslation);
+        }
+        continue;
+      }
+
       const item = await this.phrases.create({
         lessonIds: [input.lesson.id],
         language: input.lesson.language,
@@ -106,9 +214,10 @@ export class AiPhraseOrchestrator {
           reviewedByAdmin: false
         }
       });
-      created.push(item);
+      createdOrLinked.push(item);
+      translationMap.set(translationKey, item);
     }
-    return created;
+    return createdOrLinked;
   }
 
   async generateForLanguage(input: {
@@ -117,7 +226,22 @@ export class AiPhraseOrchestrator {
     seedWords?: string[];
     extraInstructions?: string;
   }) {
+    const beginnerWordBank = await this.getBeginnerWordBank(input.language);
+    const progressionInstructions =
+      input.level === "beginner"
+        ? ""
+        : beginnerWordBank.length > 0
+          ? [
+              "Build on beginner vocabulary as much as possible.",
+              "Use at least one beginner word in most generated items when natural.",
+              `Beginner vocabulary to reuse: ${beginnerWordBank.slice(0, 80).join(", ")}`
+            ].join(" ")
+          : "";
+
     const existingPhrases = await this.phrases.list({ language: input.language });
+    const existingTranslationKeys = new Set(
+      existingPhrases.map((phrase) => normalizeTranslationKey(phrase.translation))
+    );
     const existingKeys = new Set(
       existingPhrases.map((phrase) => normalizePhraseKey(phrase.text, phrase.translation))
     );
@@ -126,20 +250,27 @@ export class AiPhraseOrchestrator {
       language: input.language,
       level: input.level,
       seedWords: input.seedWords,
-      extraInstructions: input.extraInstructions,
+      extraInstructions: [input.extraInstructions || "", progressionInstructions]
+        .filter(Boolean)
+        .join(" "),
       lessonTitle: "General phrases",
       lessonDescription: "Phrases not attached to a lesson yet",
       existingPhrases: existingPhrases.map((phrase) => phrase.text)
     });
 
+    const levelAdjusted = applyLevelPhrasePolicy(input.level, phrases);
+    const ranked = rankByBeginnerOverlap(levelAdjusted, new Set(beginnerWordBank.map((item) => item.toLowerCase())));
     const uniqueInBatch = new Set<string>();
-    const sanitized = phrases
+    const sanitized = ranked
       .map(sanitizePhrase)
       .filter((item): item is LlmGeneratedPhrase => Boolean(item))
       .filter((item) => {
+        const translationKey = normalizeTranslationKey(item.translation);
+        if (existingTranslationKeys.has(translationKey)) return false;
         const key = normalizePhraseKey(item.text, item.translation);
         if (existingKeys.has(key) || uniqueInBatch.has(key)) return false;
         uniqueInBatch.add(key);
+        existingTranslationKeys.add(translationKey);
         return true;
       });
 
@@ -201,5 +332,23 @@ export class AiPhraseOrchestrator {
         reviewedByAdmin: false
       }
     });
+  }
+
+  private async getBeginnerWordBank(language: LessonEntity["language"]) {
+    const lessons = await this.lessons.list({ language });
+    const beginnerLessonIds = lessons
+      .filter((lesson) => lesson.level === "beginner")
+      .map((lesson) => lesson.id);
+    if (beginnerLessonIds.length === 0) return [];
+
+    const phrases = await this.phrases.list({ lessonIds: beginnerLessonIds });
+    const words = new Set<string>();
+    for (const phrase of phrases) {
+      for (const token of tokenize(phrase.text)) {
+        if (token.length < 2) continue;
+        words.add(token);
+      }
+    }
+    return [...words].slice(0, 200);
   }
 }

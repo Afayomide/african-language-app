@@ -6,14 +6,32 @@ import { TutorScopeService } from "../../application/services/TutorScopeService.
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
+import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
 import { AiPhraseOrchestrator } from "../../application/services/AiPhraseOrchestrator.js";
+import { AdminUnitAiContentUseCases } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
 import { isValidLevel, validateLessonId } from "../../interfaces/http/validators/ai.validators.js";
 
 const lessons = new MongooseLessonRepository();
 const phrases = new MongoosePhraseRepository();
 const proverbs = new MongooseProverbRepository();
+const questions = new MongooseQuestionRepository();
+const units = new MongooseUnitRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const unitAiContentUseCases = new AdminUnitAiContentUseCases(
+  lessons,
+  phrases,
+  proverbs,
+  questions,
+  getLlmClient()
+);
+
+function isEnglishLikeTitle(value: string) {
+  const title = String(value || "").trim();
+  if (!title) return false;
+  return /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(title);
+}
 
 export async function suggestLesson(req: AuthRequest, res: Response) {
   if (!req.user) {
@@ -35,11 +53,23 @@ export async function suggestLesson(req: AuthRequest, res: Response) {
 
   const llm = getLlmClient();
   try {
+    const existingLessons = await lessons.list({ language: tutorLanguage });
+    const existingPhrases = await phrases.list({ language: tutorLanguage });
+    const existingProverbs = await proverbs.list({ language: tutorLanguage });
     const suggestion = await llm.suggestLesson({
       language: tutorLanguage,
       level: String(level),
-      topic: topic ? String(topic) : undefined
+      topic: topic ? String(topic) : undefined,
+      curriculumInstruction:
+        "Continue the curriculum progressively. Do not repeat old lesson topics with new titles.",
+      existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean),
+      existingPhraseTexts: existingPhrases.map((item) => item.text).filter(Boolean),
+      existingProverbTexts: existingProverbs.map((item) => item.text).filter(Boolean)
     });
+
+    if (!isEnglishLikeTitle(String(suggestion.title || ""))) {
+      return res.status(422).json({ error: "AI title must be in English." });
+    }
 
     return res.status(200).json({ suggestion });
   } catch (error) {
@@ -223,6 +253,62 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
     return res.status(201).json({ total: created.length, proverbs: created });
   } catch (error) {
     console.error("Tutor AI generateProverbs LLM error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
+}
+
+export async function generateUnitContent(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+
+  const { unitId } = req.params;
+  const { lessonCount, phrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+    return res.status(400).json({ error: "invalid unit id" });
+  }
+  if (topics !== undefined && !Array.isArray(topics)) {
+    return res.status(400).json({ error: "topics must be an array" });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "invalid extra instructions" });
+  }
+
+  const requestedLessonCount = Number(lessonCount ?? 3);
+  const requestedPhrasesPerLesson = Number(phrasesPerLesson ?? 8);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+  if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
+    return res.status(400).json({ error: "lessonCount must be between 1 and 20" });
+  }
+  if (Number.isNaN(requestedPhrasesPerLesson) || requestedPhrasesPerLesson < 2 || requestedPhrasesPerLesson > 30) {
+    return res.status(400).json({ error: "phrasesPerLesson must be between 2 and 30" });
+  }
+  if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
+    return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10" });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
+
+  const unit = await units.findById(String(unitId));
+  if (!unit || unit.language !== tutorLanguage) {
+    return res.status(404).json({ error: "unit not found or out of scope" });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.generate({
+      unitId: unit.id,
+      language: unit.language,
+      level: unit.level,
+      createdBy: req.user.id,
+      lessonCount: requestedLessonCount,
+      phrasesPerLesson: requestedPhrasesPerLesson,
+      proverbsPerLesson: requestedProverbsPerLesson,
+      topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error("Tutor AI generateUnitContent error", error);
     return res.status(502).json({ error: "llm generation failed" });
   }
 }

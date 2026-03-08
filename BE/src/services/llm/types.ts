@@ -58,6 +58,15 @@ export type LlmClient = {
     existingProverbs?: string[];
   }) => Promise<LlmGeneratedProverb[]>;
   enhancePhrase: (input: EnhancePhraseInput) => Promise<Partial<LlmGeneratedPhrase>>;
-  suggestLesson: (input: { language: string; level: string; topic?: string }) => Promise<LlmLessonSuggestion>;
+  suggestLesson: (input: {
+    language: string;
+    level: string;
+    topic?: string;
+    curriculumInstruction?: string;
+    existingUnitTitles?: string[];
+    existingLessonTitles?: string[];
+    existingPhraseTexts?: string[];
+    existingProverbTexts?: string[];
+  }) => Promise<LlmLessonSuggestion>;
   modelName: string;
 };

@@ -392,6 +392,11 @@ export const questionService = {
     return response.data.question;
   },
 
+  async getQuestion(id: string) {
+    const response = await api.get<{ question: ExerciseQuestion }>(feAdminRoutes.question(id));
+    return response.data.question;
+  },
+
   async updateQuestion(id: string, data: Partial<ExerciseQuestion>) {
     const response = await api.put<{ question: ExerciseQuestion }>(feAdminRoutes.question(id), data);
     return response.data.question;

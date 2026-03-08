@@ -32,5 +32,34 @@ export const aiService = {
       { lessonId, count, extraInstructions }
     );
     return response.data.proverbs;
+  },
+
+  async generateUnitContent(
+    unitId: string,
+    payload?: {
+      lessonCount?: number;
+      phrasesPerLesson?: number;
+      proverbsPerLesson?: number;
+      topics?: string[];
+      extraInstructions?: string;
+    }
+  ) {
+    const response = await api.post<{
+      unitId: string;
+      requestedLessons: number;
+      createdLessons: number;
+      skippedLessons: Array<{ reason: string; topic?: string; title?: string }>;
+      lessonGenerationErrors: Array<{ topic?: string; error: string }>;
+      contentErrors: Array<{ lessonId?: string; title?: string; error: string }>;
+      lessons: Array<{
+        lessonId: string;
+        title: string;
+        phrasesGenerated: number;
+        proverbsGenerated: number;
+        questionsGenerated: number;
+        blocksGenerated: number;
+      }>;
+    }>(feTutorAiRoutes.generateUnitContent(unitId), payload || {});
+    return response.data;
   }
 };

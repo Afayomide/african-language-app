@@ -16,7 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
-import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus } from "lucide-react";
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
+import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EditUnitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +44,13 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
   const [bulkTopic, setBulkTopic] = useState("");
   const [bulkCount, setBulkCount] = useState(5);
+  const [isGenerateContentDialogOpen, setIsGenerateContentDialogOpen] = useState(false);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [contentLessonCount, setContentLessonCount] = useState(3);
+  const [contentPhrasesPerLesson, setContentPhrasesPerLesson] = useState(8);
+  const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(2);
+  const [contentTopic, setContentTopic] = useState("");
+  const [contentExtraInstructions, setContentExtraInstructions] = useState("");
 
   const isPublished = useMemo(() => unit?.status === "published", [unit?.status]);
 
@@ -171,6 +179,47 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  async function handleGenerateUnitContent() {
+    try {
+      setIsGeneratingContent(true);
+      const result = await aiService.generateUnitContent(id, {
+        lessonCount: contentLessonCount,
+        phrasesPerLesson: contentPhrasesPerLesson,
+        proverbsPerLesson: contentProverbsPerLesson,
+        topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
+        extraInstructions: contentExtraInstructions.trim() || undefined
+      });
+      toast.success(
+        `Generated content for ${result.createdLessons} lessons (${result.contentErrors.length} content errors).`
+      );
+      setIsGenerateContentDialogOpen(false);
+      const refreshed = await lessonService.listLessonsPage({
+        language,
+        unitId: id,
+        page: 1,
+        limit: lessonLimit
+      });
+      setLessonPage(1);
+      setLessons(refreshed.items);
+      setLessonTotal(refreshed.total);
+      setLessonTotalPages(refreshed.pagination.totalPages);
+    } catch (error) {
+      toast.error("Failed to generate full unit content.");
+    } finally {
+      setIsGeneratingContent(false);
+    }
+  }
+
+  async function handlePublishLesson(lessonId: string) {
+    try {
+      const updated = await lessonService.publishLesson(lessonId);
+      setLessons((prev) => prev.map((lesson) => (lesson._id === lessonId ? updated : lesson)));
+      toast.success("Lesson published.");
+    } catch (error) {
+      toast.error("Failed to publish lesson.");
+    }
+  }
+
   if (isLoading) return <div className="text-muted-foreground">Loading unit...</div>;
   if (!unit) return <div className="text-muted-foreground">Unit not found.</div>;
 
@@ -190,6 +239,10 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
           <Button type="button" variant="outline" onClick={() => setIsBulkDialogOpen(true)} className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 transition-all">
             <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
             Bulk Generate Lessons
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setIsGenerateContentDialogOpen(true)} className="h-11 rounded-xl border-2 font-bold hover:bg-emerald-50 hover:text-emerald-600 transition-all">
+            <Sparkles className="mr-2 h-5 w-5 text-emerald-600" />
+            Generate Full Unit
           </Button>
           <Button asChild variant="outline" className="h-11 rounded-xl border-2 font-bold">
             <Link href={`/lessons/new?language=${language}&unitId=${id}`}>
@@ -320,12 +373,23 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                     <TableCell>{new Date(lesson.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right pr-8">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit lesson">
+                        {lesson.status === "finished" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Publish lesson"
+                            className={TABLE_ACTION_ICON_CLASS.publish}
+                            onClick={() => handlePublishLesson(lesson._id)}
+                          >
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" asChild title="Edit lesson" className={TABLE_ACTION_ICON_CLASS.edit}>
                           <Link href={`/lessons/${lesson._id}`}>
                             <Edit className="h-4 w-4" />
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="icon" asChild title="View phrases">
+                        <Button variant="ghost" size="icon" asChild title="View phrases" className={TABLE_ACTION_ICON_CLASS.view}>
                           <Link href={`/phrases/lang/${language}?lessonId=${lesson._id}`}>
                             <ExternalLink className="h-4 w-4" />
                           </Link>
@@ -374,6 +438,49 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             </Button>
             <Button type="button" onClick={handleBulkGenerateLessons} disabled={isGeneratingBulk}>
               {isGeneratingBulk ? "Generating..." : "Generate Lessons"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isGenerateContentDialogOpen} onOpenChange={setIsGenerateContentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Full Unit Content</DialogTitle>
+            <DialogDescription>
+              Creates lessons with phrases, proverbs, questions, and lesson flow blocks in draft state.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Lessons</Label>
+                <Input type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => setContentLessonCount(Number(event.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Phrases / Lesson</Label>
+                <Input type="number" min={2} max={30} value={contentPhrasesPerLesson} onChange={(event) => setContentPhrasesPerLesson(Number(event.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Proverbs / Lesson</Label>
+                <Input type="number" min={0} max={10} value={contentProverbsPerLesson} onChange={(event) => setContentProverbsPerLesson(Number(event.target.value))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Theme (optional)</Label>
+              <Input value={contentTopic} onChange={(event) => setContentTopic(event.target.value)} placeholder="Greetings, family, market, travel..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Extra AI Description (optional)</Label>
+              <Textarea value={contentExtraInstructions} onChange={(event) => setContentExtraInstructions(event.target.value)} rows={3} placeholder="Only beginner words, avoid idioms, focus on everyday dialogue..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsGenerateContentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleGenerateUnitContent} disabled={isGeneratingContent}>
+              {isGeneratingContent ? "Generating..." : "Generate Full Unit"}
             </Button>
           </DialogFooter>
         </DialogContent>

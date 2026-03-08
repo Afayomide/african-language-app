@@ -25,6 +25,7 @@ import {
 import { ArrowLeft, Upload, Loader2, Mic, Square, Send, RotateCcw, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -575,7 +576,7 @@ export default function VoicePhrasesPage({ params }: { params: Promise<{ languag
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-primary"
+                      className={`h-8 w-8 ${TABLE_ACTION_ICON_CLASS.play}`}
                       onClick={() => playAudio(submission.audio?.url)}
                     >
                       <Volume2 className="h-4 w-4" />

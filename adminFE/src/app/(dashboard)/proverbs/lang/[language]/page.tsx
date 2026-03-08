@@ -36,6 +36,7 @@ import {
 import { ArrowLeft, CheckCircle, Edit, MessageSquareQuote, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -417,20 +418,20 @@ export default function AdminProverbsByLanguagePage({ params }: { params: Promis
                     <Badge className={workflowStatusBadgeClass(item.status)}>{item.status}</Badge>
                   </TableCell>
                   <TableCell className="pr-8 text-right space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(item)} title="Edit">
+                    <Button variant="ghost" size="icon" className={TABLE_ACTION_ICON_CLASS.edit} onClick={() => openEdit(item)} title="Edit">
                       <Edit className="h-4 w-4" />
                     </Button>
                     {item.status === "draft" && (
-                      <Button variant="ghost" size="icon" onClick={() => void handleFinish(item._id)} title="Mark finished">
+                      <Button variant="ghost" size="icon" className={TABLE_ACTION_ICON_CLASS.finish} onClick={() => void handleFinish(item._id)} title="Mark finished">
                         <Send className="h-4 w-4" />
                       </Button>
                     )}
                     {item.status === "finished" && (
-                      <Button variant="ghost" size="icon" onClick={() => void handlePublish(item._id)} title="Publish">
+                      <Button variant="ghost" size="icon" className={TABLE_ACTION_ICON_CLASS.publish} onClick={() => void handlePublish(item._id)} title="Publish">
                         <CheckCircle className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => void handleDelete(item._id)} title="Delete">
+                    <Button variant="ghost" size="icon" className={TABLE_ACTION_ICON_CLASS.delete} onClick={() => void handleDelete(item._id)} title="Delete">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>

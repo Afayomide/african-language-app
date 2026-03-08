@@ -1,10 +1,19 @@
 import type { Language, Level, LessonEntity } from "../../../../domain/entities/Lesson.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
+import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
 import type { LlmClient } from "../../../../services/llm/types.js";
 
 function normalizeTitle(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isEnglishLikeTitle(value: string) {
+  const title = String(value || "").trim();
+  if (!title) return false;
+  // Guardrail: keep lesson titles in English-like latin script to avoid target-language titles.
+  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/;
+  return latinPattern.test(title);
 }
 
 function normalizeSuggestedProverb(item: unknown) {
@@ -27,6 +36,7 @@ function normalizeSuggestedProverb(item: unknown) {
 export class AdminLessonAiUseCases {
   constructor(
     private readonly lessons: LessonRepository,
+    private readonly phrases: PhraseRepository,
     private readonly proverbs: ProverbRepository,
     private readonly llm: LlmClient
   ) {}
@@ -67,6 +77,17 @@ export class AdminLessonAiUseCases {
 
     const lastOrder = await this.lessons.findLastOrderIndex(input.unitId);
     let nextOrderIndex = (lastOrder ?? -1) + 1;
+    const lessonIdsInUnit = existingLessons.map((item) => item.id);
+    const existingPhrasesInUnit = lessonIdsInUnit.length
+      ? await this.phrases.list({ lessonIds: lessonIdsInUnit })
+      : [];
+    const existingPhraseTexts = existingPhrasesInUnit.map((item) => item.text).filter(Boolean);
+    const existingProverbTexts = (
+      await Promise.all(lessonIdsInUnit.map((lessonId) => this.proverbs.findByLessonId(lessonId)))
+    )
+      .flat()
+      .map((item) => item.text)
+      .filter(Boolean);
 
     for (let idx = 0; idx < input.count; idx += 1) {
       const lessonTopic = targetTopics[idx];
@@ -74,12 +95,21 @@ export class AdminLessonAiUseCases {
         const suggestion = await this.llm.suggestLesson({
           language: input.language,
           level: input.level,
-          topic: lessonTopic
+          topic: lessonTopic,
+          curriculumInstruction:
+            "Continue the same unit curriculum progressively and avoid repeating existing lessons with renamed titles.",
+          existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean),
+          existingPhraseTexts,
+          existingProverbTexts
         });
 
         const title = String(suggestion.title || "").trim();
         if (!title) {
           skipped.push({ reason: "empty_title", topic: lessonTopic });
+          continue;
+        }
+        if (!isEnglishLikeTitle(title)) {
+          skipped.push({ reason: "non_english_title", topic: lessonTopic, title });
           continue;
         }
 
@@ -156,5 +186,58 @@ export class AdminLessonAiUseCases {
       skipped,
       errors
     };
+  }
+
+  async generateLessonProverbs(input: {
+    lesson: LessonEntity;
+    count: number;
+    extraInstructions?: string;
+  }) {
+    const existing = await this.proverbs.findByLessonId(input.lesson.id);
+    const suggested = await this.llm.generateProverbs({
+      language: input.lesson.language,
+      level: input.lesson.level,
+      lessonTitle: input.lesson.title,
+      lessonDescription: input.lesson.description,
+      count: input.count,
+      extraInstructions: input.extraInstructions?.trim() || undefined,
+      existingProverbs: existing.map((item) => item.text)
+    });
+
+    const created = [];
+    const seen = new Set<string>();
+    for (const item of suggested) {
+      const text = String(item.text || "").trim();
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const reusable = await this.proverbs.findReusable(input.lesson.language, text);
+      if (reusable) {
+        const mergedLessonIds = Array.from(new Set([...reusable.lessonIds, input.lesson.id]));
+        const updated = await this.proverbs.updateById(reusable.id, {
+          lessonIds: mergedLessonIds,
+          translation: String(item.translation || reusable.translation || "").trim(),
+          contextNote: String(item.contextNote || reusable.contextNote || "").trim(),
+          aiMeta: { generatedByAI: true, model: this.llm.modelName, reviewedByAdmin: false }
+        });
+        if (updated) created.push(updated);
+        continue;
+      }
+
+      const proverb = await this.proverbs.create({
+        lessonIds: [input.lesson.id],
+        language: input.lesson.language,
+        text,
+        translation: String(item.translation || "").trim(),
+        contextNote: String(item.contextNote || "").trim(),
+        aiMeta: { generatedByAI: true, model: this.llm.modelName, reviewedByAdmin: false },
+        status: "draft"
+      });
+      created.push(proverb);
+    }
+
+    return created;
   }
 }

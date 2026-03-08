@@ -17,6 +17,7 @@ import { Plus, Trash, CheckCircle, GripVertical, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -374,22 +375,22 @@ export default function UnitsPage() {
                   <TableCell className="text-muted-foreground font-medium">{new Date(unit.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right pr-8">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" asChild title="Edit" className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                      <Button variant="ghost" size="icon" asChild title="Edit" className={TABLE_ACTION_ICON_CLASS.edit}>
                         <Link href={`/units/${unit._id}`}>
                           <Edit className="h-4 w-4" />
                         </Link>
                       </Button>
                       {unit.status === "draft" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleFinish(unit._id)} title="Finish" className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                        <Button variant="ghost" size="icon" onClick={() => handleFinish(unit._id)} title="Finish" className={TABLE_ACTION_ICON_CLASS.finish}>
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
                       {unit.status === "finished" && (
-                        <Button variant="ghost" size="icon" onClick={() => handlePublish(unit._id)} title="Publish" className="rounded-full hover:bg-green-100 hover:text-green-600 transition-colors">
+                        <Button variant="ghost" size="icon" onClick={() => handlePublish(unit._id)} title="Publish" className={TABLE_ACTION_ICON_CLASS.publish}>
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(unit._id)} title="Delete" className="rounded-full hover:bg-red-100 hover:text-red-600 transition-colors">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(unit._id)} title="Delete" className={TABLE_ACTION_ICON_CLASS.delete}>
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>

@@ -2,16 +2,33 @@ import type { Response } from "express";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AdminLessonAiUseCases } from "../../application/use-cases/admin/lesson-ai/AdminLessonAiUseCases.js";
+import { AdminUnitAiContentUseCases } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
+import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import type { Level } from "../../domain/entities/Lesson.js";
 
 const lessons = new MongooseLessonRepository();
-const proverbs = new MongooseProverbRepository();
+const phrases = new MongoosePhraseRepository();
 const units = new MongooseUnitRepository();
-const useCases = new AdminLessonAiUseCases(lessons, new MongooseProverbRepository(), getLlmClient());
+const useCases = new AdminLessonAiUseCases(lessons, phrases, new MongooseProverbRepository(), getLlmClient());
+const unitAiContentUseCases = new AdminUnitAiContentUseCases(
+  lessons,
+  phrases,
+  new MongooseProverbRepository(),
+  new MongooseQuestionRepository(),
+  getLlmClient()
+);
+
+function isEnglishLikeTitle(value: string) {
+  const title = String(value || "").trim();
+  if (!title) return false;
+  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/;
+  return latinPattern.test(title);
+}
 
 export async function generateLessonsBulk(req: AuthRequest, res: Response) {
   if (!req.user) {
@@ -80,6 +97,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
 
   const llm = getLlmClient();
   const existingUnits = await units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa");
+  const existingLessons = await lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" });
   let lastOrderIndex = existingUnits.reduce((max, unit) => Math.max(max, unit.orderIndex), -1);
   const seenTitles = new Set(existingUnits.map((unit) => unit.title.trim().toLowerCase()));
 
@@ -96,12 +114,20 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
       const suggestion = await llm.suggestLesson({
         language: String(language),
         level: String(level),
-        topic: variationTopic
+        topic: variationTopic,
+        curriculumInstruction:
+          "Suggest the next coherent unit in the curriculum sequence. Avoid recycled topics with renamed titles.",
+        existingUnitTitles: existingUnits.map((item) => item.title).filter(Boolean),
+        existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean)
       });
 
       const rawTitle = String(suggestion.title || "").trim();
       if (!rawTitle) {
         errors.push({ index: index + 1, error: "AI returned an empty title." });
+        continue;
+      }
+      if (!isEnglishLikeTitle(rawTitle)) {
+        skipped.push({ reason: "non_english_title", title: rawTitle });
         continue;
       }
 
@@ -156,53 +182,12 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "invalid extra instructions" });
   }
 
-  const llm = getLlmClient();
-  const existing = await proverbs.findByLessonId(lesson.id);
-
   try {
-    const suggested = await llm.generateProverbs({
-      language: lesson.language,
-      level: lesson.level,
-      lessonTitle: lesson.title,
-      lessonDescription: lesson.description,
+    const created = await useCases.generateLessonProverbs({
+      lesson,
       count: requestedCount,
-      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined,
-      existingProverbs: existing.map((item) => item.text)
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
     });
-
-    const created = [];
-    const seen = new Set<string>();
-    for (const item of suggested) {
-      const text = String(item.text || "").trim();
-      if (!text) continue;
-      const key = text.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const reusable = await proverbs.findReusable(lesson.language, text);
-      if (reusable) {
-        const mergedLessonIds = Array.from(new Set([...reusable.lessonIds, lesson.id]));
-        const updated = await proverbs.updateById(reusable.id, {
-          lessonIds: mergedLessonIds,
-          translation: String(item.translation || reusable.translation || "").trim(),
-          contextNote: String(item.contextNote || reusable.contextNote || "").trim(),
-          aiMeta: { generatedByAI: true, model: llm.modelName, reviewedByAdmin: false }
-        });
-        if (updated) created.push(updated);
-        continue;
-      }
-
-      const proverb = await proverbs.create({
-        lessonIds: [lesson.id],
-        language: lesson.language,
-        text,
-        translation: String(item.translation || "").trim(),
-        contextNote: String(item.contextNote || "").trim(),
-        aiMeta: { generatedByAI: true, model: llm.modelName, reviewedByAdmin: false },
-        status: "draft"
-      });
-      created.push(proverb);
-    }
 
     if (created.length === 0) {
       return res.status(409).json({ error: "no new proverbs generated" });
@@ -210,6 +195,66 @@ export async function generateProverbs(req: AuthRequest, res: Response) {
     return res.status(201).json({ total: created.length, proverbs: created });
   } catch (error) {
     console.error("Admin AI generateProverbs LLM error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
+}
+
+export async function generateUnitContent(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { unitId } = req.params;
+  const { lessonCount, phrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+
+  if (!unitId || typeof unitId !== "string") {
+    return res.status(400).json({ error: "Unit id is required." });
+  }
+  if (topics !== undefined && !Array.isArray(topics)) {
+    return res.status(400).json({ error: "Topics must be an array." });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "Extra instructions must be a string." });
+  }
+
+  const requestedLessonCount = Number(lessonCount ?? 3);
+  const requestedPhrasesPerLesson = Number(phrasesPerLesson ?? 8);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+
+  if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
+    return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
+  }
+  if (Number.isNaN(requestedPhrasesPerLesson) || requestedPhrasesPerLesson < 2 || requestedPhrasesPerLesson > 30) {
+    return res.status(400).json({ error: "phrasesPerLesson must be between 2 and 30." });
+  }
+  if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
+    return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10." });
+  }
+
+  const unit = await units.findById(String(unitId));
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found." });
+  }
+  if (!isValidLevel(String(unit.level))) {
+    return res.status(400).json({ error: "Unit level is invalid." });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.generate({
+      unitId: unit.id,
+      language: unit.language,
+      level: String(unit.level) as Level,
+      createdBy: req.user.id,
+      lessonCount: requestedLessonCount,
+      phrasesPerLesson: requestedPhrasesPerLesson,
+      proverbsPerLesson: requestedProverbsPerLesson,
+      topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error("Admin AI generateUnitContent error", error);
     return res.status(502).json({ error: "llm generation failed" });
   }
 }

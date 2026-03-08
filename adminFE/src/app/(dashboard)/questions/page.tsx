@@ -11,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { BookOpen, MessageSquare, Trash2, CheckCircle, RotateCcw } from "lucide-react"
+import { BookOpen, MessageSquare, Trash2, CheckCircle, RotateCcw, Edit } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { workflowStatusBadgeClass } from "@/lib/status-badge"
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
@@ -530,7 +531,7 @@ export default function QuestionsPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleSendBackToTutor(q._id)}
-                                className="h-12 w-12 text-amber-600 hover:text-amber-700 hover:bg-amber-100 rounded-2xl transition-all"
+                                className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.sendBack}`}
                                 title="Send back to tutor"
                               >
                                 <RotateCcw className="h-6 w-6" />
@@ -539,18 +540,27 @@ export default function QuestionsPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handlePublish(q._id)}
-                                className="h-12 w-12 text-accent hover:text-accent hover:bg-accent/10 rounded-2xl transition-all"
+                                className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.publish}`}
                                 title="Publish"
                               >
                                 <CheckCircle className="h-6 w-6" />
                               </Button>
                             </>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push(`/questions/${q._id}`)}
+                            className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.edit}`}
+                            title="Edit question"
+                          >
+                            <Edit className="h-6 w-6" />
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             onClick={() => handleDelete(q._id)} 
-                            className="h-12 w-12 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl transition-all"
+                            className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.delete}`}
                             title="Delete"
                           >
                             <Trash2 className="h-6 w-6" />

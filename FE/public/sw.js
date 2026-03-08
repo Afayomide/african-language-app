@@ -1,4 +1,4 @@
-const CACHE_NAME = "language-app-v1";
+const CACHE_NAME = "language-app-v2";
 const CORE_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -31,6 +31,21 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (!event.request.url.startsWith(self.location.origin)) return;
+  const { pathname } = new URL(event.request.url);
+
+  // Never cache API responses so dashboard data (like progress) is always fresh.
+  if (pathname.startsWith("/api/")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).catch(
+        () =>
+          new Response(JSON.stringify({ message: "Network unavailable" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" }
+          })
+      )
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -45,4 +60,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
-

@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
+import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
+import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
+import { AdminLessonUseCases } from "../../application/use-cases/admin/lesson/AdminLessonUseCases.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import {
   isValidLessonLanguage,
@@ -10,6 +15,13 @@ import {
 import type { Language, Level } from "../../domain/entities/Lesson.js";
 
 const units = new MongooseUnitRepository();
+const lessonRepo = new MongooseLessonRepository();
+const lessonUseCases = new AdminLessonUseCases(
+  lessonRepo,
+  new MongoosePhraseRepository(),
+  new MongooseProverbRepository(),
+  new MongooseQuestionRepository()
+);
 
 export async function createUnit(req: AuthRequest, res: Response) {
   const { title, description, language, level } = req.body ?? {};
@@ -93,8 +105,15 @@ export async function updateUnit(req: Request, res: Response) {
 export async function deleteUnit(req: Request, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  const unit = await units.softDeleteById(id);
+  const unit = await units.findById(id);
   if (!unit) return res.status(404).json({ error: "Unit not found." });
+
+  const unitLessons = await lessonRepo.listByUnitId(unit.id);
+  for (const lesson of unitLessons) {
+    await lessonUseCases.delete(lesson.id);
+  }
+
+  await units.softDeleteById(id);
   return res.status(200).json({ message: "Unit deleted." });
 }
 

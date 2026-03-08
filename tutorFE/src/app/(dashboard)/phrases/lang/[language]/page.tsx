@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -178,6 +179,24 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
     }
   }
 
+  async function handleBulkFinishPhrases() {
+    const finishable = phrases
+      .filter((phrase) => selectedPhraseIds.includes(phrase._id) && phrase.status === "draft")
+      .map((phrase) => phrase._id);
+    if (finishable.length === 0) {
+      toast.error("No selected draft phrases to finish");
+      return;
+    }
+    try {
+      await Promise.all(finishable.map((id) => phraseService.finishPhrase(id)));
+      toast.success(`Marked ${finishable.length} phrase(s) as finished`);
+      setSelectedPhraseIds([]);
+      fetchPhrases();
+    } catch (error) {
+      toast.error("Failed to bulk finish phrases");
+    }
+  }
+
   async function handleFinish(id: string) {
     try {
       await phraseService.finishPhrase(id);
@@ -246,11 +265,20 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         </div>
         <div className="flex gap-2">
           <Button
-            variant="destructive"
+            variant="outline"
             onClick={handleBulkDeletePhrases}
             disabled={selectedPhraseIds.length === 0}
+            className={TABLE_BULK_BUTTON_CLASS.delete}
           >
             Delete Selected ({selectedPhraseIds.length})
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleBulkFinishPhrases}
+            disabled={selectedPhraseIds.length === 0}
+            className={TABLE_BULK_BUTTON_CLASS.finish}
+          >
+            Bulk Finish
           </Button>
           {selectedLessonId !== "all" && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -384,25 +412,34 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead className="w-12" />
+              <TableHead className="w-12">
+                <input
+                  type="checkbox"
+                  checked={phrases.length > 0 && selectedPhraseIds.length === phrases.length}
+                  onChange={(event) =>
+                    setSelectedPhraseIds(event.target.checked ? phrases.map((phrase) => phrase._id) : [])
+                  }
+                />
+              </TableHead>
               <TableHead className="pl-8 font-bold text-primary">Text</TableHead>
               <TableHead className="font-bold text-primary">Translation</TableHead>
               <TableHead className="font-bold text-primary">Difficulty</TableHead>
               <TableHead className="font-bold text-primary">Status</TableHead>
               <TableHead className="font-bold text-primary">Created At</TableHead>
+              <TableHead className="font-bold text-primary">Updated At</TableHead>
               <TableHead className="pr-8 text-right font-bold text-primary">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : phrases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   No phrases found.
                 </TableCell>
               </TableRow>
@@ -433,6 +470,9 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                   <TableCell className="font-medium text-muted-foreground">
                     {new Date(phrase.createdAt).toLocaleDateString()}
                   </TableCell>
+                  <TableCell className="font-medium text-muted-foreground">
+                    {new Date(phrase.updatedAt).toLocaleDateString()}
+                  </TableCell>
                   <TableCell className="pr-8 text-right">
                     <div className="flex justify-end gap-2">
                       {phrase.audio?.url && (
@@ -441,8 +481,9 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                           size="icon"
                           onClick={() => handlePlayAudio(phrase.audio.url)}
                           title="Play audio"
+                          className={TABLE_ACTION_ICON_CLASS.play}
                         >
-                          <Volume2 className="h-4 w-4 text-blue-600" />
+                          <Volume2 className="h-4 w-4" />
                         </Button>
                       )}
                       <Button
@@ -450,6 +491,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                         size="icon"
                         onClick={() => router.push(`/phrases/${phrase._id}`)}
                         title="Edit"
+                        className={TABLE_ACTION_ICON_CLASS.edit}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -457,10 +499,11 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleFinish(phrase._id)}
-                          title="Mark as finished"
-                        >
-                          <CheckCircle className="h-4 w-4 text-amber-600" />
+                        onClick={() => handleFinish(phrase._id)}
+                        title="Mark as finished"
+                        className={TABLE_ACTION_ICON_CLASS.finish}
+                      >
+                          <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
                       <Button
@@ -468,8 +511,9 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                         size="icon"
                         onClick={() => handleDelete(phrase._id)}
                         title="Delete"
+                        className={TABLE_ACTION_ICON_CLASS.delete}
                       >
-                        <Trash className="h-4 w-4 text-red-600" />
+                        <Trash className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

@@ -38,6 +38,10 @@ function buildPhrasesPrompt(input: GeneratePhrasesInput) {
     "- Use the target language for text and English for translation.",
     "- difficulty between 1 and 5.",
     "- Keep phrasing culturally accurate.",
+    "- Beginner level: output mostly single words or very short chunks (1-2 words), not full sentences.",
+    "- Beginner level: avoid punctuation that suggests full sentences.",
+    "- Intermediate level: short practical expressions (1-5 words).",
+    "- Advanced level: longer conversational expressions are allowed.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     seedWords ? `Seed words: ${seedWords}` : "",
@@ -95,19 +99,50 @@ function buildProverbsPrompt(input: {
     .join("\n");
 }
 
-function buildLessonSuggestPrompt(input: { language: string; level: string; topic?: string }) {
+function buildLessonSuggestPrompt(input: {
+  language: string;
+  level: string;
+  topic?: string;
+  curriculumInstruction?: string;
+  existingUnitTitles?: string[];
+  existingLessonTitles?: string[];
+  existingPhraseTexts?: string[];
+  existingProverbTexts?: string[];
+}) {
+  const existingUnitTitles = input.existingUnitTitles?.length
+    ? input.existingUnitTitles.slice(0, 60).join(" | ")
+    : "";
+  const existingLessonTitles = input.existingLessonTitles?.length
+    ? input.existingLessonTitles.slice(0, 120).join(" | ")
+    : "";
+  const existingPhraseTexts = input.existingPhraseTexts?.length
+    ? input.existingPhraseTexts.slice(0, 150).join(" | ")
+    : "";
+  const existingProverbTexts = input.existingProverbTexts?.length
+    ? input.existingProverbTexts.slice(0, 100).join(" | ")
+    : "";
   return [
     "Suggest a lesson outline.",
     "Return ONLY valid JSON with this shape:",
     "{\"title\":string,\"description\":string?,\"language\":string,\"level\":string,\"objectives\":[string],\"seedPhrases\":[string],\"proverbs\":[{\"text\":string,\"translation\":string,\"contextNote\":string?}]}",
     "Rules:",
+    "- title, description, and objectives MUST be in English.",
+    "- Title MUST be in English only. Never write title in the target language.",
     "- Use the target language for seedPhrases.",
     "- proverbs.text should be in the target language with short culturally authentic entries.",
     "- proverbs.translation should be in English.",
     "- Keep objectives short and measurable.",
+    "- Continue the curriculum like a teacher. Do not repeat prior lessons with renamed titles.",
+    "- Build progression from known concepts to slightly harder ones.",
+    "- Avoid phrases/proverbs already used in existing data.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
-    input.topic ? `Topic: ${input.topic}` : ""
+    input.topic ? `Topic: ${input.topic}` : "",
+    input.curriculumInstruction ? `Curriculum instruction: ${input.curriculumInstruction}` : "",
+    existingUnitTitles ? `Existing unit titles (avoid overlap): ${existingUnitTitles}` : "",
+    existingLessonTitles ? `Existing lesson titles (avoid overlap): ${existingLessonTitles}` : "",
+    existingPhraseTexts ? `Existing phrase texts (avoid reuse): ${existingPhraseTexts}` : "",
+    existingProverbTexts ? `Existing proverb texts (avoid reuse): ${existingProverbTexts}` : ""
   ]
     .filter(Boolean)
     .join("\n");
@@ -155,7 +190,16 @@ export function createOpenAiClient(): LlmClient {
       const payload = parseJson<{ proverbs: LlmGeneratedProverb[] }>(text, "invalid_llm_json");
       return Array.isArray(payload.proverbs) ? payload.proverbs : [];
     },
-    async suggestLesson(input: { language: string; level: string; topic?: string }): Promise<LlmLessonSuggestion> {
+    async suggestLesson(input: {
+      language: string;
+      level: string;
+      topic?: string;
+      curriculumInstruction?: string;
+      existingUnitTitles?: string[];
+      existingLessonTitles?: string[];
+      existingPhraseTexts?: string[];
+      existingProverbTexts?: string[];
+    }): Promise<LlmLessonSuggestion> {
       const response = await client.responses.create({
         model: OPENAI_MODEL,
         input: buildLessonSuggestPrompt(input)

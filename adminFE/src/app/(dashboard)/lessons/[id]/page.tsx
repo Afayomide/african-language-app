@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table"
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { workflowStatusBadgeClass } from "@/lib/status-badge"
+import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles"
 import {
   Dialog,
   DialogContent,
@@ -64,6 +65,8 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const [phraseLimit, setPhraseLimit] = useState(20)
   const [phraseTotal, setPhraseTotal] = useState(0)
   const [phraseTotalPages, setPhraseTotalPages] = useState(1)
+  const [selectedPhraseIds, setSelectedPhraseIds] = useState<string[]>([])
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([])
 
   useEffect(() => {
     fetchLesson()
@@ -77,6 +80,14 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     setPhrasePage(1)
   }, [phraseSearch, lesson?._id])
+
+  useEffect(() => {
+    setSelectedPhraseIds((prev) => prev.filter((id) => phrases.some((phrase) => phrase._id === id)))
+  }, [phrases])
+
+  useEffect(() => {
+    setSelectedQuestionIds((prev) => prev.filter((id) => allQuestions.some((question) => question._id === id)))
+  }, [allQuestions])
 
   useEffect(() => {
     if (!lesson?.language) return
@@ -287,6 +298,102 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  const togglePhraseSelection = (phraseId: string) => {
+    setSelectedPhraseIds((prev) =>
+      prev.includes(phraseId) ? prev.filter((id) => id !== phraseId) : [...prev, phraseId]
+    )
+  }
+
+  const toggleSelectAllPhrases = () => {
+    if (selectedPhraseIds.length === phrases.length) {
+      setSelectedPhraseIds([])
+      return
+    }
+    setSelectedPhraseIds(phrases.map((phrase) => phrase._id))
+  }
+
+  const toggleQuestionSelection = (questionId: string) => {
+    setSelectedQuestionIds((prev) =>
+      prev.includes(questionId) ? prev.filter((id) => id !== questionId) : [...prev, questionId]
+    )
+  }
+
+  const toggleSelectAllQuestions = () => {
+    if (selectedQuestionIds.length === allQuestions.length) {
+      setSelectedQuestionIds([])
+      return
+    }
+    setSelectedQuestionIds(allQuestions.map((question) => question._id))
+  }
+
+  const handleBulkDeletePhrases = async () => {
+    if (selectedPhraseIds.length === 0) return
+    if (!confirm(`Delete ${selectedPhraseIds.length} selected phrase(s)?`)) return
+    try {
+      await Promise.all(selectedPhraseIds.map((id) => phraseService.deletePhrase(id)))
+      toast.success("Selected phrases deleted")
+      setSelectedPhraseIds([])
+      if (lesson) fetchLessonPhrases(lesson._id)
+    } catch (error) {
+      toast.error("Failed to delete selected phrases")
+    }
+  }
+
+  const handleBulkPublishPhrases = async () => {
+    const publishable = phrases
+      .filter((phrase) => selectedPhraseIds.includes(phrase._id) && phrase.status === "finished")
+      .map((phrase) => phrase._id)
+    if (publishable.length === 0) {
+      toast.error("No selected finished phrases to publish")
+      return
+    }
+    try {
+      await Promise.all(publishable.map((id) => phraseService.publishPhrase(id)))
+      toast.success(`Published ${publishable.length} phrase(s)`)
+      setSelectedPhraseIds([])
+      if (lesson) fetchLessonPhrases(lesson._id)
+    } catch (error) {
+      toast.error("Failed to publish selected phrases")
+    }
+  }
+
+  const handleBulkDeleteQuestions = async () => {
+    if (selectedQuestionIds.length === 0) return
+    if (!confirm(`Delete ${selectedQuestionIds.length} selected question(s)?`)) return
+    try {
+      await Promise.all(selectedQuestionIds.map((id) => questionService.deleteQuestion(id)))
+      toast.success("Selected questions deleted")
+      setSelectedQuestionIds([])
+      if (lesson?._id) {
+        const refreshed = await questionService.listQuestions({ lessonId: lesson._id })
+        setAllQuestions(refreshed)
+      }
+    } catch (error) {
+      toast.error("Failed to delete selected questions")
+    }
+  }
+
+  const handleBulkPublishQuestions = async () => {
+    const publishable = allQuestions
+      .filter((question) => selectedQuestionIds.includes(question._id) && question.status === "finished")
+      .map((question) => question._id)
+    if (publishable.length === 0) {
+      toast.error("No selected finished questions to publish")
+      return
+    }
+    try {
+      await Promise.all(publishable.map((id) => questionService.publishQuestion(id)))
+      toast.success(`Published ${publishable.length} question(s)`)
+      setSelectedQuestionIds([])
+      if (lesson?._id) {
+        const refreshed = await questionService.listQuestions({ lessonId: lesson._id })
+        setAllQuestions(refreshed)
+      }
+    } catch (error) {
+      toast.error("Failed to publish selected questions")
+    }
+  }
+
   const handlePublishPhrase = async (phraseId: string) => {
     try {
       await phraseService.publishPhrase(phraseId)
@@ -300,6 +407,46 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const handlePlayAudio = (url: string) => {
     const audio = new Audio(url)
     void audio.play().catch(() => toast.error("Unable to play audio"))
+  }
+
+  const handlePublishQuestion = async (questionId: string) => {
+    try {
+      await questionService.publishQuestion(questionId)
+      toast.success("Question published")
+      if (lesson?._id) {
+        const refreshed = await questionService.listQuestions({ lessonId: lesson._id })
+        setAllQuestions(refreshed)
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to publish question")
+    }
+  }
+
+  const handleSendBackQuestion = async (questionId: string) => {
+    try {
+      await questionService.sendBackToTutorQuestion(questionId)
+      toast.success("Question sent back to draft")
+      if (lesson?._id) {
+        const refreshed = await questionService.listQuestions({ lessonId: lesson._id })
+        setAllQuestions(refreshed)
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to send question back")
+    }
+  }
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!confirm("Delete this question?")) return
+    try {
+      await questionService.deleteQuestion(questionId)
+      toast.success("Question deleted")
+      if (lesson?._id) {
+        const refreshed = await questionService.listQuestions({ lessonId: lesson._id })
+        setAllQuestions(refreshed)
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to delete question")
+    }
   }
 
   if (isLoading) return <div>Loading...</div>
@@ -621,32 +768,55 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
             onNext={() => setPhrasePage((prev) => Math.min(phraseTotalPages, prev + 1))}
           />
           <div className="mb-4 mt-4 flex justify-end">
-            <Button onClick={() => router.push(`/phrases/new?language=${lesson.language}&lessonId=${lesson._id}`)}>
-              Add Phrase
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.delete} onClick={handleBulkDeletePhrases} disabled={selectedPhraseIds.length === 0}>
+                Bulk Delete ({selectedPhraseIds.length})
+              </Button>
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.publish} onClick={handleBulkPublishPhrases} disabled={selectedPhraseIds.length === 0}>
+                Bulk Publish
+              </Button>
+              <Button onClick={() => router.push(`/phrases/new?language=${lesson.language}&lessonId=${lesson._id}`)}>
+                Add Phrase
+              </Button>
+            </div>
           </div>
           <Table>
             <TableHeader className="bg-primary/5">
               <TableRow>
+                <TableHead className="w-12 pl-8">
+                  <input
+                    type="checkbox"
+                    checked={phrases.length > 0 && selectedPhraseIds.length === phrases.length}
+                    onChange={toggleSelectAllPhrases}
+                  />
+                </TableHead>
                 <TableHead className="font-bold text-primary pl-8">Text</TableHead>
                 <TableHead className="font-bold text-primary">Translation</TableHead>
                 <TableHead className="font-bold text-primary">Status</TableHead>
                 <TableHead className="font-bold text-primary">Created At</TableHead>
+                <TableHead className="font-bold text-primary">Updated At</TableHead>
                 <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoadingPhrases ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">Loading phrases...</TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center">Loading phrases...</TableCell>
                 </TableRow>
               ) : phrases.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">No phrases for this lesson yet.</TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center">No phrases for this lesson yet.</TableCell>
                 </TableRow>
               ) : (
                 phrases.map((phrase) => (
                   <TableRow key={phrase._id} className="group transition-colors hover:bg-secondary/30">
+                    <TableCell className="pl-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedPhraseIds.includes(phrase._id)}
+                        onChange={() => togglePhraseSelection(phrase._id)}
+                      />
+                    </TableCell>
                     <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
                     <TableCell>{phrase.translation}</TableCell>
                     <TableCell>
@@ -657,6 +827,9 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                     <TableCell>
                       {new Date(phrase.createdAt).toLocaleDateString()}
                     </TableCell>
+                    <TableCell>
+                      {new Date(phrase.updatedAt).toLocaleDateString()}
+                    </TableCell>
                     <TableCell className="pr-8 text-right">
                       <div className="flex justify-end gap-1">
                       {phrase.audio?.url ? (
@@ -665,7 +838,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                           size="icon"
                           onClick={() => handlePlayAudio(phrase.audio.url)}
                           title="Play audio"
-                          className="rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.play}
                         >
                           <Volume2 className="h-4 w-4" />
                         </Button>
@@ -675,7 +848,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                           size="icon"
                           onClick={() => router.push(`/phrases/${phrase._id}`)}
                           title="Edit"
-                          className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.edit}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -685,7 +858,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                             size="icon"
                             onClick={() => handlePublishPhrase(phrase._id)}
                             title="Publish"
-                            className="rounded-full hover:bg-green-100 hover:text-green-600 transition-colors"
+                            className={TABLE_ACTION_ICON_CLASS.publish}
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>
@@ -695,7 +868,123 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                           size="icon"
                           onClick={() => handleDeletePhrase(phrase._id)}
                           title="Delete"
-                          className="rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.delete}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="border-2 border-primary/10 shadow-xl rounded-3xl overflow-hidden">
+        <CardHeader className="bg-primary/5">
+          <CardTitle className="text-xl font-bold text-primary">Lesson Questions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 mt-4 flex justify-end">
+            <div className="flex gap-2">
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.delete} onClick={handleBulkDeleteQuestions} disabled={selectedQuestionIds.length === 0}>
+                Bulk Delete ({selectedQuestionIds.length})
+              </Button>
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.publish} onClick={handleBulkPublishQuestions} disabled={selectedQuestionIds.length === 0}>
+                Bulk Publish
+              </Button>
+              <Button onClick={() => router.push("/questions")}>
+                Add Question
+              </Button>
+            </div>
+          </div>
+          <Table>
+            <TableHeader className="bg-primary/5">
+              <TableRow>
+                <TableHead className="w-12 pl-8">
+                  <input
+                    type="checkbox"
+                    checked={allQuestions.length > 0 && selectedQuestionIds.length === allQuestions.length}
+                    onChange={toggleSelectAllQuestions}
+                  />
+                </TableHead>
+                <TableHead className="font-bold text-primary pl-8">Type</TableHead>
+                <TableHead className="font-bold text-primary">Prompt</TableHead>
+                <TableHead className="font-bold text-primary">Phrase</TableHead>
+                <TableHead className="font-bold text-primary">Status</TableHead>
+                <TableHead className="font-bold text-primary">Created At</TableHead>
+                <TableHead className="font-bold text-primary">Updated At</TableHead>
+                <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allQuestions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-24 text-center">No questions for this lesson yet.</TableCell>
+                </TableRow>
+              ) : (
+                allQuestions.map((question) => (
+                  <TableRow key={question._id} className="group transition-colors hover:bg-secondary/30">
+                    <TableCell className="pl-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedQuestionIds.includes(question._id)}
+                        onChange={() => toggleQuestionSelection(question._id)}
+                      />
+                    </TableCell>
+                    <TableCell className="pl-8 font-bold text-foreground capitalize">
+                      {question.type.replaceAll("-", " ")}
+                    </TableCell>
+                    <TableCell>{question.promptTemplate}</TableCell>
+                    <TableCell>{typeof question.phraseId === "string" ? question.phraseId : question.phraseId.text}</TableCell>
+                    <TableCell>
+                      <Badge className={workflowStatusBadgeClass(question.status)}>
+                        {question.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(question.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(question.updatedAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="pr-8 text-right">
+                      <div className="flex justify-end gap-1">
+                        {question.status === "finished" && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleSendBackQuestion(question._id)}
+                              title="Send back"
+                              className={TABLE_ACTION_ICON_CLASS.sendBack}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handlePublishQuestion(question._id)}
+                              title="Publish"
+                              className={TABLE_ACTION_ICON_CLASS.publish}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => router.push(`/questions/${question._id}`)}
+                          title="Edit"
+                          className={TABLE_ACTION_ICON_CLASS.edit}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteQuestion(question._id)}
+                          title="Delete"
+                          className={TABLE_ACTION_ICON_CLASS.delete}
                         >
                           <Trash className="h-4 w-4" />
                         </Button>

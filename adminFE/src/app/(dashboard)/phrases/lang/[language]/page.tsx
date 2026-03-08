@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -178,6 +179,24 @@ function PhrasesByLanguageContent({
     }
   }
 
+  async function handleBulkPublishPhrases() {
+    const publishable = phrases
+      .filter((phrase) => selectedPhraseIds.includes(phrase._id) && phrase.status === "finished")
+      .map((phrase) => phrase._id);
+    if (publishable.length === 0) {
+      toast.error("No selected finished phrases to publish");
+      return;
+    }
+    try {
+      await Promise.all(publishable.map((id) => phraseService.publishPhrase(id)));
+      toast.success(`Published ${publishable.length} phrase(s)`);
+      setSelectedPhraseIds([]);
+      fetchPhrases();
+    } catch (error) {
+      toast.error("Failed to bulk publish phrases");
+    }
+  }
+
   async function handlePublish(id: string) {
     try {
       await phraseService.publishPhrase(id);
@@ -266,12 +285,20 @@ function PhrasesByLanguageContent({
         </div>
         <div className="flex flex-wrap gap-3">
           <Button
-            variant="destructive"
+            variant="outline"
             onClick={handleBulkDeletePhrases}
             disabled={selectedPhraseIds.length === 0}
-            className="h-11 rounded-xl font-bold"
+            className={`${TABLE_BULK_BUTTON_CLASS.delete} font-bold`}
           >
             Delete Selected ({selectedPhraseIds.length})
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleBulkPublishPhrases}
+            disabled={selectedPhraseIds.length === 0}
+            className={`${TABLE_BULK_BUTTON_CLASS.publish} font-bold`}
+          >
+            Bulk Publish
           </Button>
           {selectedLessonId !== "all" && (
             <Button 
@@ -426,20 +453,29 @@ function PhrasesByLanguageContent({
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead className="w-12" />
+              <TableHead className="w-12">
+                <input
+                  type="checkbox"
+                  checked={phrases.length > 0 && selectedPhraseIds.length === phrases.length}
+                  onChange={(event) =>
+                    setSelectedPhraseIds(event.target.checked ? phrases.map((phrase) => phrase._id) : [])
+                  }
+                />
+              </TableHead>
               <TableHead className="font-bold text-primary pl-8">Text</TableHead>
               <TableHead className="font-bold text-primary">Translation</TableHead>
               <TableHead className="font-bold text-primary">Difficulty</TableHead>
               <TableHead className="font-bold text-primary">Status</TableHead>
               <TableHead className="font-bold text-primary">AI</TableHead>
               <TableHead className="font-bold text-primary">Created At</TableHead>
+              <TableHead className="font-bold text-primary">Updated At</TableHead>
               <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2 font-medium">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     Loading phrases...
@@ -448,7 +484,7 @@ function PhrasesByLanguageContent({
               </TableRow>
             ) : phrases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={9} className="h-48 text-center text-muted-foreground font-medium">
                   No phrases found.
                 </TableCell>
               </TableRow>
@@ -493,6 +529,9 @@ function PhrasesByLanguageContent({
                   <TableCell className="text-muted-foreground font-medium">
                     {new Date(phrase.createdAt).toLocaleDateString()}
                   </TableCell>
+                  <TableCell className="text-muted-foreground font-medium">
+                    {new Date(phrase.updatedAt).toLocaleDateString()}
+                  </TableCell>
                   <TableCell className="text-right pr-8">
                     <div className="flex justify-end gap-1">
                       {phrase.audio?.url && (
@@ -501,7 +540,7 @@ function PhrasesByLanguageContent({
                           size="icon"
                           onClick={() => handlePlayAudio(phrase.audio.url)}
                           title="Play audio"
-                          className="rounded-full hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.play}
                         >
                           <Volume2 className="h-4 w-4" />
                         </Button>
@@ -511,7 +550,7 @@ function PhrasesByLanguageContent({
                         size="icon"
                         onClick={() => router.push(`/phrases/${phrase._id}`)}
                         title="Edit"
-                        className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                        className={TABLE_ACTION_ICON_CLASS.edit}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -521,7 +560,7 @@ function PhrasesByLanguageContent({
                           size="icon"
                           onClick={() => handlePublish(phrase._id)}
                           title="Publish"
-                          className="rounded-full hover:bg-green-100 hover:text-green-600 transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.publish}
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
@@ -531,7 +570,7 @@ function PhrasesByLanguageContent({
                         size="icon"
                         onClick={() => handleDelete(phrase._id)}
                         title="Delete"
-                        className="rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+                        className={TABLE_ACTION_ICON_CLASS.delete}
                       >
                         <Trash className="h-4 w-4" />
                       </Button>

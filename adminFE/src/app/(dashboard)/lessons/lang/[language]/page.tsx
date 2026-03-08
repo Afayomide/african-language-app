@@ -31,6 +31,7 @@ import { Plus, Edit, Trash, ExternalLink, CheckCircle, GripVertical, ArrowLeft }
 import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
 
 const LANGUAGE_LABELS: Record<Language, string> = {
   yoruba: "Yoruba",
@@ -172,6 +173,24 @@ export default function LessonsByLanguagePage({
     }
   }
 
+  async function handleBulkPublishLessons() {
+    const publishable = lessons
+      .filter((lesson) => selectedLessonIds.includes(lesson._id) && lesson.status === "finished")
+      .map((lesson) => lesson._id);
+    if (publishable.length === 0) {
+      toast.error("No selected finished lessons to publish");
+      return;
+    }
+    try {
+      await Promise.all(publishable.map((id) => lessonService.publishLesson(id)));
+      toast.success(`Published ${publishable.length} lesson(s)`);
+      setSelectedLessonIds([]);
+      fetchLessons();
+    } catch (error) {
+      toast.error("Failed to bulk publish lessons");
+    }
+  }
+
   async function handlePublish(id: string) {
     try {
       await lessonService.publishLesson(id);
@@ -293,12 +312,21 @@ export default function LessonsByLanguagePage({
         <div className="flex items-center gap-3">
           <Button
             type="button"
-            variant="destructive"
+            variant="outline"
             onClick={handleBulkDeleteLessons}
             disabled={selectedLessonIds.length === 0}
-            className="h-12 rounded-xl px-6 font-semibold"
+            className={`${TABLE_BULK_BUTTON_CLASS.delete} px-6 font-semibold`}
           >
             Delete Selected ({selectedLessonIds.length})
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleBulkPublishLessons}
+            disabled={selectedLessonIds.length === 0}
+            className={`${TABLE_BULK_BUTTON_CLASS.publish} px-6 font-semibold`}
+          >
+            Bulk Publish
           </Button>
           <Button
             type="button"
@@ -424,19 +452,28 @@ export default function LessonsByLanguagePage({
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead className="w-12" />
+              <TableHead className="w-12">
+                <input
+                  type="checkbox"
+                  checked={lessons.length > 0 && selectedLessonIds.length === lessons.length}
+                  onChange={(event) =>
+                    setSelectedLessonIds(event.target.checked ? lessons.map((lesson) => lesson._id) : [])
+                  }
+                />
+              </TableHead>
               <TableHead className="w-24 font-bold text-primary pl-8">Order</TableHead>
               <TableHead className="font-bold text-primary">Title</TableHead>
               <TableHead className="font-bold text-primary">Level</TableHead>
               <TableHead className="font-bold text-primary">Status</TableHead>
               <TableHead className="font-bold text-primary">Created At</TableHead>
+              <TableHead className="font-bold text-primary">Updated At</TableHead>
               <TableHead className="text-right font-bold text-primary pr-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     Loading lessons...
@@ -445,7 +482,7 @@ export default function LessonsByLanguagePage({
               </TableRow>
             ) : lessons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
                   No lessons found for this language.
                 </TableCell>
               </TableRow>
@@ -496,14 +533,15 @@ export default function LessonsByLanguagePage({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground font-medium">{new Date(lesson.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-muted-foreground font-medium">{new Date(lesson.updatedAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right pr-8">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" asChild title="Edit" className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                      <Button variant="ghost" size="icon" asChild title="Edit" className={TABLE_ACTION_ICON_CLASS.edit}>
                         <Link href={`/lessons/${lesson._id}`}>
                           <Edit className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" asChild title="View Phrases" className="rounded-full hover:bg-accent/10 hover:text-accent transition-colors">
+                      <Button variant="ghost" size="icon" asChild title="View Phrases" className={TABLE_ACTION_ICON_CLASS.view}>
                         <Link href={`/phrases/lang/${language}?lessonId=${lesson._id}`}>
                           <ExternalLink className="h-4 w-4" />
                         </Link>
@@ -514,7 +552,7 @@ export default function LessonsByLanguagePage({
                           size="icon"
                           onClick={() => handlePublish(lesson._id)}
                           title="Publish"
-                          className="rounded-full hover:bg-green-100 hover:text-green-600 transition-colors"
+                          className={TABLE_ACTION_ICON_CLASS.publish}
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
@@ -524,7 +562,7 @@ export default function LessonsByLanguagePage({
                         size="icon"
                         onClick={() => handleDelete(lesson._id)}
                         title="Delete"
-                        className="rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+                        className={TABLE_ACTION_ICON_CLASS.delete}
                       >
                         <Trash className="h-4 w-4" />
                       </Button>

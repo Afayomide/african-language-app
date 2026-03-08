@@ -15,6 +15,7 @@ import { BookOpen, MessageSquare, Trash2, CheckCircle } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { workflowStatusBadgeClass } from "@/lib/status-badge"
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
@@ -509,7 +510,7 @@ export default function TutorQuestionsPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleFinish(q._id)}
-                              className="h-12 w-12 text-accent hover:text-accent hover:bg-accent/10 rounded-2xl transition-all"
+                              className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.finish}`}
                               title="Mark finished"
                             >
                               <CheckCircle className="h-6 w-6" />
@@ -519,7 +520,7 @@ export default function TutorQuestionsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(q._id)}
-                            className="h-12 w-12 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl transition-all"
+                            className={`h-12 w-12 ${TABLE_ACTION_ICON_CLASS.delete}`}
                             title="Delete"
                           >
                             <Trash2 className="h-6 w-6" />

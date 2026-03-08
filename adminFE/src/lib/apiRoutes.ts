@@ -49,6 +49,7 @@ export const beAdminRoutes = {
   acceptVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/accept`,
   rejectVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => `${BE_API_URL}/admin/ai/lessons/generate-bulk`,
+  generateUnitContent: (unitId: string) => `${BE_API_URL}/admin/ai/units/${unitId}/generate-content`,
   generateBulkUnits: () => `${BE_API_URL}/admin/ai/units/generate-bulk`,
   generateLessonProverbs: () => `${BE_API_URL}/admin/ai/proverbs/generate`,
 };
@@ -102,6 +103,7 @@ export const feAdminRoutes = {
   acceptVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/accept`,
   rejectVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/reject`,
   generateBulkLessons: () => "/api/admin/ai/lessons/generate-bulk",
+  generateUnitContent: (unitId: string) => `/api/admin/ai/units/${unitId}/generate-content`,
   generateBulkUnits: () => "/api/admin/ai/units/generate-bulk",
   generateLessonProverbs: () => "/api/admin/ai/proverbs/generate",
 };
