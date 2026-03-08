@@ -4,7 +4,7 @@ export type Status = "draft" | "finished" | "published";
 
 export type LessonBlock = 
   | { type: "text"; content: string }
-  | { type: "phrase"; refId: string }
+  | { type: "phrase"; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
@@ -66,7 +66,7 @@ export interface Phrase {
   lessonIds: string[];
   language: Language;
   text: string;
-  translation: string;
+  translations: string[];
   pronunciation: string;
   explanation: string;
   examples: Example[];
@@ -108,10 +108,13 @@ export type QuestionSubtype =
 export interface ExerciseQuestion {
   _id: string;
   lessonId: string;
+  translationIndex: number;
   phraseId: string | {
     _id: string;
     text: string;
-    translation: string;
+    translations: string[];
+    selectedTranslation?: string;
+    selectedTranslationIndex?: number;
     status: Status;
   };
   type: QuestionType;
@@ -173,7 +176,8 @@ export interface VoiceAudioSubmission {
     id?: string;
     _id?: string;
     text: string;
-    translation: string;
+    translations: string[];
+    selectedTranslation?: string;
   } | null;
   voiceArtist?: {
     id?: string;

@@ -4,6 +4,7 @@ const ExerciseQuestionSchema = new Schema(
   {
     lessonId: { type: Schema.Types.ObjectId, ref: "Lesson", required: true, index: true },
     phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true, index: true },
+    translationIndex: { type: Number, min: 0, default: 0 },
     type: {
       type: String,
       enum: ["multiple-choice", "fill-in-the-gap", "listening"],

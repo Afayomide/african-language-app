@@ -22,11 +22,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [phrases, setPhrases] = useState<{ _id: string; text: string; translation: string }[]>([])
+  const [phrases, setPhrases] = useState<{ _id: string; text: string; translations: string[] }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState({
     lessonId: "",
     phraseId: "",
+    translationIndex: 0,
     type: "multiple-choice" as QuestionType,
     subtype: "mc-select-translation" as QuestionSubtype,
     promptTemplate: "What is {phrase} in English?",
@@ -49,7 +50,7 @@ export default function QuestionsPage() {
     "ls-fg-word-order": "Listen and arrange the words",
     "ls-fg-gap-fill": "Listen and fill in the blank",
     "ls-dictation": "Listen and type what you hear",
-    "tone-recognition": "Which syllable has the rising tone?"
+    "ls-tone-recognition": "Which syllable has the rising tone?"
   }
 
   const isFillInGapType = formData.type === "fill-in-the-gap"
@@ -76,7 +77,7 @@ export default function QuestionsPage() {
   async function fetchPhrases(lessonId: string) {
     try {
       const data = await phraseService.listPhrases(lessonId)
-      setPhrases(data.map((p: any) => ({ _id: p._id, text: p.text, translation: p.translation })))
+      setPhrases(data.map((p) => ({ _id: p._id, text: p.text, translations: p.translations || [] })))
     } catch (error) {
       toast.error("Failed to load phrases")
       setPhrases([])
@@ -161,6 +162,7 @@ export default function QuestionsPage() {
         await questionService.createQuestion({
           lessonId: formData.lessonId,
           phraseId: formData.phraseId,
+          translationIndex: formData.translationIndex,
           type: formData.type,
           subtype: formData.subtype,
           promptTemplate: formData.promptTemplate,
@@ -182,6 +184,7 @@ export default function QuestionsPage() {
         await questionService.createQuestion({
           lessonId: formData.lessonId,
           phraseId: formData.phraseId,
+          translationIndex: formData.translationIndex,
           type: formData.type,
           subtype: formData.subtype,
           promptTemplate: formData.promptTemplate,
@@ -194,6 +197,7 @@ export default function QuestionsPage() {
       setFormData({
         lessonId: formData.lessonId,
         phraseId: "",
+        translationIndex: 0,
         type: formData.type,
         subtype: formData.subtype,
         promptTemplate: subtypeTemplates[formData.subtype],
@@ -265,7 +269,7 @@ export default function QuestionsPage() {
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Lesson</Label>
                 <Select value={formData.lessonId} onValueChange={(v) => {
-                  setFormData({ ...formData, lessonId: v, phraseId: "" })
+                  setFormData({ ...formData, lessonId: v, phraseId: "", translationIndex: 0 })
                   fetchPhrases(v)
                 }}>
                   <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue placeholder="Choose a lesson..." /></SelectTrigger>
@@ -279,11 +283,33 @@ export default function QuestionsPage() {
 
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Phrase</Label>
-                <Select value={formData.phraseId} onValueChange={(v) => setFormData({ ...formData, phraseId: v })}>
+                <Select value={formData.phraseId} onValueChange={(v) => setFormData({ ...formData, phraseId: v, translationIndex: 0 })}>
                   <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue placeholder="Choose a phrase..." /></SelectTrigger>
                   <SelectContent className="rounded-2xl border-2 shadow-xl">
                     {phrases.map((phrase) => (
-                      <SelectItem key={phrase._id} value={phrase._id} className="py-2">{phrase.text} ({phrase.translation})</SelectItem>
+                      <SelectItem key={phrase._id} value={phrase._id} className="py-2">
+                        {phrase.text} ({phrase.translations.join(" | ")})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Translation Index</Label>
+                <Select
+                  value={String(formData.translationIndex)}
+                  onValueChange={(v) => setFormData({ ...formData, translationIndex: Number(v) })}
+                  disabled={!formData.phraseId}
+                >
+                  <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm">
+                    <SelectValue placeholder="Pick translation index" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-2 shadow-xl">
+                    {(phrases.find((phrase) => phrase._id === formData.phraseId)?.translations || []).map((item, index) => (
+                      <SelectItem key={`q-translation-${index}`} value={String(index)} className="py-2">
+                        Index {index}: {item}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

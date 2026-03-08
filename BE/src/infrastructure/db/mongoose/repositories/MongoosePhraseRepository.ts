@@ -7,25 +7,63 @@ import type {
   PhraseUpdateInput
 } from "../../../../domain/repositories/PhraseRepository.js";
 
-function toEntity(doc: any): PhraseEntity {
+type PhrasePersistenceDoc = {
+  _id: { toString(): string };
+  lessonIds?: Array<{ toString(): string } | string> | null;
+  lessonId?: { toString(): string } | string | null;
+  language?: string | null;
+  text?: string | null;
+  translations?: string[] | null;
+  pronunciation?: string | null;
+  explanation?: string | null;
+  examples?: Array<{ original?: string; translation?: string }> | null;
+  difficulty?: number | null;
+  aiMeta?: {
+    generatedByAI?: boolean;
+    model?: string;
+    reviewedByAdmin?: boolean;
+  } | null;
+  audio?: {
+    provider?: string;
+    model?: string;
+    voice?: string;
+    locale?: string;
+    format?: string;
+    url?: string;
+    s3Key?: string;
+  } | null;
+  status: PhraseEntity["status"];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function normalizeTranslations(translations: string[]) {
+  return Array.from(new Set(translations.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
+function toEntity(doc: PhrasePersistenceDoc): PhraseEntity {
+  const translations = normalizeTranslations(
+    Array.isArray(doc.translations) ? doc.translations : []
+  );
+
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     lessonIds: Array.isArray(doc.lessonIds) && doc.lessonIds.length > 0
-      ? doc.lessonIds.map((id: { toString(): string }) => id.toString())
+      ? doc.lessonIds.map((id) => String(id))
       : doc.lessonId
-        ? [doc.lessonId.toString()]
+        ? [String(doc.lessonId)]
         : [],
     language: String(doc.language || "yoruba") as PhraseEntity["language"],
-    text: doc.text,
-    translation: doc.translation,
-    pronunciation: doc.pronunciation || "",
-    explanation: doc.explanation || "",
-    examples: (doc.examples || []).map((item: { original?: string; translation?: string }) => ({
+    text: String(doc.text || ""),
+    translations,
+    pronunciation: String(doc.pronunciation || ""),
+    explanation: String(doc.explanation || ""),
+    examples: (doc.examples || []).map((item) => ({
       original: String(item.original || ""),
       translation: String(item.translation || "")
     })),
-    difficulty: doc.difficulty ?? 1,
+    difficulty: Number(doc.difficulty ?? 1),
     aiMeta: {
       generatedByAI: Boolean(doc.aiMeta?.generatedByAI),
       model: String(doc.aiMeta?.model || ""),
@@ -46,18 +84,52 @@ function toEntity(doc: any): PhraseEntity {
   };
 }
 
+function normalizeText(text: string) {
+  return text.trim().toLowerCase();
+}
+
 export class MongoosePhraseRepository implements PhraseRepository {
   async create(input: PhraseCreateInput): Promise<PhraseEntity> {
-    const lessonIds = Array.from(
-      new Set(
-        (input.lessonIds || []).map(String).filter(Boolean)
-      )
-    );
+    const lessonIds = Array.from(new Set((input.lessonIds || []).map(String).filter(Boolean)));
+    const text = String(input.text).trim();
+    const textNormalized = normalizeText(text);
+    const translations = normalizeTranslations(input.translations);
+
+    const existing = await PhraseModel.findOne({
+      language: input.language,
+      textNormalized,
+      isDeleted: { $ne: true }
+    });
+
+    if (existing) {
+      const mergedLessonIds = Array.from(
+        new Set([...(existing.lessonIds || []).map((id: { toString(): string }) => id.toString()), ...lessonIds])
+      );
+      const mergedTranslations = normalizeTranslations([
+        ...(Array.isArray(existing.translations) ? existing.translations : []),
+        ...translations
+      ]);
+
+      existing.lessonIds = mergedLessonIds as never;
+      existing.translations = mergedTranslations as never;
+      if (!existing.pronunciation && input.pronunciation) existing.pronunciation = input.pronunciation as never;
+      if (!existing.explanation && input.explanation) existing.explanation = input.explanation as never;
+      if (existing.status !== "published" && input.status === "published") {
+        existing.status = "published" as never;
+      }
+      if (input.audio && !existing.audio?.url) existing.audio = input.audio as never;
+      await existing.save();
+      return toEntity(existing.toObject() as PhrasePersistenceDoc);
+    }
+
     const created = await PhraseModel.create({
       ...input,
+      text,
+      textNormalized,
+      translations,
       lessonIds
     });
-    return toEntity(created);
+    return toEntity(created.toObject() as PhrasePersistenceDoc);
   }
 
   async list(filter: PhraseListFilter): Promise<PhraseEntity[]> {
@@ -67,12 +139,24 @@ export class MongoosePhraseRepository implements PhraseRepository {
     if (filter.lessonId) query.lessonIds = filter.lessonId;
     if (filter.lessonIds) query.lessonIds = { $in: filter.lessonIds };
     const phrases = await PhraseModel.find(query).sort({ createdAt: -1 }).lean();
-    return phrases.map(toEntity);
+    return phrases.map((doc) => toEntity(doc as PhrasePersistenceDoc));
+  }
+
+  async findReusableByText(
+    language: PhraseEntity["language"],
+    text: string
+  ): Promise<PhraseEntity | null> {
+    const phrase = await PhraseModel.findOne({
+      language,
+      textNormalized: normalizeText(String(text)),
+      isDeleted: { $ne: true }
+    });
+    return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 
   async findById(id: string): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({ _id: id, isDeleted: { $ne: true } });
-    return phrase ? toEntity(phrase) : null;
+    return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 
   async findByIds(ids: string[]): Promise<PhraseEntity[]> {
@@ -80,32 +164,55 @@ export class MongoosePhraseRepository implements PhraseRepository {
       _id: { $in: ids },
       isDeleted: { $ne: true }
     }).lean();
-    return phrases.map(toEntity);
+    return phrases.map((doc) => toEntity(doc as PhrasePersistenceDoc));
   }
 
   async findByLessonId(lessonId: string): Promise<PhraseEntity[]> {
     const phrases = await PhraseModel.find({ lessonIds: lessonId, isDeleted: { $ne: true } })
       .sort({ createdAt: 1 })
       .lean();
-    return phrases.map(toEntity);
+    return phrases.map((doc) => toEntity(doc as PhrasePersistenceDoc));
   }
 
   async findByIdAndLessonId(id: string, lessonId: string): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({ _id: id, lessonIds: lessonId, isDeleted: { $ne: true } });
-    return phrase ? toEntity(phrase) : null;
+    return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 
   async updateById(id: string, update: PhraseUpdateInput): Promise<PhraseEntity | null> {
-    const payload: PhraseUpdateInput = { ...update };
+    const current = await PhraseModel.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!current) return null;
+
     if (Array.isArray(update.lessonIds)) {
-      payload.lessonIds = Array.from(new Set(update.lessonIds.map(String).filter(Boolean)));
+      current.lessonIds = Array.from(new Set(update.lessonIds.map(String).filter(Boolean))) as never;
     }
-    const phrase = await PhraseModel.findOneAndUpdate(
-      { _id: id, isDeleted: { $ne: true } },
-      payload,
-      { new: true }
-    );
-    return phrase ? toEntity(phrase) : null;
+    if (update.language) {
+      current.language = update.language as never;
+    }
+    if (update.text !== undefined) {
+      const text = String(update.text || "").trim();
+      current.text = text as never;
+      current.textNormalized = normalizeText(text) as never;
+    }
+    if (Array.isArray(update.translations)) {
+      current.translations = normalizeTranslations(update.translations) as never;
+    }
+    if (update.pronunciation !== undefined) current.pronunciation = update.pronunciation as never;
+    if (update.explanation !== undefined) current.explanation = update.explanation as never;
+    if (update.examples !== undefined) current.examples = update.examples as never;
+    if (update.difficulty !== undefined) current.difficulty = update.difficulty as never;
+    if (update.aiMeta !== undefined) {
+      current.aiMeta = {
+        generatedByAI: Boolean(update.aiMeta.generatedByAI ?? current.aiMeta?.generatedByAI),
+        model: String(update.aiMeta.model ?? current.aiMeta?.model ?? ""),
+        reviewedByAdmin: Boolean(update.aiMeta.reviewedByAdmin ?? current.aiMeta?.reviewedByAdmin)
+      } as never;
+    }
+    if (update.audio !== undefined) current.audio = update.audio as never;
+    if (update.status !== undefined) current.status = update.status as never;
+
+    await current.save();
+    return toEntity(current.toObject() as PhrasePersistenceDoc);
   }
 
   async softDeleteById(id: string, now: Date): Promise<PhraseEntity | null> {
@@ -114,7 +221,7 @@ export class MongoosePhraseRepository implements PhraseRepository {
       { isDeleted: true, deletedAt: now },
       { new: true }
     );
-    return phrase ? toEntity(phrase) : null;
+    return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 
   async softDeleteByLessonId(lessonId: string, now: Date): Promise<void> {
@@ -138,7 +245,7 @@ export class MongoosePhraseRepository implements PhraseRepository {
       phrase.aiMeta.reviewedByAdmin = reviewedByAdmin;
     }
     await phrase.save();
-    return toEntity(phrase);
+    return toEntity(phrase.toObject() as PhrasePersistenceDoc);
   }
 
   async finishById(id: string): Promise<PhraseEntity | null> {
@@ -147,6 +254,6 @@ export class MongoosePhraseRepository implements PhraseRepository {
       { status: "finished" },
       { new: true }
     );
-    return phrase ? toEntity(phrase) : null;
+    return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 }

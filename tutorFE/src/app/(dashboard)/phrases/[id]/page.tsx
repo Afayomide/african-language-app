@@ -31,6 +31,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
   const [isSaving, setIsSaving] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [translationsText, setTranslationsText] = useState("");
 
   useEffect(() => {
     Promise.all([fetchPhrase(), fetchLessons()]).finally(() => setIsLoading(false));
@@ -40,6 +41,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     try {
       const data = await phraseService.getPhrase(id);
       setPhrase({ ...data, lessonIds: Array.isArray(data.lessonIds) ? data.lessonIds : [] });
+      setTranslationsText(Array.isArray(data.translations) ? data.translations.join("\n") : "");
     } catch (error) {
       toast.error("Failed to fetch phrase")
       router.push("/phrases");
@@ -91,7 +93,10 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
         : undefined;
       await phraseService.updatePhrase(id, {
         text: phrase.text,
-        translation: phrase.translation,
+        translations: translationsText
+          .split(/\n|,/)
+          .map((item) => item.trim())
+          .filter(Boolean),
         pronunciation: phrase.pronunciation,
         explanation: phrase.explanation,
         difficulty: phrase.difficulty,
@@ -121,6 +126,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     try {
       const updated = await aiService.enhancePhrase(id);
       setPhrase(updated);
+      setTranslationsText(Array.isArray(updated.translations) ? updated.translations.join("\n") : "");
       toast.success("Phrase enhanced with AI");
     } catch (error) {
       toast.error("AI enhancement failed")
@@ -170,8 +176,14 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="translation">Translation</Label>
-                <Input id="translation" value={phrase.translation} onChange={(e) => setPhrase({ ...phrase, translation: e.target.value })} required />
+                <Label htmlFor="translationsText">Translations</Label>
+                <Textarea
+                  id="translationsText"
+                  value={translationsText}
+                  onChange={(e) => setTranslationsText(e.target.value)}
+                  rows={4}
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

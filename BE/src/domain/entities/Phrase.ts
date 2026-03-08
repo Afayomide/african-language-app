@@ -25,7 +25,7 @@ export type PhraseEntity = {
   lessonIds: string[];
   language: "yoruba" | "igbo" | "hausa";
   text: string;
-  translation: string;
+  translations: string[];
   pronunciation: string;
   explanation: string;
   examples: PhraseExample[];

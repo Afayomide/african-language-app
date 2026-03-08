@@ -39,6 +39,7 @@ type BlockInput = {
   type?: string;
   content?: string;
   refId?: string;
+  translationIndex?: number;
 };
 
 type QueryValue = string | number | boolean | object;
@@ -119,7 +120,11 @@ export async function createLesson(req: AuthRequest, res: Response) {
           return {
             type: String(row.type || ""),
             content: String(row.content || ""),
-            refId: row.refId ? String(row.refId) : undefined
+            refId: row.refId ? String(row.refId) : undefined,
+            translationIndex:
+              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
+                ? Number(row.translationIndex)
+                : 0
           };
         })
         .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[]
@@ -290,11 +295,15 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     normalizedBlocks = blocks
       .map((block: BlockInput) => {
         const row = block;
-        return {
-          type: String(row.type || ""),
-          content: String(row.content || ""),
-          refId: row.refId ? String(row.refId) : undefined
-        };
+          return {
+            type: String(row.type || ""),
+            content: String(row.content || ""),
+            refId: row.refId ? String(row.refId) : undefined,
+            translationIndex:
+              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
+                ? Number(row.translationIndex)
+                : 0
+          };
       })
       .filter((b: { type: string }) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[];
   }

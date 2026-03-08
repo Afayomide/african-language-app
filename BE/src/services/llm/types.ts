@@ -5,7 +5,7 @@ export type LlmPhraseExample = {
 
 export type LlmGeneratedPhrase = {
   text: string;
-  translation: string;
+  translations: string[];
   pronunciation?: string;
   explanation?: string;
   examples?: LlmPhraseExample[];
@@ -41,7 +41,7 @@ export type GeneratePhrasesInput = {
 
 export type EnhancePhraseInput = {
   text: string;
-  translation: string;
+  translations: string[];
   language: "yoruba" | "igbo" | "hausa";
   level: "beginner" | "intermediate" | "advanced";
 };

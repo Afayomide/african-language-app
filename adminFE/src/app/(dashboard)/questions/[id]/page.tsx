@@ -18,7 +18,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
   const [question, setQuestion] = useState<ExerciseQuestion | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [phrases, setPhrases] = useState<Array<{ _id: string; text: string; translation: string }>>([])
+  const [phrases, setPhrases] = useState<Array<{ _id: string; text: string; translations: string[] }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [optionsCsv, setOptionsCsv] = useState("")
@@ -71,7 +71,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         const lessonId = loadedQuestion.lessonId
         if (lessonId) {
           const lessonPhrases = await phraseService.listPhrases(lessonId)
-          setPhrases(lessonPhrases.map((p) => ({ _id: p._id, text: p.text, translation: p.translation })))
+          setPhrases(lessonPhrases.map((p) => ({ _id: p._id, text: p.text, translations: p.translations || [] })))
         }
       } catch (error) {
         toast.error("Failed to load question.")
@@ -86,7 +86,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   async function loadPhrasesForLesson(lessonId: string) {
     try {
       const lessonPhrases = await phraseService.listPhrases(lessonId)
-      setPhrases(lessonPhrases.map((p) => ({ _id: p._id, text: p.text, translation: p.translation })))
+      setPhrases(lessonPhrases.map((p) => ({ _id: p._id, text: p.text, translations: p.translations || [] })))
     } catch (error) {
       toast.error("Failed to load phrases.")
       setPhrases([])
@@ -100,6 +100,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     const payload: Partial<ExerciseQuestion> = {
       lessonId: question.lessonId,
       phraseId: question.phraseId,
+      translationIndex: question.translationIndex,
       type: question.type,
       subtype: question.subtype,
       promptTemplate: question.promptTemplate,
@@ -177,11 +178,30 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
               <div className="space-y-2">
                 <Label>Phrase</Label>
-                <Select value={typeof question.phraseId === "string" ? question.phraseId : question.phraseId._id} onValueChange={(value) => setQuestion({ ...question, phraseId: value })}>
+                <Select value={typeof question.phraseId === "string" ? question.phraseId : question.phraseId._id} onValueChange={(value) => setQuestion({ ...question, phraseId: value, translationIndex: 0 })}>
                   <SelectTrigger><SelectValue placeholder="Select phrase" /></SelectTrigger>
                   <SelectContent>
                     {phrases.map((phrase) => (
-                      <SelectItem key={phrase._id} value={phrase._id}>{phrase.text} ({phrase.translation})</SelectItem>
+                      <SelectItem key={phrase._id} value={phrase._id}>
+                        {phrase.text} ({phrase.translations.join(" | ")})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Translation Index</Label>
+                <Select
+                  value={String(question.translationIndex ?? 0)}
+                  onValueChange={(value) => setQuestion({ ...question, translationIndex: Number(value) })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select translation index" /></SelectTrigger>
+                  <SelectContent>
+                    {(phrases.find((phrase) => phrase._id === (typeof question.phraseId === "string" ? question.phraseId : question.phraseId._id))?.translations || []).map((item, index) => (
+                      <SelectItem key={`edit-translation-${index}`} value={String(index)}>
+                        Index {index}: {item}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -276,4 +296,3 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     </div>
   )
 }
-

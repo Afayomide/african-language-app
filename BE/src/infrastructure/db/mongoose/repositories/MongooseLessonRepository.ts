@@ -21,6 +21,7 @@ type LessonPersistenceDoc = {
     type?: "text" | "phrase" | "proverb" | "question" | null;
     content?: string | null;
     refId?: { toString(): string } | string | null;
+    translationIndex?: number | null;
   }> | null;
   status: LessonEntity["status"];
   createdBy: { toString(): string } | string;
@@ -42,8 +43,18 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
 
   const blockRows = Array.isArray(doc.blocks)
     ? doc.blocks.map((row) => {
+        const blockType = String(row.type || "") as "text" | "phrase" | "proverb" | "question";
+        if (blockType === "phrase") {
+          const rawIndex = Number(row.translationIndex ?? 0);
+          return {
+            type: "phrase" as const,
+            content: String(row.content || ""),
+            refId: row.refId ? String(row.refId) : "",
+            translationIndex: Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : 0
+          };
+        }
         return {
-          type: String(row.type || "") as "text" | "phrase" | "proverb" | "question",
+          type: blockType,
           content: String(row.content || ""),
           refId: row.refId ? String(row.refId) : ""
         };

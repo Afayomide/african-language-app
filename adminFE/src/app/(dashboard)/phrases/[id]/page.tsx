@@ -30,6 +30,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
+  const [translationsText, setTranslationsText] = useState("")
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
@@ -57,6 +58,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     try {
       const data = await phraseService.getPhrase(id)
       setPhrase({ ...data, lessonIds: Array.isArray(data.lessonIds) ? data.lessonIds : [] })
+      setTranslationsText(Array.isArray(data.translations) ? data.translations.join("\n") : "")
     } catch (error) {
       toast.error("Failed to fetch phrase")
       router.push("/phrases")
@@ -175,7 +177,10 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
         : undefined
       await phraseService.updatePhrase(id, {
         text: phrase.text,
-        translation: phrase.translation,
+        translations: translationsText
+          .split(/\n|,/)
+          .map((item) => item.trim())
+          .filter(Boolean),
         pronunciation: phrase.pronunciation,
         explanation: phrase.explanation,
         difficulty: phrase.difficulty,
@@ -202,6 +207,7 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
     try {
       const enhanced = await aiService.enhancePhrase(id, lesson.language, lesson.level)
       setPhrase(enhanced)
+      setTranslationsText(Array.isArray(enhanced.translations) ? enhanced.translations.join("\n") : "")
       toast.success("Phrase enhanced with AI")
     } catch (error) {
       toast.error("Enhancement failed")
@@ -282,11 +288,12 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="translation">Translation</Label>
-                <Input
-                  id="translation"
-                  value={phrase.translation}
-                  onChange={(e) => setPhrase({ ...phrase, translation: e.target.value })}
+                <Label htmlFor="translationsText">Translations</Label>
+                <Textarea
+                  id="translationsText"
+                  value={translationsText}
+                  onChange={(e) => setTranslationsText(e.target.value)}
+                  rows={4}
                   required
                 />
               </div>

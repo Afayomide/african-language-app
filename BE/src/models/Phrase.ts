@@ -5,7 +5,17 @@ const PhraseSchema = new Schema(
     lessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
     text: { type: String, required: true, trim: true },
-    translation: { type: String, required: true, trim: true },
+    textNormalized: { type: String, required: true, trim: true, index: true },
+    translations: {
+      type: [{ type: String, trim: true }],
+      default: [],
+      validate: {
+        validator(value: string[]) {
+          return Array.isArray(value) && value.length > 0;
+        },
+        message: "At least one translation is required"
+      }
+    },
     pronunciation: { type: String, default: "" },
     explanation: { type: String, default: "" },
     examples: [
@@ -42,6 +52,24 @@ PhraseSchema.index({ lessonIds: 1, status: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ language: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ language: 1, status: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ status: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ language: 1, textNormalized: 1, isDeleted: 1 }, { unique: true });
+
+PhraseSchema.pre("validate", function normalizePhraseFields(next) {
+  const doc = this as {
+    text?: string;
+    textNormalized?: string;
+    translations?: string[];
+  };
+  const normalizedText = String(doc.text || "").trim();
+  doc.text = normalizedText;
+  doc.textNormalized = normalizedText.toLowerCase();
+
+  const uniqueTranslations = Array.isArray(doc.translations)
+    ? Array.from(new Set(doc.translations.map((item) => String(item || "").trim()).filter(Boolean)))
+    : [];
+  doc.translations = uniqueTranslations;
+  next();
+});
 
 export type PhraseDocument = InferSchemaType<typeof PhraseSchema> & {
   _id: mongoose.Types.ObjectId;

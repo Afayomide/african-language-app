@@ -83,7 +83,9 @@ function LessonPhrasesContent() {
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex-1 space-y-2">
                       <h3 className="text-2xl font-black text-primary">{phrase.text}</h3>
-                      <p className="text-lg font-bold text-foreground/70">{phrase.translation}</p>
+                      <p className="text-lg font-bold text-foreground/70">
+                        {phrase.selectedTranslation || phrase.translations?.[0] || ""}
+                      </p>
                       {phrase.pronunciation && (
                         <p className="text-sm font-medium text-foreground/30 italic">[{phrase.pronunciation}]</p>
                       )}

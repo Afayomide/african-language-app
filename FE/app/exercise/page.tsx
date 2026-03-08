@@ -17,7 +17,8 @@ type ExerciseQuestion = {
   phrase?: {
     _id: string
     text: string
-    translation: string
+    selectedTranslation?: string
+    translations?: string[]
     audio?: { url?: string }
   }
 }

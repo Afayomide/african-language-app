@@ -25,9 +25,27 @@ const questionUseCases = new AdminQuestionUseCases(
 );
 const phraseRepo = new MongoosePhraseRepository();
 
+function getSelectedTranslation(translations: string[], index: number) {
+  if (!Array.isArray(translations) || translations.length === 0) return "";
+  if (Number.isInteger(index) && index >= 0 && index < translations.length) {
+    return String(translations[index] || "");
+  }
+  return String(translations[0] || "");
+}
 
 export async function createQuestion(req: Request, res: Response) {
-  const { lessonId, phraseId, type, subtype, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const {
+    lessonId,
+    phraseId,
+    translationIndex,
+    type,
+    subtype,
+    promptTemplate,
+    options,
+    correctIndex,
+    explanation,
+    reviewData
+  } = req.body ?? {};
 
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
     return res.status(400).json({ error: "invalid lesson id" });
@@ -43,6 +61,10 @@ export async function createQuestion(req: Request, res: Response) {
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
     return res.status(400).json({ error: "prompt template required" });
+  }
+  const parsedTranslationIndex = Number(translationIndex ?? 0);
+  if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
+    return res.status(400).json({ error: "invalid translation index" });
   }
 
   let parsedOptions = parseQuestionOptions(options);
@@ -67,6 +89,7 @@ export async function createQuestion(req: Request, res: Response) {
   const created = await questionUseCases.create({
     lessonId: String(lessonId),
     phraseId: String(phraseId),
+    translationIndex: parsedTranslationIndex,
     type: String(type) as QuestionType,
     subtype: String(subtype) as QuestionSubtype,
     promptTemplate: String(promptTemplate).trim(),
@@ -86,6 +109,9 @@ export async function createQuestion(req: Request, res: Response) {
   }
   if (created === "phrase_not_in_lesson") {
     return res.status(400).json({ error: "phrase not in lesson" });
+  }
+  if (created === "invalid_translation_index") {
+    return res.status(400).json({ error: "invalid translation index" });
   }
   return res.status(201).json({ question: created });
 }
@@ -131,7 +157,12 @@ export async function listQuestions(req: Request, res: Response) {
       ? {
           _id: phraseMap.get(q.phraseId)?.id,
           text: phraseMap.get(q.phraseId)?.text,
-          translation: phraseMap.get(q.phraseId)?.translation,
+          translations: phraseMap.get(q.phraseId)?.translations || [],
+          selectedTranslation: getSelectedTranslation(
+            phraseMap.get(q.phraseId)?.translations || [],
+            q.translationIndex
+          ),
+          selectedTranslationIndex: q.translationIndex,
           status: phraseMap.get(q.phraseId)?.status
         }
       : q.phraseId
@@ -145,7 +176,7 @@ export async function listQuestions(req: Request, res: Response) {
           item.promptTemplate,
           item.explanation,
           phrase?.text,
-          phrase?.translation
+          phrase?.selectedTranslation
         ].some((value) => includesSearch(value, q));
       })
     : data;
@@ -176,7 +207,9 @@ export async function getQuestionById(req: Request, res: Response) {
         ? {
             _id: phrase.id,
             text: phrase.text,
-            translation: phrase.translation,
+            translations: phrase.translations,
+            selectedTranslation: getSelectedTranslation(phrase.translations, question.translationIndex),
+            selectedTranslationIndex: question.translationIndex,
             status: phrase.status,
             audio: phrase.audio
           }
@@ -191,7 +224,7 @@ export async function updateQuestion(req: Request, res: Response) {
     return res.status(400).json({ error: "invalid id" });
   }
 
-  const { type, subtype, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const { type, subtype, phraseId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const currentQuestion = await questionUseCases.getById(id);
   if (!currentQuestion) {
@@ -217,6 +250,7 @@ export async function updateQuestion(req: Request, res: Response) {
     }
     update.promptTemplate = String(promptTemplate).trim();
   }
+  let targetPhraseId = currentQuestion.phraseId;
   if (phraseId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
       return res.status(400).json({ error: "invalid phrase id" });
@@ -226,6 +260,21 @@ export async function updateQuestion(req: Request, res: Response) {
       return res.status(404).json({ error: "phrase not found" });
     }
     update.phraseId = phrase.id;
+    targetPhraseId = phrase.id;
+  }
+  if (translationIndex !== undefined) {
+    const parsedTranslationIndex = Number(translationIndex);
+    if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    const phrase = await phraseRepo.findById(targetPhraseId);
+    if (!phrase) {
+      return res.status(404).json({ error: "phrase not found" });
+    }
+    if (parsedTranslationIndex >= phrase.translations.length) {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    update.translationIndex = parsedTranslationIndex;
   }
   if (effectiveType === "fill-in-the-gap") {
     if (type !== undefined && String(type) === "fill-in-the-gap" && reviewData === undefined && !currentQuestion.reviewData?.sentence) {

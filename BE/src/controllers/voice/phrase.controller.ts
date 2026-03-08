@@ -22,6 +22,11 @@ const useCases = new VoiceArtistAudioUseCases(
   new MongooseVoiceAudioSubmissionRepository()
 );
 
+function pickTranslation(translations: string[]) {
+  if (!Array.isArray(translations) || translations.length === 0) return "";
+  return String(translations[0] || "");
+}
+
 function parseAudioUpload(audioUpload: unknown) {
   if (typeof audioUpload !== "object" || audioUpload === null) return "invalid_audio_upload";
 
@@ -94,7 +99,7 @@ export async function getQueue(req: AuthRequest, res: Response) {
     ? result.queue.filter((item) =>
         [
           item.phrase.text,
-          item.phrase.translation,
+          pickTranslation(item.phrase.translations),
           item.phrase.pronunciation,
           item.phrase.explanation,
           item.phrase.status,
@@ -177,7 +182,7 @@ export async function listOwnSubmissions(req: AuthRequest, res: Response) {
           submission.status,
           submission.rejectionReason,
           submission.phrase?.text,
-          submission.phrase?.translation
+          submission.phrase ? pickTranslation(submission.phrase.translations) : ""
         ].some((value) => includesSearch(value, q))
       )
     : result.submissions;

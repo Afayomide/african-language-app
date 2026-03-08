@@ -11,6 +11,7 @@ export type QuestionListFilter = {
 export type QuestionCreateInput = {
   lessonId: string;
   phraseId: string;
+  translationIndex?: number;
   type: QuestionEntity["type"];
   subtype: QuestionEntity["subtype"];
   promptTemplate: string;
@@ -23,6 +24,7 @@ export type QuestionCreateInput = {
 
 export type QuestionUpdateInput = Partial<{
   phraseId: string;
+  translationIndex: number;
   type: QuestionEntity["type"];
   subtype: QuestionEntity["subtype"];
   promptTemplate: string;

@@ -302,7 +302,9 @@ export default function VoiceArtistsPage() {
                 <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
                   <TableCell className="pl-8">
                     <div className="font-semibold">{submission.phrase?.text || "-"}</div>
-                    <div className="text-xs text-muted-foreground">{submission.phrase?.translation || ""}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {submission.phrase?.selectedTranslation || submission.phrase?.translations?.[0] || ""}
+                    </div>
                   </TableCell>
                   <TableCell>{submission.voiceArtist?.email || "-"}</TableCell>
                   <TableCell className="capitalize">{submission.language}</TableCell>

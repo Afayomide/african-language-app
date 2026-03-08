@@ -4,7 +4,7 @@ export type Status = "draft" | "finished" | "published";
 
 export type LessonBlock = 
   | { type: "text"; content: string }
-  | { type: "phrase"; refId: string }
+  | { type: "phrase"; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
@@ -17,7 +17,9 @@ export type PopulatedLessonBlock =
 export interface Phrase {
   _id: string;
   text: string;
-  translation: string;
+  translations: string[];
+  selectedTranslation?: string;
+  selectedTranslationIndex?: number;
   pronunciation?: string;
   explanation?: string;
   audio?: {
@@ -49,6 +51,7 @@ export type QuestionSubtype =
 export interface ExerciseQuestion {
   _id: string;
   lessonId: string;
+  translationIndex?: number;
   phraseId: string | Phrase;
   type: QuestionType;
   subtype: QuestionSubtype;

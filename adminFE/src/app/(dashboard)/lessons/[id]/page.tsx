@@ -818,7 +818,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                       />
                     </TableCell>
                     <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
-                    <TableCell>{phrase.translation}</TableCell>
+                    <TableCell>{phrase.translations.join(" | ")}</TableCell>
                     <TableCell>
                       <Badge className={workflowStatusBadgeClass(phrase.status)}>
                         {phrase.status}

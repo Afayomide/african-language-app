@@ -19,6 +19,11 @@ export const LESSON_STEPS = [
   { key: "fill-in-the-gap", title: "Fill in the Gap", description: "Test your knowledge", route: "/sentence-builder" }
 ] as const;
 
+type LessonPhraseView = PhraseEntity & {
+  selectedTranslation: string;
+  selectedTranslationIndex: number;
+};
+
 function toStepProgress(progress: LessonStepProgressEntity[]) {
   const byKey = new Map(progress.map((item) => [item.stepKey, item]));
   return LESSON_STEPS.map((step, idx) => {
@@ -53,6 +58,19 @@ function buildReviewFallback(question: {
     new Set(providedOrder).size === providedOrder.length;
   const correctOrder = validProvidedOrder ? providedOrder : words.map((_, idx) => idx);
   return { sentence, words, correctOrder, meaning };
+}
+
+function getTranslationByIndex(translations: string[], index?: number) {
+  if (!Array.isArray(translations) || translations.length === 0) return "";
+  if (
+    index !== undefined &&
+    Number.isInteger(index) &&
+    index >= 0 &&
+    index < translations.length
+  ) {
+    return String(translations[index] || "");
+  }
+  return String(translations[0] || "");
 }
 
 export class LearnerLessonUseCases {
@@ -107,7 +125,16 @@ export class LearnerLessonUseCases {
       const refId = (block as any).refId;
       if (block.type === "phrase") {
         const data = phraseMap.get(refId);
-        return data ? { ...block, data } : null;
+        if (!data) return null;
+        const selectedTranslation = getTranslationByIndex(data.translations, block.translationIndex);
+        return {
+          ...block,
+          data: {
+            ...data,
+            selectedTranslation,
+            selectedTranslationIndex: block.translationIndex ?? 0
+          }
+        };
       }
       if (block.type === "proverb") {
         const data = proverbMap.get(refId);
@@ -119,11 +146,14 @@ export class LearnerLessonUseCases {
         
         const phrase = phraseMap.get(q.phraseId) || null;
         const prompt = String(q.promptTemplate || "").replace("{phrase}", phrase?.text || "");
+        const selectedTranslation = phrase
+          ? getTranslationByIndex(phrase.translations, q.translationIndex)
+          : "";
         
         let interactionData = {};
         if (q.type === "fill-in-the-gap") {
           interactionData = buildReviewFallback({
-            phrase: phrase ? { text: phrase.text, translation: phrase.translation } : undefined,
+            phrase: phrase ? { text: phrase.text, translation: selectedTranslation } : undefined,
             reviewData: q.reviewData
           });
         }
@@ -133,7 +163,13 @@ export class LearnerLessonUseCases {
           data: {
             ...q,
             prompt,
-            phrase,
+            phrase: phrase
+              ? {
+                  ...phrase,
+                  selectedTranslation,
+                  selectedTranslationIndex: q.translationIndex
+                }
+              : null,
             interactionData
           }
         };
@@ -319,7 +355,7 @@ export class LearnerLessonUseCases {
     };
   }
 
-  async getLessonPhrases(lessonId: string): Promise<PhraseEntity[] | null> {
+  async getLessonPhrases(lessonId: string): Promise<LessonPhraseView[] | null> {
     const lesson = await this.lessons.findById(lessonId);
     if (!lesson || lesson.status !== "published") return null;
 
@@ -340,11 +376,36 @@ export class LearnerLessonUseCases {
       }
     }
 
+    const selectedIndexByPhraseId = new Map<string, number>();
+    for (const block of lesson.blocks) {
+      if (block.type === "phrase") {
+        const index = Number(block.translationIndex ?? 0);
+        if (!selectedIndexByPhraseId.has(block.refId)) {
+          selectedIndexByPhraseId.set(block.refId, Number.isInteger(index) && index >= 0 ? index : 0);
+        }
+      }
+    }
+    for (const questionId of questionIds) {
+      const question = await this.questions.findById(String(questionId));
+      if (question && !selectedIndexByPhraseId.has(question.phraseId)) {
+        selectedIndexByPhraseId.set(question.phraseId, question.translationIndex);
+      }
+    }
+
     // 3. Merge and unique
     const allPhrases = [...lessonPhrases, ...referencedPhrases];
     const uniqueMap = new Map(allPhrases.map(p => [p.id, p]));
-    
-    return Array.from(uniqueMap.values()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+    return Array.from(uniqueMap.values())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((phrase) => {
+        const selectedTranslationIndex = selectedIndexByPhraseId.get(phrase.id) ?? 0;
+        return {
+          ...phrase,
+          selectedTranslationIndex,
+          selectedTranslation: getTranslationByIndex(phrase.translations, selectedTranslationIndex)
+        };
+      });
   }
 
   async getLessonQuestions(lessonId: string, type: QuestionEntity["type"]) {
@@ -366,7 +427,9 @@ export class LearnerLessonUseCases {
           phrase: {
             _id: phrase.id,
             text: phrase.text,
-            translation: phrase.translation,
+            selectedTranslation: getTranslationByIndex(phrase.translations, q.translationIndex),
+            selectedTranslationIndex: q.translationIndex,
+            translations: phrase.translations,
             pronunciation: phrase.pronunciation,
             explanation: phrase.explanation,
             audio: phrase.audio
@@ -398,7 +461,10 @@ export class LearnerLessonUseCases {
         if (!phrase) return null;
 
         const review = buildReviewFallback({
-          phrase: { text: phrase.text, translation: phrase.translation },
+          phrase: {
+            text: phrase.text,
+            translation: getTranslationByIndex(phrase.translations, q.translationIndex)
+          },
           reviewData: q.reviewData
         });
 
@@ -412,7 +478,9 @@ export class LearnerLessonUseCases {
           phrase: {
             _id: phrase.id,
             text: phrase.text,
-            translation: phrase.translation,
+            selectedTranslation: getTranslationByIndex(phrase.translations, q.translationIndex),
+            selectedTranslationIndex: q.translationIndex,
+            translations: phrase.translations,
             pronunciation: phrase.pronunciation,
             explanation: phrase.explanation,
             audio: phrase.audio

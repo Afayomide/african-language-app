@@ -30,11 +30,29 @@ const questionUseCases = new TutorQuestionUseCases(
 const phraseRepo = new MongoosePhraseRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
 
+function getSelectedTranslation(translations: string[], index: number) {
+  if (!Array.isArray(translations) || translations.length === 0) return "";
+  if (Number.isInteger(index) && index >= 0 && index < translations.length) {
+    return String(translations[index] || "");
+  }
+  return String(translations[0] || "");
+}
+
 export async function createQuestion(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
-  const { lessonId, phraseId, type, subtype, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
-  console.log(req.body)
+  const {
+    lessonId,
+    phraseId,
+    translationIndex,
+    type,
+    subtype,
+    promptTemplate,
+    options,
+    correctIndex,
+    explanation,
+    reviewData
+  } = req.body ?? {};
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
@@ -49,6 +67,10 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
     return res.status(400).json({ error: "prompt template required" });
+  }
+  const parsedTranslationIndex = Number(translationIndex ?? 0);
+  if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
+    return res.status(400).json({ error: "invalid translation index" });
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
@@ -73,9 +95,10 @@ export async function createQuestion(req: AuthRequest, res: Response) {
 
   const created = await questionUseCases.create(
     {
-      lessonId: String(lessonId),
-      phraseId: String(phraseId),
-      type: String(type) as QuestionType,
+    lessonId: String(lessonId),
+    phraseId: String(phraseId),
+    translationIndex: parsedTranslationIndex,
+    type: String(type) as QuestionType,
       subtype: String(subtype) as QuestionSubtype,
       promptTemplate: String(promptTemplate).trim(),
       options: parsedOptions,
@@ -87,6 +110,9 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   );
   if (created === "lesson_not_found") return res.status(404).json({ error: "lesson not found" });
   if (created === "phrase_not_found") return res.status(404).json({ error: "phrase not found" });
+  if (created === "invalid_translation_index") {
+    return res.status(400).json({ error: "invalid translation index" });
+  }
 
   return res.status(201).json({ question: created });
 }
@@ -134,7 +160,12 @@ export async function listQuestions(req: AuthRequest, res: Response) {
       ? {
           _id: phraseMap.get(q.phraseId)?.id,
           text: phraseMap.get(q.phraseId)?.text,
-          translation: phraseMap.get(q.phraseId)?.translation,
+          translations: phraseMap.get(q.phraseId)?.translations || [],
+          selectedTranslation: getSelectedTranslation(
+            phraseMap.get(q.phraseId)?.translations || [],
+            q.translationIndex
+          ),
+          selectedTranslationIndex: q.translationIndex,
           status: phraseMap.get(q.phraseId)?.status
         }
       : q.phraseId
@@ -148,7 +179,7 @@ export async function listQuestions(req: AuthRequest, res: Response) {
           item.promptTemplate,
           item.explanation,
           phrase?.text,
-          phrase?.translation
+          phrase?.selectedTranslation
         ].some((value) => includesSearch(value, q));
       })
     : data;
@@ -181,7 +212,9 @@ export async function getQuestionById(req: AuthRequest, res: Response) {
         ? {
             _id: phrase.id,
             text: phrase.text,
-            translation: phrase.translation,
+            translations: phrase.translations,
+            selectedTranslation: getSelectedTranslation(phrase.translations, question.translationIndex),
+            selectedTranslationIndex: question.translationIndex,
             status: phrase.status,
             audio: phrase.audio
           }
@@ -203,7 +236,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!question) return res.status(404).json({ error: "question not found" });
 
-  const { type, subtype, phraseId, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const { type, subtype, phraseId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const effectiveType = String(type || question.type);
 
@@ -225,6 +258,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     }
     update.promptTemplate = String(promptTemplate).trim();
   }
+  let targetPhraseId = question.phraseId;
   if (phraseId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
       return res.status(400).json({ error: "invalid phrase id" });
@@ -235,6 +269,19 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     }
     if (!phrase) return res.status(404).json({ error: "phrase not found" });
     update.phraseId = phrase.id;
+    targetPhraseId = phrase.id;
+  }
+  if (translationIndex !== undefined) {
+    const parsedTranslationIndex = Number(translationIndex);
+    if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    const phrase = await phraseRepo.findById(targetPhraseId);
+    if (!phrase) return res.status(404).json({ error: "phrase not found" });
+    if (parsedTranslationIndex >= phrase.translations.length) {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    update.translationIndex = parsedTranslationIndex;
   }
 
   if (effectiveType === "fill-in-the-gap") {

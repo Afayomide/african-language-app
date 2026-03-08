@@ -43,7 +43,7 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
 
       const [p, prv, q] = await Promise.all([
         phraseService.listPhrasesPage({ lessonId: id, limit: 100 }),
-        proverbService.listProverbs(id, undefined, lessonData.language),
+        proverbService.listProverbs(id, undefined),
         questionService.listQuestions({ lessonId: id })
       ])
       
@@ -80,6 +80,19 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
       updated[index] = { ...block, content: value }
     } else {
       updated[index] = { ...block, refId: value }
+    }
+    setBlocks(updated)
+  }
+
+  const handleBlockTranslationIndexChange = (index: number, value: string) => {
+    const nextIndex = Number(value)
+    if (!Number.isInteger(nextIndex) || nextIndex < 0) return
+    const updated = [...blocks]
+    const block = updated[index]
+    if (block.type !== "phrase") return
+    updated[index] = {
+      ...block,
+      translationIndex: nextIndex
     }
     setBlocks(updated)
   }
@@ -199,7 +212,9 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           {block.type === "phrase" && allPhrases.map(p => (
-                            <SelectItem key={p._id} value={p._id}>{p.text} — {p.translation}</SelectItem>
+                            <SelectItem key={p._id} value={p._id}>
+                              {p.text} — {p.translations.join(" | ")}
+                            </SelectItem>
                           ))}
                           {block.type === "proverb" && allProverbs.map(p => (
                             <SelectItem key={p._id} value={p._id}>{p.text}</SelectItem>
@@ -214,6 +229,24 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                             (block.type === "question" && allQuestions.length === 0)) && (
                             <SelectItem value="none" disabled>No {block.type}s found for this lesson</SelectItem>
                           )}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {block.type === "phrase" && block.refId && (
+                      <Select
+                        value={String(block.translationIndex ?? 0)}
+                        onValueChange={(v) => handleBlockTranslationIndexChange(index, v)}
+                      >
+                        <SelectTrigger className="border-2 rounded-xl h-11">
+                          <SelectValue placeholder="Select translation index" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {(allPhrases.find((p) => p._id === block.refId)?.translations || []).map((item, translationIndex) => (
+                            <SelectItem key={`${block.refId}-${translationIndex}`} value={String(translationIndex)}>
+                              Index {translationIndex}: {item}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     )}

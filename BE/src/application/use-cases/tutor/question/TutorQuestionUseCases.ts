@@ -15,6 +15,7 @@ export class TutorQuestionUseCases {
     input: {
       lessonId: string;
       phraseId: string;
+      translationIndex?: number;
       type: QuestionEntity["type"];
       subtype: QuestionEntity["subtype"];
       promptTemplate: string;
@@ -30,8 +31,12 @@ export class TutorQuestionUseCases {
 
     const phrase = await this.phrases.findById(input.phraseId);
     if (!phrase || !phrase.lessonIds.includes(lesson.id)) return "phrase_not_found" as const;
+    const translationIndex = Number(input.translationIndex ?? 0);
+    if (translationIndex < 0 || translationIndex >= phrase.translations.length) {
+      return "invalid_translation_index" as const;
+    }
 
-    return this.questions.create({ ...input, status: "draft" });
+    return this.questions.create({ ...input, translationIndex, status: "draft" });
   }
 
   async list(

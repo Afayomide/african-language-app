@@ -186,7 +186,9 @@ export async function getLessonPhrases(req: AuthRequest, res: Response) {
     phrases: phrases.map((p) => ({
       id: p.id,
       text: p.text,
-      translation: p.translation,
+      selectedTranslation: p.selectedTranslation,
+      selectedTranslationIndex: p.selectedTranslationIndex,
+      translations: p.translations,
       pronunciation: p.pronunciation,
       explanation: p.explanation,
       examples: p.examples,

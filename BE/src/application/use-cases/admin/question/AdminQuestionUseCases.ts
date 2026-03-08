@@ -13,6 +13,7 @@ export class AdminQuestionUseCases {
   async create(input: {
     lessonId: string;
     phraseId: string;
+    translationIndex?: number;
     type: QuestionEntity["type"];
     subtype: QuestionEntity["subtype"];
     promptTemplate: string;
@@ -27,6 +28,10 @@ export class AdminQuestionUseCases {
     const phrase = await this.phrases.findById(input.phraseId);
     if (!phrase) return "phrase_not_found" as const;
     if (!phrase.lessonIds.includes(lesson.id)) return "phrase_not_in_lesson" as const;
+    const translationIndex = Number(input.translationIndex ?? 0);
+    if (translationIndex < 0 || translationIndex >= phrase.translations.length) {
+      return "invalid_translation_index" as const;
+    }
 
     // Validation: Cannot add draft items to a published lesson
     if (lesson.status === "published") {
@@ -35,6 +40,7 @@ export class AdminQuestionUseCases {
 
     return this.questions.create({
       ...input,
+      translationIndex,
       status: "draft"
     });
   }

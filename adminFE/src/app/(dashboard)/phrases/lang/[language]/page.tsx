@@ -505,7 +505,7 @@ function PhrasesByLanguageContent({
                     />
                   </TableCell>
                   <TableCell className="pl-8 font-bold text-foreground text-lg">{phrase.text}</TableCell>
-                  <TableCell className="font-medium text-muted-foreground italic">{phrase.translation}</TableCell>
+                  <TableCell className="font-medium text-muted-foreground italic">{phrase.translations.join(" | ")}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <span className="font-black text-primary">{phrase.difficulty}</span>

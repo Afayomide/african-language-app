@@ -310,6 +310,7 @@ export const questionService = {
   async createQuestion(data: {
     lessonId: string;
     phraseId: string;
+    translationIndex?: number;
     type: QuestionType;
     subtype: string;
     promptTemplate: string;

@@ -156,7 +156,7 @@ export default function TutorVoiceAudioPage() {
                 items.map((submission) => (
                   <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
                     <TableCell className="pl-8 font-bold text-foreground">{submission.phrase?.text || "-"}</TableCell>
-                    <TableCell>{submission.phrase?.translation || "-"}</TableCell>
+                    <TableCell>{submission.phrase?.selectedTranslation || submission.phrase?.translations?.[0] || "-"}</TableCell>
                     <TableCell>{submission.voiceArtist?.email || "-"}</TableCell>
                     <TableCell>
                       <Badge className={reviewStatusBadgeClass(submission.status)}>

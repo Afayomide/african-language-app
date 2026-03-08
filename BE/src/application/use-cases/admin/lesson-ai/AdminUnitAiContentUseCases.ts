@@ -59,17 +59,30 @@ function makeUniqueOptions(values: string[]) {
   return result;
 }
 
+function pickTranslation(phrase: PhraseEntity, translationIndex = 0) {
+  if (!Array.isArray(phrase.translations) || phrase.translations.length === 0) return "";
+  if (
+    Number.isInteger(translationIndex) &&
+    translationIndex >= 0 &&
+    translationIndex < phrase.translations.length
+  ) {
+    return String(phrase.translations[translationIndex] || "").trim();
+  }
+  return String(phrase.translations[0] || "").trim();
+}
+
 function buildReviewData(phrase: PhraseEntity): NonNullable<QuestionEntity["reviewData"]> {
+  const translation = pickTranslation(phrase);
   const baseSentence = String(phrase.examples[0]?.original || phrase.text || "").trim();
   const fallbackSentence = baseSentence || phrase.text.trim();
   const rawWords = fallbackSentence.split(/\s+/).map((item) => item.trim()).filter(Boolean);
-  const words = rawWords.length >= 2 ? rawWords : [phrase.text.trim(), phrase.translation.trim()].filter(Boolean);
+  const words = rawWords.length >= 2 ? rawWords : [phrase.text.trim(), translation].filter(Boolean);
   const safeWords = words.length >= 2 ? words : [phrase.text.trim(), phrase.text.trim()].filter(Boolean);
   return {
     sentence: fallbackSentence || phrase.text.trim(),
     words: safeWords,
     correctOrder: safeWords.map((_, index) => index),
-    meaning: phrase.translation.trim()
+    meaning: translation
   };
 }
 
@@ -89,11 +102,11 @@ function buildMcOptions(
   lessonPhrases: PhraseEntity[],
   languagePool: PhraseEntity[]
 ) {
-  const currentTranslation = phrase.translation.trim();
+  const currentTranslation = pickTranslation(phrase);
   const distractorPool = lessonPhrases
     .filter((item) => item.id !== phrase.id)
-    .map((item) => item.translation)
-    .concat(languagePool.filter((item) => item.id !== phrase.id).map((item) => item.translation));
+    .map((item) => pickTranslation(item))
+    .concat(languagePool.filter((item) => item.id !== phrase.id).map((item) => pickTranslation(item)));
 
   const uniqueDistractors = makeUniqueOptions(distractorPool).filter(
     (item) => item.toLowerCase() !== currentTranslation.toLowerCase()
@@ -132,7 +145,7 @@ function buildQuestionDrafts(
       promptTemplate: "What is {phrase} in English?",
       options: mc.options,
       correctIndex: mc.correctIndex,
-      explanation: phrase.explanation || `The correct meaning is ${phrase.translation}.`
+      explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
     },
     {
       type: "fill-in-the-gap",
@@ -149,7 +162,7 @@ function buildQuestionDrafts(
       promptTemplate: "Listen to {phrase} and choose the meaning.",
       options: mc.options,
       correctIndex: mc.correctIndex,
-      explanation: phrase.explanation || `The correct meaning is ${phrase.translation}.`
+      explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
     }
   ];
 }
@@ -259,6 +272,7 @@ export class AdminUnitAiContentUseCases {
             const created = await this.questions.create({
               lessonId: lesson.id,
               phraseId: phrase.id,
+              translationIndex: 0,
               type: draft.type,
               subtype: draft.subtype,
               promptTemplate: draft.promptTemplate,

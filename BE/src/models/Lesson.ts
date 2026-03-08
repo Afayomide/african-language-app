@@ -21,7 +21,8 @@ const LessonSchema = new Schema(
       type: [{
         type: { type: String, enum: ["text", "phrase", "proverb", "question"], required: true },
         content: { type: String }, // For 'text' blocks
-        refId: { type: Schema.Types.ObjectId } // Generic ref, logic handled in controller/service
+        refId: { type: Schema.Types.ObjectId }, // Generic ref, logic handled in controller/service
+        translationIndex: { type: Number, min: 0, default: 0 }
       }],
       default: []
     },

@@ -41,7 +41,7 @@ function NewPhraseContent() {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [formData, setFormData] = useState({
     text: "",
-    translation: "",
+    translationsText: "",
     pronunciation: "",
     explanation: "",
     difficulty: 1,
@@ -194,7 +194,14 @@ function NewPhraseContent() {
           }
         : undefined
       await phraseService.createPhrase({
-        ...formData,
+        text: formData.text,
+        translations: formData.translationsText
+          .split(/\n|,/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        pronunciation: formData.pronunciation,
+        explanation: formData.explanation,
+        difficulty: formData.difficulty,
         lessonIds: selectedLessonIds,
         language: languageForPhrase,
         audioUpload
@@ -339,13 +346,14 @@ function NewPhraseContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="translation">Translation</Label>
-              <Input
-                id="translation"
-                value={formData.translation}
-                onChange={(e) => setFormData({...formData, translation: e.target.value})}
-                placeholder="Enter the English translation"
+              <Label htmlFor="translationsText">Translations</Label>
+              <Textarea
+                id="translationsText"
+                value={formData.translationsText}
+                onChange={(e) => setFormData({...formData, translationsText: e.target.value})}
+                placeholder="Enter one translation per line"
                 required
+                rows={4}
               />
             </div>
 

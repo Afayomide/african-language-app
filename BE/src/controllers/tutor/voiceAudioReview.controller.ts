@@ -22,6 +22,11 @@ const useCases = new AdminVoiceAudioReviewUseCases(
   new MongooseUserRepository()
 );
 
+function firstTranslation(translations: string[]) {
+  if (!Array.isArray(translations) || translations.length === 0) return "";
+  return String(translations[0] || "");
+}
+
 export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
@@ -53,7 +58,7 @@ export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response)
           submission.rejectionReason,
           submission.voiceArtist?.email,
           submission.phrase?.text,
-          submission.phrase?.translation
+          submission.phrase ? firstTranslation(submission.phrase.translations) : ""
         ].some((value) => includesSearch(value, q))
       )
     : submissions;

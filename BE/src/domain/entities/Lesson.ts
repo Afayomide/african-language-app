@@ -8,7 +8,7 @@ export type Status = (typeof STATUS_VALUES)[number];
 
 export type LessonBlock = 
   | { type: "text"; content: string }
-  | { type: "phrase"; refId: string }
+  | { type: "phrase"; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 

@@ -460,7 +460,7 @@ function PhrasesByLanguageContent({ params }: { params: Promise<{ language: stri
                     />
                   </TableCell>
                   <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
-                  <TableCell className="font-medium text-muted-foreground italic">{phrase.translation}</TableCell>
+                  <TableCell className="font-medium text-muted-foreground italic">{phrase.translations.join(" | ")}</TableCell>
                   <TableCell>{phrase.difficulty}/5</TableCell>
                   <TableCell>
                     <Badge className={workflowStatusBadgeClass(phrase.status)}>

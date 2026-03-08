@@ -9,6 +9,7 @@ import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repos
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
+import type { PhraseEntity } from "../../domain/entities/Phrase.js";
 import {
   isValidPhraseDifficulty,
   isValidPhraseStatus
@@ -90,7 +91,17 @@ function parseAudioUpload(audioUpload: unknown) {
 }
 
 export async function createPhrase(req: Request, res: Response) {
-  const { lessonIds, language, text, translation, pronunciation, explanation, examples, difficulty, audioUpload } = req.body ?? {};
+  const {
+    lessonIds,
+    language,
+    text,
+    translations,
+    pronunciation,
+    explanation,
+    examples,
+    difficulty,
+    audioUpload
+  } = req.body ?? {};
 
   if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
     return res.status(400).json({ error: "lesson ids required" });
@@ -102,8 +113,11 @@ export async function createPhrase(req: Request, res: Response) {
   if (!text || String(text).trim().length === 0) {
     return res.status(400).json({ error: "text required" });
   }
-  if (!translation || String(translation).trim().length === 0) {
-    return res.status(400).json({ error: "translation required" });
+  const normalizedTranslations = Array.isArray(translations)
+    ? Array.from(new Set(translations.map((item) => String(item || "").trim()).filter(Boolean)))
+    : [];
+  if (normalizedTranslations.length === 0) {
+    return res.status(400).json({ error: "at least one translation required" });
   }
 
   const parsedAudioUpload = parseAudioUpload(audioUpload);
@@ -127,7 +141,7 @@ export async function createPhrase(req: Request, res: Response) {
     lessonIds: lessonIds.map(String),
     language: String(language) as Language,
     text: String(text).trim(),
-    translation: String(translation).trim(),
+    translations: normalizedTranslations,
     pronunciation: pronunciation ? String(pronunciation).trim() : "",
     explanation: explanation ? String(explanation).trim() : "",
     examples: Array.isArray(examples) ? examples : undefined,
@@ -169,7 +183,7 @@ export async function listPhrases(req: Request, res: Response) {
     const regex = new RegExp(escapeRegex(q), "i");
     query.$or = [
       { text: regex },
-      { translation: regex },
+      { translations: regex },
       { pronunciation: regex },
       { explanation: regex },
       { status: regex },
@@ -218,7 +232,17 @@ export async function getPhraseById(req: Request, res: Response) {
 
 export async function updatePhrase(req: Request, res: Response) {
   const { id } = req.params;
-  const { text, translation, pronunciation, explanation, examples, difficulty, lessonIds, language, audioUpload } = req.body ?? {};
+  const {
+    text,
+    translations,
+    pronunciation,
+    explanation,
+    examples,
+    difficulty,
+    lessonIds,
+    language,
+    audioUpload
+  } = req.body ?? {};
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "invalid id" });
@@ -228,12 +252,12 @@ export async function updatePhrase(req: Request, res: Response) {
     lessonIds: string[];
     language: Language;
     text: string;
-    translation: string;
+    translations: string[];
     pronunciation: string;
     explanation: string;
     examples: Array<{ original: string; translation: string }>;
     difficulty: number;
-    audio: any;
+    audio: PhraseEntity["audio"];
   }> = {};
 
   if (lessonIds !== undefined) {
@@ -242,7 +266,15 @@ export async function updatePhrase(req: Request, res: Response) {
   }
   if (language !== undefined) update.language = String(language) as Language;
   if (text !== undefined) update.text = String(text).trim();
-  if (translation !== undefined) update.translation = String(translation).trim();
+  if (translations !== undefined) {
+    const normalizedTranslations = Array.isArray(translations)
+      ? Array.from(new Set(translations.map((item) => String(item || "").trim()).filter(Boolean)))
+      : [];
+    if (normalizedTranslations.length === 0) {
+      return res.status(400).json({ error: "at least one translation required" });
+    }
+    update.translations = normalizedTranslations;
+  }
   if (pronunciation !== undefined) update.pronunciation = String(pronunciation).trim();
   if (explanation !== undefined) update.explanation = String(explanation).trim();
   if (examples !== undefined) update.examples = examples;

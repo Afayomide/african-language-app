@@ -11,7 +11,7 @@ export type PhraseCreateInput = {
   lessonIds?: string[];
   language: PhraseEntity["language"];
   text: string;
-  translation: string;
+  translations: string[];
   pronunciation?: string;
   explanation?: string;
   examples?: PhraseExample[];
@@ -25,7 +25,7 @@ export type PhraseUpdateInput = Partial<{
   lessonIds: string[];
   language: PhraseEntity["language"];
   text: string;
-  translation: string;
+  translations: string[];
   pronunciation: string;
   explanation: string;
   examples: PhraseExample[];
@@ -38,6 +38,7 @@ export type PhraseUpdateInput = Partial<{
 export interface PhraseRepository {
   create(input: PhraseCreateInput): Promise<PhraseEntity>;
   list(filter: PhraseListFilter): Promise<PhraseEntity[]>;
+  findReusableByText(language: PhraseEntity["language"], text: string): Promise<PhraseEntity | null>;
   findById(id: string): Promise<PhraseEntity | null>;
   findByIds(ids: string[]): Promise<PhraseEntity[]>;
   findByLessonId(lessonId: string): Promise<PhraseEntity[]>;

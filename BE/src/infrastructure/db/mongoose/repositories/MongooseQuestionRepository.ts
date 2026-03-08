@@ -9,11 +9,13 @@ import type {
 } from "../../../../domain/repositories/QuestionRepository.js";
 
 function toEntity(doc: any): QuestionEntity {
+  const translationIndex = Number(doc.translationIndex ?? 0);
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     lessonId: doc.lessonId.toString(),
     phraseId: doc.phraseId.toString(),
+    translationIndex: Number.isInteger(translationIndex) && translationIndex >= 0 ? translationIndex : 0,
     type: doc.type,
     subtype: doc.subtype,
     promptTemplate: doc.promptTemplate,

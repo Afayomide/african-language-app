@@ -33,9 +33,13 @@ function buildPhrasesPrompt(input: GeneratePhrasesInput) {
   return [
     "You are generating phrases for a language lesson.",
     "Return ONLY valid JSON with this shape:",
-    "{\"phrases\":[{\"text\":string,\"translation\":string,\"pronunciation\":string?,\"explanation\":string?,\"examples\":[{\"original\":string,\"translation\":string}]?,\"difficulty\":number?}]}",
+    "{\"phrases\":[{\"text\":string,\"translations\":string[],\"pronunciation\":string?,\"explanation\":string?,\"examples\":[{\"original\":string,\"translation\":string}]?,\"difficulty\":number?}]}",
     "Rules:",
-    "- Use the target language for text and English for translation.",
+    "- Use the target language for text and English for translations.",
+    "- translations must be an array of distinct concise meanings.",
+    "- If a phrase has multiple meanings, return each one as a separate array item.",
+    "- Do NOT combine meanings with '/' or ',' inside one translation item.",
+    "- translations must contain at least one item.",
     "- difficulty between 1 and 5.",
     "- Keep phrasing culturally accurate.",
     "- Beginner level: output mostly single words or very short chunks (1-2 words), not full sentences.",
@@ -62,7 +66,7 @@ function buildEnhancePrompt(input: EnhancePhraseInput) {
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     `Phrase: ${input.text}`,
-    `Translation: ${input.translation}`
+    `Existing meanings: ${input.translations.join(" | ")}`
   ].join("\n");
 }
 

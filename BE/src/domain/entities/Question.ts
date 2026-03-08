@@ -27,6 +27,7 @@ export type QuestionEntity = {
   _id?: string;
   lessonId: string;
   phraseId: string;
+  translationIndex: number;
   type: QuestionType;
   subtype: QuestionSubtype;
   promptTemplate: string;

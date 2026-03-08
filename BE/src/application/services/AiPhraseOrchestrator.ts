@@ -16,11 +16,22 @@ function isValidExamples(examples: unknown) {
 }
 
 function sanitizePhrase(phrase: LlmGeneratedPhrase): LlmGeneratedPhrase | null {
-  if (!phrase.text || !phrase.translation) return null;
+  const rawTranslations = Array.isArray(phrase.translations)
+    ? phrase.translations
+    : [];
+  const translations = Array.from(
+    new Set(
+      rawTranslations
+        .flatMap((item) => String(item || "").split("/"))
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+  if (!phrase.text || translations.length === 0) return null;
 
   const result: LlmGeneratedPhrase = {
     text: String(phrase.text).trim(),
-    translation: String(phrase.translation).trim()
+    translations
   };
 
   if (phrase.pronunciation) result.pronunciation = String(phrase.pronunciation).trim();
@@ -43,12 +54,8 @@ function sanitizePhrase(phrase: LlmGeneratedPhrase): LlmGeneratedPhrase | null {
   return result;
 }
 
-function normalizePhraseKey(text: string, translation: string) {
-  return `${text.trim().toLowerCase()}::${translation.trim().toLowerCase()}`;
-}
-
-function normalizeTranslationKey(translation: string) {
-  return translation.trim().toLowerCase();
+function normalizePhraseText(text: string) {
+  return text.trim().toLowerCase();
 }
 
 function wordCount(value: string) {
@@ -128,13 +135,13 @@ export class AiPhraseOrchestrator {
     const existingPhrases = await this.phrases.findByLessonId(input.lesson.id);
     const allLanguagePhrases = await this.phrases.list({ language: input.lesson.language });
     const existingKeys = new Set(
-      existingPhrases.map((phrase) => normalizePhraseKey(phrase.text, phrase.translation))
+      existingPhrases.map((phrase) => normalizePhraseText(phrase.text))
     );
-    const translationMap = new Map<string, PhraseEntity>();
+    const phraseByText = new Map<string, PhraseEntity>();
     for (const phrase of allLanguagePhrases) {
-      const translationKey = normalizeTranslationKey(phrase.translation);
-      if (!translationMap.has(translationKey)) {
-        translationMap.set(translationKey, phrase);
+      const textKey = normalizePhraseText(phrase.text);
+      if (!phraseByText.has(textKey)) {
+        phraseByText.set(textKey, phrase);
       }
     }
 
@@ -170,7 +177,7 @@ export class AiPhraseOrchestrator {
       .map(sanitizePhrase)
       .filter((item): item is LlmGeneratedPhrase => Boolean(item))
       .filter((item) => {
-        const key = normalizePhraseKey(item.text, item.translation);
+        const key = normalizePhraseText(item.text);
         if (existingKeys.has(key) || uniqueInBatch.has(key)) return false;
         uniqueInBatch.add(key);
         return true;
@@ -180,20 +187,28 @@ export class AiPhraseOrchestrator {
 
     const createdOrLinked: PhraseEntity[] = [];
     for (const phrase of sanitized) {
-      const translationKey = normalizeTranslationKey(phrase.translation);
-      const existingByTranslation = translationMap.get(translationKey);
-      if (existingByTranslation) {
-        if (!existingByTranslation.lessonIds.includes(input.lesson.id)) {
-          const lessonIds = Array.from(new Set([...existingByTranslation.lessonIds, input.lesson.id]));
-          const updated = await this.phrases.updateById(existingByTranslation.id, { lessonIds });
+      const textKey = normalizePhraseText(phrase.text);
+      const existingByText = phraseByText.get(textKey);
+      if (existingByText) {
+        const lessonIds = existingByText.lessonIds.includes(input.lesson.id)
+          ? existingByText.lessonIds
+          : Array.from(new Set([...existingByText.lessonIds, input.lesson.id]));
+        const translations = Array.from(
+          new Set([...existingByText.translations, ...phrase.translations].filter(Boolean))
+        );
+        if (
+          lessonIds.length !== existingByText.lessonIds.length ||
+          translations.length !== existingByText.translations.length
+        ) {
+          const updated = await this.phrases.updateById(existingByText.id, { lessonIds, translations });
           if (updated) {
             createdOrLinked.push(updated);
-            translationMap.set(translationKey, updated);
+            phraseByText.set(textKey, updated);
           } else {
-            createdOrLinked.push(existingByTranslation);
+            createdOrLinked.push(existingByText);
           }
         } else {
-          createdOrLinked.push(existingByTranslation);
+          createdOrLinked.push(existingByText);
         }
         continue;
       }
@@ -202,7 +217,7 @@ export class AiPhraseOrchestrator {
         lessonIds: [input.lesson.id],
         language: input.lesson.language,
         text: phrase.text,
-        translation: phrase.translation,
+        translations: phrase.translations,
         pronunciation: phrase.pronunciation || "",
         explanation: phrase.explanation || "",
         examples: phrase.examples || [],
@@ -215,7 +230,7 @@ export class AiPhraseOrchestrator {
         }
       });
       createdOrLinked.push(item);
-      translationMap.set(translationKey, item);
+      phraseByText.set(textKey, item);
     }
     return createdOrLinked;
   }
@@ -239,11 +254,8 @@ export class AiPhraseOrchestrator {
           : "";
 
     const existingPhrases = await this.phrases.list({ language: input.language });
-    const existingTranslationKeys = new Set(
-      existingPhrases.map((phrase) => normalizeTranslationKey(phrase.translation))
-    );
     const existingKeys = new Set(
-      existingPhrases.map((phrase) => normalizePhraseKey(phrase.text, phrase.translation))
+      existingPhrases.map((phrase) => normalizePhraseText(phrase.text))
     );
 
     const phrases = await this.llm.generatePhrases({
@@ -265,12 +277,9 @@ export class AiPhraseOrchestrator {
       .map(sanitizePhrase)
       .filter((item): item is LlmGeneratedPhrase => Boolean(item))
       .filter((item) => {
-        const translationKey = normalizeTranslationKey(item.translation);
-        if (existingTranslationKeys.has(translationKey)) return false;
-        const key = normalizePhraseKey(item.text, item.translation);
+        const key = normalizePhraseText(item.text);
         if (existingKeys.has(key) || uniqueInBatch.has(key)) return false;
         uniqueInBatch.add(key);
-        existingTranslationKeys.add(translationKey);
         return true;
       });
 
@@ -282,7 +291,7 @@ export class AiPhraseOrchestrator {
         lessonIds: [],
         language: input.language,
         text: phrase.text,
-        translation: phrase.translation,
+        translations: phrase.translations,
         pronunciation: phrase.pronunciation || "",
         explanation: phrase.explanation || "",
         examples: phrase.examples || [],
@@ -306,14 +315,14 @@ export class AiPhraseOrchestrator {
   }) {
     const updates = await this.llm.enhancePhrase({
       text: input.phrase.text,
-      translation: input.phrase.translation,
+      translations: input.phrase.translations,
       language: input.language,
       level: input.level
     });
 
     const sanitized = sanitizePhrase({
       text: input.phrase.text,
-      translation: input.phrase.translation,
+      translations: input.phrase.translations,
       pronunciation: updates.pronunciation,
       explanation: updates.explanation,
       examples: updates.examples,
@@ -322,6 +331,7 @@ export class AiPhraseOrchestrator {
     if (!sanitized) return null;
 
     return this.phrases.updateById(input.phrase.id, {
+      translations: input.phrase.translations,
       pronunciation: sanitized.pronunciation || input.phrase.pronunciation,
       explanation: sanitized.explanation || input.phrase.explanation,
       examples: sanitized.examples && sanitized.examples.length > 0 ? sanitized.examples : input.phrase.examples,

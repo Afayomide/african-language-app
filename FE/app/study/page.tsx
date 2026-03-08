@@ -328,7 +328,7 @@ function StudyPageContent() {
                 <div className="h-px w-full bg-border" />
 
                 <p className="text-center text-2xl font-black text-foreground/80">
-                  {currentBlock.data.translation}
+                  {currentBlock.data.selectedTranslation || currentBlock.data.translations?.[0] || ""}
                 </p>
               </div>
 
@@ -371,7 +371,7 @@ function StudyPageContent() {
                   </h3>
                   <div className="h-px w-20 bg-amber-300" />
                   <p className="text-lg font-semibold italic text-amber-900/75">
-                    {currentBlock.data.translation}
+                    {currentBlock.data.translation || ""}
                   </p>
                 </div>
               </div>
