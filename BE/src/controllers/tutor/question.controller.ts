@@ -7,13 +7,22 @@ import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/rep
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
+import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
+import { MongoosePhraseImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseImageLinkRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 import type { QuestionType, QuestionSubtype } from "../../domain/entities/Question.js";
 import {
+  isManuallySupportedQuestionSubtype,
+  parseQuestionMatchingPairs,
   isValidQuestionSubtype,
   isValidQuestionType,
   parseQuestionOptions,
-  parseQuestionReviewData
+  parseQuestionReviewData,
+  subtypeMatchesType,
+  subtypeUsesMatching,
+  subtypeRequiresReviewData,
+  subtypeUsesChoiceOptions,
+  subtypeUsesWordOrder
 } from "../../interfaces/http/validators/question.validators.js";
 import {
   getSearchQuery,
@@ -21,6 +30,7 @@ import {
   paginate,
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
+import { buildMatchingInteractionData } from "../shared/questionMatching.js";
 
 const questionUseCases = new TutorQuestionUseCases(
   new MongooseQuestionRepository(),
@@ -29,6 +39,8 @@ const questionUseCases = new TutorQuestionUseCases(
 );
 const phraseRepo = new MongoosePhraseRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const imageAssetRepo = new MongooseImageAssetRepository();
+const phraseImageLinkRepo = new MongoosePhraseImageLinkRepository();
 
 function getSelectedTranslation(translations: string[], index: number) {
   if (!Array.isArray(translations) || translations.length === 0) return "";
@@ -51,12 +63,13 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     options,
     correctIndex,
     explanation,
-    reviewData
+    reviewData,
+    interactionData
   } = req.body ?? {};
   if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
-  if (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId))) {
+  if (!subtypeUsesMatching(String(subtype)) && (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId)))) {
     return res.status(400).json({ error: "invalid phrase id" });
   }
   if (!type || !isValidQuestionType(String(type))) {
@@ -64,6 +77,12 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   }
   if (!subtype || !isValidQuestionSubtype(String(subtype))) {
     return res.status(400).json({ error: "invalid subtype" });
+  }
+  if (!isManuallySupportedQuestionSubtype(String(subtype))) {
+    return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
+  }
+  if (!subtypeMatchesType(String(type), String(subtype))) {
+    return res.status(400).json({ error: "Question type and subtype do not match." });
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
     return res.status(400).json({ error: "prompt template required" });
@@ -79,31 +98,68 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   let parsedOptions = parseQuestionOptions(options);
   let answerIndex = Number(correctIndex);
   let parsedReviewData: ReturnType<typeof parseQuestionReviewData> = null;
-  if (String(type) === "fill-in-the-gap") {
+  let parsedInteractionData: Awaited<ReturnType<typeof buildMatchingInteractionData>> | null = null;
+  if (subtypeRequiresReviewData(String(subtype))) {
     parsedReviewData = parseQuestionReviewData(reviewData);
     if (!parsedReviewData) {
-      return res.status(400).json({ error: "invalid review data" });
+      return res.status(400).json({ error: "This question subtype requires valid sentence review data." });
+    }
+  }
+  if (subtypeUsesMatching(String(subtype))) {
+    const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, String(subtype));
+    if (!parsedMatchingPairs) {
+      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+    }
+    parsedInteractionData = await buildMatchingInteractionData({
+      matchingPairs: parsedMatchingPairs,
+      subtype: String(subtype),
+      lessonId: String(lessonId),
+      phrases: phraseRepo,
+      phraseImageLinks: phraseImageLinkRepo,
+      imageAssets: imageAssetRepo
+    });
+    if (parsedInteractionData === "phrase_not_found") {
+      return res.status(404).json({ error: "phrase not found" });
+    }
+    if (parsedInteractionData === "invalid_translation_index") {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    if (parsedInteractionData === "matching_image_required") {
+      return res.status(400).json({ error: "Each image matching pair must have a linked image." });
+    }
+    if (parsedInteractionData === "matching_pairs_required") {
+      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+    }
+    parsedOptions = [];
+    answerIndex = 0;
+  } else if (subtypeUsesWordOrder(String(subtype))) {
+    if (!parsedReviewData) {
+      return res.status(400).json({ error: "This word order question requires valid review data." });
     }
     parsedOptions = parsedReviewData.words;
     answerIndex = 0;
-  } else {
-    if (!parsedOptions) return res.status(400).json({ error: "invalid options" });
+  } else if (subtypeUsesChoiceOptions(String(subtype))) {
+    if (!parsedOptions) return res.status(400).json({ error: "This question subtype requires answer options." });
     if (Number.isNaN(answerIndex) || answerIndex < 0 || answerIndex >= parsedOptions.length) {
       return res.status(400).json({ error: "invalid correct index" });
     }
+  } else {
+    return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
   }
 
   const created = await questionUseCases.create(
     {
-    lessonId: String(lessonId),
-    phraseId: String(phraseId),
-    translationIndex: parsedTranslationIndex,
-    type: String(type) as QuestionType,
+      lessonId: String(lessonId),
+      phraseId: parsedInteractionData ? parsedInteractionData.phraseId : String(phraseId),
+      relatedPhraseIds: parsedInteractionData ? parsedInteractionData.relatedPhraseIds : [],
+      translationIndex: parsedInteractionData ? parsedInteractionData.translationIndex : parsedTranslationIndex,
+      type: String(type) as QuestionType,
       subtype: String(subtype) as QuestionSubtype,
       promptTemplate: String(promptTemplate).trim(),
       options: parsedOptions,
       correctIndex: answerIndex,
       reviewData: parsedReviewData || undefined,
+      interactionData: parsedInteractionData ? parsedInteractionData.interactionData : undefined,
       explanation: explanation ? String(explanation).trim() : ""
     },
     tutorLanguage as Language
@@ -236,9 +292,10 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!question) return res.status(404).json({ error: "question not found" });
 
-  const { type, subtype, phraseId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData } = req.body ?? {};
+  const { type, subtype, phraseId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData, interactionData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const effectiveType = String(type || question.type);
+  const effectiveSubtype = String(subtype || question.subtype);
 
   if (type !== undefined) {
     if (!isValidQuestionType(String(type))) {
@@ -250,7 +307,13 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (!isValidQuestionSubtype(String(subtype))) {
       return res.status(400).json({ error: "invalid subtype" });
     }
+    if (!isManuallySupportedQuestionSubtype(String(subtype))) {
+      return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
+    }
     update.subtype = String(subtype) as QuestionSubtype;
+  }
+  if (!subtypeMatchesType(effectiveType, effectiveSubtype)) {
+    return res.status(400).json({ error: "Question type and subtype do not match." });
   }
   if (promptTemplate !== undefined) {
     if (!String(promptTemplate).trim()) {
@@ -259,7 +322,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.promptTemplate = String(promptTemplate).trim();
   }
   let targetPhraseId = question.phraseId;
-  if (phraseId !== undefined) {
+  if (!subtypeUsesMatching(effectiveSubtype) && phraseId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
       return res.status(400).json({ error: "invalid phrase id" });
     }
@@ -271,7 +334,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.phraseId = phrase.id;
     targetPhraseId = phrase.id;
   }
-  if (translationIndex !== undefined) {
+  if (!subtypeUsesMatching(effectiveSubtype) && translationIndex !== undefined) {
     const parsedTranslationIndex = Number(translationIndex);
     if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
       return res.status(400).json({ error: "invalid translation index" });
@@ -284,24 +347,64 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.translationIndex = parsedTranslationIndex;
   }
 
-  if (effectiveType === "fill-in-the-gap") {
-    if (type !== undefined && String(type) === "fill-in-the-gap" && reviewData === undefined && !question.reviewData?.sentence) {
-      return res.status(400).json({ error: "invalid review data" });
+  let parsedReviewData: ReturnType<typeof parseQuestionReviewData> | undefined;
+  let parsedInteractionData: Awaited<ReturnType<typeof buildMatchingInteractionData>> | null = null;
+  if (reviewData !== undefined) {
+    parsedReviewData = parseQuestionReviewData(reviewData) ?? undefined;
+    if (!parsedReviewData) {
+      return res.status(400).json({ error: "This question subtype requires valid sentence review data." });
     }
-    if (reviewData !== undefined) {
-      const parsedReviewData = parseQuestionReviewData(reviewData);
-      if (!parsedReviewData) {
-        return res.status(400).json({ error: "invalid review data" });
-      }
-      update.reviewData = parsedReviewData;
-      update.options = parsedReviewData.words;
-      update.correctIndex = 0;
+    update.reviewData = parsedReviewData;
+  }
+  if (subtypeRequiresReviewData(effectiveSubtype) && !parsedReviewData && !question.reviewData?.sentence) {
+    return res.status(400).json({ error: "This question subtype requires valid sentence review data." });
+  }
+  if (subtypeUsesMatching(effectiveSubtype)) {
+    const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, effectiveSubtype);
+    if (!parsedMatchingPairs) {
+      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
     }
-  } else {
+    parsedInteractionData = await buildMatchingInteractionData({
+      matchingPairs: parsedMatchingPairs,
+      subtype: effectiveSubtype,
+      lessonId: question.lessonId,
+      phrases: phraseRepo,
+      phraseImageLinks: phraseImageLinkRepo,
+      imageAssets: imageAssetRepo
+    });
+    if (parsedInteractionData === "phrase_not_found") {
+      return res.status(404).json({ error: "phrase not found" });
+    }
+    if (parsedInteractionData === "invalid_translation_index") {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    if (parsedInteractionData === "matching_image_required") {
+      return res.status(400).json({ error: "Each image matching pair must have a linked image." });
+    }
+    if (parsedInteractionData === "matching_pairs_required") {
+      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+    }
+    update.phraseId = parsedInteractionData.phraseId;
+    update.relatedPhraseIds = parsedInteractionData.relatedPhraseIds;
+    update.translationIndex = parsedInteractionData.translationIndex;
+    update.interactionData = parsedInteractionData.interactionData;
+    update.options = [];
+    update.correctIndex = 0;
+    update.reviewData = undefined;
+  } else if (subtypeUsesWordOrder(effectiveSubtype)) {
+    const wordOrderReview = parsedReviewData || question.reviewData;
+    if (!wordOrderReview) {
+      return res.status(400).json({ error: "This word order question requires valid review data." });
+    }
+    update.options = wordOrderReview.words;
+    update.correctIndex = 0;
+    update.relatedPhraseIds = [];
+    update.interactionData = undefined;
+  } else if (subtypeUsesChoiceOptions(effectiveSubtype)) {
     if (options !== undefined) {
       const parsedOptions = parseQuestionOptions(options);
       if (!parsedOptions) {
-        return res.status(400).json({ error: "invalid options" });
+        return res.status(400).json({ error: "This question subtype requires answer options." });
       }
       update.options = parsedOptions;
       if (correctIndex !== undefined) {
@@ -312,12 +415,17 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
         update.correctIndex = idx;
       }
     } else if (correctIndex !== undefined) {
+      const existingOptions = Array.isArray(update.options) ? update.options : question.options;
       const idx = Number(correctIndex);
-      if (Number.isNaN(idx) || idx < 0 || idx >= question.options.length) {
+      if (Number.isNaN(idx) || idx < 0 || idx >= existingOptions.length) {
         return res.status(400).json({ error: "invalid correct index" });
       }
       update.correctIndex = idx;
     }
+    update.relatedPhraseIds = [];
+    update.interactionData = undefined;
+  } else {
+    return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
   }
 
   if (explanation !== undefined) update.explanation = String(explanation).trim();

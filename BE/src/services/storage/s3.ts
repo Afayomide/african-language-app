@@ -41,6 +41,10 @@ function resolvePublicUrl(key: string) {
 }
 
 export async function uploadAudio(buffer: Buffer, key: string, contentType: string) {
+  return uploadObject(buffer, key, contentType);
+}
+
+export async function uploadObject(buffer: Buffer, key: string, contentType: string) {
   if (!R2_BUCKET) {
     console.error("Missing R2_BUCKET");
     throw new Error("Missing R2_BUCKET");

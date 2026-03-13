@@ -10,11 +10,14 @@ import {
   Status,
   ExerciseQuestion,
   QuestionType,
+  ImageAsset,
+  PhraseImageLink,
   Tutor,
   AdminUserRecord,
   UserRole,
   VoiceArtist,
-  VoiceAudioSubmission
+  VoiceAudioSubmission,
+  LessonAuditResult
 } from "@/types";
 
 type PaginationMeta = {
@@ -96,6 +99,11 @@ export const lessonService = {
     return response.data.lesson;
   },
 
+  async auditLesson(id: string) {
+    const response = await api.get<{ audit: LessonAuditResult }>(feAdminRoutes.auditLesson(id));
+    return response.data.audit;
+  },
+
   async createLesson(data: {
     title: string;
     unitId: string;
@@ -116,9 +124,18 @@ export const lessonService = {
     await api.delete(feAdminRoutes.lesson(id));
   },
 
+  async bulkDeleteLessons(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeleteLessons(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
+  },
+
   async publishLesson(id: string) {
     const response = await api.put<{ lesson: Lesson }>(feAdminRoutes.publishLesson(id));
-    console.log("response",response)
     return response.data.lesson;
   },
 
@@ -162,6 +179,11 @@ export const unitService = {
     return response.data.unit;
   },
 
+  async getDeletedEntries(id: string) {
+    const response = await api.get<{ lessons: Lesson[]; phrases: Phrase[] }>(feAdminRoutes.unitDeletedEntries(id));
+    return response.data;
+  },
+
   async createUnit(data: { title: string; description?: string; language: Language; level: Level }) {
     const response = await api.post<{ unit: Unit }>(feAdminRoutes.units(), data);
     return response.data.unit;
@@ -174,6 +196,16 @@ export const unitService = {
 
   async deleteUnit(id: string) {
     await api.delete(feAdminRoutes.unit(id));
+  },
+
+  async restoreDeletedLesson(unitId: string, lessonId: string) {
+    const response = await api.post<{ lesson: Lesson }>(feAdminRoutes.restoreDeletedUnitLesson(unitId, lessonId));
+    return response.data.lesson;
+  },
+
+  async restoreDeletedPhrase(unitId: string, phraseId: string) {
+    const response = await api.post<{ phrase: Phrase }>(feAdminRoutes.restoreDeletedUnitPhrase(unitId, phraseId));
+    return response.data.phrase;
   },
 
   async finishUnit(id: string) {
@@ -249,6 +281,43 @@ export const phraseService = {
     return response.data.phrase;
   },
 
+  async listPhraseImages(id: string) {
+    const response = await api.get<{ phraseId: string; images: PhraseImageLink[] }>(feAdminRoutes.phraseImages(id));
+    return response.data.images;
+  },
+
+  async linkPhraseImage(
+    id: string,
+    data: {
+      imageAssetId: string;
+      translationIndex?: number | null;
+      isPrimary?: boolean;
+      notes?: string;
+    }
+  ) {
+    const response = await api.post<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImages(id), data);
+    return response.data.images;
+  },
+
+  async updatePhraseImageLink(
+    id: string,
+    linkId: string,
+    data: {
+      imageAssetId?: string;
+      translationIndex?: number | null;
+      isPrimary?: boolean;
+      notes?: string;
+    }
+  ) {
+    const response = await api.put<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImageLink(id, linkId), data);
+    return response.data.images;
+  },
+
+  async deletePhraseImageLink(id: string, linkId: string) {
+    const response = await api.delete<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImageLink(id, linkId));
+    return response.data.images;
+  },
+
   async createPhrase(data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
     const response = await api.post<{ phrase: Phrase }>(feAdminRoutes.phrases(), data);
     return response.data.phrase;
@@ -261,6 +330,16 @@ export const phraseService = {
 
   async deletePhrase(id: string) {
     await api.delete(feAdminRoutes.phrase(id));
+  },
+
+  async bulkDeletePhrases(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeletePhrases(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
   },
 
   async publishPhrase(id: string) {
@@ -284,6 +363,55 @@ export const phraseService = {
     }>(feAdminRoutes.bulkPhraseAudio(lessonId));
     return response.data;
   },
+};
+
+export const imageService = {
+  async listImagesPage(params?: { status?: "draft" | "approved"; q?: string; page?: number; limit?: number }) {
+    const response = await api.get<{ images: ImageAsset[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.images(),
+      { params }
+    );
+    return {
+      items: response.data.images,
+      total: response.data.total ?? response.data.images.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.images.length || 20,
+        total: response.data.images.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<ImageAsset>;
+  },
+
+  async createImage(data: {
+    url?: string;
+    thumbnailUrl?: string;
+    mimeType?: string;
+    width?: number;
+    height?: number;
+    description?: string;
+    altText: string;
+    tags?: string[];
+    languageNeutralLabel?: string;
+    status?: "draft" | "approved";
+    imageUpload?: { base64: string; mimeType?: string; fileName?: string };
+  }) {
+    const response = await api.post<{ image: ImageAsset }>(feAdminRoutes.images(), data);
+    return response.data.image;
+  },
+
+  async updateImage(id: string, data: Partial<ImageAsset> & {
+    imageUpload?: { base64: string; mimeType?: string; fileName?: string };
+  }) {
+    const response = await api.put<{ image: ImageAsset }>(feAdminRoutes.image(id), data);
+    return response.data.image;
+  },
+
+  async deleteImage(id: string) {
+    await api.delete(feAdminRoutes.image(id));
+  }
 };
 
 export const proverbService = {
@@ -375,6 +503,7 @@ export const questionService = {
   async createQuestion(data: {
     lessonId: string;
     phraseId: string;
+    relatedPhraseIds?: string[];
     translationIndex?: number;
     type: QuestionType;
     subtype: string;
@@ -386,6 +515,13 @@ export const questionService = {
       words: string[];
       correctOrder: number[];
       meaning: string;
+    };
+    interactionData?: {
+      matchingPairs?: Array<{
+        phraseId: string;
+        translationIndex: number;
+        imageAssetId?: string;
+      }>;
     };
     explanation?: string;
   }) {

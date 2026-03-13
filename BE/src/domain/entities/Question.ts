@@ -1,4 +1,4 @@
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
 
 export type QuestionSubtype =
   // Multiple Choice Interactions (Text-based)
@@ -12,6 +12,9 @@ export type QuestionSubtype =
   | "ls-mc-select-missing-word"
   | "ls-fg-word-order"
   | "ls-fg-gap-fill"
+  // Matching interactions
+  | "mt-match-image"
+  | "mt-match-translation"
   | "ls-dictation"
   | "ls-tone-recognition";
 
@@ -22,11 +25,32 @@ export type QuestionReviewData = {
   meaning: string;
 };
 
+export type QuestionMatchingImage = {
+  imageAssetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  altText: string;
+};
+
+export type QuestionMatchingPair = {
+  pairId: string;
+  phraseId: string;
+  phraseText: string;
+  translationIndex: number;
+  translation: string;
+  image?: QuestionMatchingImage | null;
+};
+
+export type QuestionInteractionData = {
+  matchingPairs?: QuestionMatchingPair[];
+};
+
 export type QuestionEntity = {
   id: string;
   _id?: string;
   lessonId: string;
   phraseId: string;
+  relatedPhraseIds?: string[];
   translationIndex: number;
   type: QuestionType;
   subtype: QuestionSubtype;
@@ -34,6 +58,7 @@ export type QuestionEntity = {
   options: string[];
   correctIndex: number;
   reviewData?: QuestionReviewData;
+  interactionData?: QuestionInteractionData;
   explanation: string;
   status: "draft" | "finished" | "published";
   createdAt: Date;

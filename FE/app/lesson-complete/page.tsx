@@ -7,19 +7,40 @@ import { ArrowRight, Flame, Gift, TrendingUp, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { learnerLessonService } from '@/services'
+import { getCulturalSoundPath } from '@/lib/culturalSounds'
 
 function LessonCompleteContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get("lessonId")
-  const [xpEarned, setXpEarned] = useState(50)
+  const language = searchParams.get("language")
+  const requestedXp = Number(searchParams.get("xpEarned") || 50)
+  const initialXp = Number.isFinite(requestedXp) && requestedXp > 0 ? requestedXp : 50
+  const [xpEarned, setXpEarned] = useState(initialXp)
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [totalXp, setTotalXp] = useState(0)
 
   useEffect(() => {
+    const lessonCompleteSound = getCulturalSoundPath(language, 'celebration')
+    const preloadAudio = new Audio(lessonCompleteSound)
+    preloadAudio.preload = 'auto'
+    preloadAudio.load()
+
+    const audio = new Audio(lessonCompleteSound)
+    audio.volume = 0.4
+    audio.play().catch(() => {})
+
     if (!lessonId) return
     learnerLessonService
-      .completeLesson(lessonId, { xpEarned: 50, minutesSpent: 10 })
-      .then((payload) => setXpEarned(payload.xpEarned || 50))
+      .completeLesson(lessonId, { xpEarned: initialXp, minutesSpent: 10 })
+      .then((payload) => {
+        setXpEarned(payload.xpEarned || initialXp)
+        if (payload.learnerStats) {
+          setCurrentStreak(payload.learnerStats.currentStreak || 0)
+          setTotalXp(payload.learnerStats.totalXp || 0)
+        }
+      })
       .catch((error) => console.error("Failed to complete lesson", error))
-  }, [lessonId])
+  }, [initialXp, language, lessonId])
 
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
@@ -71,7 +92,7 @@ function LessonCompleteContent() {
                 <div>
                   <p className="text-sm text-foreground/70">Streak</p>
                   <p className="text-2xl font-bold text-foreground">
-                    🔥 3 days
+                    🔥 {currentStreak} day{currentStreak === 1 ? '' : 's'}
                   </p>
                 </div>
               </div>
@@ -89,12 +110,12 @@ function LessonCompleteContent() {
                   <TrendingUp className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-foreground/70">Course Progress</p>
-                  <p className="text-2xl font-bold text-foreground">12%</p>
+                  <p className="text-sm text-foreground/70">Total XP</p>
+                  <p className="text-2xl font-bold text-foreground">{totalXp} XP</p>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full border-4 border-primary/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary">12%</span>
+              <div className="h-12 min-w-12 rounded-full border-4 border-primary/20 flex items-center justify-center px-3">
+                <span className="text-sm font-bold text-primary">{totalXp}</span>
               </div>
             </div>
           </Card>

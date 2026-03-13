@@ -13,6 +13,8 @@
     "migrate:phrase-lesson-ids": "node --enable-source-maps --import tsx src/scripts/migratePhraseLessonIds.ts",
     "migrate:lessons-to-unit": "node --enable-source-maps --import tsx src/scripts/migrateLessonsToUnit.ts",
     "migrate:split-slash-translations": "node --enable-source-maps --import tsx src/scripts/splitSlashPhraseTranslations.ts",
+    "migrate:lesson-blocks-to-stages": "node --enable-source-maps --import tsx src/scripts/migrateLessonBlocksToStages.ts",
+    "migrate:merge-duplicate-phrases": "node --enable-source-maps --import tsx src/scripts/mergeDuplicatePhrases.ts",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -4,6 +4,7 @@ export {
   lessonService,
   unitService,
   phraseService,
+  imageService,
   proverbService,
   questionService,
   tutorService,

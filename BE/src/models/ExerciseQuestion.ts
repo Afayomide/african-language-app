@@ -4,10 +4,11 @@ const ExerciseQuestionSchema = new Schema(
   {
     lessonId: { type: Schema.Types.ObjectId, ref: "Lesson", required: true, index: true },
     phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true, index: true },
+    relatedPhraseIds: { type: [Schema.Types.ObjectId], ref: "Phrase", default: [] },
     translationIndex: { type: Number, min: 0, default: 0 },
     type: {
       type: String,
-      enum: ["multiple-choice", "fill-in-the-gap", "listening"],
+      enum: ["multiple-choice", "fill-in-the-gap", "listening", "matching"],
       required: true,
       index: true
     },
@@ -22,6 +23,8 @@ const ExerciseQuestionSchema = new Schema(
         "ls-mc-select-missing-word",
         "ls-fg-word-order",
         "ls-fg-gap-fill",
+        "mt-match-image",
+        "mt-match-translation",
         "ls-dictation",
         "ls-tone-recognition"
       ],
@@ -37,6 +40,26 @@ const ExerciseQuestionSchema = new Schema(
       correctOrder: { type: [Number], default: [] },
       meaning: { type: String, default: "" }
     },
+    interactionData: {
+      matchingPairs: {
+        type: [
+          {
+            pairId: { type: String, required: true, trim: true },
+            phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true },
+            phraseText: { type: String, required: true, trim: true },
+            translationIndex: { type: Number, required: true, min: 0 },
+            translation: { type: String, required: true, trim: true },
+            image: {
+              imageAssetId: { type: Schema.Types.ObjectId, ref: "ImageAsset", default: null },
+              url: { type: String, default: "" },
+              thumbnailUrl: { type: String, default: "" },
+              altText: { type: String, default: "" }
+            }
+          }
+        ],
+        default: []
+      }
+    },
     explanation: { type: String, default: "" },
     status: { type: String, enum: ["draft", "finished", "published"], default: "draft", index: true },
     isDeleted: { type: Boolean, default: false, index: true },
@@ -49,6 +72,7 @@ const ExerciseQuestionSchema = new Schema(
 ExerciseQuestionSchema.index({ lessonId: 1, status: 1, isDeleted: 1, createdAt: 1 });
 ExerciseQuestionSchema.index({ lessonId: 1, type: 1, status: 1, isDeleted: 1, createdAt: 1 });
 ExerciseQuestionSchema.index({ phraseId: 1, isDeleted: 1 });
+ExerciseQuestionSchema.index({ relatedPhraseIds: 1, isDeleted: 1 });
 
 export type ExerciseQuestionDocument = InferSchemaType<typeof ExerciseQuestionSchema> & {
   _id: mongoose.Types.ObjectId;

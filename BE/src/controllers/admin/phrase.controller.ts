@@ -8,8 +8,11 @@ import { AdminPhraseUseCases } from "../../application/use-cases/admin/phrase/Ad
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
+import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
+import { MongoosePhraseImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseImageLinkRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 import type { PhraseEntity } from "../../domain/entities/Phrase.js";
+import type { AuthRequest } from "../../utils/authMiddleware.js";
 import {
   isValidPhraseDifficulty,
   isValidPhraseStatus
@@ -18,6 +21,7 @@ import {
   getSearchQuery,
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
+import { PhraseImageService } from "../../application/services/PhraseImageService.js";
 
 const phraseUseCases = new AdminPhraseUseCases(
   new MongooseLessonRepository(),
@@ -26,9 +30,32 @@ const phraseUseCases = new AdminPhraseUseCases(
 );
 const lessonRepo = new MongooseLessonRepository();
 const phraseRepo = new MongoosePhraseRepository();
+const imageAssetRepo = new MongooseImageAssetRepository();
+const phraseImageLinkRepo = new MongoosePhraseImageLinkRepository();
+const phraseImageService = new PhraseImageService(phraseImageLinkRepo, imageAssetRepo);
+
+type PhraseRecord = {
+  _id?: mongoose.Types.ObjectId | string;
+  id?: string;
+};
 
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getPhraseRecordId(phrase: PhraseRecord) {
+  if (phrase.id) return String(phrase.id);
+  if (phrase._id) return String(phrase._id);
+  return "";
+}
+
+async function withPhraseImages<T extends PhraseRecord>(phrases: T[]) {
+  const phraseIds = phrases.map(getPhraseRecordId).filter(Boolean);
+  const imageMap = await phraseImageService.listByPhraseIds(phraseIds);
+  return phrases.map((phrase) => ({
+    ...phrase,
+    images: imageMap.get(getPhraseRecordId(phrase)) || []
+  }));
 }
 
 async function buildManualAudioMeta(input: {
@@ -158,7 +185,8 @@ export async function createPhrase(req: Request, res: Response) {
     return res.status(400).json({ error: "failed to create phrase" });
   }
 
-  return res.status(201).json({ phrase });
+  const [enrichedPhrase] = await withPhraseImages([phrase]);
+  return res.status(201).json({ phrase: enrichedPhrase });
 }
 
 export async function listPhrases(req: Request, res: Response) {
@@ -202,9 +230,11 @@ export async function listPhrases(req: Request, res: Response) {
     .limit(paginationInput.limit)
     .lean();
 
+  const enrichedPhrases = await withPhraseImages(phrases);
+
   return res.status(200).json({
     total,
-    phrases,
+    phrases: enrichedPhrases,
     pagination: {
       page,
       limit: paginationInput.limit,
@@ -227,7 +257,8 @@ export async function getPhraseById(req: Request, res: Response) {
     return res.status(404).json({ error: "phrase not found" });
   }
 
-  return res.status(200).json({ phrase });
+  const [enrichedPhrase] = await withPhraseImages([phrase]);
+  return res.status(200).json({ phrase: enrichedPhrase });
 }
 
 export async function updatePhrase(req: Request, res: Response) {
@@ -299,7 +330,8 @@ export async function updatePhrase(req: Request, res: Response) {
   if (!updated) {
     return res.status(404).json({ error: "phrase not found" });
   }
-  return res.status(200).json({ phrase: updated });
+  const [enrichedPhrase] = await withPhraseImages([updated]);
+  return res.status(200).json({ phrase: enrichedPhrase });
 }
 
 export async function deletePhrase(req: Request, res: Response) {
@@ -427,4 +459,155 @@ export async function generateLessonPhrasesAudio(req: Request, res: Response) {
     updatedIds,
     failedIds
   });
+}
+
+export async function listPhraseImages(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid phrase id" });
+  }
+
+  const phrase = await phraseRepo.findById(id);
+  if (!phrase) {
+    return res.status(404).json({ error: "phrase not found" });
+  }
+
+  const images = await phraseImageService.listByPhraseId(id);
+  return res.status(200).json({ phraseId: id, images });
+}
+
+export async function linkPhraseImage(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+
+  const { id } = req.params;
+  const { imageAssetId, translationIndex, isPrimary, notes } = req.body ?? {};
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid phrase id" });
+  }
+  if (!mongoose.Types.ObjectId.isValid(String(imageAssetId || ""))) {
+    return res.status(400).json({ error: "invalid image asset id" });
+  }
+
+  const phrase = await phraseRepo.findById(id);
+  if (!phrase) {
+    return res.status(404).json({ error: "phrase not found" });
+  }
+  const image = await imageAssetRepo.findById(String(imageAssetId));
+  if (!image) {
+    return res.status(404).json({ error: "image not found" });
+  }
+
+  const normalizedTranslationIndex =
+    translationIndex === undefined || translationIndex === null || translationIndex === ""
+      ? null
+      : Number(translationIndex);
+  if (
+    normalizedTranslationIndex !== null &&
+    (!Number.isInteger(normalizedTranslationIndex) ||
+      normalizedTranslationIndex < 0 ||
+      normalizedTranslationIndex >= phrase.translations.length)
+  ) {
+    return res.status(400).json({ error: "invalid translation index" });
+  }
+
+  const link = await phraseImageLinkRepo.create({
+    phraseId: phrase.id,
+    imageAssetId: String(imageAssetId),
+    translationIndex: normalizedTranslationIndex,
+    isPrimary: Boolean(isPrimary),
+    notes: String(notes || "").trim(),
+    createdBy: req.user.id
+  });
+
+  const images = await phraseImageService.listByPhraseId(id);
+  return res.status(201).json({ link, images });
+}
+
+export async function updatePhraseImageLink(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+
+  const { id, linkId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid phrase id" });
+  }
+  if (!mongoose.Types.ObjectId.isValid(linkId)) {
+    return res.status(400).json({ error: "invalid phrase image link id" });
+  }
+
+  const phrase = await phraseRepo.findById(id);
+  if (!phrase) {
+    return res.status(404).json({ error: "phrase not found" });
+  }
+  const currentLink = await phraseImageLinkRepo.findById(linkId);
+  if (!currentLink || currentLink.phraseId !== phrase.id) {
+    return res.status(404).json({ error: "phrase image link not found" });
+  }
+
+  const { imageAssetId, translationIndex, isPrimary, notes } = req.body ?? {};
+  const update: {
+    imageAssetId?: string;
+    translationIndex?: number | null;
+    isPrimary?: boolean;
+    notes?: string;
+  } = {};
+
+  if (imageAssetId !== undefined) {
+    if (!mongoose.Types.ObjectId.isValid(String(imageAssetId || ""))) {
+      return res.status(400).json({ error: "invalid image asset id" });
+    }
+    const image = await imageAssetRepo.findById(String(imageAssetId));
+    if (!image) {
+      return res.status(404).json({ error: "image not found" });
+    }
+    update.imageAssetId = String(imageAssetId);
+  }
+
+  if (translationIndex !== undefined) {
+    const normalizedTranslationIndex =
+      translationIndex === null || translationIndex === "" ? null : Number(translationIndex);
+    if (
+      normalizedTranslationIndex !== null &&
+      (!Number.isInteger(normalizedTranslationIndex) ||
+        normalizedTranslationIndex < 0 ||
+        normalizedTranslationIndex >= phrase.translations.length)
+    ) {
+      return res.status(400).json({ error: "invalid translation index" });
+    }
+    update.translationIndex = normalizedTranslationIndex;
+  }
+  if (isPrimary !== undefined) update.isPrimary = Boolean(isPrimary);
+  if (notes !== undefined) update.notes = String(notes || "").trim();
+
+  const link = await phraseImageLinkRepo.updateById(linkId, update);
+  if (!link) {
+    return res.status(404).json({ error: "phrase image link not found" });
+  }
+
+  const images = await phraseImageService.listByPhraseId(id);
+  return res.status(200).json({ link, images });
+}
+
+export async function deletePhraseImageLink(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+
+  const { id, linkId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid phrase id" });
+  }
+  if (!mongoose.Types.ObjectId.isValid(linkId)) {
+    return res.status(400).json({ error: "invalid phrase image link id" });
+  }
+
+  const phrase = await phraseRepo.findById(id);
+  if (!phrase) {
+    return res.status(404).json({ error: "phrase not found" });
+  }
+  const link = await phraseImageLinkRepo.findById(linkId);
+  if (!link || link.phraseId !== phrase.id) {
+    return res.status(404).json({ error: "phrase image link not found" });
+  }
+
+  await phraseImageLinkRepo.softDeleteById(linkId, new Date());
+  const images = await phraseImageService.listByPhraseId(id);
+  return res.status(200).json({ message: "phrase image link deleted", images });
 }

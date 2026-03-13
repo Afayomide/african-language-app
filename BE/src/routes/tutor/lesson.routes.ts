@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  auditLesson,
   bulkDeleteLessons,
   createLesson,
   deleteLesson,
@@ -19,6 +20,7 @@ router.post("/", createLesson);
 router.delete("/bulk-delete", bulkDeleteLessons);
 router.get("/", listLessons);
 router.put("/reorder", reorderLessons);
+router.get("/:id/audit", auditLesson);
 router.get("/:id", getLessonById);
 router.put("/:id", updateLesson);
 router.put("/:id/finish", finishLesson);

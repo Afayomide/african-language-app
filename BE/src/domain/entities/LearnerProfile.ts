@@ -10,6 +10,9 @@ export type LearnerProfileEntity = {
   _id?: string;
   userId: string;
   displayName: string;
+  proficientLanguage: string;
+  countryOfOrigin: string;
+  onboardingCompleted: boolean;
   currentLanguage: Language;
   dailyGoalMinutes: number;
   totalXp: number;

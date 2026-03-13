@@ -8,6 +8,8 @@ const BE_API_URL = normalizeBackendBase(process.env.BE_API_URL);
 export const beLearnerRoutes = {
   signup: () => `${BE_API_URL}/api/learner/auth/signup`,
   login: () => `${BE_API_URL}/api/learner/auth/login`,
+  me: () => `${BE_API_URL}/api/learner/auth/me`,
+  updateProfile: () => `${BE_API_URL}/api/learner/auth/profile`,
   dashboardOverview: () => `${BE_API_URL}/api/learner/dashboard/overview`,
   updateDailyGoal: () => `${BE_API_URL}/api/learner/dashboard/daily-goal`,
   updateLanguage: () => `${BE_API_URL}/api/learner/dashboard/language`,
@@ -21,12 +23,16 @@ export const beLearnerRoutes = {
   lessonQuestions: (id: string, type: string) =>
     `${BE_API_URL}/api/learner/lessons/${id}/questions?type=${encodeURIComponent(type)}`,
   completeStep: (id: string, stepKey: string) => `${BE_API_URL}/api/learner/lessons/${id}/steps/${stepKey}/complete`,
+  completeStage: (id: string, stageIndex: number) => `${BE_API_URL}/api/learner/lessons/${id}/stages/${stageIndex}/complete`,
   completeLesson: (id: string) => `${BE_API_URL}/api/learner/lessons/${id}/complete`
 };
 
 export const feLearnerRoutes = {
   signup: () => "/api/learner/auth/signup",
   login: () => "/api/learner/auth/login",
+  logout: () => "/api/learner/auth/logout",
+  me: () => "/api/learner/auth/me",
+  updateProfile: () => "/api/learner/auth/profile",
   dashboardOverview: () => "/api/learner/dashboard",
   updateDailyGoal: () => "/api/learner/dashboard/daily-goal",
   updateLanguage: () => "/api/learner/dashboard/language",
@@ -40,5 +46,6 @@ export const feLearnerRoutes = {
   lessonQuestions: (id: string, type: string) =>
     `/api/learner/lessons/${id}/questions?type=${encodeURIComponent(type)}`,
   completeStep: (id: string, stepKey: string) => `/api/learner/lessons/${id}/steps/${stepKey}/complete`,
+  completeStage: (id: string, stageIndex: number) => `/api/learner/lessons/${id}/stages/${stageIndex}/complete`,
   completeLesson: (id: string) => `/api/learner/lessons/${id}/complete`
 };

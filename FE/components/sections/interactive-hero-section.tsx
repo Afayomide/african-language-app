@@ -6,8 +6,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { LogoShowcase } from '@/components/branding/logo-showcase'
 import { ArrowRight } from 'lucide-react'
+import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 
 export function InteractiveHeroSection() {
+  const { isAuthenticated } = useLearnerAuth()
   const [scrollY, setScrollY] = useState(0)
   const [activeCharacter, setActiveCharacter] = useState(0)
 
@@ -30,6 +32,9 @@ export function InteractiveHeroSection() {
     }, 4000)
     return () => clearInterval(interval)
   }, [characters.length])
+
+  const primaryHref = isAuthenticated ? '/dashboard' : '/language-selection'
+  const primaryLabel = isAuthenticated ? 'Go to Dashboard' : 'Start Learning'
 
   return (
     <section className="relative overflow-hidden px-4 py-16 md:py-32 min-h-screen flex items-center">
@@ -89,12 +94,12 @@ export function InteractiveHeroSection() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/language-selection">
+              <Link href={primaryHref}>
                 <Button
                   size="lg"
                   className="gap-2 px-8 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  Start Learning
+                  {primaryLabel}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

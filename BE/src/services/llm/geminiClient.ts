@@ -5,11 +5,22 @@ import type {
   LlmClient,
   LlmGeneratedPhrase,
   LlmGeneratedProverb,
-  LlmLessonSuggestion
+  LlmLessonSuggestion,
+  LlmUnitPlanLesson
 } from "./types.js";
+import {
+  CURRICULUM_QUALITY_RULES,
+  JSON_ONLY_RULES,
+  PROVERB_GUARDRAILS,
+  getLevelPedagogyRules,
+  getPhrasePromptGuardrails,
+  getStandardLanguageRules,
+  getSuggestionGuardrails
+} from "./promptGuardrails.js";
+import { buildThemeAlignmentInstruction } from "./unitTheme.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-pro-preview";
 
 function getClient() {
   if (!GEMINI_API_KEY) {
@@ -46,22 +57,16 @@ function buildPhrasesPrompt(input: GeneratePhrasesInput) {
     ? input.existingPhrases.slice(0, 40).join(" | ")
     : "";
   return [
-    "You are generating phrases for a language lesson.",
+    "You are an expert curriculum writer for a conversational African language-learning app.",
+    "Generate learner-safe, reusable target-language phrases for a single lesson.",
     "Return ONLY valid JSON with this shape:",
     "{\"phrases\":[{\"text\":string,\"translations\":string[],\"pronunciation\":string?,\"explanation\":string?,\"examples\":[{\"original\":string,\"translation\":string}]?,\"difficulty\":number?}]}",
     "Rules:",
-    "- Use the target language for text and English for translations.",
-    "- translations must be an array of distinct concise meanings.",
-    "- If a phrase has multiple meanings, return each one as a separate array item.",
-    "- Do NOT combine meanings with '/' or ',' inside one translation item.",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...getPhrasePromptGuardrails(input).map((rule) => `- ${rule}`),
     "- translations must contain at least one item.",
-    "- difficulty between 1 and 5.",
-    "- Keep phrasing culturally accurate.",
-    "- Generate unique phrases that do not repeat existing phrases.",
-    "- Beginner level: output mostly single words or very short chunks (1-2 words), not full sentences.",
-    "- Beginner level: avoid punctuation that suggests full sentences.",
-    "- Intermediate level: short practical expressions (1-5 words).",
-    "- Advanced level: longer conversational expressions are allowed.",
+    "- difficulty must be an integer between 1 and 5.",
+    "- Keep outputs reusable for spaced repetition across future lessons.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     input.lessonTitle ? `Lesson title: ${input.lessonTitle}` : "",
@@ -76,12 +81,19 @@ function buildPhrasesPrompt(input: GeneratePhrasesInput) {
 
 function buildEnhancePrompt(input: EnhancePhraseInput) {
   return [
-    "You are enhancing a single phrase with pronunciation, explanation, examples, and difficulty.",
+    "You are enhancing a single phrase for a language-learning app.",
+    "Improve the teaching metadata only. Do not change the phrase text or its meanings.",
     "Return ONLY valid JSON with this shape:",
     "{\"pronunciation\":string?,\"explanation\":string?,\"examples\":[{\"original\":string,\"translation\":string}]?,\"difficulty\":number?}",
     "Rules:",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...CURRICULUM_QUALITY_RULES.map((rule) => `- ${rule}`),
+    ...getStandardLanguageRules(input.language).map((rule) => `- ${rule}`),
+    ...getLevelPedagogyRules(input.level).map((rule) => `- ${rule}`),
     "- Use the target language for examples.original and English for examples.translation.",
-    "- difficulty between 1 and 5.",
+    "- Examples must be short, natural, and no harder than the phrase level.",
+    "- Explanation should help a learner know when to use the phrase, in simple English.",
+    "- difficulty must be an integer between 1 and 5.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     `Phrase: ${input.text}`,
@@ -102,14 +114,15 @@ function buildProverbsPrompt(input: {
     ? input.existingProverbs.slice(0, 40).join(" | ")
     : "";
   return [
-    "You are generating proverbs for a language lesson.",
+    "You are generating culturally authentic proverbs for a language-learning app.",
     "Return ONLY valid JSON with this shape:",
     "{\"proverbs\":[{\"text\":string,\"translation\":string,\"contextNote\":string?}]}",
     "Rules:",
-    "- text must be in the target language.",
-    "- translation must be English and concise.",
-    "- contextNote should be short and practical.",
-    "- Avoid duplicates against existing proverbs list.",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...PROVERB_GUARDRAILS.map((rule) => `- ${rule}`),
+    ...getStandardLanguageRules(input.language as "yoruba" | "igbo" | "hausa").map((rule) => `- ${rule}`),
+    ...getLevelPedagogyRules(input.level as "beginner" | "intermediate" | "advanced").map((rule) => `- ${rule}`),
+    "- translation should be concise but complete.",
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     input.lessonTitle ? `Lesson title: ${input.lessonTitle}` : "",
@@ -126,7 +139,10 @@ function buildLessonSuggestPrompt(input: {
   language: string;
   level: string;
   topic?: string;
+  unitTitle?: string;
+  unitDescription?: string;
   curriculumInstruction?: string;
+  themeAnchors?: string[];
   existingUnitTitles?: string[];
   existingLessonTitles?: string[];
   existingPhraseTexts?: string[];
@@ -145,19 +161,29 @@ function buildLessonSuggestPrompt(input: {
     ? input.existingProverbTexts.slice(0, 100).join(" | ")
     : "";
   return [
-    "Suggest a lesson outline.",
+    "You are designing the next strong lesson or unit idea in a coherent language curriculum.",
     "Return ONLY valid JSON with this shape:",
     "{\"title\":string,\"description\":string?,\"language\":string,\"level\":string,\"objectives\":[string],\"seedPhrases\":[string],\"proverbs\":[{\"text\":string,\"translation\":string,\"contextNote\":string?}]}",
     "Rules:",
-    "- title, description, and objectives MUST be in English.",
-    "- Title MUST be in English only. Never write title in the target language.",
-    "- Use the target language for seedPhrases.",
-    "- proverbs.text should be in the target language with short culturally authentic entries.",
-    "- proverbs.translation should be in English.",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...getSuggestionGuardrails(
+      input.level as "beginner" | "intermediate" | "advanced",
+      input.language as "yoruba" | "igbo" | "hausa"
+    ).map((rule) => `- ${rule}`),
+    "- Use the target language for seedPhrases only.",
     "- Keep objectives short and measurable.",
-    "- Continue the curriculum like a teacher. Do not repeat prior lessons with renamed titles.",
-    "- Build progression from known concepts to slightly harder ones.",
-    "- Avoid phrases/proverbs already used in existing data.",
+    "- objectives should read like stage goals from foundation to controlled practice to listening/review.",
+    "- Return 3 to 5 objectives.",
+    "- Return 4 to 8 seedPhrases.",
+    "- seedPhrases should reflect the lesson content and difficulty, not random vocabulary.",
+    "- For beginner level, at least 6 seedPhrases should be 1 to 3 words.",
+    "- For beginner level, at most 1 seedPhrase may be longer than 3 words.",
+    "- For beginner level, avoid full questions and full answer sentences in seedPhrases.",
+    "- For beginner level, prefer reusable vocabulary chunks over complete conversational turns.",
+    "- proverbs.text should be in the target language.",
+    "- proverbs.translation and contextNote should be in English.",
+    "- Avoid phrases and proverbs already covered in the provided curriculum context.",
+    `- ${buildThemeAlignmentInstruction({ unitTitle: input.unitTitle, unitDescription: input.unitDescription, topic: input.topic, themeAnchors: input.themeAnchors })}`,
     `Language: ${input.language}`,
     `Level: ${input.level}`,
     input.topic ? `Topic: ${input.topic}` : "",
@@ -165,6 +191,74 @@ function buildLessonSuggestPrompt(input: {
     existingUnitTitles ? `Existing unit titles (avoid overlap): ${existingUnitTitles}` : "",
     existingLessonTitles ? `Existing lesson titles (avoid overlap): ${existingLessonTitles}` : "",
     existingPhraseTexts ? `Existing phrase texts (avoid reuse): ${existingPhraseTexts}` : "",
+    existingProverbTexts ? `Existing proverb texts (avoid reuse): ${existingProverbTexts}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildUnitPlanPrompt(input: {
+  language: string;
+  level: string;
+  lessonCount: number;
+  unitTitle?: string;
+  unitDescription?: string;
+  topic?: string;
+  curriculumInstruction?: string;
+  extraInstructions?: string;
+  themeAnchors?: string[];
+  existingUnitTitles?: string[];
+  existingLessonTitles?: string[];
+  existingPhraseTexts?: string[];
+  existingProverbTexts?: string[];
+  existingLessonsSummary?: string;
+}) {
+  const existingUnitTitles = input.existingUnitTitles?.length
+    ? input.existingUnitTitles.slice(0, 60).join(" | ")
+    : "";
+  const existingLessonTitles = input.existingLessonTitles?.length
+    ? input.existingLessonTitles.slice(0, 120).join(" | ")
+    : "";
+  const existingPhraseTexts = input.existingPhraseTexts?.length
+    ? input.existingPhraseTexts.slice(0, 150).join(" | ")
+    : "";
+  const existingProverbTexts = input.existingProverbTexts?.length
+    ? input.existingProverbTexts.slice(0, 100).join(" | ")
+    : "";
+
+  return [
+    "You are planning a complete language-learning unit before any lesson content is generated.",
+    "Return ONLY valid JSON with this shape:",
+    "{\"lessons\":[{\"title\":string,\"description\":string,\"objectives\":[string],\"seedPhrases\":[string],\"focusSummary\":string}]}",
+    "Rules:",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...getSuggestionGuardrails(
+      input.level as "beginner" | "intermediate" | "advanced",
+      input.language as "yoruba" | "igbo" | "hausa"
+    ).map((rule) => `- ${rule}`),
+    "- Plan the whole unit first, not one lesson at a time.",
+    "- Return exactly the requested lesson count.",
+    "- Each lesson must have a distinct primary focus, not a renamed repeat of another lesson.",
+    "- Lessons may recycle earlier phrases for retention, but each lesson must introduce a clearly different teaching focus.",
+    "- If extra instructions assign specific subtopics to specific lessons, follow that allocation exactly.",
+    "- Titles, descriptions, objectives, and focusSummary must be in English only.",
+    "- seedPhrases must be in the target language only.",
+    "- seedPhrases should represent the primary focus of that specific lesson.",
+    "- Do not restart from the same easiest cluster in every lesson.",
+    "- Spread the requested coverage across the lesson sequence coherently.",
+    `- ${buildThemeAlignmentInstruction({ unitTitle: input.unitTitle, unitDescription: input.unitDescription, topic: input.topic, themeAnchors: input.themeAnchors })}`,
+    `Language: ${input.language}`,
+    `Level: ${input.level}`,
+    `Requested lesson count: ${input.lessonCount}`,
+    input.unitTitle ? `Unit title: ${input.unitTitle}` : "",
+    input.unitDescription ? `Unit description: ${input.unitDescription}` : "",
+    input.topic ? `Topic: ${input.topic}` : "",
+    input.curriculumInstruction ? `Curriculum instruction: ${input.curriculumInstruction}` : "",
+    input.extraInstructions ? `Extra instructions: ${input.extraInstructions}` : "",
+    input.existingLessonsSummary ? `Existing lesson summary:\n${input.existingLessonsSummary}` : "",
+    existingUnitTitles ? `Existing unit titles (avoid overlap): ${existingUnitTitles}` : "",
+    existingLessonTitles ? `Existing lesson titles (avoid overlap when adding new lessons): ${existingLessonTitles}` : "",
+    existingPhraseTexts ? `Existing phrase texts (reuse deliberately, avoid shallow duplication): ${existingPhraseTexts}` : "",
     existingProverbTexts ? `Existing proverb texts (avoid reuse): ${existingProverbTexts}` : ""
   ]
     .filter(Boolean)
@@ -217,7 +311,10 @@ export function createGeminiClient(): LlmClient {
       language: string;
       level: string;
       topic?: string;
+      unitTitle?: string;
+      unitDescription?: string;
       curriculumInstruction?: string;
+      themeAnchors?: string[];
       existingUnitTitles?: string[];
       existingLessonTitles?: string[];
       existingPhraseTexts?: string[];
@@ -230,6 +327,31 @@ export function createGeminiClient(): LlmClient {
 
       const text = response.text?.trim() || "";
       return parseJson<LlmLessonSuggestion>(text, "invalid_llm_json");
+    },
+    async planUnitLessons(input: {
+      language: string;
+      level: string;
+      lessonCount: number;
+      unitTitle?: string;
+      unitDescription?: string;
+      topic?: string;
+      curriculumInstruction?: string;
+      extraInstructions?: string;
+      themeAnchors?: string[];
+      existingUnitTitles?: string[];
+      existingLessonTitles?: string[];
+      existingPhraseTexts?: string[];
+      existingProverbTexts?: string[];
+      existingLessonsSummary?: string;
+    }): Promise<LlmUnitPlanLesson[]> {
+      const response = await client.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: buildUnitPlanPrompt(input)
+      });
+
+      const text = response.text?.trim() || "";
+      const payload = parseJson<{ lessons: LlmUnitPlanLesson[] }>(text, "invalid_llm_json");
+      return Array.isArray(payload.lessons) ? payload.lessons : [];
     }
   };
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { questionService, lessonService, phraseService } from "@/services"
-import { ExerciseQuestion, Lesson, QuestionType, QuestionSubtype, Status } from "@/types"
+import { ExerciseQuestion, Lesson, Phrase, QuestionType, QuestionSubtype, Status } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,9 +20,14 @@ import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 export default function QuestionsPage() {
+  type MatchingItemDraft = {
+    phraseId: string
+    translationIndex: number
+  }
+
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [phrases, setPhrases] = useState<{ _id: string; text: string; translations: string[] }[]>([])
+  const [phrases, setPhrases] = useState<{ _id: string; text: string; translations: string[]; images?: Phrase["images"] }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState({
     lessonId: "",
@@ -38,23 +43,27 @@ export default function QuestionsPage() {
     reviewWordsCsv: "",
     reviewCorrectOrderCsv: "",
     reviewMeaning: "",
+    matchingItems: [] as MatchingItemDraft[],
   })
 
   const subtypeTemplates: Record<QuestionSubtype, string> = {
     "mc-select-translation": "What is {phrase} in English?",
-    "mc-select-missing-word": "Select the missing word for {phrase}",
+    "mc-select-missing-word": "Select the missing word: {sentence}",
     "fg-word-order": "Arrange the words to mean: {meaning}",
-    "fg-gap-fill": "Fill in the blank for {phrase}",
-    "ls-mc-select-translation": "Listen and select the correct translation",
-    "ls-mc-select-missing-word": "Listen and select the missing word",
-    "ls-fg-word-order": "Listen and arrange the words",
-    "ls-fg-gap-fill": "Listen and fill in the blank",
+    "fg-gap-fill": "Fill in the blank: {sentence}",
+    "ls-mc-select-translation": "Listen to {phrase} and choose the meaning.",
+    "ls-mc-select-missing-word": "Listen and choose the word you heard.",
+    "ls-fg-word-order": "Listen and arrange the words to match: {meaning}",
+    "ls-fg-gap-fill": "Listen and fill in the blank: {sentence}",
+    "mt-match-image": "Match each phrase to the correct image.",
+    "mt-match-translation": "Match each phrase to the correct translation.",
     "ls-dictation": "Listen and type what you hear",
     "ls-tone-recognition": "Which syllable has the rising tone?"
   }
 
-  const isFillInGapType = formData.type === "fill-in-the-gap"
-  const isListeningType = formData.type === "listening"
+  const isMatchingQuestion = formData.type === "matching"
+  const requiresReviewData = ["mc-select-missing-word", "fg-word-order", "fg-gap-fill", "ls-fg-word-order", "ls-fg-gap-fill"].includes(formData.subtype)
+  const usesChoiceOptions = ["mc-select-translation", "mc-select-missing-word", "fg-gap-fill", "ls-mc-select-translation", "ls-mc-select-missing-word", "ls-fg-gap-fill"].includes(formData.subtype)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -77,7 +86,7 @@ export default function QuestionsPage() {
   async function fetchPhrases(lessonId: string) {
     try {
       const data = await phraseService.listPhrases(lessonId)
-      setPhrases(data.map((p) => ({ _id: p._id, text: p.text, translations: p.translations || [] })))
+      setPhrases(data.map((p) => ({ _id: p._id, text: p.text, translations: p.translations || [], images: p.images || [] })))
     } catch (error) {
       toast.error("Failed to load phrases")
       setPhrases([])
@@ -140,59 +149,104 @@ export default function QuestionsPage() {
     router.replace(`${pathname}?${nextQuery}`)
   }, [search, statusFilter, page, limit, pathname, router, searchParams])
 
+  function toggleMatchingPhrase(phraseId: string, checked: boolean) {
+    setFormData((current) => ({
+      ...current,
+      matchingItems: checked
+        ? [...current.matchingItems, { phraseId, translationIndex: 0 }]
+        : current.matchingItems.filter((item) => item.phraseId !== phraseId)
+    }))
+  }
+
+  function updateMatchingTranslationIndex(phraseId: string, translationIndex: number) {
+    setFormData((current) => ({
+      ...current,
+      matchingItems: current.matchingItems.map((item) =>
+        item.phraseId === phraseId ? { ...item, translationIndex } : item
+      )
+    }))
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!formData.lessonId) {
       toast.error("Select a lesson")
       return
     }
-    if (!formData.phraseId) {
+    if (!isMatchingQuestion && !formData.phraseId) {
       toast.error("Select a phrase")
+      return
+    }
+    if (isMatchingQuestion && formData.matchingItems.length < 2) {
+      toast.error("Select at least two phrases for a matching question")
       return
     }
 
     try {
-      if (isFillInGapType) {
-        const words = formData.reviewWordsCsv.split(",").map((v) => v.trim()).filter(Boolean)
-        const correctOrder = formData.reviewCorrectOrderCsv
-          .split(",")
-          .map((v) => Number(v.trim()))
-          .filter((n) => !Number.isNaN(n))
+      const payload = {
+        lessonId: formData.lessonId,
+        phraseId: isMatchingQuestion ? formData.matchingItems[0]?.phraseId || "" : formData.phraseId,
+        translationIndex: formData.translationIndex,
+        type: formData.type,
+        subtype: formData.subtype,
+        promptTemplate: formData.promptTemplate,
+        explanation: formData.explanation,
+      }
 
-        await questionService.createQuestion({
-          lessonId: formData.lessonId,
-          phraseId: formData.phraseId,
-          translationIndex: formData.translationIndex,
-          type: formData.type,
-          subtype: formData.subtype,
-          promptTemplate: formData.promptTemplate,
-          reviewData: {
+      const reviewData = requiresReviewData
+        ? {
             sentence: formData.reviewSentence,
-            words,
-            correctOrder,
+            words: formData.reviewWordsCsv.split(",").map((v) => v.trim()).filter(Boolean),
+            correctOrder: formData.reviewCorrectOrderCsv
+              .split(",")
+              .map((v) => Number(v.trim()))
+              .filter((n) => !Number.isNaN(n)),
             meaning: formData.reviewMeaning,
-          },
-          explanation: formData.explanation,
+          }
+        : undefined
+
+      const options = usesChoiceOptions
+        ? formData.optionsCsv.split(",").map((v) => v.trim()).filter(Boolean)
+        : undefined
+
+      if (usesChoiceOptions && (!options || options.length < 2)) {
+        toast.error("Add at least 2 options")
+        return
+      }
+
+      if (isMatchingQuestion && formData.subtype === "mt-match-image") {
+        const missingImages = formData.matchingItems.some((item) => {
+          const phrase = phrases.find((entry) => entry._id === item.phraseId)
+          return !phrase?.images || phrase.images.length === 0
         })
-      } else {
-        const options = formData.optionsCsv.split(",").map((v) => v.trim()).filter(Boolean)
-        if (options.length < 2) {
-          toast.error("Add at least 2 options")
+        if (missingImages) {
+          toast.error("Each selected phrase needs at least one linked image")
           return
         }
-
-        await questionService.createQuestion({
-          lessonId: formData.lessonId,
-          phraseId: formData.phraseId,
-          translationIndex: formData.translationIndex,
-          type: formData.type,
-          subtype: formData.subtype,
-          promptTemplate: formData.promptTemplate,
-          options,
-          correctIndex: Number(formData.correctIndex),
-          explanation: formData.explanation,
-        })
       }
+
+      const matchingPairs = isMatchingQuestion
+        ? formData.matchingItems.map((item) => {
+            const phrase = phrases.find((entry) => entry._id === item.phraseId)
+            const preferredImage = phrase?.images?.find((image) => image.isPrimary) || phrase?.images?.[0]
+            return {
+              phraseId: item.phraseId,
+              translationIndex: item.translationIndex,
+              imageAssetId: formData.subtype === "mt-match-image" ? preferredImage?.imageAssetId : undefined
+            }
+          })
+        : undefined
+
+      await questionService.createQuestion({
+        ...payload,
+        ...(matchingPairs ? {
+          relatedPhraseIds: matchingPairs.map((item) => item.phraseId),
+          interactionData: { matchingPairs }
+        } : {}),
+        ...(reviewData ? { reviewData } : {}),
+        ...(options ? { options, correctIndex: Number(formData.correctIndex) } : {}),
+      })
+
       toast.success("Question created")
       setFormData({
         lessonId: formData.lessonId,
@@ -208,6 +262,7 @@ export default function QuestionsPage() {
         reviewWordsCsv: "",
         reviewCorrectOrderCsv: "",
         reviewMeaning: "",
+        matchingItems: [],
       })
       fetchQuestions()
     } catch (error: any) {
@@ -269,7 +324,7 @@ export default function QuestionsPage() {
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Lesson</Label>
                 <Select value={formData.lessonId} onValueChange={(v) => {
-                  setFormData({ ...formData, lessonId: v, phraseId: "", translationIndex: 0 })
+                  setFormData({ ...formData, lessonId: v, phraseId: "", translationIndex: 0, matchingItems: [] })
                   fetchPhrases(v)
                 }}>
                   <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue placeholder="Choose a lesson..." /></SelectTrigger>
@@ -281,6 +336,7 @@ export default function QuestionsPage() {
                 </Select>
               </div>
 
+              {!isMatchingQuestion && (
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Select Phrase</Label>
                 <Select value={formData.phraseId} onValueChange={(v) => setFormData({ ...formData, phraseId: v, translationIndex: 0 })}>
@@ -294,7 +350,9 @@ export default function QuestionsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
+              {!isMatchingQuestion && (
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Translation Index</Label>
                 <Select
@@ -314,6 +372,7 @@ export default function QuestionsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Question Type</Label>
@@ -323,6 +382,7 @@ export default function QuestionsPage() {
                   if (newType === "multiple-choice") newSubtype = "mc-select-translation"
                   if (newType === "fill-in-the-gap") newSubtype = "fg-word-order"
                   if (newType === "listening") newSubtype = "ls-mc-select-translation"
+                  if (newType === "matching") newSubtype = "mt-match-image"
                   setFormData({ ...formData, type: newType, subtype: newSubtype, promptTemplate: subtypeTemplates[newSubtype] })
                 }}>
                   <SelectTrigger className="h-12 rounded-xl border border-secondary focus:ring-primary text-sm"><SelectValue /></SelectTrigger>
@@ -330,6 +390,7 @@ export default function QuestionsPage() {
                     <SelectItem value="multiple-choice" className="py-2 text-orange-600">Multiple Choice</SelectItem>
                     <SelectItem value="fill-in-the-gap" className="py-2 text-emerald-600">Fill in the Gap</SelectItem>
                     <SelectItem value="listening" className="py-2 text-blue-600">Listening</SelectItem>
+                    <SelectItem value="matching" className="py-2 text-fuchsia-600">Matching</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -360,8 +421,12 @@ export default function QuestionsPage() {
                         <SelectItem value="ls-mc-select-missing-word" className="py-2">Listen & Pick Word</SelectItem>
                         <SelectItem value="ls-fg-word-order" className="py-2">Listen & Order Sentence</SelectItem>
                         <SelectItem value="ls-fg-gap-fill" className="py-2">Listen & Gap Fill</SelectItem>
-                        <SelectItem value="ls-dictation" className="py-2">Listen & Dictation</SelectItem>
-                        <SelectItem value="ls-tone-recognition" className="py-2">Tone Recognition</SelectItem>
+                      </>
+                    )}
+                    {formData.type === "matching" && (
+                      <>
+                        <SelectItem value="mt-match-image" className="py-2">Match Word To Image</SelectItem>
+                        <SelectItem value="mt-match-translation" className="py-2">Match Word To Translation</SelectItem>
                       </>
                     )}
                   </SelectContent>
@@ -369,58 +434,112 @@ export default function QuestionsPage() {
               </div>
             </div>
 
-            {!isFillInGapType && (
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Prompt Template</Label>
+              <Input
+                value={formData.promptTemplate}
+                onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })}
+                placeholder="e.g. What is {phrase} in English?"
+                required
+                className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+              />
+            </div>
+
+            {isMatchingQuestion && (
+              <div className="space-y-4 rounded-2xl border border-secondary/40 p-4">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Matching Phrases</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Select at least two phrases. For image matching, each phrase needs a linked image.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {phrases.map((phrase) => {
+                    const selected = formData.matchingItems.find((item) => item.phraseId === phrase._id)
+                    return (
+                      <div key={phrase._id} className="rounded-xl border bg-background p-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <label className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(selected)}
+                              onChange={(event) => toggleMatchingPhrase(phrase._id, event.target.checked)}
+                            />
+                            <div>
+                              <p className="font-semibold">{phrase.text}</p>
+                              <p className="text-sm text-muted-foreground">{phrase.translations.join(" | ")}</p>
+                            </div>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{phrase.images?.length || 0} image(s)</Badge>
+                            {selected && (
+                              <Select
+                                value={String(selected.translationIndex)}
+                                onValueChange={(value) => updateMatchingTranslationIndex(phrase._id, Number(value))}
+                              >
+                                <SelectTrigger className="w-[220px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {phrase.translations.map((translation, index) => (
+                                    <SelectItem key={`${phrase._id}-${index}`} value={String(index)}>
+                                      {index}: {translation}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {requiresReviewData && (
               <div className="space-y-3">
-                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Prompt Template</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Sentence / Context</Label>
                 <Input
-                  value={formData.promptTemplate}
-                  onChange={(e) => setFormData({ ...formData, promptTemplate: e.target.value })}
-                  placeholder="e.g. What is {phrase} in English?"
+                  value={formData.reviewSentence}
+                  onChange={(e) => setFormData({ ...formData, reviewSentence: e.target.value })}
+                  placeholder="Ẹ ṣeun / ____ ṣeun"
                   required
                   className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
                 />
               </div>
             )}
 
-            {!isFillInGapType ? (
-              <>
-                <div className="grid gap-8 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Correct Index (0-based)</Label>
-                    <Input 
-                      type="number" 
-                      min={0} 
-                      value={formData.correctIndex} 
-                      onChange={(e) => setFormData({ ...formData, correctIndex: Number(e.target.value) })} 
-                      required 
-                      className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
-                    />
-                  </div>
-                </div>
+            {usesChoiceOptions && (
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Correct Index (0-based)</Label>
+                <Input 
+                  type="number" 
+                  min={0} 
+                  value={formData.correctIndex} 
+                  onChange={(e) => setFormData({ ...formData, correctIndex: Number(e.target.value) })} 
+                  required 
+                  className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                />
+              </div>
+            )}
 
-                <div className="space-y-3">
-                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Answer Options (comma separated)</Label>
-                  <Input 
-                    value={formData.optionsCsv} 
-                    onChange={(e) => setFormData({ ...formData, optionsCsv: e.target.value })} 
-                    placeholder="Correct Answer, Wrong Answer 1, Wrong Answer 2" 
-                    required 
-                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
-                  />
-                </div>
-              </>
-            ) : (
+            {usesChoiceOptions && (
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Answer Options (comma separated)</Label>
+                <Input 
+                  value={formData.optionsCsv} 
+                  onChange={(e) => setFormData({ ...formData, optionsCsv: e.target.value })} 
+                  placeholder="Correct Answer, Wrong Answer 1, Wrong Answer 2" 
+                  required 
+                  className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
+                />
+              </div>
+            )}
+
+            {requiresReviewData && (
               <div className="grid gap-8 md:grid-cols-2">
-                <div className="space-y-3 md:col-span-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Sentence</Label>
-                  <Input
-                    value={formData.reviewSentence}
-                    onChange={(e) => setFormData({ ...formData, reviewSentence: e.target.value })}
-                    placeholder="Ẹ káàrọ̀ ní"
-                    required
-                    className="h-12 rounded-xl border border-secondary focus-visible:ring-primary text-sm"
-                  />
-                </div>
                 <div className="space-y-3">
                   <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground ml-1">Words (comma separated)</Label>
                   <Input

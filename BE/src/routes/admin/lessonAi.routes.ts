@@ -3,7 +3,8 @@ import {
   generateLessonsBulk,
   generateProverbs,
   generateUnitContent,
-  generateUnitsBulk
+  generateUnitsBulk,
+  reviseUnitContent
 } from "../../controllers/admin/lessonAi.controller.js";
 import { requireAdmin, requireAuth } from "../../utils/authMiddleware.js";
 
@@ -14,6 +15,7 @@ router.use(requireAuth, requireAdmin);
 router.post("/lessons/generate-bulk", generateLessonsBulk);
 router.post("/units/generate-bulk", generateUnitsBulk);
 router.post("/units/:unitId/generate-content", generateUnitContent);
+router.post("/units/:unitId/revise", reviseUnitContent);
 router.post("/proverbs/generate", generateProverbs);
 
 export default router;

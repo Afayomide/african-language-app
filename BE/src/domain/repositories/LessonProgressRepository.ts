@@ -1,4 +1,9 @@
-import type { LessonProgressEntity, LessonProgressStatus, LessonStepProgressEntity } from "../entities/LessonProgress.js";
+import type {
+  LessonProgressEntity,
+  LessonProgressStatus,
+  LessonStageProgressEntity,
+  LessonStepProgressEntity
+} from "../entities/LessonProgress.js";
 
 export interface LessonProgressRepository {
   findByUserAndLessonId(userId: string, lessonId: string): Promise<LessonProgressEntity | null>;
@@ -9,6 +14,8 @@ export interface LessonProgressRepository {
     status: LessonProgressStatus;
     progressPercent: number;
     stepProgress: LessonStepProgressEntity[];
+    stageProgress: LessonStageProgressEntity[];
+    currentStageIndex: number;
   }): Promise<LessonProgressEntity>;
   updateById(
     id: string,
@@ -17,6 +24,8 @@ export interface LessonProgressRepository {
       progressPercent: number;
       xpEarned: number;
       stepProgress: LessonStepProgressEntity[];
+      stageProgress: LessonStageProgressEntity[];
+      currentStageIndex: number;
       startedAt?: Date;
       completedAt?: Date;
     }>

@@ -2,6 +2,7 @@ import PhraseModel from "../../../../models/Phrase.js";
 import type { PhraseEntity } from "../../../../domain/entities/Phrase.js";
 import type {
   PhraseCreateInput,
+  PhraseDeletedListFilter,
   PhraseListFilter,
   PhraseRepository,
   PhraseUpdateInput
@@ -10,6 +11,7 @@ import type {
 type PhrasePersistenceDoc = {
   _id: { toString(): string };
   lessonIds?: Array<{ toString(): string } | string> | null;
+  deletedLessonIds?: Array<{ toString(): string } | string> | null;
   lessonId?: { toString(): string } | string | null;
   language?: string | null;
   text?: string | null;
@@ -33,6 +35,7 @@ type PhrasePersistenceDoc = {
     s3Key?: string;
   } | null;
   status: PhraseEntity["status"];
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -79,6 +82,7 @@ function toEntity(doc: PhrasePersistenceDoc): PhraseEntity {
       s3Key: String(doc.audio?.s3Key || "")
     },
     status: doc.status,
+    deletedAt: doc.deletedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
   };
@@ -97,27 +101,36 @@ export class MongoosePhraseRepository implements PhraseRepository {
 
     const existing = await PhraseModel.findOne({
       language: input.language,
-      textNormalized,
-      isDeleted: { $ne: true }
-    });
+      textNormalized
+    }).sort({ isDeleted: 1, createdAt: 1 });
 
     if (existing) {
       const mergedLessonIds = Array.from(
         new Set([...(existing.lessonIds || []).map((id: { toString(): string }) => id.toString()), ...lessonIds])
       );
+      const mergedDeletedLessonIds = Array.from(
+        new Set((existing.deletedLessonIds || []).map((id: { toString(): string }) => id.toString()))
+      ).filter((lessonId) => !mergedLessonIds.includes(lessonId));
       const mergedTranslations = normalizeTranslations([
         ...(Array.isArray(existing.translations) ? existing.translations : []),
         ...translations
       ]);
 
       existing.lessonIds = mergedLessonIds as never;
+      existing.deletedLessonIds = mergedDeletedLessonIds as never;
       existing.translations = mergedTranslations as never;
       if (!existing.pronunciation && input.pronunciation) existing.pronunciation = input.pronunciation as never;
       if (!existing.explanation && input.explanation) existing.explanation = input.explanation as never;
       if (existing.status !== "published" && input.status === "published") {
         existing.status = "published" as never;
+      } else if (existing.status === "draft" && input.status === "finished") {
+        existing.status = "finished" as never;
       }
       if (input.audio && !existing.audio?.url) existing.audio = input.audio as never;
+      if (existing.isDeleted) {
+        existing.isDeleted = false as never;
+        existing.deletedAt = null as never;
+      }
       await existing.save();
       return toEntity(existing.toObject() as PhrasePersistenceDoc);
     }
@@ -127,7 +140,8 @@ export class MongoosePhraseRepository implements PhraseRepository {
       text,
       textNormalized,
       translations,
-      lessonIds
+      lessonIds,
+      deletedLessonIds: []
     });
     return toEntity(created.toObject() as PhrasePersistenceDoc);
   }
@@ -148,9 +162,8 @@ export class MongoosePhraseRepository implements PhraseRepository {
   ): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({
       language,
-      textNormalized: normalizeText(String(text)),
-      isDeleted: { $ne: true }
-    });
+      textNormalized: normalizeText(String(text))
+    }).sort({ isDeleted: 1, createdAt: 1 });
     return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
   }
 
@@ -177,6 +190,34 @@ export class MongoosePhraseRepository implements PhraseRepository {
   async findByIdAndLessonId(id: string, lessonId: string): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({ _id: id, lessonIds: lessonId, isDeleted: { $ne: true } });
     return phrase ? toEntity(phrase.toObject() as PhrasePersistenceDoc) : null;
+  }
+
+  async listDeleted(filter: PhraseDeletedListFilter): Promise<PhraseEntity[]> {
+    const query: Record<string, unknown> = { isDeleted: true };
+    const clauses: Array<Record<string, unknown>> = [];
+
+    if (Array.isArray(filter.lessonIds) && filter.lessonIds.length > 0) {
+      clauses.push({
+        $or: [
+          { lessonIds: { $in: filter.lessonIds } },
+          { deletedLessonIds: { $in: filter.lessonIds } }
+        ]
+      });
+    }
+    if (Array.isArray(filter.ids) && filter.ids.length > 0) {
+      clauses.push({ _id: { $in: filter.ids } });
+    }
+
+    if (clauses.length === 1) {
+      Object.assign(query, clauses[0]);
+    } else if (clauses.length > 1) {
+      query.$or = clauses;
+    }
+
+    const phrases = await PhraseModel.find(query)
+      .sort({ deletedAt: -1, updatedAt: -1 })
+      .lean();
+    return phrases.map((doc) => toEntity(doc as PhrasePersistenceDoc));
   }
 
   async updateById(id: string, update: PhraseUpdateInput): Promise<PhraseEntity | null> {
@@ -227,11 +268,53 @@ export class MongoosePhraseRepository implements PhraseRepository {
   async softDeleteByLessonId(lessonId: string, now: Date): Promise<void> {
     await PhraseModel.updateMany(
       { lessonIds: lessonId, isDeleted: { $ne: true } },
-      { $pull: { lessonIds: lessonId } }
+      {
+        $pull: { lessonIds: lessonId },
+        $addToSet: { deletedLessonIds: lessonId }
+      }
     );
     await PhraseModel.updateMany(
       { lessonIds: { $size: 0 }, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: now }
+    );
+  }
+
+  async restoreById(id: string, lessonIdsToAdd: string[] = []): Promise<PhraseEntity | null> {
+    const phrase = await PhraseModel.findOne({ _id: id });
+    if (!phrase) return null;
+
+    const currentLessonIds = (phrase.lessonIds || []).map((lessonId: { toString(): string }) => lessonId.toString());
+    const removedLessonIds = Array.from(
+      new Set((phrase.deletedLessonIds || []).map((lessonId: { toString(): string }) => lessonId.toString()))
+    );
+    const canRestoreExplicitIds = currentLessonIds.length === 0 && removedLessonIds.length === 0;
+    const lessonIdsToRestore = Array.from(new Set(lessonIdsToAdd.map(String).filter(Boolean))).filter(
+      (lessonId) => canRestoreExplicitIds || removedLessonIds.includes(lessonId) || currentLessonIds.includes(lessonId)
+    );
+    const mergedLessonIds = Array.from(
+      new Set([
+        ...currentLessonIds,
+        ...lessonIdsToRestore
+      ])
+    );
+    const remainingDeletedLessonIds = removedLessonIds.filter((lessonId) => !lessonIdsToRestore.includes(lessonId));
+
+    phrase.lessonIds = mergedLessonIds as never;
+    phrase.deletedLessonIds = remainingDeletedLessonIds as never;
+    phrase.isDeleted = false as never;
+    phrase.deletedAt = null as never;
+    await phrase.save();
+    return toEntity(phrase.toObject() as PhrasePersistenceDoc);
+  }
+
+  async restoreByLessonId(lessonId: string): Promise<void> {
+    await PhraseModel.updateMany(
+      { deletedLessonIds: lessonId },
+      {
+        $addToSet: { lessonIds: lessonId },
+        $pull: { deletedLessonIds: lessonId },
+        $set: { isDeleted: false, deletedAt: null }
+      }
     );
   }
 

@@ -33,6 +33,7 @@ export type PhraseEntity = {
   aiMeta: PhraseAiMeta;
   audio: PhraseAudio;
   status: "draft" | "finished" | "published";
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

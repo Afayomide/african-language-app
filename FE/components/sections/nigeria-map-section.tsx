@@ -14,9 +14,9 @@ interface RegionInfo {
 }
 
 const regions: RegionInfo[] = [
-  { id: 'yoruba', name: 'Yoruba Country', x: 20, y: 65, character: 'Southwest' },
-  { id: 'igbo', name: 'Igbo Land', x: 55, y: 70, character: 'Southeast' },
-  { id: 'hausa', name: 'Hausa Region', x: 40, y: 30, character: 'North' },
+  { id: 'yoruba', name: 'Yoruba Country', x: 315, y: 548, character: 'Southwest Nigeria' },
+  { id: 'igbo', name: 'Igbo Land', x: 372, y: 578, character: 'Southeast Nigeria' },
+  { id: 'hausa', name: 'Hausa Region', x: 338, y: 458, character: 'Northern Nigeria' },
 ]
 
 export function NigeriaMapSection() {
@@ -42,32 +42,83 @@ export function NigeriaMapSection() {
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-16 text-center">
           <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 text-balance">
-            Explore Nigeria's Linguistic Tapestry
+            Explore Africa, Starting from Nigeria
           </h2>
           <p className="text-lg text-foreground/70">
-            Hover over each region to discover the languages and cultures
+            See where Nigeria sits in Africa, then explore the language regions that shape its cultural voice
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Interactive Map Area */}
           <div className="relative h-[400px] md:h-[500px] bg-gradient-to-br from-blue-100 to-blue-50 rounded-3xl overflow-hidden shadow-2xl border border-primary/20">
-            {/* Simplified Nigeria Map */}
+            {/* Africa map with Nigeria highlighted */}
             <svg
-              viewBox="0 0 100 140"
+              viewBox="0 0 900 1200"
               className="w-full h-full"
               style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)' }}
+              preserveAspectRatio="xMidYMid meet"
             >
-              {/* Nigeria country shape (simplified) */}
+              <defs>
+                <radialGradient id="nigeriaGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+                </radialGradient>
+              </defs>
+
+              {/* Africa outline */}
               <path
-                d="M 35 20 L 55 15 L 65 20 L 70 35 L 75 45 L 70 55 L 65 65 L 60 70 L 50 75 L 40 78 L 30 75 L 25 65 L 22 55 L 20 45 L 20 35 L 25 25 Z"
+                d="M280 80
+                  C350 46 430 38 500 54
+                  C565 68 635 60 690 92
+                  C746 126 788 184 816 256
+                  C836 306 878 336 874 386
+                  C870 432 824 476 804 550
+                  C786 622 820 712 794 808
+                  C770 896 716 992 646 1078
+                  C606 1128 566 1172 508 1190
+                  C458 1206 420 1170 396 1120
+                  C372 1068 354 1012 316 962
+                  C270 904 204 846 172 756
+                  C142 674 100 610 108 522
+                  C114 448 164 390 190 336
+                  C212 290 198 234 210 178
+                  C222 126 248 96 280 80 Z"
                 fill="#fef3c7"
                 stroke="#d97706"
-                strokeWidth="1.5"
-                opacity="0.8"
+                strokeWidth="14"
+                strokeLinejoin="round"
+                opacity="0.95"
               />
 
-              {/* Interactive regions */}
+              {/* Nigeria highlight */}
+              <ellipse cx="342" cy="522" rx="72" ry="108" fill="url(#nigeriaGlow)" />
+              <path
+                d="M300 430
+                  C328 420 352 422 376 438
+                  C394 456 400 486 394 516
+                  C390 544 396 572 386 596
+                  C372 626 344 638 318 634
+                  C292 630 278 606 280 580
+                  C280 554 272 526 274 500
+                  C276 470 282 444 300 430 Z"
+                fill="rgba(34,197,94,0.18)"
+                stroke="#15803d"
+                strokeWidth="7"
+                strokeDasharray="18 12"
+              />
+
+              <text
+                x="420"
+                y="448"
+                className="text-[46px] font-black fill-foreground/80"
+              >
+                Nigeria
+              </text>
+
+              <path d="M405 456 L384 486" stroke="#111827" strokeWidth="5" strokeLinecap="round" opacity="0.55" />
+
+              {/* Interactive language markers */}
               {regions.map((region) => (
                 <g
                   key={region.id}
@@ -80,7 +131,7 @@ export function NigeriaMapSection() {
                   <circle
                     cx={region.x}
                     cy={region.y}
-                    r={hoveredRegion === region.id ? 8 : 6}
+                    r={hoveredRegion === region.id ? 20 : 16}
                     fill={
                       selectedRegion === region.id
                         ? '#f97316'
@@ -95,18 +146,18 @@ export function NigeriaMapSection() {
                       <circle
                         cx={region.x}
                         cy={region.y}
-                        r={12}
+                        r={34}
                         fill="none"
                         stroke="#f97316"
-                        strokeWidth="1"
+                        strokeWidth="5"
                         opacity="0.5"
                         className="animate-pulse"
                       />
                       <text
                         x={region.x}
-                        y={region.y - 16}
+                        y={region.y - 34}
                         textAnchor="middle"
-                        className="text-xs font-bold fill-foreground"
+                        className="text-[34px] font-black fill-foreground"
                       >
                         {region.name}
                       </text>

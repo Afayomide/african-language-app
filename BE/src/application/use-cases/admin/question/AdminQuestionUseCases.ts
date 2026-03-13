@@ -13,6 +13,7 @@ export class AdminQuestionUseCases {
   async create(input: {
     lessonId: string;
     phraseId: string;
+    relatedPhraseIds?: string[];
     translationIndex?: number;
     type: QuestionEntity["type"];
     subtype: QuestionEntity["subtype"];
@@ -20,6 +21,7 @@ export class AdminQuestionUseCases {
     options: string[];
     correctIndex: number;
     reviewData?: QuestionEntity["reviewData"];
+    interactionData?: QuestionEntity["interactionData"];
     explanation?: string;
   }) {
     const lesson = await this.lessons.findById(input.lessonId);
@@ -40,6 +42,7 @@ export class AdminQuestionUseCases {
 
     return this.questions.create({
       ...input,
+      relatedPhraseIds: Array.isArray(input.relatedPhraseIds) ? input.relatedPhraseIds : [],
       translationIndex,
       status: "draft"
     });
@@ -70,9 +73,13 @@ export class AdminQuestionUseCases {
     const question = await this.questions.findById(id);
     if (!question) return "question_not_found" as const;
     if (question.status !== "finished") return "question_not_finished" as const;
-
-    const phrase = await this.phrases.findById(question.phraseId);
-    if (!phrase || phrase.status !== "published") return "linked_phrase_must_be_published" as const;
+    const phraseIds = Array.from(
+      new Set([question.phraseId, ...(Array.isArray(question.relatedPhraseIds) ? question.relatedPhraseIds : [])])
+    );
+    const phrases = await this.phrases.findByIds(phraseIds);
+    if (phrases.length !== phraseIds.length || phrases.some((phrase) => phrase.status !== "published")) {
+      return "linked_phrase_must_be_published" as const;
+    }
 
     return this.questions.publishById(id);
   }

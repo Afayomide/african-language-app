@@ -1,4 +1,4 @@
-import type { Language, Level, LessonBlock, LessonEntity, Status } from "../../../../domain/entities/Lesson.js";
+import type { Language, Level, LessonEntity, LessonStage, Status } from "../../../../domain/entities/Lesson.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
@@ -20,7 +20,7 @@ export class AdminLessonUseCases {
     description?: string;
     topics?: string[];
     proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
-    blocks?: LessonBlock[];
+    stages?: LessonStage[];
     createdBy: string;
   }) {
     const lastOrderIndex = await this.lessons.findLastOrderIndex(input.unitId);
@@ -35,7 +35,7 @@ export class AdminLessonUseCases {
       description: input.description?.trim() || "",
       topics: Array.isArray(input.topics) ? input.topics : [],
       proverbs: Array.isArray(input.proverbs) ? input.proverbs : [],
-      blocks: Array.isArray(input.blocks) ? input.blocks : [],
+      stages: Array.isArray(input.stages) ? input.stages : [],
       status: "draft",
       createdBy: input.createdBy
     });
@@ -60,7 +60,7 @@ export class AdminLessonUseCases {
       orderIndex: number;
       topics: string[];
       proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-      blocks: LessonBlock[];
+      stages: LessonStage[];
     }>
   ) {
     const current = await this.lessons.findById(id);
@@ -99,27 +99,28 @@ export class AdminLessonUseCases {
 
   async publish(id: string) {
     const lesson = await this.getById(id);
-    console.log(lesson)
-    for (const block of lesson?.blocks || []) {
-      if (block.type === "phrase" && block.refId) {
-        const phrase = await this.phrases.findById(block.refId);
-        if (phrase?.status !== "published") {
-          return "phrases_not_published" as const;
+    for (const stage of lesson?.stages || []) {
+      for (const block of stage.blocks || []) {
+        if (block.type === "phrase" && block.refId) {
+          const phrase = await this.phrases.findById(block.refId);
+          if (phrase?.status !== "published") {
+            return "phrases_not_published" as const;
+          }
         }
-      } 
-      if (block.type === "proverb" && block.refId) {
-        const proverb = await this.proverbs.findById(block.refId);
-        if (proverb?.status !== "published") {
-          return "proverbs_not_published" as const;
+        if (block.type === "proverb" && block.refId) {
+          const proverb = await this.proverbs.findById(block.refId);
+          if (proverb?.status !== "published") {
+            return "proverbs_not_published" as const;
+          }
+        }
+        if (block.type === "question" && block.refId) {
+          const question = await this.questions.findById(block.refId);
+          if (question?.status !== "published") {
+            return "questions_not_published" as const;
+          }
         }
       }
-      if (block.type === "question" && block.refId) {
-        const question = await this.questions.findById(block.refId);
-        if (question?.status !== "published") {
-          return "questions_not_published" as const;
-        }
-      }
-    } 
+    }
     const published = await this.lessons.publishById(id, new Date());
     return published;
   }

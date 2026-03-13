@@ -10,6 +10,16 @@ const StepProgressSchema = new Schema(
   { _id: false }
 );
 
+const StageProgressSchema = new Schema(
+  {
+    stageId: { type: String, required: true },
+    stageIndex: { type: Number, required: true, min: 0 },
+    status: { type: String, enum: ["not_started", "in_progress", "completed"], default: "not_started" },
+    completedAt: { type: Date }
+  },
+  { _id: false }
+);
+
 const LessonProgressSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -18,6 +28,8 @@ const LessonProgressSchema = new Schema(
     progressPercent: { type: Number, default: 0, min: 0, max: 100 },
     xpEarned: { type: Number, default: 0, min: 0 },
     stepProgress: { type: [StepProgressSchema], default: [] },
+    stageProgress: { type: [StageProgressSchema], default: [] },
+    currentStageIndex: { type: Number, default: 0, min: 0 },
     startedAt: { type: Date },
     completedAt: { type: Date }
   },

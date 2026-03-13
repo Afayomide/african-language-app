@@ -36,7 +36,8 @@ export interface ProverbRepository {
   updateById(id: string, update: ProverbUpdateInput): Promise<ProverbEntity | null>;
   softDeleteById(id: string, now: Date): Promise<ProverbEntity | null>;
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
+  restoreById(id: string, lessonIdsToAdd?: string[]): Promise<ProverbEntity | null>;
+  restoreByLessonId(lessonId: string): Promise<void>;
   publishById(id: string, reviewedByAdmin: boolean): Promise<ProverbEntity | null>;
   finishById(id: string): Promise<ProverbEntity | null>;
 }
-

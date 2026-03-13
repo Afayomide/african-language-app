@@ -2,11 +2,48 @@ export type Language = "yoruba" | "igbo" | "hausa";
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Status = "draft" | "finished" | "published";
 
+export type LearnerAuthUser = {
+  id: string;
+  email: string;
+  role: "learner";
+  roles?: Array<"admin" | "learner" | "tutor" | "voice_artist">;
+};
+
+export type LearnerProfile = {
+  id: string;
+  userId: string;
+  displayName: string;
+  proficientLanguage: string;
+  countryOfOrigin: string;
+  onboardingCompleted: boolean;
+  currentLanguage: Language;
+  dailyGoalMinutes: number;
+  totalXp: number;
+  currentStreak: number;
+  longestStreak: number;
+  completedLessonsCount: number;
+};
+
 export type LessonBlock = 
   | { type: "text"; content: string }
   | { type: "phrase"; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
+
+export type LessonStage = {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  blocks: LessonBlock[];
+};
+
+export type LessonStageProgress = {
+  stageId: string;
+  stageIndex: number;
+  status: "not_started" | "in_progress" | "completed";
+  completedAt?: string | Date;
+};
 
 export type PopulatedLessonBlock = 
   | { type: "text"; content: string }
@@ -34,7 +71,7 @@ export interface Proverb {
   contextNote?: string;
 }
 
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
 
 export type QuestionSubtype =
   | "mc-select-translation"
@@ -45,8 +82,37 @@ export type QuestionSubtype =
   | "ls-mc-select-missing-word"
   | "ls-fg-word-order"
   | "ls-fg-gap-fill"
+  | "mt-match-image"
+  | "mt-match-translation"
   | "ls-dictation"
   | "ls-tone-recognition";
+
+export interface QuestionMatchingPair {
+  pairId: string;
+  phraseId: string;
+  phraseText: string;
+  translationIndex: number;
+  translation: string;
+  image?: {
+    imageAssetId?: string;
+    url: string;
+    thumbnailUrl?: string;
+    altText: string;
+  } | null;
+}
+
+export interface QuestionMatchingDisplayItem {
+  id: string;
+  label: string;
+  phraseId?: string;
+  translationIndex?: number;
+  image?: {
+    imageAssetId?: string;
+    url: string;
+    thumbnailUrl?: string;
+    altText: string;
+  } | null;
+}
 
 export interface ExerciseQuestion {
   _id: string;
@@ -66,10 +132,13 @@ export interface ExerciseQuestion {
     meaning: string;
   };
   interactionData?: {
-    sentence: string;
-    words: string[];
-    correctOrder: number[];
-    meaning: string;
+    sentence?: string;
+    words?: string[];
+    correctOrder?: number[];
+    meaning?: string;
+    matchingPairs?: QuestionMatchingPair[];
+    leftItems?: QuestionMatchingDisplayItem[];
+    rightItems?: QuestionMatchingDisplayItem[];
   };
   prompt?: string;
   phrase?: Phrase | null;
@@ -84,6 +153,9 @@ export interface Lesson {
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-  blocks: LessonBlock[];
+  stages: LessonStage[];
   status: Status;
+  progressPercent?: number;
+  currentStageIndex?: number;
+  stageProgress?: LessonStageProgress[];
 }

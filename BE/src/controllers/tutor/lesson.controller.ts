@@ -10,24 +10,33 @@ import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/rep
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import type { Language, Level, LessonBlock, Status } from "../../domain/entities/Lesson.js";
+import { LessonAuditService } from "../../application/services/LessonAuditService.js";
+import type { Language, Level, LessonBlock, LessonStage, Status } from "../../domain/entities/Lesson.js";
 import {
   isValidLessonStatus
 } from "../../interfaces/http/validators/lesson.validators.js";
+import { subtypeUsesMatching } from "../../interfaces/http/validators/question.validators.js";
 import {
   getSearchQuery,
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
 
+const questionRepo = new MongooseQuestionRepository();
 const lessonUseCases = new TutorLessonUseCases(
   new MongooseLessonRepository(),
   new MongoosePhraseRepository(),
   new MongooseProverbRepository(),
-  new MongooseQuestionRepository()
+  questionRepo
 );
 const proverbRepo = new MongooseProverbRepository();
 const unitRepo = new MongooseUnitRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const lessonAuditService = new LessonAuditService(
+  new MongooseLessonRepository(),
+  new MongoosePhraseRepository(),
+  proverbRepo,
+  questionRepo
+);
 
 type ProverbInput = {
   text?: string;
@@ -42,10 +51,87 @@ type BlockInput = {
   translationIndex?: number;
 };
 
+type StageInput = {
+  id?: string;
+  title?: string;
+  description?: string;
+  orderIndex?: number;
+  blocks?: BlockInput[];
+};
+
 type QueryValue = string | number | boolean | object;
 
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeBlocks(blocks: unknown): LessonBlock[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks
+    .map((block: BlockInput) => {
+      const type = String(block.type || "");
+      const content = String(block.content || "").trim();
+      const refId = block.refId ? String(block.refId).trim() : undefined;
+      return {
+        type,
+        content,
+        refId,
+        translationIndex:
+          Number.isInteger(Number(block.translationIndex)) && Number(block.translationIndex) >= 0
+            ? Number(block.translationIndex)
+            : 0
+      };
+    })
+    .filter((block) => {
+      if (!["text", "phrase", "proverb", "question"].includes(block.type)) {
+        return false;
+      }
+      if (block.type === "text") {
+        return block.content.length > 0;
+      }
+      const refId = block.refId;
+      return typeof refId === "string" && mongoose.Types.ObjectId.isValid(refId);
+    }) as LessonBlock[];
+}
+
+function normalizeStages(stages: unknown): LessonStage[] {
+  if (!Array.isArray(stages)) return [];
+  return stages
+    .map((stage, index) => {
+      const row = stage as StageInput;
+      return {
+        id: String(row.id || `stage-${index + 1}`),
+        title: String(row.title || "").trim(),
+        description: String(row.description || "").trim(),
+        orderIndex:
+          Number.isInteger(Number(row.orderIndex)) && Number(row.orderIndex) >= 0
+            ? Number(row.orderIndex)
+            : index,
+        blocks: normalizeBlocks(row.blocks)
+      };
+    })
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+async function validateStageOneQuestionPlacement(stages: LessonStage[]) {
+  const firstStage = stages
+    .slice()
+    .sort((left, right) => left.orderIndex - right.orderIndex)[0];
+  if (!firstStage) return null;
+
+  const questionIds = firstStage.blocks
+    .filter((block) => block.type === "question")
+    .map((block) => block.refId)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  for (const questionId of questionIds) {
+    const question = await questionRepo.findById(questionId);
+    if (question && subtypeUsesMatching(question.subtype)) {
+      return "Matching questions can only appear after Stage 1.";
+    }
+  }
+
+  return null;
 }
 
 async function upsertLessonProverbs(
@@ -80,7 +166,7 @@ export async function createLesson(req: AuthRequest, res: Response) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const { title, description, unitId, topics, proverbs, blocks } = req.body ?? {};
+  const { title, description, unitId, topics, proverbs, stages } = req.body ?? {};
   if (!title || String(title).trim().length === 0) {
     return res.status(400).json({ error: "title required" });
   }
@@ -93,8 +179,8 @@ export async function createLesson(req: AuthRequest, res: Response) {
   if (proverbs !== undefined && !Array.isArray(proverbs)) {
     return res.status(400).json({ error: "invalid proverbs" });
   }
-  if (blocks !== undefined && !Array.isArray(blocks)) {
-    return res.status(400).json({ error: "invalid blocks" });
+  if (stages !== undefined && !Array.isArray(stages)) {
+    return res.status(400).json({ error: "invalid stages" });
   }
   const normalizedTopics: string[] = Array.isArray(topics)
     ? topics.map((item) => String(item || "").trim()).filter(Boolean)
@@ -113,22 +199,11 @@ export async function createLesson(req: AuthRequest, res: Response) {
         .filter((p) => p.text)
     : [];
 
-  const normalizedBlocks: LessonBlock[] = Array.isArray(blocks)
-    ? blocks
-        .map((block) => {
-          const row = block as BlockInput;
-          return {
-            type: String(row.type || ""),
-            content: String(row.content || ""),
-            refId: row.refId ? String(row.refId) : undefined,
-            translationIndex:
-              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
-                ? Number(row.translationIndex)
-                : 0
-          };
-        })
-        .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[]
-    : [];
+  const normalizedStages = normalizeStages(stages);
+  const stagePlacementError = await validateStageOneQuestionPlacement(normalizedStages);
+  if (stagePlacementError) {
+    return res.status(400).json({ error: stagePlacementError });
+  }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) {
@@ -148,7 +223,7 @@ export async function createLesson(req: AuthRequest, res: Response) {
     description: description ? String(description).trim() : "",
     topics: normalizedTopics,
     proverbs: normalizedProverbs,
-    blocks: normalizedBlocks,
+    stages: normalizedStages,
     createdBy: req.user.id
   });
 
@@ -251,9 +326,9 @@ export async function updateLesson(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  const { title, description, unitId, orderIndex, topics, proverbs, blocks } = req.body ?? {};
+  const { title, description, unitId, orderIndex, topics, proverbs, stages } = req.body ?? {};
   let normalizedProverbs: Array<{ text: string; translation: string; contextNote: string }> = [];
-  let normalizedBlocks: LessonBlock[] = [];
+  let normalizedStages: LessonStage[] = [];
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "invalid id" });
@@ -271,8 +346,8 @@ export async function updateLesson(req: AuthRequest, res: Response) {
   if (proverbs !== undefined && !Array.isArray(proverbs)) {
     return res.status(400).json({ error: "invalid proverbs" });
   }
-  if (blocks !== undefined && !Array.isArray(blocks)) {
-    return res.status(400).json({ error: "invalid blocks" });
+  if (stages !== undefined && !Array.isArray(stages)) {
+    return res.status(400).json({ error: "invalid stages" });
   }
   const normalizedTopics: string[] = Array.isArray(topics)
     ? topics.map((item) => String(item || "").trim()).filter(Boolean)
@@ -291,21 +366,12 @@ export async function updateLesson(req: AuthRequest, res: Response) {
       .filter((p: { text: string }) => p.text);
   }
 
-  if (blocks !== undefined) {
-    normalizedBlocks = blocks
-      .map((block: BlockInput) => {
-        const row = block;
-          return {
-            type: String(row.type || ""),
-            content: String(row.content || ""),
-            refId: row.refId ? String(row.refId) : undefined,
-            translationIndex:
-              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
-                ? Number(row.translationIndex)
-                : 0
-          };
-      })
-      .filter((b: { type: string }) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[];
+  if (stages !== undefined) {
+    normalizedStages = normalizeStages(stages);
+    const stagePlacementError = await validateStageOneQuestionPlacement(normalizedStages);
+    if (stagePlacementError) {
+      return res.status(400).json({ error: stagePlacementError });
+    }
   }
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
@@ -322,7 +388,7 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     orderIndex: number;
     topics: string[];
     proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-    blocks: LessonBlock[];
+    stages: LessonStage[];
   }> = {};
   if (title !== undefined) {
     if (!String(title).trim()) {
@@ -354,8 +420,8 @@ export async function updateLesson(req: AuthRequest, res: Response) {
   if (proverbs !== undefined) {
     update.proverbs = normalizedProverbs;
   }
-  if (blocks !== undefined) {
-    update.blocks = normalizedBlocks;
+  if (stages !== undefined) {
+    update.stages = normalizedStages;
   }
 
   const lesson = await lessonUseCases.update(id, tutorLanguage as Language, update);
@@ -473,4 +539,24 @@ export async function finishLesson(req: AuthRequest, res: Response) {
     return res.status(404).json({ error: "lesson not found" });
   }
   return res.status(200).json({ lesson });
+}
+
+export async function auditLesson(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid id" });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) {
+    return res.status(403).json({ error: "tutor language not configured" });
+  }
+
+  const audit = await lessonAuditService.auditLesson(id, tutorLanguage as Language);
+  if (!audit) {
+    return res.status(404).json({ error: "lesson not found" });
+  }
+
+  return res.status(200).json({ audit });
 }

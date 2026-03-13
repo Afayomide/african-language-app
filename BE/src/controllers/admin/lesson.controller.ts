@@ -8,25 +8,34 @@ import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repos
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import type { Language, Level, LessonBlock, Status } from "../../domain/entities/Lesson.js";
+import { LessonAuditService } from "../../application/services/LessonAuditService.js";
+import type { Language, Level, LessonBlock, LessonStage, Status } from "../../domain/entities/Lesson.js";
 import {
   isValidLessonLanguage,
   isValidLessonStatus
 } from "../../interfaces/http/validators/lesson.validators.js";
+import { subtypeUsesMatching } from "../../interfaces/http/validators/question.validators.js";
 import {
   getSearchQuery,
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
 
+const questionRepo = new MongooseQuestionRepository();
 const lessonUseCases = new AdminLessonUseCases(
   new MongooseLessonRepository(),
   new MongoosePhraseRepository(),
   new MongooseProverbRepository(),
-  new MongooseQuestionRepository()
+  questionRepo
 );
 
 const proverbRepo = new MongooseProverbRepository();
 const unitRepo = new MongooseUnitRepository();
+const lessonAuditService = new LessonAuditService(
+  new MongooseLessonRepository(),
+  new MongoosePhraseRepository(),
+  proverbRepo,
+  questionRepo
+);
 
 type ProverbInput = {
   text?: string;
@@ -40,6 +49,84 @@ type BlockInput = {
   refId?: string;
   translationIndex?: number;
 };
+
+type StageInput = {
+  id?: string;
+  title?: string;
+  description?: string;
+  orderIndex?: number;
+  blocks?: BlockInput[];
+};
+
+function normalizeBlocks(blocks: unknown): LessonBlock[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks
+    .map((block) => {
+      const row = block as BlockInput;
+      const type = String(row.type || "");
+      const content = String(row.content || "").trim();
+      const refId = row.refId ? String(row.refId).trim() : undefined;
+      return {
+        type,
+        content,
+        refId,
+        translationIndex:
+          Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
+            ? Number(row.translationIndex)
+            : 0
+      };
+    })
+    .filter((block) => {
+      if (!["text", "phrase", "proverb", "question"].includes(block.type)) {
+        return false;
+      }
+      if (block.type === "text") {
+        return block.content.length > 0;
+      }
+      const refId = block.refId;
+      return typeof refId === "string" && mongoose.Types.ObjectId.isValid(refId);
+    }) as LessonBlock[];
+}
+
+function normalizeStages(stages: unknown): LessonStage[] {
+  if (!Array.isArray(stages)) return [];
+  return stages
+    .map((stage, index) => {
+      const row = stage as StageInput;
+      return {
+        id: String(row.id || `stage-${index + 1}`),
+        title: String(row.title || "").trim(),
+        description: String(row.description || "").trim(),
+        orderIndex:
+          Number.isInteger(Number(row.orderIndex)) && Number(row.orderIndex) >= 0
+            ? Number(row.orderIndex)
+            : index,
+        blocks: normalizeBlocks(row.blocks)
+      };
+    })
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+async function validateStageOneQuestionPlacement(stages: LessonStage[]) {
+  const firstStage = stages
+    .slice()
+    .sort((left, right) => left.orderIndex - right.orderIndex)[0];
+  if (!firstStage) return null;
+
+  const questionIds = firstStage.blocks
+    .filter((block) => block.type === "question")
+    .map((block) => block.refId)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  for (const questionId of questionIds) {
+    const question = await questionRepo.findById(questionId);
+    if (question && subtypeUsesMatching(question.subtype)) {
+      return "Matching questions can only appear after Stage 1.";
+    }
+  }
+
+  return null;
+}
 
 type QueryValue = string | number | boolean | object;
 
@@ -76,7 +163,7 @@ async function upsertLessonProverbs(
 }
 
 export async function createLesson(req: AuthRequest, res: Response) {
-  const { title, description, unitId, topics, proverbs, blocks } = req.body ?? {};
+  const { title, description, unitId, topics, proverbs, stages } = req.body ?? {};
 
   if (!title || String(title).trim().length === 0) {
     return res.status(400).json({ error: "title required" });
@@ -93,8 +180,8 @@ export async function createLesson(req: AuthRequest, res: Response) {
   if (proverbs !== undefined && !Array.isArray(proverbs)) {
     return res.status(400).json({ error: "invalid proverbs" });
   }
-  if (blocks !== undefined && !Array.isArray(blocks)) {
-    return res.status(400).json({ error: "invalid blocks" });
+  if (stages !== undefined && !Array.isArray(stages)) {
+    return res.status(400).json({ error: "invalid stages" });
   }
 
   const normalizedTopics = Array.isArray(topics)
@@ -114,22 +201,11 @@ export async function createLesson(req: AuthRequest, res: Response) {
         .filter((p) => p.text)
     : [];
 
-  const normalizedBlocks = Array.isArray(blocks)
-    ? blocks
-        .map((block) => {
-          const row = block as BlockInput;
-          return {
-            type: String(row.type || ""),
-            content: String(row.content || ""),
-            refId: row.refId ? String(row.refId) : undefined,
-            translationIndex:
-              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
-                ? Number(row.translationIndex)
-                : 0
-          };
-        })
-        .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[]
-    : [];
+  const normalizedStages = normalizeStages(stages);
+  const stagePlacementError = await validateStageOneQuestionPlacement(normalizedStages);
+  if (stagePlacementError) {
+    return res.status(400).json({ error: stagePlacementError });
+  }
 
   const unit = await unitRepo.findById(String(unitId));
   if (!unit) {
@@ -144,7 +220,7 @@ export async function createLesson(req: AuthRequest, res: Response) {
     description: description ? String(description).trim() : "",
     topics: normalizedTopics,
     proverbs: normalizedProverbs,
-    blocks: normalizedBlocks,
+    stages: normalizedStages,
     createdBy: req.user.id
   });
 
@@ -229,9 +305,9 @@ export async function getLessonById(req: Request, res: Response) {
 
 export async function updateLesson(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  const { title, description, unitId, orderIndex, topics, proverbs, blocks } = req.body ?? {};
+  const { title, description, unitId, orderIndex, topics, proverbs, stages } = req.body ?? {};
   let normalizedProverbs: Array<{ text: string; translation: string; contextNote: string }> = [];
-  let normalizedBlocks: LessonBlock[] = [];
+  let normalizedStages: LessonStage[] = [];
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "invalid id" });
@@ -289,25 +365,16 @@ export async function updateLesson(req: AuthRequest, res: Response) {
       .filter((p) => p.text);
     update.proverbs = normalizedProverbs;
   }
-  if (blocks !== undefined) {
-    if (!Array.isArray(blocks)) {
-      return res.status(400).json({ error: "invalid blocks" });
+  if (stages !== undefined) {
+    if (!Array.isArray(stages)) {
+      return res.status(400).json({ error: "invalid stages" });
     }
-    normalizedBlocks = blocks
-      .map((block) => {
-        const row = block as BlockInput;
-          return {
-            type: String(row.type || ""),
-            content: String(row.content || ""),
-            refId: row.refId ? String(row.refId) : undefined,
-            translationIndex:
-              Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
-                ? Number(row.translationIndex)
-                : 0
-          };
-      })
-      .filter((b) => ["text", "phrase", "proverb", "question"].includes(b.type)) as LessonBlock[];
-    update.blocks = normalizedBlocks;
+    normalizedStages = normalizeStages(stages);
+    const stagePlacementError = await validateStageOneQuestionPlacement(normalizedStages);
+    if (stagePlacementError) {
+      return res.status(400).json({ error: stagePlacementError });
+    }
+    update.stages = normalizedStages;
   }
 
   const lesson = await lessonUseCases.update(id, update as Partial<{
@@ -319,7 +386,7 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     orderIndex: number;
     topics: string[];
     proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-    blocks: LessonBlock[];
+    stages: LessonStage[];
   }>);
   if (!lesson) {
     return res.status(404).json({ error: "lesson not found" });
@@ -378,6 +445,16 @@ export async function publishLesson(req: Request, res: Response) {
   if (current.status !== "finished") {
     return res.status(400).json({ error: "lesson not finished" });
   }
+  const audit = await lessonAuditService.auditLesson(id);
+  if (!audit) {
+    return res.status(404).json({ error: "lesson not found" });
+  }
+  if (!audit.ok) {
+    return res.status(409).json({
+      error: "lesson quality audit failed",
+      audit
+    });
+  }
 
   const result = await lessonUseCases.publish(id);
   if (!result) {
@@ -394,6 +471,20 @@ export async function publishLesson(req: Request, res: Response) {
   }
 
   return res.status(200).json({ lesson: result });
+}
+
+export async function auditLesson(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid id" });
+  }
+
+  const audit = await lessonAuditService.auditLesson(id);
+  if (!audit) {
+    return res.status(404).json({ error: "lesson not found" });
+  }
+
+  return res.status(200).json({ audit });
 }
 
 export async function reorderLessons(req: Request, res: Response) {

@@ -4,6 +4,7 @@ import {
   generatePhrases,
   generateProverbs,
   generateUnitContent,
+  reviseUnitContent,
   suggestLesson
 } from "../../controllers/tutor/ai.controller.js";
 import { requireAuth, requireTutor } from "../../utils/authMiddleware.js";
@@ -14,6 +15,7 @@ router.use(requireAuth, requireTutor);
 
 router.post("/lessons/suggest", suggestLesson);
 router.post("/units/:unitId/generate-content", generateUnitContent);
+router.post("/units/:unitId/revise", reviseUnitContent);
 router.post("/phrases/generate", generatePhrases);
 router.post("/phrases/:id/enhance", enhancePhrase);
 router.post("/proverbs/generate", generateProverbs);

@@ -10,16 +10,26 @@ import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repos
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import type { Level } from "../../domain/entities/Lesson.js";
+import { LESSON_GENERATION_LIMITS } from "../../config/lessonGeneration.js";
+import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
+import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
 
 const lessons = new MongooseLessonRepository();
 const phrases = new MongoosePhraseRepository();
 const units = new MongooseUnitRepository();
-const useCases = new AdminLessonAiUseCases(lessons, phrases, new MongooseProverbRepository(), getLlmClient());
+const useCases = new AdminLessonAiUseCases(
+  lessons,
+  phrases,
+  new MongooseProverbRepository(),
+  units,
+  getLlmClient()
+);
 const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   lessons,
   phrases,
   new MongooseProverbRepository(),
   new MongooseQuestionRepository(),
+  units,
   getLlmClient()
 );
 
@@ -111,15 +121,47 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
       : undefined;
 
     try {
-      const suggestion = await llm.suggestLesson({
-        language: String(language),
-        level: String(level),
-        topic: variationTopic,
-        curriculumInstruction:
-          "Suggest the next coherent unit in the curriculum sequence. Avoid recycled topics with renamed titles.",
+      const validationInput = {
+        language: String(language) as "yoruba" | "igbo" | "hausa",
+        level: String(level) as Level,
         existingUnitTitles: existingUnits.map((item) => item.title).filter(Boolean),
         existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean)
-      });
+      };
+      let suggestion = null;
+      let retryInstruction = "";
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const candidate = await llm.suggestLesson({
+          language: String(language),
+          level: String(level),
+          topic: variationTopic,
+          curriculumInstruction: [
+            "Suggest the next coherent unit in the curriculum sequence. Avoid recycled topics with renamed titles.",
+            retryInstruction
+          ].filter(Boolean).join(" ").trim(),
+          existingUnitTitles: validationInput.existingUnitTitles,
+          existingLessonTitles: validationInput.existingLessonTitles
+        });
+        const validation = validateLessonSuggestion(candidate, validationInput);
+        if (validation.ok) {
+          suggestion = candidate;
+          break;
+        }
+        logAiValidation("admin-generate-unit", {
+          attempt,
+          topic: variationTopic,
+          title: candidate.title,
+          reasons: validation.reasons,
+          details: validation.details
+        });
+        if (attempt < 3) {
+          retryInstruction = buildRetryInstruction(validation.reasons);
+          logAiRetry("admin-generate-unit", { attempt, topic: variationTopic, retryInstruction });
+        }
+      }
+      if (!suggestion) {
+        skipped.push({ reason: "invalid_suggestion" });
+        continue;
+      }
 
       const rawTitle = String(suggestion.title || "").trim();
       if (!rawTitle) {
@@ -218,14 +260,22 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
 
   const requestedLessonCount = Number(lessonCount ?? 3);
-  const requestedPhrasesPerLesson = Number(phrasesPerLesson ?? 8);
+  const requestedPhrasesPerLesson = Number(
+    phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  );
   const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
   }
-  if (Number.isNaN(requestedPhrasesPerLesson) || requestedPhrasesPerLesson < 2 || requestedPhrasesPerLesson > 30) {
-    return res.status(400).json({ error: "phrasesPerLesson must be between 2 and 30." });
+  if (
+    Number.isNaN(requestedPhrasesPerLesson) ||
+    requestedPhrasesPerLesson < LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON ||
+    requestedPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  ) {
+    return res.status(400).json({
+      error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}.`
+    });
   }
   if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
     return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10." });
@@ -256,5 +306,77 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   } catch (error) {
     console.error("Admin AI generateUnitContent error", error);
     return res.status(502).json({ error: "llm generation failed" });
+  }
+}
+
+export async function reviseUnitContent(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { unitId } = req.params;
+  const { mode, lessonCount, phrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+
+  if (!unitId || typeof unitId !== "string") {
+    return res.status(400).json({ error: "Unit id is required." });
+  }
+  if (mode !== "refactor" && mode !== "regenerate") {
+    return res.status(400).json({ error: "Mode must be refactor or regenerate." });
+  }
+  if (topics !== undefined && !Array.isArray(topics)) {
+    return res.status(400).json({ error: "Topics must be an array." });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "Extra instructions must be a string." });
+  }
+
+  const requestedLessonCount = Number(lessonCount ?? 3);
+  const requestedPhrasesPerLesson = Number(
+    phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  );
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+
+  if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
+    return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
+  }
+  if (
+    Number.isNaN(requestedPhrasesPerLesson) ||
+    requestedPhrasesPerLesson < LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON ||
+    requestedPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  ) {
+    return res.status(400).json({
+      error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}.`
+    });
+  }
+  if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
+    return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10." });
+  }
+
+  const unit = await units.findById(String(unitId));
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found." });
+  }
+  if (!isValidLevel(String(unit.level))) {
+    return res.status(400).json({ error: "Unit level is invalid." });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.revise({
+      mode,
+      unitId: unit.id,
+      language: unit.language,
+      level: String(unit.level) as Level,
+      createdBy: req.user.id,
+      lessonCount: requestedLessonCount,
+      phrasesPerLesson: requestedPhrasesPerLesson,
+      proverbsPerLesson: requestedProverbsPerLesson,
+      topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Admin AI reviseUnitContent error", error);
+    return res.status(502).json({ error: "llm revision failed" });
   }
 }

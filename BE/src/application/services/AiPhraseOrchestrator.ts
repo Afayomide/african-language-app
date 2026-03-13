@@ -3,6 +3,8 @@ import type { PhraseEntity } from "../../domain/entities/Phrase.js";
 import type { LessonRepository } from "../../domain/repositories/LessonRepository.js";
 import type { PhraseRepository } from "../../domain/repositories/PhraseRepository.js";
 import type { LlmClient, LlmGeneratedPhrase } from "../../services/llm/types.js";
+import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
+import { validateGeneratedPhrases } from "../../services/llm/outputQuality.js";
 
 function isValidExamples(examples: unknown) {
   if (!Array.isArray(examples)) return false;
@@ -157,20 +159,19 @@ export class AiPhraseOrchestrator {
             ].join(" ")
           : "";
 
-    const phrases = await this.llm.generatePhrases({
+    const baseRequest = {
       lessonId: input.lesson.id,
       language: input.lesson.language,
       level: input.lesson.level,
       seedWords: input.seedWords,
-      extraInstructions: [input.extraInstructions || "", progressionInstructions]
-        .filter(Boolean)
-        .join(" "),
+      extraInstructions: [input.extraInstructions || "", progressionInstructions].filter(Boolean).join(" "),
       lessonTitle: input.lesson.title,
       lessonDescription: input.lesson.description,
-      existingPhrases: existingPhrases.map((phrase) => phrase.text)
-    });
+      existingPhrases: allLanguagePhrases.map((phrase) => phrase.text)
+    } as const;
+    const validated = await this.generateValidatedPhrases("lesson", baseRequest);
 
-    const levelAdjusted = applyLevelPhrasePolicy(input.lesson.level, phrases);
+    const levelAdjusted = applyLevelPhrasePolicy(input.lesson.level, validated.accepted);
     const ranked = rankByBeginnerOverlap(levelAdjusted, new Set(beginnerWordBank.map((item) => item.toLowerCase())));
     const uniqueInBatch = new Set<string>();
     const sanitized = ranked
@@ -258,19 +259,18 @@ export class AiPhraseOrchestrator {
       existingPhrases.map((phrase) => normalizePhraseText(phrase.text))
     );
 
-    const phrases = await this.llm.generatePhrases({
+    const baseRequest = {
       language: input.language,
       level: input.level,
       seedWords: input.seedWords,
-      extraInstructions: [input.extraInstructions || "", progressionInstructions]
-        .filter(Boolean)
-        .join(" "),
+      extraInstructions: [input.extraInstructions || "", progressionInstructions].filter(Boolean).join(" "),
       lessonTitle: "General phrases",
       lessonDescription: "Phrases not attached to a lesson yet",
       existingPhrases: existingPhrases.map((phrase) => phrase.text)
-    });
+    } as const;
+    const validated = await this.generateValidatedPhrases("language", baseRequest);
 
-    const levelAdjusted = applyLevelPhrasePolicy(input.level, phrases);
+    const levelAdjusted = applyLevelPhrasePolicy(input.level, validated.accepted);
     const ranked = rankByBeginnerOverlap(levelAdjusted, new Set(beginnerWordBank.map((item) => item.toLowerCase())));
     const uniqueInBatch = new Set<string>();
     const sanitized = ranked
@@ -306,6 +306,54 @@ export class AiPhraseOrchestrator {
       created.push(item);
     }
     return created;
+  }
+
+  private async generateValidatedPhrases(context: "lesson" | "language", input: {
+    lessonId?: string;
+    language: LessonEntity["language"];
+    level: LessonEntity["level"];
+    seedWords?: string[];
+    extraInstructions?: string;
+    lessonTitle?: string;
+    lessonDescription?: string;
+    existingPhrases?: string[];
+  }) {
+    let retryInstruction = "";
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const request = {
+        ...input,
+        extraInstructions: [input.extraInstructions || "", retryInstruction].filter(Boolean).join(" ").trim() || undefined
+      };
+      const raw = await this.llm.generatePhrases(request);
+      const validated = validateGeneratedPhrases(raw, request);
+
+      if (validated.rejected.length > 0) {
+        logAiValidation("phrases", {
+          context,
+          attempt,
+          acceptedCount: validated.accepted.length,
+          rejectedCount: validated.rejected.length,
+          sampleRejected: validated.rejected.slice(0, 5).map((item) => ({
+            text: item.item.text,
+            translations: item.item.translations,
+            reasons: item.reasons
+          }))
+        });
+      }
+
+      if (validated.accepted.length > 0) {
+        return validated;
+      }
+
+      if (attempt < 2) {
+        const reasons = validated.rejected.flatMap((item) => item.reasons);
+        retryInstruction = buildRetryInstruction(reasons);
+        logAiRetry("phrases", { context, attempt, retryInstruction });
+      }
+    }
+
+    return { accepted: [], rejected: [] };
   }
 
   async enhancePhrase(input: {

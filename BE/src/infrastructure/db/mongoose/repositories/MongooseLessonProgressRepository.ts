@@ -1,8 +1,8 @@
-import LessonProgressModel from "../../../../models/learner/LessonProgress.js";
+import LessonProgressModel, { type LessonProgressDocument } from "../../../../models/learner/LessonProgress.js";
 import type { LessonProgressEntity } from "../../../../domain/entities/LessonProgress.js";
 import type { LessonProgressRepository } from "../../../../domain/repositories/LessonProgressRepository.js";
 
-function toEntity(doc: any): LessonProgressEntity {
+function toEntity(doc: LessonProgressDocument): LessonProgressEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
@@ -11,14 +11,21 @@ function toEntity(doc: any): LessonProgressEntity {
     status: doc.status,
     progressPercent: doc.progressPercent,
     xpEarned: doc.xpEarned ?? 0,
-    stepProgress: (doc.stepProgress || []).map((s: any) => ({
-      stepKey: String(s.stepKey),
-      status: s.status,
-      score: s.score,
-      completedAt: s.completedAt
+    stepProgress: (doc.stepProgress || []).map((step) => ({
+      stepKey: String(step.stepKey),
+      status: step.status,
+      score: step.score,
+      completedAt: step.completedAt ?? undefined
     })),
-    startedAt: doc.startedAt,
-    completedAt: doc.completedAt,
+    stageProgress: (doc.stageProgress || []).map((stage) => ({
+      stageId: String(stage.stageId),
+      stageIndex: stage.stageIndex,
+      status: stage.status,
+      completedAt: stage.completedAt ?? undefined
+    })),
+    currentStageIndex: doc.currentStageIndex ?? 0,
+    startedAt: doc.startedAt ?? undefined,
+    completedAt: doc.completedAt ?? undefined,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
   };
@@ -49,9 +56,30 @@ export class MongooseLessonProgressRepository implements LessonProgressRepositor
       score?: number;
       completedAt?: Date;
     }>;
+    stageProgress: Array<{
+      stageId: string;
+      stageIndex: number;
+      status: "not_started" | "in_progress" | "completed";
+      completedAt?: Date;
+    }>;
+    currentStageIndex: number;
   }): Promise<LessonProgressEntity> {
-    const created = await LessonProgressModel.create(input);
-    return toEntity(created);
+    const updated = await LessonProgressModel.findOneAndUpdate(
+      { userId: input.userId, lessonId: input.lessonId },
+      {
+        $setOnInsert: {
+          userId: input.userId,
+          lessonId: input.lessonId,
+          status: input.status,
+          progressPercent: input.progressPercent,
+          stepProgress: input.stepProgress,
+          stageProgress: input.stageProgress,
+          currentStageIndex: input.currentStageIndex
+        }
+      },
+      { upsert: true, new: true }
+    );
+    return toEntity(updated);
   }
 
   async updateById(
@@ -66,6 +94,13 @@ export class MongooseLessonProgressRepository implements LessonProgressRepositor
         score?: number;
         completedAt?: Date;
       }>;
+      stageProgress: Array<{
+        stageId: string;
+        stageIndex: number;
+        status: "not_started" | "in_progress" | "completed";
+        completedAt?: Date;
+      }>;
+      currentStageIndex: number;
       startedAt?: Date;
       completedAt?: Date;
     }>

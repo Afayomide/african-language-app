@@ -1,4 +1,4 @@
-import type { Language, Level, LessonBlock, LessonEntity, Status } from "../../../../domain/entities/Lesson.js";
+import type { Language, Level, LessonEntity, LessonStage, Status } from "../../../../domain/entities/Lesson.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
@@ -20,7 +20,7 @@ export class TutorLessonUseCases {
     description?: string;
     topics?: string[];
     proverbs?: Array<{ text: string; translation: string; contextNote: string }>;
-    blocks?: LessonBlock[];
+    stages?: LessonStage[];
     createdBy: string;
   }) {
     const lastOrderIndex = await this.lessons.findLastOrderIndex(input.unitId);
@@ -35,7 +35,7 @@ export class TutorLessonUseCases {
       description: input.description?.trim() || "",
       topics: Array.isArray(input.topics) ? input.topics : [],
       proverbs: Array.isArray(input.proverbs) ? input.proverbs : [],
-      blocks: Array.isArray(input.blocks) ? input.blocks : [],
+      stages: Array.isArray(input.stages) ? input.stages : [],
       status: "draft",
       createdBy: input.createdBy
     });
@@ -60,7 +60,7 @@ export class TutorLessonUseCases {
       orderIndex: number;
       topics: string[];
       proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-      blocks: LessonBlock[];
+      stages: LessonStage[];
     }>
   ) {
     return this.lessons.updateByIdAndLanguage(id, language, update);

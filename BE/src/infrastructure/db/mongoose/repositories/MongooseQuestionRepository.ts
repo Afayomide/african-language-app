@@ -15,6 +15,9 @@ function toEntity(doc: any): QuestionEntity {
     _id: doc._id.toString(),
     lessonId: doc.lessonId.toString(),
     phraseId: doc.phraseId.toString(),
+    relatedPhraseIds: Array.isArray(doc.relatedPhraseIds)
+      ? doc.relatedPhraseIds.map((item: { toString(): string }) => item.toString())
+      : [],
     translationIndex: Number.isInteger(translationIndex) && translationIndex >= 0 ? translationIndex : 0,
     type: doc.type,
     subtype: doc.subtype,
@@ -22,6 +25,45 @@ function toEntity(doc: any): QuestionEntity {
     options: doc.options || [],
     correctIndex: doc.correctIndex,
     reviewData: doc.reviewData,
+    interactionData: doc.interactionData
+      ? {
+          matchingPairs: Array.isArray(doc.interactionData.matchingPairs)
+            ? doc.interactionData.matchingPairs.map(
+                (item: {
+                  pairId?: string;
+                  phraseId?: { toString(): string } | string;
+                  phraseText?: string;
+                  translationIndex?: number;
+                  translation?: string;
+                  image?: {
+                    imageAssetId?: { toString(): string } | string | null;
+                    url?: string;
+                    thumbnailUrl?: string;
+                    altText?: string;
+                  } | null;
+                }) => ({
+                  pairId: String(item.pairId || ""),
+                  phraseId: typeof item.phraseId === "string" ? item.phraseId : String(item.phraseId?.toString() || ""),
+                  phraseText: String(item.phraseText || ""),
+                  translationIndex: Number(item.translationIndex || 0),
+                  translation: String(item.translation || ""),
+                  image: item.image?.url
+                    ? {
+                        imageAssetId: item.image.imageAssetId
+                          ? typeof item.image.imageAssetId === "string"
+                            ? item.image.imageAssetId
+                            : item.image.imageAssetId.toString()
+                          : "",
+                        url: String(item.image.url || ""),
+                        thumbnailUrl: String(item.image.thumbnailUrl || ""),
+                        altText: String(item.image.altText || "")
+                      }
+                    : null
+                })
+              )
+            : []
+        }
+      : undefined,
     explanation: String(doc.explanation || ""),
     status: doc.status,
     createdAt: doc.createdAt,
@@ -80,20 +122,33 @@ export class MongooseQuestionRepository implements QuestionRepository {
     const reusedByOtherLessons = await LessonModel.find({
       _id: { $ne: lessonId },
       isDeleted: { $ne: true },
-      blocks: {
+      stages: {
         $elemMatch: {
-          type: "question",
-          refId: { $in: candidateIds }
+          blocks: {
+            $elemMatch: {
+              type: "question",
+              refId: { $in: candidateIds }
+            }
+          }
         }
       }
-    }).select("blocks.refId");
+    }).select("stages.blocks.refId stages.blocks.type");
 
     const preserved = new Set<string>();
     for (const lesson of reusedByOtherLessons) {
-      const blocks = Array.isArray(lesson.blocks) ? lesson.blocks : [];
-      for (const block of blocks) {
-        if (block?.type === "question" && block.refId) {
-          preserved.add(String(block.refId));
+      const stages = Array.isArray((lesson as {
+        stages?: Array<{ blocks?: Array<{ type?: string; refId?: string | { toString(): string } }> }>;
+      }).stages)
+        ? (lesson as {
+            stages: Array<{ blocks?: Array<{ type?: string; refId?: string | { toString(): string } }> }>;
+          }).stages
+        : [];
+      for (const stage of stages) {
+        const blocks = Array.isArray(stage.blocks) ? stage.blocks : [];
+        for (const block of blocks) {
+          if (block?.type === "question" && block.refId) {
+            preserved.add(String(block.refId));
+          }
         }
       }
     }
@@ -109,8 +164,15 @@ export class MongooseQuestionRepository implements QuestionRepository {
 
   async softDeleteByPhraseId(phraseId: string, now: Date): Promise<void> {
     await ExerciseQuestionModel.updateMany(
-      { phraseId, isDeleted: { $ne: true } },
+      { $or: [{ phraseId }, { relatedPhraseIds: phraseId }], isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: now }
+    );
+  }
+
+  async restoreByLessonId(lessonId: string): Promise<void> {
+    await ExerciseQuestionModel.updateMany(
+      { lessonId, isDeleted: true },
+      { isDeleted: false, deletedAt: null }
     );
   }
 

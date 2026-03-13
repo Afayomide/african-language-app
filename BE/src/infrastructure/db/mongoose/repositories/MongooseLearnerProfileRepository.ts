@@ -7,6 +7,9 @@ function toEntity(doc: {
   _id: { toString(): string };
   userId: { toString(): string };
   displayName: string;
+  proficientLanguage?: string;
+  countryOfOrigin?: string;
+  onboardingCompleted?: boolean;
   currentLanguage: Language;
   dailyGoalMinutes: number;
   totalXp: number;
@@ -22,6 +25,9 @@ function toEntity(doc: {
     _id: doc._id.toString(),
     userId: doc.userId.toString(),
     displayName: doc.displayName,
+    proficientLanguage: String(doc.proficientLanguage || ""),
+    countryOfOrigin: String(doc.countryOfOrigin || ""),
+    onboardingCompleted: Boolean(doc.onboardingCompleted),
     currentLanguage: doc.currentLanguage,
     dailyGoalMinutes: doc.dailyGoalMinutes,
     totalXp: doc.totalXp ?? 0,
@@ -46,6 +52,9 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
   async create(input: {
     userId: string;
     displayName: string;
+    proficientLanguage?: string;
+    countryOfOrigin?: string;
+    onboardingCompleted?: boolean;
     currentLanguage: Language;
     dailyGoalMinutes: number;
   }): Promise<LearnerProfileEntity> {
@@ -57,6 +66,9 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
     userId: string,
     update: Partial<{
       displayName: string;
+      proficientLanguage: string;
+      countryOfOrigin: string;
+      onboardingCompleted: boolean;
       currentLanguage: Language;
       dailyGoalMinutes: number;
       totalXp: number;

@@ -8,6 +8,14 @@ export type LessonBlock =
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
+export type LessonStage = {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  blocks: LessonBlock[];
+};
+
 export interface Lesson {
   _id: string;
   title: string;
@@ -18,10 +26,11 @@ export interface Lesson {
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-  blocks: LessonBlock[];
+  stages: LessonStage[];
   status: Status;
   createdBy: string;
   publishedAt?: string;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +70,37 @@ export interface Audio {
   s3Key: string;
 }
 
+export interface ImageAsset {
+  _id: string;
+  url: string;
+  thumbnailUrl?: string;
+  storageKey?: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  description: string;
+  altText: string;
+  tags: string[];
+  languageNeutralLabel?: string;
+  status: "draft" | "approved";
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PhraseImageLink {
+  _id: string;
+  phraseId: string;
+  translationIndex?: number | null;
+  imageAssetId: string;
+  isPrimary: boolean;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  asset: ImageAsset | null;
+}
+
 export interface Phrase {
   _id: string;
   lessonIds: string[];
@@ -73,9 +113,16 @@ export interface Phrase {
   difficulty: number;
   aiMeta: AIMeta;
   audio: Audio;
+  images?: PhraseImageLink[];
   status: Status;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UnitDeletedEntries {
+  lessons: Lesson[];
+  phrases: Phrase[];
 }
 
 export interface Proverb {
@@ -91,7 +138,7 @@ export interface Proverb {
   updatedAt: string;
 }
 
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
 
 export type QuestionSubtype =
   | "mc-select-translation"
@@ -102,12 +149,29 @@ export type QuestionSubtype =
   | "ls-mc-select-missing-word"
   | "ls-fg-word-order"
   | "ls-fg-gap-fill"
+  | "mt-match-image"
+  | "mt-match-translation"
   | "ls-dictation"
   | "ls-tone-recognition";
+
+export interface QuestionMatchingPair {
+  pairId: string;
+  phraseId: string;
+  phraseText: string;
+  translationIndex: number;
+  translation: string;
+  image?: {
+    imageAssetId: string;
+    url: string;
+    thumbnailUrl?: string;
+    altText: string;
+  } | null;
+}
 
 export interface ExerciseQuestion {
   _id: string;
   lessonId: string;
+  relatedPhraseIds?: string[];
   translationIndex: number;
   phraseId: string | {
     _id: string;
@@ -128,6 +192,9 @@ export interface ExerciseQuestion {
     correctOrder: number[];
     meaning: string;
   };
+  interactionData?: {
+    matchingPairs?: QuestionMatchingPair[];
+  };
   explanation: string;
   status: Status;
   createdAt: string;
@@ -138,6 +205,28 @@ export interface User {
   _id: string;
   email: string;
   role: "admin" | "user";
+}
+
+export type UserRole = "admin" | "learner" | "tutor" | "voice_artist";
+
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  roles: UserRole[];
+  createdAt: string;
+  updatedAt: string;
+  tutorProfile?: {
+    userId?: string;
+    language: Language;
+    displayName?: string;
+    isActive: boolean;
+  } | null;
+  voiceArtistProfile?: {
+    userId?: string;
+    language: Language;
+    displayName?: string;
+    isActive: boolean;
+  } | null;
 }
 
 export interface Tutor {
@@ -188,4 +277,24 @@ export interface VoiceAudioSubmission {
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+export interface LessonAuditFinding {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+}
+
+export interface LessonAuditResult {
+  ok: boolean;
+  errors: number;
+  warnings: number;
+  metrics: {
+    stageCount: number;
+    blockCount: number;
+    uniquePhraseCount: number;
+    questionCount: number;
+    listeningQuestionCount: number;
+  };
+  findings: LessonAuditFinding[];
 }

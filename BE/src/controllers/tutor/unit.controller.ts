@@ -11,14 +11,24 @@ import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/rep
 import { TutorLessonUseCases } from "../../application/use-cases/tutor/lesson/TutorLessonUseCases.js";
 import { isValidLessonStatus } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language } from "../../domain/entities/Lesson.js";
+import { UnitDeletedEntriesService } from "../../application/services/UnitDeletedEntriesService.js";
 
 const units = new MongooseUnitRepository();
 const lessonRepo = new MongooseLessonRepository();
+const phraseRepo = new MongoosePhraseRepository();
+const proverbRepo = new MongooseProverbRepository();
+const questionRepo = new MongooseQuestionRepository();
 const lessonUseCases = new TutorLessonUseCases(
   lessonRepo,
-  new MongoosePhraseRepository(),
-  new MongooseProverbRepository(),
-  new MongooseQuestionRepository()
+  phraseRepo,
+  proverbRepo,
+  questionRepo
+);
+const deletedEntries = new UnitDeletedEntriesService(
+  lessonRepo,
+  phraseRepo,
+  proverbRepo,
+  questionRepo
 );
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
 
@@ -79,6 +89,21 @@ export async function getUnitById(req: AuthRequest, res: Response) {
   return res.status(200).json({ unit });
 }
 
+export async function getDeletedEntries(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized." });
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
+
+  const unit = await units.findById(id);
+  if (!unit || unit.language !== tutorLanguage) return res.status(404).json({ error: "Unit not found." });
+
+  const result = await deletedEntries.list(unit.id);
+  return res.status(200).json(result);
+}
+
 export async function updateUnit(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
@@ -132,6 +157,44 @@ export async function deleteUnit(req: AuthRequest, res: Response) {
 
   await units.softDeleteById(id);
   return res.status(200).json({ message: "Unit deleted." });
+}
+
+export async function restoreDeletedLesson(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized." });
+  const { id, lessonId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!mongoose.Types.ObjectId.isValid(lessonId)) {
+    return res.status(400).json({ error: "Lesson id is invalid." });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
+
+  const unit = await units.findById(id);
+  if (!unit || unit.language !== tutorLanguage) return res.status(404).json({ error: "Unit not found." });
+
+  const lesson = await deletedEntries.restoreLesson(unit.id, lessonId);
+  if (!lesson) return res.status(404).json({ error: "Deleted lesson not found in this unit." });
+  return res.status(200).json({ message: "Lesson restored.", lesson });
+}
+
+export async function restoreDeletedPhrase(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized." });
+  const { id, phraseId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!mongoose.Types.ObjectId.isValid(phraseId)) {
+    return res.status(400).json({ error: "Phrase id is invalid." });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
+
+  const unit = await units.findById(id);
+  if (!unit || unit.language !== tutorLanguage) return res.status(404).json({ error: "Unit not found." });
+
+  const phrase = await deletedEntries.restorePhrase(unit.id, phraseId);
+  if (!phrase) return res.status(404).json({ error: "Deleted phrase not found in this unit." });
+  return res.status(200).json({ message: "Phrase restored.", phrase });
 }
 
 export async function finishUnit(req: AuthRequest, res: Response) {

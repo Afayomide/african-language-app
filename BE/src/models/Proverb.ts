@@ -3,6 +3,7 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 const ProverbSchema = new Schema(
   {
     lessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", required: true, index: true }],
+    deletedLessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
     language: {
       type: String,
       enum: ["yoruba", "igbo", "hausa"],
@@ -43,6 +44,7 @@ ProverbSchema.pre("validate", function normalizeText(next) {
 
 // Fast lesson feed and moderation filters.
 ProverbSchema.index({ lessonIds: 1, status: 1, isDeleted: 1, createdAt: -1 });
+ProverbSchema.index({ deletedLessonIds: 1, isDeleted: 1, createdAt: -1 });
 ProverbSchema.index({ language: 1, status: 1, isDeleted: 1, createdAt: -1 });
 ProverbSchema.index({ language: 1, normalizedText: 1, isDeleted: 1 });
 
@@ -53,4 +55,3 @@ export type ProverbDocument = InferSchemaType<typeof ProverbSchema> & {
 const ProverbModel = mongoose.model("Proverb", ProverbSchema);
 
 export default ProverbModel;
-

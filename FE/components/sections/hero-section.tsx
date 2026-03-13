@@ -5,6 +5,7 @@ import React from "react"
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
+import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 
 interface HeroSectionProps {
   title: string
@@ -29,6 +30,16 @@ export function HeroSection({
   trustMetric,
   children,
 }: HeroSectionProps) {
+  const { isAuthenticated } = useLearnerAuth()
+
+  const resolvedPrimaryCta = isAuthenticated
+    ? { label: 'Go to Dashboard', href: '/dashboard' }
+    : primaryCta
+
+  const resolvedSecondaryCta = isAuthenticated
+    ? { label: 'Dashboard', href: '/dashboard' }
+    : secondaryCta
+
   return (
     <section className="relative overflow-hidden px-4 py-16 md:py-40">
       {/* Grid background pattern */}
@@ -75,22 +86,22 @@ export function HeroSection({
 
         {/* CTA Buttons */}
         <div className="flex flex-col items-center justify-center gap-4 pt-2 sm:flex-row">
-          <Link href={primaryCta.href}>
+          <Link href={resolvedPrimaryCta.href}>
             <Button
               size="lg"
               className="gap-2 px-8 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
             >
-              {primaryCta.label}
+              {resolvedPrimaryCta.label}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
-          <Link href={secondaryCta.href}>
+          <Link href={resolvedSecondaryCta.href}>
             <Button
               size="lg"
               variant="outline"
               className="px-8 text-base font-semibold border-2 hover:bg-foreground/5 transition-all duration-200 bg-transparent"
             >
-              {secondaryCta.label}
+              {resolvedSecondaryCta.label}
             </Button>
           </Link>
         </div>

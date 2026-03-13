@@ -7,6 +7,7 @@ import adminAuthRouter from "./routes/admin/auth.routes.js";
 import adminLessonRouter from "./routes/admin/lesson.routes.js";
 import adminUnitRouter from "./routes/admin/unit.routes.js";
 import adminPhraseRouter from "./routes/admin/phrase.routes.js";
+import adminImageRouter from "./routes/admin/image.routes.js";
 import adminProverbRouter from "./routes/admin/proverb.routes.js";
 import adminQuestionRouter from "./routes/admin/question.routes.js";
 import adminTutorRouter from "./routes/admin/tutor.routes.js";
@@ -23,12 +24,14 @@ import tutorAuthRouter from "./routes/tutor/auth.routes.js";
 import tutorLessonRouter from "./routes/tutor/lesson.routes.js";
 import tutorUnitRouter from "./routes/tutor/unit.routes.js";
 import tutorPhraseRouter from "./routes/tutor/phrase.routes.js";
+import tutorImageRouter from "./routes/tutor/image.routes.js";
 import tutorProverbRouter from "./routes/tutor/proverb.routes.js";
 import tutorAiRouter from "./routes/tutor/ai.routes.js";
 import tutorQuestionRouter from "./routes/tutor/question.routes.js";
 import tutorVoiceAudioRouter from "./routes/tutor/voiceAudio.routes.js";
 import voiceAuthRouter from "./routes/voice/auth.routes.js";
 import voicePhraseRouter from "./routes/voice/phrase.routes.js";
+import LessonModel from "./models/Lesson.js";
 
 const app = express();
 
@@ -56,6 +59,7 @@ app.use("/api/admin/auth", adminAuthRouter);
 app.use("/api/admin/units", adminUnitRouter);
 app.use("/api/admin/lessons", adminLessonRouter);
 app.use("/api/admin/phrases", adminPhraseRouter);
+app.use("/api/admin/images", adminImageRouter);
 app.use("/api/admin/proverbs", adminProverbRouter);
 app.use("/api/admin/questions", adminQuestionRouter);
 app.use("/api/admin/tutors", adminTutorRouter);
@@ -72,6 +76,7 @@ app.use("/api/tutor/auth", tutorAuthRouter);
 app.use("/api/tutor/units", tutorUnitRouter);
 app.use("/api/tutor/lessons", tutorLessonRouter);
 app.use("/api/tutor/phrases", tutorPhraseRouter);
+app.use("/api/tutor/images", tutorImageRouter);
 app.use("/api/tutor/proverbs", tutorProverbRouter);
 app.use("/api/tutor/questions", tutorQuestionRouter);
 app.use("/api/tutor/ai", tutorAiRouter);
@@ -99,6 +104,11 @@ async function start() {
 
   try {
     await mongoose.connect(mongoUri);
+      const lesson = await LessonModel.findById(
+        "69afd803c6e6017933d72fe9",
+      ).lean();
+      console.log(lesson, { depth: null });
+
     console.log("Connected to MongoDB");
   } catch (error) {
     console.error("Failed to connect to MongoDB", error);

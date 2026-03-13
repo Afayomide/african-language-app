@@ -7,6 +7,15 @@ export type LessonStepProgressEntity = {
   completedAt?: Date;
 };
 
+export type LessonStageProgressStatus = "not_started" | "in_progress" | "completed";
+
+export type LessonStageProgressEntity = {
+  stageId: string;
+  stageIndex: number;
+  status: LessonStageProgressStatus;
+  completedAt?: Date;
+};
+
 export type LessonProgressStatus = "not_started" | "in_progress" | "completed";
 
 export type LessonProgressEntity = {
@@ -18,6 +27,8 @@ export type LessonProgressEntity = {
   progressPercent: number;
   xpEarned: number;
   stepProgress: LessonStepProgressEntity[];
+  stageProgress: LessonStageProgressEntity[];
+  currentStageIndex: number;
   startedAt?: Date;
   completedAt?: Date;
   createdAt: Date;

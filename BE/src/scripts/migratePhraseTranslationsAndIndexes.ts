@@ -20,9 +20,13 @@ type LessonBlockRaw = {
   [key: string]: string | number | boolean | null | undefined | mongoose.Types.ObjectId;
 };
 
+type LessonStageRaw = {
+  blocks?: LessonBlockRaw[];
+};
+
 type LessonRaw = {
   _id: mongoose.Types.ObjectId;
-  blocks?: LessonBlockRaw[];
+  stages?: LessonStageRaw[];
 };
 
 function normalizeTranslations(input: string[] | undefined, fallback: string | undefined) {
@@ -124,31 +128,39 @@ async function migrateLessonBlockTranslationIndexes() {
   let scanned = 0;
   let updated = 0;
 
-  const cursor = collection.find({ "blocks.type": "phrase" });
+  const cursor = collection.find({ "stages.blocks.type": "phrase" });
   for await (const lesson of cursor) {
     scanned += 1;
-    const blocks = Array.isArray(lesson.blocks) ? lesson.blocks : [];
+    const stages = Array.isArray(lesson.stages) ? lesson.stages : [];
     let changed = false;
 
-    const nextBlocks = blocks.map((block) => {
-      if (block.type !== "phrase") return block;
+    const nextStages = stages.map((stage) => {
+      const blocks = Array.isArray(stage.blocks) ? stage.blocks : [];
+      const nextBlocks = blocks.map((block) => {
+        if (block.type !== "phrase") return block;
 
-      const index = Number(block.translationIndex);
-      const valid = Number.isInteger(index) && index >= 0;
-      if (valid) return block;
+        const index = Number(block.translationIndex);
+        const valid = Number.isInteger(index) && index >= 0;
+        if (valid) return block;
 
-      changed = true;
+        changed = true;
+        return {
+          ...block,
+          translationIndex: 0
+        };
+      });
+
       return {
-        ...block,
-        translationIndex: 0
+        ...stage,
+        blocks: nextBlocks
       };
     });
 
     if (!changed) continue;
 
-    await collection.updateOne(
+      await collection.updateOne(
       { _id: lesson._id },
-      { $set: { blocks: nextBlocks } }
+      { $set: { stages: nextStages } }
     );
     updated += 1;
   }

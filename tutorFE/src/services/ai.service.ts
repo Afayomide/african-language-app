@@ -61,5 +61,38 @@ export const aiService = {
       }>;
     }>(feTutorAiRoutes.generateUnitContent(unitId), payload || {});
     return response.data;
+  },
+
+  async reviseUnitContent(
+    unitId: string,
+    payload: {
+      mode: "refactor" | "regenerate";
+      lessonCount?: number;
+      phrasesPerLesson?: number;
+      proverbsPerLesson?: number;
+      topics?: string[];
+      extraInstructions?: string;
+    }
+  ) {
+    const response = await api.post<{
+      unitId: string;
+      requestedLessons: number;
+      createdLessons: number;
+      updatedLessons: number;
+      clearedLessons: number;
+      revisionMode: "refactor" | "regenerate";
+      skippedLessons: Array<{ reason: string; topic?: string; title?: string }>;
+      lessonGenerationErrors: Array<{ topic?: string; error: string }>;
+      contentErrors: Array<{ lessonId?: string; title?: string; error: string }>;
+      lessons: Array<{
+        lessonId: string;
+        title: string;
+        phrasesGenerated: number;
+        proverbsGenerated: number;
+        questionsGenerated: number;
+        blocksGenerated: number;
+      }>;
+    }>(feTutorAiRoutes.reviseUnitContent(unitId), payload);
+    return response.data;
   }
 };

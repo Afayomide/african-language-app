@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   completeLesson,
+  completeStage,
   completeStep,
   getLessonOverview,
   getLessonFlow,
@@ -24,6 +25,7 @@ router.get("/:id/phrases", getLessonPhrases);
 router.get("/:id/review-exercises", getLessonReviewExercises);
 router.get("/:id/questions", getLessonQuestions);
 router.put("/:id/steps/:stepKey/complete", completeStep);
+router.post("/:id/stages/:stageIndex/complete", completeStage);
 router.post("/:id/complete", completeLesson);
 
 export default router;

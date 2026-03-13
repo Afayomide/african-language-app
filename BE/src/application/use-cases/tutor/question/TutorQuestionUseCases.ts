@@ -15,6 +15,7 @@ export class TutorQuestionUseCases {
     input: {
       lessonId: string;
       phraseId: string;
+      relatedPhraseIds?: string[];
       translationIndex?: number;
       type: QuestionEntity["type"];
       subtype: QuestionEntity["subtype"];
@@ -22,6 +23,7 @@ export class TutorQuestionUseCases {
       options: string[];
       correctIndex: number;
       reviewData?: QuestionEntity["reviewData"];
+      interactionData?: QuestionEntity["interactionData"];
       explanation?: string;
     },
     tutorLanguage: Language
@@ -36,7 +38,12 @@ export class TutorQuestionUseCases {
       return "invalid_translation_index" as const;
     }
 
-    return this.questions.create({ ...input, translationIndex, status: "draft" });
+    return this.questions.create({
+      ...input,
+      relatedPhraseIds: Array.isArray(input.relatedPhraseIds) ? input.relatedPhraseIds : [],
+      translationIndex,
+      status: "draft"
+    });
   }
 
   async list(

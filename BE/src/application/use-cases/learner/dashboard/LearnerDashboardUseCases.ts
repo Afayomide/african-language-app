@@ -114,7 +114,9 @@ export class LearnerDashboardUseCases {
             level: lesson.level,
             orderIndex: lesson.orderIndex,
             status: lessonProgress?.status || "not_started",
-            progressPercent: lessonProgress?.progressPercent || 0
+            progressPercent: lessonProgress?.progressPercent || 0,
+            currentStageIndex: lessonProgress?.currentStageIndex || 0,
+            totalStages: Array.isArray(lesson.stages) ? lesson.stages.length : 0
           };
         });
 
@@ -151,7 +153,10 @@ export class LearnerDashboardUseCases {
             unitTitle: unitsById.get(nextLesson.unitId)?.title || "Unit",
             title: nextLesson.title,
             description: nextLesson.description,
-            level: nextLesson.level
+            level: nextLesson.level,
+            currentStageIndex: progressByLessonId.get(nextLesson.id)?.currentStageIndex || 0,
+            totalStages: Array.isArray(nextLesson.stages) ? nextLesson.stages.length : 0,
+            progressPercent: progressByLessonId.get(nextLesson.id)?.progressPercent || 0
           }
         : null,
       units,

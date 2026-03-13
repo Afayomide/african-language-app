@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { lessonService, phraseService, proverbService, questionService } from "@/services"
-import { Lesson, LessonBlock, Phrase, Proverb, ExerciseQuestion } from "@/types"
+import { Lesson, LessonBlock, LessonStage, Phrase, Proverb, ExerciseQuestion } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,7 +23,8 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
   const router = useRouter()
 
   const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [blocks, setBlocks] = useState<LessonBlock[]>([])
+  const [stages, setStages] = useState<LessonStage[]>([])
+  const [activeStageIndex, setActiveStageIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -39,7 +40,14 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     try {
       const lessonData = await lessonService.getLesson(id)
       setLesson(lessonData)
-      setBlocks(Array.isArray(lessonData.blocks) ? lessonData.blocks : [])
+      const incomingStages = Array.isArray(lessonData.stages) ? lessonData.stages : []
+      setStages(incomingStages.length > 0 ? incomingStages : [{
+        id: "stage-1",
+        title: "Stage 1",
+        description: "",
+        orderIndex: 0,
+        blocks: []
+      }])
 
       const [p, prv, q] = await Promise.all([
         phraseService.listPhrases(id, undefined, lessonData.language),
@@ -57,62 +65,109 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleAddBlock = (type: LessonBlock["type"] | "listening") => {
+  const handleAddBlock = (type: LessonBlock["type"]) => {
+    const active = stages[activeStageIndex]
+    if (!active) return
+    const blocks = Array.isArray(active.blocks) ? active.blocks : []
     if (type === "text") {
-      setBlocks([...blocks, { type: "text", content: "" }])
+      const next = [...stages]
+      next[activeStageIndex] = { ...active, blocks: [...blocks, { type: "text", content: "" }] }
+      setStages(next)
       return
     }
 
-    if (type === "listening") {
-      const listeningQuestion = allQuestions.find((q) => q.type === "listening")
-      setBlocks([...blocks, { type: "question", refId: listeningQuestion?._id || "" }])
-      return
-    }
-
-    setBlocks([...blocks, { type, refId: "" }])
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, blocks: [...blocks, { type, refId: "" }] }
+    setStages(next)
   }
 
   const handleBlockChange = (index: number, value: string) => {
-    const updated = [...blocks]
-    const block = updated[index]
+    const active = stages[activeStageIndex]
+    if (!active) return
+    const blocks = Array.isArray(active.blocks) ? [...active.blocks] : []
+    const block = blocks[index]
+    if (!block) return
     if (block.type === "text") {
-      updated[index] = { ...block, content: value }
+      blocks[index] = { ...block, content: value }
     } else {
-      updated[index] = { ...block, refId: value }
+      blocks[index] = { ...block, refId: value }
     }
-    setBlocks(updated)
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, blocks }
+    setStages(next)
+  }
+
+  const handleStageTitleChange = (value: string) => {
+    const active = stages[activeStageIndex]
+    if (!active) return
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, title: value }
+    setStages(next)
+  }
+
+  const handleAddStage = () => {
+    const nextStage: LessonStage = {
+      id: `stage-${Date.now()}`,
+      title: `Stage ${stages.length + 1}`,
+      description: "",
+      orderIndex: stages.length,
+      blocks: []
+    }
+    const next = [...stages, nextStage]
+    setStages(next)
+    setActiveStageIndex(next.length - 1)
+  }
+
+  const handleRemoveStage = () => {
+    if (stages.length <= 1) return
+    const next = stages.filter((_, index) => index !== activeStageIndex).map((stage, index) => ({ ...stage, orderIndex: index }))
+    setStages(next)
+    setActiveStageIndex(Math.max(0, activeStageIndex - 1))
   }
 
   const handleBlockTranslationIndexChange = (index: number, value: string) => {
+    const active = stages[activeStageIndex]
+    if (!active) return
     const nextIndex = Number(value)
     if (!Number.isInteger(nextIndex) || nextIndex < 0) return
-    const updated = [...blocks]
-    const block = updated[index]
-    if (block.type !== "phrase") return
-    updated[index] = {
+    const blocks = Array.isArray(active.blocks) ? [...active.blocks] : []
+    const block = blocks[index]
+    if (!block || block.type !== "phrase") return
+    blocks[index] = {
       ...block,
       translationIndex: nextIndex
     }
-    setBlocks(updated)
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, blocks }
+    setStages(next)
   }
 
   const handleRemoveBlock = (index: number) => {
-    setBlocks(blocks.filter((_, i) => i !== index))
+    const active = stages[activeStageIndex]
+    if (!active) return
+    const blocks = (active.blocks || []).filter((_, i) => i !== index)
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, blocks }
+    setStages(next)
   }
 
   const handleMoveBlock = (index: number, direction: "up" | "down") => {
-    const updated = [...blocks]
+    const active = stages[activeStageIndex]
+    if (!active) return
+    const blocks = [...(active.blocks || [])]
     const newIndex = direction === "up" ? index - 1 : index + 1
     if (newIndex < 0 || newIndex >= blocks.length) return
-    const [moved] = updated.splice(index, 1)
-    updated.splice(newIndex, 0, moved)
-    setBlocks(updated)
+    const [moved] = blocks.splice(index, 1)
+    blocks.splice(newIndex, 0, moved)
+    const next = [...stages]
+    next[activeStageIndex] = { ...active, blocks }
+    setStages(next)
   }
 
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await lessonService.updateLesson(id, { blocks })
+      await lessonService.updateLesson(id, { stages })
       toast.success("Lesson flow saved successfully")
     } catch (error) {
       toast.error("Failed to save lesson flow")
@@ -123,6 +178,8 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) return <div className="p-8 text-center">Loading flow builder...</div>
   if (!lesson) return <div className="p-8 text-center">Lesson not found</div>
+  const activeStage = stages[activeStageIndex]
+  const blocks = Array.isArray(activeStage?.blocks) ? activeStage.blocks : []
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -161,15 +218,34 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                 <LayoutList className="h-5 w-5" />
                 Flow Timeline
               </CardTitle>
-              <div className="flex gap-1">
+              <div className="flex gap-1 items-center">
+                <Select value={String(activeStageIndex)} onValueChange={(v) => setActiveStageIndex(Number(v))}>
+                  <SelectTrigger className="h-9 w-[160px]">
+                    <SelectValue placeholder="Choose stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stages.map((stage, index) => (
+                      <SelectItem key={stage.id} value={String(index)}>
+                        {stage.title || `Stage ${index + 1}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" className="text-xs font-bold" onClick={handleAddStage}>+ Stage</Button>
+                <Button size="sm" variant="outline" className="text-xs font-bold" onClick={handleRemoveStage} disabled={stages.length <= 1}>- Stage</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("text")}>+ Text</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("phrase")}>+ Phrase</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("proverb")}>+ Proverb</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("question")}>+ Question</Button>
-                <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("listening")}>+ Listening</Button>
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
+              <Textarea
+                value={activeStage?.title || ""}
+                onChange={(e) => handleStageTitleChange(e.target.value)}
+                placeholder="Stage title"
+                className="border-2 rounded-xl focus-visible:ring-primary min-h-[56px]"
+              />
               {blocks.map((block, index) => (
                 <div key={index} className="flex gap-4 items-start p-4 border-2 rounded-2xl bg-muted/5 group relative transition-all hover:border-primary/30">
                   <div className="flex flex-col gap-1">

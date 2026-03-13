@@ -17,12 +17,20 @@ const LessonSchema = new Schema(
       }],
       default: []
     },
-    blocks: {
+    stages: {
       type: [{
-        type: { type: String, enum: ["text", "phrase", "proverb", "question"], required: true },
-        content: { type: String }, // For 'text' blocks
-        refId: { type: Schema.Types.ObjectId }, // Generic ref, logic handled in controller/service
-        translationIndex: { type: Number, min: 0, default: 0 }
+        title: { type: String, default: "" },
+        description: { type: String, default: "" },
+        orderIndex: { type: Number, default: 0 },
+        blocks: {
+          type: [{
+            type: { type: String, enum: ["text", "phrase", "proverb", "question"], required: true },
+            content: { type: String },
+            refId: { type: Schema.Types.ObjectId },
+            translationIndex: { type: Number, min: 0, default: 0 }
+          }],
+          default: []
+        }
       }],
       default: []
     },

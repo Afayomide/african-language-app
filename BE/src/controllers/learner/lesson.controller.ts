@@ -8,10 +8,12 @@ import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/rep
 import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
 import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
 import type { QuestionType } from "../../domain/entities/Question.js";
 
 const useCases = new LearnerLessonUseCases(
   new MongooseLessonRepository(),
+  new MongooseUnitRepository(),
   new MongoosePhraseRepository(),
   new MongooseProverbRepository(),
   new MongooseQuestionRepository(),
@@ -29,7 +31,7 @@ export async function getLessonFlow(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
-  const result = await useCases.getLessonFlow(id);
+  const result = await useCases.getLessonFlow(req.user.id, id);
   if (!result) {
     return res.status(404).json({ error: "lesson not found" });
   }
@@ -79,12 +81,20 @@ export async function getLessonOverview(req: AuthRequest, res: Response) {
   return res.status(200).json({
     lesson: {
       id: result.lesson.id,
+      _id: result.lesson.id,
       title: result.lesson.title,
       description: result.lesson.description,
       language: result.lesson.language,
       level: result.lesson.level,
+      topics: result.lesson.topics,
+      proverbs: result.lesson.proverbs,
+      stages: result.lesson.stages,
+      unitId: result.lesson.unitId,
+      orderIndex: result.lesson.orderIndex,
       progressPercent: result.progress.progressPercent,
-      status: result.progress.status
+      status: result.progress.status,
+      currentStageIndex: result.progress.currentStageIndex,
+      stageProgress: result.progress.stageProgress
     },
     steps: result.steps,
     comingNext: result.comingNext
@@ -104,6 +114,47 @@ export async function getLessonSteps(req: AuthRequest, res: Response) {
   const result = await useCases.getLessonSteps(req.user.id, id);
   if (!result) {
     return res.status(404).json({ error: "lesson not found" });
+  }
+
+  return res.status(200).json(result);
+}
+
+export async function completeStage(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { id, stageIndex } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid lesson id" });
+  }
+
+  const stageValue = Number(stageIndex);
+  if (!Number.isInteger(stageValue) || stageValue < 0) {
+    return res.status(400).json({ error: "invalid stage index" });
+  }
+
+  const { xpEarned, minutesSpent } = req.body ?? {};
+  if (xpEarned !== undefined && (!Number.isFinite(Number(xpEarned)) || Number(xpEarned) < 0)) {
+    return res.status(400).json({ error: "invalid xp earned" });
+  }
+  if (minutesSpent !== undefined && (!Number.isFinite(Number(minutesSpent)) || Number(minutesSpent) < 0)) {
+    return res.status(400).json({ error: "invalid minutes spent" });
+  }
+
+  const result = await useCases.completeStage({
+    userId: req.user.id,
+    lessonId: id,
+    stageIndex: stageValue,
+    xpEarned: xpEarned !== undefined ? Number(xpEarned) : undefined,
+    minutesSpent: minutesSpent !== undefined ? Number(minutesSpent) : undefined
+  });
+
+  if (result === "lesson_not_found") {
+    return res.status(404).json({ error: "lesson not found" });
+  }
+  if (result === "invalid_stage_index") {
+    return res.status(400).json({ error: "invalid stage index" });
   }
 
   return res.status(200).json(result);

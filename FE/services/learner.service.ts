@@ -10,26 +10,32 @@ export const learnerAuthService = {
     dailyGoalMinutes?: number;
   }) {
     const response = await api.post(feLearnerRoutes.signup(), data);
-    if (response.data?.token) {
-      localStorage.setItem("learnerToken", response.data.token);
-      localStorage.setItem("learnerUser", JSON.stringify(response.data.user));
-    }
     return response.data;
   },
 
   async login(email: string, password: string) {
     const response = await api.post(feLearnerRoutes.login(), { email, password });
-    if (response.data?.token) {
-      localStorage.setItem("learnerToken", response.data.token);
-      localStorage.setItem("learnerUser", JSON.stringify(response.data.user));
-    }
     return response.data;
   },
 
-  logout() {
-    localStorage.removeItem("learnerToken");
-    localStorage.removeItem("learnerUser");
-    window.location.href = "/auth/login";
+  async me() {
+    const response = await api.get(feLearnerRoutes.me());
+    return response.data;
+  },
+
+  async updateProfile(data: {
+    displayName?: string;
+    proficientLanguage?: string;
+    countryOfOrigin?: string;
+    currentLanguage?: "yoruba" | "igbo" | "hausa";
+    dailyGoalMinutes?: number;
+  }) {
+    const response = await api.put(feLearnerRoutes.updateProfile(), data);
+    return response.data;
+  },
+
+  async logout() {
+    await api.post(feLearnerRoutes.logout(), {});
   }
 };
 
@@ -93,6 +99,15 @@ export const learnerLessonService = {
 
   async completeStep(lessonId: string, stepKey: string, score?: number) {
     const response = await api.put(feLearnerRoutes.completeStep(lessonId, stepKey), { score });
+    return response.data;
+  },
+
+  async completeStage(
+    lessonId: string,
+    stageIndex: number,
+    payload?: { xpEarned?: number; minutesSpent?: number }
+  ) {
+    const response = await api.post(feLearnerRoutes.completeStage(lessonId, stageIndex), payload || {});
     return response.data;
   },
 

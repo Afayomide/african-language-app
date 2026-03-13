@@ -8,7 +8,7 @@ import {
   phraseService,
   questionService,
 } from "@/services";
-import { Lesson, Language, Level, Phrase, ExerciseQuestion } from "@/types";
+import { Lesson, Language, Level, Phrase, ExerciseQuestion, LessonAuditResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,6 +91,8 @@ export default function EditLessonPage({
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([]);
   const [selectedPhraseIds, setSelectedPhraseIds] = useState<string[]>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [audit, setAudit] = useState<LessonAuditResult | null>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
 
   const handleAddProverb = () => {
     setProverbs([...proverbs, { text: "", translation: "", contextNote: "" }]);
@@ -198,6 +200,21 @@ export default function EditLessonPage({
     }
   }
 
+  async function fetchLessonAudit() {
+    setIsAuditing(true);
+    try {
+      const data = await lessonService.auditLesson(id);
+      setAudit(data);
+      toast.success(data.ok ? "Lesson audit passed" : "Lesson audit found issues");
+      return data;
+    } catch (error) {
+      toast.error("Failed to audit lesson");
+      return null;
+    } finally {
+      setIsAuditing(false);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lesson) return;
@@ -226,6 +243,11 @@ export default function EditLessonPage({
 
   const handleFinishLesson = async () => {
     try {
+      const auditResult = await fetchLessonAudit();
+      if (!auditResult?.ok) {
+        toast.error("Fix the lesson audit errors before sending it to admin");
+        return;
+      }
       await lessonService.finishLesson(id);
       toast.success("Lesson sent to admin for publish");
       fetchLesson();
@@ -467,6 +489,14 @@ export default function EditLessonPage({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void fetchLessonAudit()}
+            disabled={isAuditing}
+            className="h-11 rounded-xl border-2 font-bold"
+          >
+            {isAuditing ? "Auditing..." : "Audit Lesson"}
+          </Button>
           <Dialog
             open={isGenerateDialogOpen}
             onOpenChange={setIsGenerateDialogOpen}
@@ -821,6 +851,58 @@ export default function EditLessonPage({
                   {lesson.orderIndex + 1}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-orange-200 shadow-lg rounded-3xl overflow-hidden">
+            <CardHeader className="bg-orange-50">
+              <CardTitle className="text-xl font-bold text-orange-700">Lesson Audit</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              {!audit ? (
+                <p className="text-sm text-muted-foreground">
+                  Run a lesson audit to check stage balance, listening coverage, and question quality.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={audit.ok ? "bg-green-500" : "bg-red-500"}>
+                      {audit.ok ? "Ready to Finish" : "Needs Fixes"}
+                    </Badge>
+                    <Badge variant="secondary">Errors: {audit.errors}</Badge>
+                    <Badge variant="secondary">Warnings: {audit.warnings}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>Stages: <span className="font-bold">{audit.metrics.stageCount}</span></div>
+                    <div>Blocks: <span className="font-bold">{audit.metrics.blockCount}</span></div>
+                    <div>Phrases: <span className="font-bold">{audit.metrics.uniquePhraseCount}</span></div>
+                    <div>Questions: <span className="font-bold">{audit.metrics.questionCount}</span></div>
+                    <div className="col-span-2">Listening: <span className="font-bold">{audit.metrics.listeningQuestionCount}</span></div>
+                  </div>
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {audit.findings.length === 0 ? (
+                      <p className="text-sm text-green-700">No issues found.</p>
+                    ) : (
+                      audit.findings.map((finding, index) => (
+                        <div
+                          key={`${finding.code}-${index}`}
+                          className={finding.severity === "error" ? "rounded-xl border border-red-200 bg-red-50 p-3" : "rounded-xl border border-amber-200 bg-amber-50 p-3"}
+                        >
+                          <div className="mb-1 flex items-center gap-2">
+                            <Badge className={finding.severity === "error" ? "bg-red-500" : "bg-amber-500"}>
+                              {finding.severity}
+                            </Badge>
+                            <span className="text-xs font-bold uppercase text-muted-foreground">
+                              {finding.code.replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <p className="text-sm">{finding.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

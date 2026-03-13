@@ -12,6 +12,14 @@ export type LessonBlock =
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
+export type LessonStage = {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  blocks: LessonBlock[];
+};
+
 export type LessonEntity = {
   id: string;
   _id?: string;
@@ -23,10 +31,11 @@ export type LessonEntity = {
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-  blocks: LessonBlock[];
+  stages: LessonStage[];
   status: Status;
   createdBy: string;
   publishedAt?: Date | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

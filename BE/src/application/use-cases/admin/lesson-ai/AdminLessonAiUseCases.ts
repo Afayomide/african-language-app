@@ -1,8 +1,15 @@
-import type { Language, Level, LessonEntity } from "../../../../domain/entities/Lesson.js";
+import type { Language, Level, LessonEntity, LessonStage } from "../../../../domain/entities/Lesson.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
+import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
 import type { LlmClient } from "../../../../services/llm/types.js";
+import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../../../services/llm/aiGenerationLogger.js";
+import { extractThemeAnchors } from "../../../../services/llm/unitTheme.js";
+import {
+  validateGeneratedProverbs,
+  validateLessonSuggestion
+} from "../../../../services/llm/outputQuality.js";
 
 function normalizeTitle(value: string) {
   return value.trim().toLowerCase();
@@ -33,11 +40,49 @@ function normalizeSuggestedProverb(item: unknown) {
   };
 }
 
+export function buildInitialStages(objectives: string[]): LessonStage[] {
+  const clean = objectives.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 4);
+  if (clean.length === 0) {
+    return [
+      {
+        id: "stage-1",
+        title: "Stage 1: Core Vocabulary",
+        description: "Start with the foundational words and phrases.",
+        orderIndex: 0,
+        blocks: []
+      },
+      {
+        id: "stage-2",
+        title: "Stage 2: Practice",
+        description: "Practice with guided exercises.",
+        orderIndex: 1,
+        blocks: []
+      },
+      {
+        id: "stage-3",
+        title: "Stage 3: Listening and Review",
+        description: "Consolidate with listening and review.",
+        orderIndex: 2,
+        blocks: []
+      }
+    ];
+  }
+
+  return clean.map((objective, index) => ({
+    id: `stage-${index + 1}`,
+    title: `Stage ${index + 1}`,
+    description: objective,
+    orderIndex: index,
+    blocks: []
+  }));
+}
+
 export class AdminLessonAiUseCases {
   constructor(
     private readonly lessons: LessonRepository,
     private readonly phrases: PhraseRepository,
     private readonly proverbs: ProverbRepository,
+    private readonly units: UnitRepository,
     private readonly llm: LlmClient
   ) {}
 
@@ -49,7 +94,13 @@ export class AdminLessonAiUseCases {
     topics?: string[];
     count: number;
     createdBy: string;
+    curriculumInstruction?: string;
   }) {
+    const unit = await this.units.findById(input.unitId);
+    if (!unit) {
+      throw new Error("Unit not found.");
+    }
+
     const existingLessons = await this.lessons.list({ unitId: input.unitId });
     const existingTitleSet = new Set(
       existingLessons
@@ -77,6 +128,7 @@ export class AdminLessonAiUseCases {
 
     const lastOrder = await this.lessons.findLastOrderIndex(input.unitId);
     let nextOrderIndex = (lastOrder ?? -1) + 1;
+    const existingUnitsInLanguage = await this.units.listByLanguage(input.language);
     const lessonIdsInUnit = existingLessons.map((item) => item.id);
     const existingPhrasesInUnit = lessonIdsInUnit.length
       ? await this.phrases.list({ lessonIds: lessonIdsInUnit })
@@ -89,19 +141,35 @@ export class AdminLessonAiUseCases {
       .map((item) => item.text)
       .filter(Boolean);
 
+    const curriculumInstruction =
+      input.curriculumInstruction?.trim() ||
+      "Continue the same unit curriculum progressively. Prioritize high-frequency conversational vocabulary, controlled repetition, and steady difficulty growth. Avoid repeating existing lessons with renamed titles.";
+
     for (let idx = 0; idx < input.count; idx += 1) {
       const lessonTopic = targetTopics[idx];
       try {
-        const suggestion = await this.llm.suggestLesson({
+        const suggestion = await this.getValidatedLessonSuggestion({
           language: input.language,
           level: input.level,
           topic: lessonTopic,
-          curriculumInstruction:
-            "Continue the same unit curriculum progressively and avoid repeating existing lessons with renamed titles.",
+          unitTitle: unit.title,
+          unitDescription: unit.description,
+          curriculumInstruction,
+          themeAnchors: extractThemeAnchors({
+            unitTitle: unit.title,
+            unitDescription: unit.description,
+            topic: lessonTopic,
+            curriculumInstruction
+          }),
+          existingUnitTitles: existingUnitsInLanguage.map((item) => item.title).filter(Boolean),
           existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean),
           existingPhraseTexts,
           existingProverbTexts
         });
+        if (!suggestion) {
+          skipped.push({ reason: "invalid_suggestion", topic: lessonTopic });
+          continue;
+        }
 
         const title = String(suggestion.title || "").trim();
         if (!title) {
@@ -127,6 +195,7 @@ export class AdminLessonAiUseCases {
           description: suggestion.description ? String(suggestion.description).trim() : "",
           topics: lessonTopic ? [lessonTopic] : [],
           proverbs: [],
+          stages: buildInitialStages(Array.isArray(suggestion.objectives) ? suggestion.objectives : []),
           status: "draft",
           createdBy: input.createdBy,
           orderIndex: nextOrderIndex
@@ -135,7 +204,20 @@ export class AdminLessonAiUseCases {
         const suggestedProverbs = Array.isArray(suggestion.proverbs)
           ? suggestion.proverbs.map(normalizeSuggestedProverb).filter((item): item is { text: string; translation: string; contextNote: string } => Boolean(item))
           : [];
-        for (const proverbItem of suggestedProverbs) {
+        const validSuggestedProverbs = await this.getValidatedGeneratedProverbs(
+          suggestedProverbs.map((item) => ({
+            text: item.text,
+            translation: item.translation,
+            contextNote: item.contextNote
+          })),
+          {
+            existingProverbs: existingProverbTexts,
+            level: input.level,
+            language: input.language
+          },
+          "suggested-lesson-proverbs"
+        );
+        for (const proverbItem of validSuggestedProverbs) {
           const reusable = await this.proverbs.findReusable(input.language, proverbItem.text);
           if (reusable) {
             const mergedLessonIds = Array.from(new Set([...reusable.lessonIds, lesson.id]));
@@ -194,19 +276,38 @@ export class AdminLessonAiUseCases {
     extraInstructions?: string;
   }) {
     const existing = await this.proverbs.findByLessonId(input.lesson.id);
-    const suggested = await this.llm.generateProverbs({
-      language: input.lesson.language,
+    const proverbValidationInput = {
+      existingProverbs: existing.map((item) => item.text),
       level: input.lesson.level,
-      lessonTitle: input.lesson.title,
-      lessonDescription: input.lesson.description,
-      count: input.count,
-      extraInstructions: input.extraInstructions?.trim() || undefined,
-      existingProverbs: existing.map((item) => item.text)
-    });
+      language: input.lesson.language
+    };
+    let validSuggested: Array<{ text: string; translation: string; contextNote?: string }> = [];
+    let retryInstruction = "";
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const suggested = await this.llm.generateProverbs({
+        language: input.lesson.language,
+        level: input.lesson.level,
+        lessonTitle: input.lesson.title,
+        lessonDescription: input.lesson.description,
+        count: input.count,
+        extraInstructions: [input.extraInstructions?.trim() || "", retryInstruction].filter(Boolean).join(" ").trim() || undefined,
+        existingProverbs: proverbValidationInput.existingProverbs
+      });
+      validSuggested = await this.getValidatedGeneratedProverbs(
+        suggested,
+        proverbValidationInput,
+        "lesson-proverbs"
+      );
+      if (validSuggested.length > 0) break;
+      if (attempt < 2) {
+        retryInstruction = buildRetryInstruction(["generate culturally authentic proverbs with English translations and context notes"]);
+        logAiRetry("lesson-proverbs", { attempt, retryInstruction });
+      }
+    }
 
     const created = [];
     const seen = new Set<string>();
-    for (const item of suggested) {
+    for (const item of validSuggested) {
       const text = String(item.text || "").trim();
       if (!text) continue;
       const key = text.toLowerCase();
@@ -239,5 +340,69 @@ export class AdminLessonAiUseCases {
     }
 
     return created;
+  }
+
+  private async getValidatedLessonSuggestion(input: {
+    language: Language;
+    level: Level;
+    topic?: string;
+    unitTitle?: string;
+    unitDescription?: string;
+    curriculumInstruction?: string;
+    themeAnchors?: string[];
+    existingUnitTitles?: string[];
+    existingLessonTitles?: string[];
+    existingPhraseTexts?: string[];
+    existingProverbTexts?: string[];
+  }) {
+    let retryInstruction = "";
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const suggestion = await this.llm.suggestLesson({
+        ...input,
+        curriculumInstruction: [input.curriculumInstruction || "", retryInstruction].filter(Boolean).join(" ").trim() || undefined
+      });
+      const validation = validateLessonSuggestion(suggestion, input);
+      if (validation.ok) {
+        return suggestion;
+      }
+
+      logAiValidation("lesson-suggestion", {
+        attempt,
+        topic: input.topic,
+        title: suggestion.title,
+        reasons: validation.reasons,
+        details: validation.details
+      });
+
+      if (attempt < 3) {
+        retryInstruction = buildRetryInstruction(validation.reasons);
+        logAiRetry("lesson-suggestion", { attempt, topic: input.topic, retryInstruction });
+      }
+    }
+
+    return null;
+  }
+
+  private async getValidatedGeneratedProverbs(
+    proverbs: Array<{ text: string; translation: string; contextNote?: string }>,
+    input: { existingProverbs?: string[]; level: Level; language: Language },
+    context: string
+  ) {
+    const validated = validateGeneratedProverbs(proverbs, input);
+    if (validated.rejected.length > 0) {
+      logAiValidation("proverbs", {
+        context,
+        acceptedCount: validated.accepted.length,
+        rejectedCount: validated.rejected.length,
+        sampleRejected: validated.rejected.slice(0, 5).map((item) => ({
+          text: item.item.text,
+          translation: item.item.translation,
+          contextNote: item.item.contextNote,
+          reasons: item.reasons
+        }))
+      });
+    }
+    return validated.accepted;
   }
 }

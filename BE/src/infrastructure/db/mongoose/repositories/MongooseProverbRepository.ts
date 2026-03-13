@@ -24,6 +24,7 @@ function toEntity(doc: any): ProverbEntity {
       reviewedByAdmin: Boolean(doc.aiMeta?.reviewedByAdmin)
     },
     status: doc.status,
+    deletedAt: doc.deletedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
   };
@@ -34,7 +35,8 @@ export class MongooseProverbRepository implements ProverbRepository {
     const lessonIds = Array.from(new Set(input.lessonIds.map(String).filter(Boolean)));
     const created = await ProverbModel.create({
       ...input,
-      lessonIds
+      lessonIds,
+      deletedLessonIds: []
     });
     return toEntity(created);
   }
@@ -101,11 +103,53 @@ export class MongooseProverbRepository implements ProverbRepository {
   async softDeleteByLessonId(lessonId: string, now: Date): Promise<void> {
     await ProverbModel.updateMany(
       { lessonIds: lessonId, isDeleted: { $ne: true } },
-      { $pull: { lessonIds: lessonId } }
+      {
+        $pull: { lessonIds: lessonId },
+        $addToSet: { deletedLessonIds: lessonId }
+      }
     );
     await ProverbModel.updateMany(
       { lessonIds: { $size: 0 }, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: now }
+    );
+  }
+
+  async restoreById(id: string, lessonIdsToAdd: string[] = []): Promise<ProverbEntity | null> {
+    const proverb = await ProverbModel.findOne({ _id: id });
+    if (!proverb) return null;
+
+    const currentLessonIds = (proverb.lessonIds || []).map((lessonId: { toString(): string }) => lessonId.toString());
+    const removedLessonIds = Array.from(
+      new Set((proverb.deletedLessonIds || []).map((lessonId: { toString(): string }) => lessonId.toString()))
+    );
+    const canRestoreExplicitIds = currentLessonIds.length === 0 && removedLessonIds.length === 0;
+    const lessonIdsToRestore = Array.from(new Set(lessonIdsToAdd.map(String).filter(Boolean))).filter(
+      (lessonId) => canRestoreExplicitIds || removedLessonIds.includes(lessonId) || currentLessonIds.includes(lessonId)
+    );
+    const mergedLessonIds = Array.from(
+      new Set([
+        ...currentLessonIds,
+        ...lessonIdsToRestore
+      ])
+    );
+    const remainingDeletedLessonIds = removedLessonIds.filter((lessonId) => !lessonIdsToRestore.includes(lessonId));
+
+    proverb.lessonIds = mergedLessonIds as never;
+    proverb.deletedLessonIds = remainingDeletedLessonIds as never;
+    proverb.isDeleted = false as never;
+    proverb.deletedAt = null as never;
+    await proverb.save();
+    return toEntity(proverb);
+  }
+
+  async restoreByLessonId(lessonId: string): Promise<void> {
+    await ProverbModel.updateMany(
+      { deletedLessonIds: lessonId },
+      {
+        $addToSet: { lessonIds: lessonId },
+        $pull: { deletedLessonIds: lessonId },
+        $set: { isDeleted: false, deletedAt: null }
+      }
     );
   }
 
@@ -128,4 +172,3 @@ export class MongooseProverbRepository implements ProverbRepository {
     return proverb ? toEntity(proverb) : null;
   }
 }
-

@@ -28,6 +28,14 @@ export type LlmGeneratedProverb = {
   contextNote?: string;
 };
 
+export type LlmUnitPlanLesson = {
+  title: string;
+  description?: string;
+  objectives: string[];
+  seedPhrases: string[];
+  focusSummary?: string;
+};
+
 export type GeneratePhrasesInput = {
   lessonId?: string;
   language: "yoruba" | "igbo" | "hausa";
@@ -62,11 +70,30 @@ export type LlmClient = {
     language: string;
     level: string;
     topic?: string;
+    unitTitle?: string;
+    unitDescription?: string;
     curriculumInstruction?: string;
+    themeAnchors?: string[];
     existingUnitTitles?: string[];
     existingLessonTitles?: string[];
     existingPhraseTexts?: string[];
     existingProverbTexts?: string[];
   }) => Promise<LlmLessonSuggestion>;
+  planUnitLessons: (input: {
+    language: string;
+    level: string;
+    lessonCount: number;
+    unitTitle?: string;
+    unitDescription?: string;
+    topic?: string;
+    curriculumInstruction?: string;
+    extraInstructions?: string;
+    themeAnchors?: string[];
+    existingUnitTitles?: string[];
+    existingLessonTitles?: string[];
+    existingPhraseTexts?: string[];
+    existingProverbTexts?: string[];
+    existingLessonsSummary?: string;
+  }) => Promise<LlmUnitPlanLesson[]>;
   modelName: string;
 };

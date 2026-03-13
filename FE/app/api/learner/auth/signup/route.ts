@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { beLearnerRoutes } from "@/lib/apiRoutes";
+import { readJsonResponse } from "@/lib/learnerProxy";
+import { setLearnerAuthCookie } from "@/lib/learnerAuthCookies";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -8,12 +10,23 @@ export async function POST(req: Request) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  const raw = await response.text();
-  let data: unknown = null;
-  try {
-    data = raw ? JSON.parse(raw) : null;
-  } catch {
-    data = { error: "invalid_backend_response", raw };
+  const data = await readJsonResponse(response);
+  const payload =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+
+  const nextResponse = NextResponse.json(
+    {
+      ...payload,
+      token: undefined
+    },
+    { status: response.status }
+  );
+
+  if (response.ok && typeof payload.token === "string" && payload.token) {
+    setLearnerAuthCookie(nextResponse, payload.token);
   }
-  return NextResponse.json(data, { status: response.status });
+
+  return nextResponse;
 }

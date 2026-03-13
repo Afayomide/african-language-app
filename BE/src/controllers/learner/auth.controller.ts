@@ -10,6 +10,7 @@ import {
   normalizeEmail
 } from "../../interfaces/http/validators/auth.validators.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
+import type { AuthRequest } from "../../utils/authMiddleware.js";
 
 const useCases = new LearnerAuthUseCases(
   new MongooseUserRepository(),
@@ -50,7 +51,10 @@ export async function signup(req: Request, res: Response) {
       dailyGoalMinutes: dailyGoalMinutes ? Number(dailyGoalMinutes) : undefined
     });
 
-    return res.status(201).json(result);
+    return res.status(201).json({
+      ...result,
+      message: "Account created successfully. Complete your profile to start learning."
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return res.status(error.status).json({ error: error.message });
@@ -75,6 +79,88 @@ export async function login(req: Request, res: Response) {
     const result = await useCases.login({
       email: normalizeEmail(String(email)),
       password: String(password)
+    });
+
+    return res.status(200).json({
+      ...result,
+      message: result.requiresOnboarding
+        ? "Signed in successfully. Complete your profile to continue."
+        : "Signed in successfully."
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+}
+
+export async function me(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "You are not authorized to perform this action." });
+  }
+
+  try {
+    const result = await useCases.me({
+      userId: req.user.id,
+      email: req.user.email,
+      role: req.user.role
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+}
+
+export async function updateProfile(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "You are not authorized to perform this action." });
+  }
+
+  const {
+    displayName,
+    proficientLanguage,
+    countryOfOrigin,
+    currentLanguage,
+    dailyGoalMinutes
+  } = req.body ?? {};
+
+  if (displayName !== undefined && !String(displayName).trim()) {
+    return res.status(400).json({ error: "Display name cannot be empty." });
+  }
+  if (proficientLanguage !== undefined && !String(proficientLanguage).trim()) {
+    return res.status(400).json({ error: "Proficient language cannot be empty." });
+  }
+  if (countryOfOrigin !== undefined && !String(countryOfOrigin).trim()) {
+    return res.status(400).json({ error: "Country of origin cannot be empty." });
+  }
+  if (currentLanguage !== undefined && !isValidLessonLanguage(String(currentLanguage))) {
+    return res.status(400).json({ error: "Selected learning language is not valid." });
+  }
+
+  const parsedDailyGoalMinutes =
+    dailyGoalMinutes !== undefined ? Number(dailyGoalMinutes) : undefined;
+  if (
+    parsedDailyGoalMinutes !== undefined &&
+    (Number.isNaN(parsedDailyGoalMinutes) || parsedDailyGoalMinutes < 1 || parsedDailyGoalMinutes > 120)
+  ) {
+    return res.status(400).json({ error: "Daily goal must be between 1 and 120 minutes." });
+  }
+
+  try {
+    const result = await useCases.updateProfile(req.user.id, {
+      displayName: displayName !== undefined ? String(displayName) : undefined,
+      proficientLanguage: proficientLanguage !== undefined ? String(proficientLanguage) : undefined,
+      countryOfOrigin: countryOfOrigin !== undefined ? String(countryOfOrigin) : undefined,
+      currentLanguage:
+        currentLanguage !== undefined ? (String(currentLanguage) as "yoruba" | "igbo" | "hausa") : undefined,
+      dailyGoalMinutes: parsedDailyGoalMinutes
     });
 
     return res.status(200).json(result);

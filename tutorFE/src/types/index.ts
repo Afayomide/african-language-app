@@ -8,6 +8,14 @@ export type LessonBlock =
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
+export type LessonStage = {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  blocks: LessonBlock[];
+};
+
 export interface Lesson {
   _id: string;
   title: string;
@@ -18,10 +26,11 @@ export interface Lesson {
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
-  blocks: LessonBlock[];
+  stages: LessonStage[];
   status: Status;
   createdBy: string;
   publishedAt?: string;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +70,37 @@ export interface Audio {
   s3Key: string;
 }
 
+export interface ImageAsset {
+  _id: string;
+  url: string;
+  thumbnailUrl?: string;
+  storageKey?: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  description: string;
+  altText: string;
+  tags: string[];
+  languageNeutralLabel?: string;
+  status: "draft" | "approved";
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PhraseImageLink {
+  _id: string;
+  phraseId: string;
+  translationIndex?: number | null;
+  imageAssetId: string;
+  isPrimary: boolean;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  asset: ImageAsset | null;
+}
+
 export interface VoiceAudioSubmission {
   id: string;
   phraseId: string;
@@ -96,9 +136,16 @@ export interface Phrase {
   difficulty: number;
   aiMeta: AIMeta;
   audio: Audio;
+  images?: PhraseImageLink[];
   status: Status;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UnitDeletedEntries {
+  lessons: Lesson[];
+  phrases: Phrase[];
 }
 
 export interface Proverb {
@@ -114,7 +161,7 @@ export interface Proverb {
   updatedAt: string;
 }
 
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
 
 export type QuestionSubtype =
   | "mc-select-translation"
@@ -125,12 +172,29 @@ export type QuestionSubtype =
   | "ls-mc-select-missing-word"
   | "ls-fg-word-order"
   | "ls-fg-gap-fill"
+  | "mt-match-image"
+  | "mt-match-translation"
   | "ls-dictation"
   | "ls-tone-recognition";
+
+export interface QuestionMatchingPair {
+  pairId: string;
+  phraseId: string;
+  phraseText: string;
+  translationIndex: number;
+  translation: string;
+  image?: {
+    imageAssetId: string;
+    url: string;
+    thumbnailUrl?: string;
+    altText: string;
+  } | null;
+}
 
 export interface ExerciseQuestion {
   _id: string;
   lessonId: string;
+  relatedPhraseIds?: string[];
   translationIndex: number;
   phraseId:
     | string
@@ -141,9 +205,8 @@ export interface ExerciseQuestion {
         selectedTranslation?: string;
         selectedTranslationIndex?: number;
         status: Status;
-      };
+  };
   type: QuestionType;
-  I;
   subtype: QuestionSubtype;
   promptTemplate: string;
   options: string[];
@@ -153,6 +216,9 @@ export interface ExerciseQuestion {
     words: string[];
     correctOrder: number[];
     meaning: string;
+  };
+  interactionData?: {
+    matchingPairs?: QuestionMatchingPair[];
   };
   explanation: string;
   status: Status;
@@ -176,4 +242,24 @@ export interface AuthResponse {
   token: string;
   user: User;
   tutor: TutorProfile;
+}
+
+export interface LessonAuditFinding {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+}
+
+export interface LessonAuditResult {
+  ok: boolean;
+  errors: number;
+  warnings: number;
+  metrics: {
+    stageCount: number;
+    blockCount: number;
+    uniquePhraseCount: number;
+    questionCount: number;
+    listeningQuestionCount: number;
+  };
+  findings: LessonAuditFinding[];
 }

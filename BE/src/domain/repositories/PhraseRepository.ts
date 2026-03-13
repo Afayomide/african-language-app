@@ -7,6 +7,11 @@ export type PhraseListFilter = {
   lessonIds?: string[];
 };
 
+export type PhraseDeletedListFilter = {
+  ids?: string[];
+  lessonIds?: string[];
+};
+
 export type PhraseCreateInput = {
   lessonIds?: string[];
   language: PhraseEntity["language"];
@@ -43,9 +48,12 @@ export interface PhraseRepository {
   findByIds(ids: string[]): Promise<PhraseEntity[]>;
   findByLessonId(lessonId: string): Promise<PhraseEntity[]>;
   findByIdAndLessonId(id: string, lessonId: string): Promise<PhraseEntity | null>;
+  listDeleted(filter: PhraseDeletedListFilter): Promise<PhraseEntity[]>;
   updateById(id: string, update: PhraseUpdateInput): Promise<PhraseEntity | null>;
   softDeleteById(id: string, now: Date): Promise<PhraseEntity | null>;
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
+  restoreById(id: string, lessonIdsToAdd?: string[]): Promise<PhraseEntity | null>;
+  restoreByLessonId(lessonId: string): Promise<void>;
   publishById(id: string, reviewedByAdmin: boolean): Promise<PhraseEntity | null>;
   finishById(id: string): Promise<PhraseEntity | null>;
 }

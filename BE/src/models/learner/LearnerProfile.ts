@@ -12,6 +12,9 @@ const LearnerProfileSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     displayName: { type: String, default: "" },
+    proficientLanguage: { type: String, default: "" },
+    countryOfOrigin: { type: String, default: "" },
+    onboardingCompleted: { type: Boolean, default: false },
     currentLanguage: { type: String, enum: ["yoruba", "igbo", "hausa"], default: "yoruba" },
     dailyGoalMinutes: { type: Number, default: 10, min: 1, max: 120 },
     totalXp: { type: Number, default: 0, min: 0 },

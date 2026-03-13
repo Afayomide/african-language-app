@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Flame, Target, BookOpen, Settings, LogOut, Layers, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { learnerDashboardService, learnerAuthService } from "@/services";
+import { learnerDashboardService } from "@/services";
+import { useLearnerAuth } from "@/components/auth/learner-auth-provider";
 
 type UnitLesson = {
   id: string;
@@ -15,6 +16,8 @@ type UnitLesson = {
   orderIndex: number;
   status: "not_started" | "in_progress" | "completed";
   progressPercent: number;
+  currentStageIndex?: number;
+  totalStages?: number;
 };
 
 type DashboardData = {
@@ -31,6 +34,9 @@ type DashboardData = {
     unitTitle?: string;
     title: string;
     description: string;
+    currentStageIndex?: number;
+    totalStages?: number;
+    progressPercent?: number;
   } | null;
   units?: Array<{
     id: string;
@@ -57,15 +63,17 @@ type DashboardData = {
 };
 
 export default function DashboardScreen() {
+  const { logout, isLoading: isAuthLoading, isAuthenticated, session } = useLearnerAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [expandedUnitId, setExpandedUnitId] = useState<string>("");
 
   useEffect(() => {
+    if (isAuthLoading || !isAuthenticated || session?.requiresOnboarding) return;
     learnerDashboardService
       .getOverview()
       .then((payload) => setData(payload))
       .catch((error) => console.error("Failed to load dashboard", error));
-  }, []);
+  }, [isAuthLoading, isAuthenticated, session?.requiresOnboarding]);
 
   useEffect(() => {
     if (!data?.units || data.units.length === 0) return;
@@ -95,7 +103,7 @@ export default function DashboardScreen() {
               <Button variant="ghost" size="icon">
                 <Settings className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => learnerAuthService.logout()}>
+              <Button variant="ghost" size="icon" onClick={() => void logout()}>
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>
@@ -196,6 +204,15 @@ export default function DashboardScreen() {
                           <div>
                             <p className="text-sm font-semibold text-foreground">{lesson.orderIndex + 1}. {lesson.title}</p>
                             <p className="text-xs text-foreground/60">{lesson.description || "Lesson"}</p>
+                            {lesson.totalStages ? (
+                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/45">
+                                {lesson.status === 'completed'
+                                  ? `Completed ${lesson.totalStages}/${lesson.totalStages} stages`
+                                  : lesson.status === 'in_progress'
+                                    ? `Stage ${(lesson.currentStageIndex ?? 0) + 1} of ${lesson.totalStages}`
+                                    : `${lesson.totalStages} stages`}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             {lesson.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : null}
@@ -230,6 +247,13 @@ export default function DashboardScreen() {
                     </div>
                     <h3 className="text-lg font-bold text-foreground">{data?.nextLesson?.title || "No lesson available"}</h3>
                     <p className="text-sm text-foreground/70">{data?.nextLesson?.description || "You are up to date for now."}</p>
+                    {data?.nextLesson?.totalStages ? (
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">
+                        {data.nextLesson.progressPercent && data.nextLesson.progressPercent > 0
+                          ? `Continue from stage ${(data.nextLesson.currentStageIndex ?? 0) + 1} of ${data.nextLesson.totalStages}`
+                          : `${data.nextLesson.totalStages} stages`}
+                      </p>
+                    ) : null}
                     {data?.nextLesson?.unitTitle ? (
                       <p className="text-xs uppercase tracking-wide text-foreground/50">{data.nextLesson.unitTitle}</p>
                     ) : null}

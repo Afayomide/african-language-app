@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
-import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus, CheckCircle2 } from "lucide-react";
+import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus, CheckCircle2, RefreshCcw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EditUnitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,6 +51,9 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(2);
   const [contentTopic, setContentTopic] = useState("");
   const [contentExtraInstructions, setContentExtraInstructions] = useState("");
+  const [isReviseDialogOpen, setIsReviseDialogOpen] = useState(false);
+  const [isRevisingContent, setIsRevisingContent] = useState(false);
+  const [revisionMode, setRevisionMode] = useState<"refactor" | "regenerate">("refactor");
 
   const isPublished = useMemo(() => unit?.status === "published", [unit?.status]);
 
@@ -210,6 +213,40 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  async function handleReviseUnitContent() {
+    try {
+      setIsRevisingContent(true);
+      const result = await aiService.reviseUnitContent(id, {
+        mode: revisionMode,
+        lessonCount: contentLessonCount,
+        phrasesPerLesson: contentPhrasesPerLesson,
+        proverbsPerLesson: contentProverbsPerLesson,
+        topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
+        extraInstructions: contentExtraInstructions.trim() || undefined
+      });
+      toast.success(
+        revisionMode === "refactor"
+          ? `Refactored ${result.updatedLessons || 0} existing lessons and added ${result.createdLessons} new lessons.`
+          : `Regenerated unit content for ${result.createdLessons} lessons after clearing ${result.clearedLessons} existing lessons.`
+      );
+      setIsReviseDialogOpen(false);
+      const refreshed = await lessonService.listLessonsPage({
+        language,
+        unitId: id,
+        page: 1,
+        limit: lessonLimit
+      });
+      setLessonPage(1);
+      setLessons(refreshed.items);
+      setLessonTotal(refreshed.total);
+      setLessonTotalPages(refreshed.pagination.totalPages);
+    } catch (error) {
+      toast.error(`Failed to ${revisionMode} unit content.`);
+    } finally {
+      setIsRevisingContent(false);
+    }
+  }
+
   async function handlePublishLesson(lessonId: string) {
     try {
       const updated = await lessonService.publishLesson(lessonId);
@@ -244,10 +281,40 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             <Sparkles className="mr-2 h-5 w-5 text-emerald-600" />
             Generate Full Unit
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setRevisionMode("refactor");
+              setIsReviseDialogOpen(true);
+            }}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-sky-50 hover:text-sky-600 transition-all"
+          >
+            <Wand2 className="mr-2 h-5 w-5 text-sky-600" />
+            Refactor Unit
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setRevisionMode("regenerate");
+              setIsReviseDialogOpen(true);
+            }}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-rose-50 hover:text-rose-600 transition-all"
+          >
+            <RefreshCcw className="mr-2 h-5 w-5 text-rose-600" />
+            Regenerate Unit
+          </Button>
           <Button asChild variant="outline" className="h-11 rounded-xl border-2 font-bold">
             <Link href={`/lessons/new?language=${language}&unitId=${id}`}>
               <Plus className="mr-2 h-4 w-4" />
               Add Lesson
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="h-11 rounded-xl border-2 font-bold">
+            <Link href={`/units/${id}/deleted`}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Deleted Entries
             </Link>
           </Button>
           <Button type="submit" form="unit-edit-form" disabled={isSaving || isPublished} className="h-11 rounded-xl px-6 font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
@@ -481,6 +548,57 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             </Button>
             <Button type="button" onClick={handleGenerateUnitContent} disabled={isGeneratingContent}>
               {isGeneratingContent ? "Generating..." : "Generate Full Unit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReviseDialogOpen} onOpenChange={setIsReviseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{revisionMode === "refactor" ? "Refactor Unit with AI" : "Regenerate Unit with AI"}</DialogTitle>
+            <DialogDescription>
+              {revisionMode === "refactor"
+                ? "AI will clear the current unit lessons and rebuild the unit with a stronger structure using the existing unit theme as context."
+                : "AI will clear the current unit lessons and generate a fresh version of this unit from scratch."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="revise-lesson-count">Lesson count</Label>
+                <Input id="revise-lesson-count" type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => setContentLessonCount(Number(event.target.value || 0))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revise-phrases-per-lesson">Phrases / lesson</Label>
+                <Input id="revise-phrases-per-lesson" type="number" min={1} max={8} value={contentPhrasesPerLesson} onChange={(event) => setContentPhrasesPerLesson(Number(event.target.value || 0))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revise-proverbs-per-lesson">Proverbs / lesson</Label>
+                <Input id="revise-proverbs-per-lesson" type="number" min={0} max={10} value={contentProverbsPerLesson} onChange={(event) => setContentProverbsPerLesson(Number(event.target.value || 0))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="revise-topic">Topic focus</Label>
+              <Input id="revise-topic" value={contentTopic} onChange={(event) => setContentTopic(event.target.value)} placeholder="Optional focus for this revision" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="revise-extra-instructions">Extra instructions</Label>
+              <Textarea
+                id="revise-extra-instructions"
+                rows={5}
+                value={contentExtraInstructions}
+                onChange={(event) => setContentExtraInstructions(event.target.value)}
+                placeholder={revisionMode === "refactor" ? "Tell AI what to improve in the current unit." : "Tell AI what to change in the regenerated unit."}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReviseDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReviseUnitContent} disabled={isRevisingContent}>
+              {isRevisingContent ? "Running..." : revisionMode === "refactor" ? "Refactor Unit" : "Regenerate Unit"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -7,7 +7,8 @@ import { ChevronLeft, BookOpen, Zap, Headphones, RotateCw, Lock, Play, CheckCirc
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { learnerLessonService } from '@/services'
-import { Lesson } from '@/types'
+import { Lesson, LessonStageProgress } from '@/types'
+import { cn } from '@/lib/utils'
 
 function LessonOverviewContent() {
   const searchParams = useSearchParams()
@@ -31,7 +32,9 @@ function LessonOverviewContent() {
         const overview = await learnerLessonService.getLessonOverview(lessonId);
         setLesson({
           ...overview.lesson,
-          _id: overview.lesson.id ?? overview.lesson._id
+          _id: overview.lesson.id ?? overview.lesson._id,
+          currentStageIndex: overview.lesson.currentStageIndex,
+          stageProgress: overview.lesson.stageProgress,
         });
         setProgress(overview.lesson.progressPercent || 0);
         setStatus(overview.lesson.status === "completed" ? "completed" : "available");
@@ -48,6 +51,9 @@ function LessonOverviewContent() {
   if (!lesson) return <div className="min-h-screen flex items-center justify-center">Lesson not found.</div>
 
   const isCompleted = status === "completed"
+  const stages = Array.isArray(lesson.stages) ? lesson.stages : []
+  const stageProgress = Array.isArray(lesson.stageProgress) ? lesson.stageProgress : []
+  const resumeStageNumber = isCompleted ? 1 : (lesson.currentStageIndex ?? 0) + 1
 
   return (
     <main className="min-h-screen bg-background">
@@ -111,7 +117,7 @@ function LessonOverviewContent() {
 
               <Link href={`/study?lessonId=${lesson._id}`} className="block">
                 <Button size="lg" className="w-full h-16 rounded-[1.5rem] text-xl font-black shadow-xl border-b-8 border-primary-foreground/30 active:translate-y-1 active:border-b-4 transition-all">
-                  {isCompleted ? "Review Lesson" : "Start Learning"}
+                  {isCompleted ? "Review Lesson" : progress > 0 ? `Continue From Stage ${resumeStageNumber}` : "Start Learning"}
                   <ArrowRight className="ml-2 h-6 w-6" />
                 </Button>
               </Link>
@@ -124,6 +130,47 @@ function LessonOverviewContent() {
 
           {/* Resource Library (Always accessible, but highlighted when completed) */}
           <div className="space-y-6">
+            {stages.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 px-2">Lesson Stages</h3>
+                <div className="space-y-2">
+                  {stages
+                    .slice()
+                    .sort((a, b) => a.orderIndex - b.orderIndex)
+                    .map((stage, index) => {
+                      const savedStage = stageProgress.find((item: LessonStageProgress) => item.stageIndex === index)
+                      const stageStatus = savedStage?.status || 'not_started'
+                      return (
+                        <Card key={stage.id || `${index}`} className="p-4 rounded-2xl border-2 border-muted/60 bg-white">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-black text-foreground">
+                                {stage.title || `Stage ${index + 1}`}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(stage.blocks || []).length} activities • {(stage.blocks || []).filter((block) => block.type === 'question').length * 10} XP
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-black uppercase tracking-wide text-foreground/50">#{index + 1}</span>
+                              <p className={cn(
+                                'mt-1 text-[10px] font-black uppercase tracking-[0.2em]',
+                                stageStatus === 'completed'
+                                  ? 'text-green-600'
+                                  : stageStatus === 'in_progress'
+                                    ? 'text-primary'
+                                    : 'text-foreground/35'
+                              )}>
+                                {stageStatus === 'completed' ? 'Completed' : stageStatus === 'in_progress' ? 'Current' : 'Not started'}
+                              </p>
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 px-2">Study Materials</h3>
             <div className="grid gap-4">
               <Link href={`/lesson-phrases?lessonId=${lesson._id}`}>
@@ -179,8 +226,4 @@ export default function LessonOverviewScreen() {
       <LessonOverviewContent />
     </Suspense>
   )
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ")
 }

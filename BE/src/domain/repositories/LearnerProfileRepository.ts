@@ -6,6 +6,9 @@ export interface LearnerProfileRepository {
   create(input: {
     userId: string;
     displayName: string;
+    proficientLanguage?: string;
+    countryOfOrigin?: string;
+    onboardingCompleted?: boolean;
     currentLanguage: Language;
     dailyGoalMinutes: number;
   }): Promise<LearnerProfileEntity>;
@@ -13,6 +16,9 @@ export interface LearnerProfileRepository {
     userId: string,
     update: Partial<{
       displayName: string;
+      proficientLanguage: string;
+      countryOfOrigin: string;
+      onboardingCompleted: boolean;
       currentLanguage: Language;
       dailyGoalMinutes: number;
       totalXp: number;

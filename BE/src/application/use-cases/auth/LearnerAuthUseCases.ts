@@ -4,6 +4,7 @@ import type { UserRepository } from "../../../domain/repositories/UserRepository
 import type { LearnerProfileRepository } from "../../../domain/repositories/LearnerProfileRepository.js";
 import { AuthTokenService } from "../../services/AuthTokenService.js";
 import { AuthError } from "./AuthErrors.js";
+import type { AuthRole } from "../../services/AuthTokenService.js";
 
 export class LearnerAuthUseCases {
   constructor(
@@ -44,6 +45,9 @@ export class LearnerAuthUseCases {
       profile = await this.learnerProfiles.create({
         userId: user.id,
         displayName: input.name.trim(),
+        proficientLanguage: "",
+        countryOfOrigin: "",
+        onboardingCompleted: false,
         currentLanguage: input.language || "yoruba",
         dailyGoalMinutes: input.dailyGoalMinutes && input.dailyGoalMinutes > 0 ? input.dailyGoalMinutes : 10
       });
@@ -59,7 +63,8 @@ export class LearnerAuthUseCases {
         role: "learner" as const,
         roles: user.roles
       },
-      profile
+      profile,
+      requiresOnboarding: !profile.onboardingCompleted
     };
   }
 
@@ -79,6 +84,9 @@ export class LearnerAuthUseCases {
       profile = await this.learnerProfiles.create({
         userId: user.id,
         displayName: "",
+        proficientLanguage: "",
+        countryOfOrigin: "",
+        onboardingCompleted: false,
         currentLanguage: "yoruba",
         dailyGoalMinutes: 10
       });
@@ -94,7 +102,84 @@ export class LearnerAuthUseCases {
         role: "learner" as const,
         roles: user.roles
       },
-      profile
+      profile,
+      requiresOnboarding: !profile.onboardingCompleted
+    };
+  }
+
+  async me(input: { userId: string; email: string; role: AuthRole }) {
+    let profile = await this.learnerProfiles.findByUserId(input.userId);
+    if (!profile) {
+      profile = await this.learnerProfiles.create({
+        userId: input.userId,
+        displayName: "",
+        proficientLanguage: "",
+        countryOfOrigin: "",
+        onboardingCompleted: false,
+        currentLanguage: "yoruba",
+        dailyGoalMinutes: 10
+      });
+    }
+
+    return {
+      user: {
+        id: input.userId,
+        email: input.email,
+        role: input.role
+      },
+      profile,
+      requiresOnboarding: !profile.onboardingCompleted
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    input: Partial<{
+      displayName: string;
+      proficientLanguage: string;
+      countryOfOrigin: string;
+      currentLanguage: "yoruba" | "igbo" | "hausa";
+      dailyGoalMinutes: number;
+    }>
+  ) {
+    let profile = await this.learnerProfiles.findByUserId(userId);
+    if (!profile) {
+      profile = await this.learnerProfiles.create({
+        userId,
+        displayName: "",
+        proficientLanguage: "",
+        countryOfOrigin: "",
+        onboardingCompleted: false,
+        currentLanguage: input.currentLanguage || "yoruba",
+        dailyGoalMinutes: input.dailyGoalMinutes && input.dailyGoalMinutes > 0 ? input.dailyGoalMinutes : 10
+      });
+    }
+
+    const nextDisplayName = input.displayName !== undefined ? input.displayName.trim() : profile.displayName;
+    const nextProficientLanguage =
+      input.proficientLanguage !== undefined ? input.proficientLanguage.trim() : profile.proficientLanguage;
+    const nextCountryOfOrigin =
+      input.countryOfOrigin !== undefined ? input.countryOfOrigin.trim() : profile.countryOfOrigin;
+    const nextCurrentLanguage = input.currentLanguage || profile.currentLanguage;
+    const nextDailyGoalMinutes =
+      input.dailyGoalMinutes && input.dailyGoalMinutes > 0 ? input.dailyGoalMinutes : profile.dailyGoalMinutes;
+
+    const updated = await this.learnerProfiles.updateByUserId(userId, {
+      displayName: nextDisplayName,
+      proficientLanguage: nextProficientLanguage,
+      countryOfOrigin: nextCountryOfOrigin,
+      onboardingCompleted: Boolean(nextProficientLanguage && nextCountryOfOrigin),
+      currentLanguage: nextCurrentLanguage,
+      dailyGoalMinutes: nextDailyGoalMinutes
+    });
+
+    if (!updated) {
+      throw new AuthError(500, "Failed to update learner profile.");
+    }
+
+    return {
+      profile: updated,
+      requiresOnboarding: !updated.onboardingCompleted
     };
   }
 }

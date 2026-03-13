@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Volume2, Sparkles } from "lucide-react";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { PhraseImageManager } from "@/components/phrases/phrase-image-manager";
 
 export default function EditPhrasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -227,6 +228,10 @@ export default function EditPhrasePage({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-6">
+          <PhraseImageManager
+            phrase={phrase}
+            onImagesChanged={(images) => setPhrase((prev) => (prev ? { ...prev, images } : prev))}
+          />
           <Card>
             <CardHeader>
               <CardTitle>Settings</CardTitle>

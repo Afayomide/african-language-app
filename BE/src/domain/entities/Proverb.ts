@@ -16,7 +16,7 @@ export type ProverbEntity = {
   contextNote: string;
   aiMeta: ProverbAiMeta;
   status: Status;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
-

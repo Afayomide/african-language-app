@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Quicksand } from 'next/font/google'
 import { PwaRegister } from "@/components/pwa/register-sw"
 import { InstallPrompt } from "@/components/pwa/install-prompt"
+import { LearnerAuthProvider } from "@/components/auth/learner-auth-provider"
+import { Toaster } from "@/components/ui/sonner"
 
 import './globals.css'
 
@@ -36,9 +38,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <PwaRegister />
-        <InstallPrompt />
-        {children}
+        <LearnerAuthProvider>
+          <PwaRegister />
+          <InstallPrompt />
+          {children}
+          <Toaster richColors position="top-center" />
+        </LearnerAuthProvider>
       </body>
     </html>
   )

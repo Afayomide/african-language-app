@@ -1,5 +1,5 @@
 import LessonModel from "../../../../models/Lesson.js";
-import type { Language, LessonEntity } from "../../../../domain/entities/Lesson.js";
+import type { Language, LessonBlock, LessonEntity } from "../../../../domain/entities/Lesson.js";
 import type {
   LessonCreateInput,
   LessonListFilter,
@@ -17,15 +17,22 @@ type LessonPersistenceDoc = {
   description?: string | null;
   topics?: string[] | null;
   proverbs?: Array<{ text?: string | null; translation?: string | null; contextNote?: string | null }> | null;
-  blocks?: Array<{
-    type?: "text" | "phrase" | "proverb" | "question" | null;
-    content?: string | null;
-    refId?: { toString(): string } | string | null;
-    translationIndex?: number | null;
+  stages?: Array<{
+    _id?: { toString(): string } | string | null;
+    title?: string | null;
+    description?: string | null;
+    orderIndex?: number | null;
+    blocks?: Array<{
+      type?: "text" | "phrase" | "proverb" | "question" | null;
+      content?: string | null;
+      refId?: { toString(): string } | string | null;
+      translationIndex?: number | null;
+    }> | null;
   }> | null;
   status: LessonEntity["status"];
   createdBy: { toString(): string } | string;
   publishedAt?: Date | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -41,24 +48,46 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
       })
     : [];
 
-  const blockRows = Array.isArray(doc.blocks)
-    ? doc.blocks.map((row) => {
+  const mapBlocks = (rows: Array<{
+    type?: "text" | "phrase" | "proverb" | "question" | null;
+    content?: string | null;
+    refId?: { toString(): string } | string | null;
+    translationIndex?: number | null;
+  }> | null | undefined): LessonBlock[] =>
+    Array.isArray(rows)
+      ? rows.map((row) => {
         const blockType = String(row.type || "") as "text" | "phrase" | "proverb" | "question";
         if (blockType === "phrase") {
           const rawIndex = Number(row.translationIndex ?? 0);
           return {
             type: "phrase" as const,
-            content: String(row.content || ""),
             refId: row.refId ? String(row.refId) : "",
             translationIndex: Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : 0
           };
         }
+        if (blockType === "text") {
+          return {
+            type: "text" as const,
+            content: String(row.content || "")
+          };
+        }
         return {
-          type: blockType,
-          content: String(row.content || ""),
+          type: blockType as "proverb" | "question",
           refId: row.refId ? String(row.refId) : ""
         };
       })
+      : [];
+
+  const stageRows = Array.isArray(doc.stages)
+    ? doc.stages
+      .map((row, index) => ({
+        id: row._id ? String(row._id) : `${doc._id.toString()}-stage-${index}`,
+        title: String(row.title || ""),
+        description: String(row.description || ""),
+        orderIndex: Number(row.orderIndex ?? index),
+        blocks: mapBlocks(row.blocks)
+      }))
+      .sort((a, b) => a.orderIndex - b.orderIndex)
     : [];
 
   return {
@@ -72,10 +101,11 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
     description: String(doc.description || ""),
     topics: Array.isArray(doc.topics) ? doc.topics.map(String) : [],
     proverbs: proverbRows,
-    blocks: blockRows,
+    stages: stageRows,
     status: doc.status,
     createdBy: String(doc.createdBy),
     publishedAt: doc.publishedAt || null,
+    deletedAt: doc.deletedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
   };
@@ -148,6 +178,15 @@ export class MongooseLessonRepository implements LessonRepository {
     const lesson = await LessonModel.findOneAndUpdate(
       { _id: id, language, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
+    return lesson ? toEntity(lesson) : null;
+  }
+
+  async restoreById(id: string, orderIndex: number): Promise<LessonEntity | null> {
+    const lesson = await LessonModel.findOneAndUpdate(
+      { _id: id, isDeleted: true },
+      { isDeleted: false, deletedAt: null, orderIndex },
       { new: true }
     );
     return lesson ? toEntity(lesson) : null;
@@ -232,6 +271,13 @@ export class MongooseLessonRepository implements LessonRepository {
   async listByUnitId(unitId: string): Promise<LessonEntity[]> {
     const lessons = await LessonModel.find({ unitId, isDeleted: { $ne: true } })
       .sort({ orderIndex: 1, createdAt: 1 })
+      .lean();
+    return lessons.map(toEntity);
+  }
+
+  async listDeletedByUnitId(unitId: string): Promise<LessonEntity[]> {
+    const lessons = await LessonModel.find({ unitId, isDeleted: true })
+      .sort({ deletedAt: -1, updatedAt: -1 })
       .lean();
     return lessons.map(toEntity);
   }

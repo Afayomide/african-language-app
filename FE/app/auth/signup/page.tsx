@@ -6,14 +6,16 @@ import { useState } from 'react'
 import { useRouter } from "next/navigation"
 import { Button } from '@/components/ui/button'
 import { Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
 import { SocialAuthButtons } from "@/components/auth/social-auth-buttons"
 import { AuthLayout } from "@/components/auth/auth-layout"
 import { AuthFormCard } from "@/components/auth/auth-form-card"
 import { FormField } from "@/components/forms/form-field"
-import { learnerAuthService } from "@/services"
+import { useLearnerAuth } from "@/components/auth/learner-auth-provider"
 
 export default function SignUpPage() {
   const router = useRouter()
+  const { signup } = useLearnerAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -30,17 +32,22 @@ export default function SignUpPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.password !== formData.confirmPassword) return
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match.')
+      return
+    }
     setIsLoading(true)
     try {
-      await learnerAuthService.signup({
+      const result = await signup({
         name: formData.name,
         email: formData.email,
         password: formData.password
       })
-      router.push("/language-selection")
+      toast.success(result.message)
+      await new Promise((resolve) => window.setTimeout(resolve, 700))
+      router.push("/onboarding")
     } catch (error) {
-      console.error("Signup failed", error)
+      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
     }
