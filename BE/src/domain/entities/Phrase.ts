@@ -23,6 +23,7 @@ export type PhraseEntity = {
   id: string;
   _id?: string;
   lessonIds: string[];
+  introducedLessonIds: string[];
   language: "yoruba" | "igbo" | "hausa";
   text: string;
   translations: string[];

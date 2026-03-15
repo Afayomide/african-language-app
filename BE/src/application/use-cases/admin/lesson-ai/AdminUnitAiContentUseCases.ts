@@ -13,6 +13,11 @@ import { LESSON_GENERATION_LIMITS, clampPhrasesPerLesson } from "../../../../con
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../../../services/llm/aiGenerationLogger.js";
 import { extractThemeAnchors } from "../../../../services/llm/unitTheme.js";
 import { validateLessonSuggestion } from "../../../../services/llm/outputQuality.js";
+import { buildLetterOrderReviewData } from "../../../../controllers/shared/spellingQuestion.js";
+import {
+  PhraseIntroductionService,
+  wasPhraseIntroducedBeforeLesson
+} from "../../../services/PhraseIntroductionService.js";
 
 type QuestionDraft = {
   type: QuestionType;
@@ -108,6 +113,19 @@ function splitWords(value: string) {
     .filter(Boolean);
 }
 
+function buildPhraseOrderReviewData(phrase: PhraseEntity): NonNullable<QuestionEntity["reviewData"]> | null {
+  const sentence = String(phrase.text || "").trim();
+  const words = splitWords(sentence);
+  if (words.length < 2) return null;
+
+  return {
+    sentence,
+    words,
+    correctOrder: words.map((_, index) => index),
+    meaning: pickTranslation(phrase)
+  };
+}
+
 function getExerciseSentence(phrase: PhraseEntity) {
   const exampleSentence = String(phrase.examples[0]?.original || "").trim();
   if (splitWords(exampleSentence).length >= 2) return exampleSentence;
@@ -118,7 +136,7 @@ function getExerciseSentence(phrase: PhraseEntity) {
   return "";
 }
 
-function buildReviewData(phrase: PhraseEntity): NonNullable<QuestionEntity["reviewData"]> | null {
+function buildSentenceReviewData(phrase: PhraseEntity): NonNullable<QuestionEntity["reviewData"]> | null {
   const translation = pickTranslation(phrase);
   const sentence = getExerciseSentence(phrase);
   const words = splitWords(sentence);
@@ -240,49 +258,70 @@ function buildMissingWordOptions(
 function buildQuestionDrafts(
   phrase: PhraseEntity,
   lessonPhrases: PhraseEntity[],
-  languagePool: PhraseEntity[]
+  languagePool: PhraseEntity[],
+  alreadyIntroduced = false
 ): StageTaggedDraft[] {
   const mc = buildMcOptions(phrase, lessonPhrases, languagePool);
-  const reviewData = buildReviewData(phrase);
+  const phraseOrderReviewData = buildPhraseOrderReviewData(phrase);
+  const sentenceReviewData = buildSentenceReviewData(phrase);
+  const spellingReviewData = buildLetterOrderReviewData({
+    phraseText: phrase.text,
+    meaning: pickTranslation(phrase)
+  });
   const heardWordMc = buildMissingWordOptions(phrase, lessonPhrases, languagePool);
-  const gapFill = reviewData ? buildGapFillQuestion(phrase, lessonPhrases, languagePool, reviewData) : null;
+  const gapFill = sentenceReviewData
+    ? buildGapFillQuestion(phrase, lessonPhrases, languagePool, sentenceReviewData)
+    : null;
   const drafts: StageTaggedDraft[] = [];
 
-  drafts.push(
-    {
-      stage: 1,
-      type: "multiple-choice",
-      subtype: "mc-select-translation",
-      promptTemplate: "What is {phrase} in English?",
-      options: mc.options,
-      correctIndex: mc.correctIndex,
-      explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
-    },
-    {
-      stage: 1,
-      type: "listening",
-      subtype: "ls-mc-select-translation",
-      promptTemplate: "Listen to {phrase} and choose the meaning.",
-      options: mc.options,
-      correctIndex: mc.correctIndex,
-      explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
-    }
-  );
+  if (!alreadyIntroduced) {
+    drafts.push(
+      {
+        stage: 1,
+        type: "multiple-choice",
+        subtype: "mc-select-translation",
+        promptTemplate: "What is {phrase} in English?",
+        options: mc.options,
+        correctIndex: mc.correctIndex,
+        explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
+      },
+      {
+        stage: 1,
+        type: "listening",
+        subtype: "ls-mc-select-translation",
+        promptTemplate: "Listen to {phrase} and choose the meaning.",
+        options: mc.options,
+        correctIndex: mc.correctIndex,
+        explanation: phrase.explanation || `The correct meaning is ${pickTranslation(phrase)}.`
+      }
+    );
 
-  if (reviewData) {
-    drafts.push({
-      stage: 1,
-      type: "fill-in-the-gap",
-      subtype: "fg-word-order",
-      promptTemplate: "Arrange the words to mean: {meaning}",
-      options: reviewData.words,
-      correctIndex: 0,
-      reviewData,
-      explanation: `Correct order: ${reviewData.words.join(" ")}`
-    });
+    if (phraseOrderReviewData) {
+      drafts.push({
+        stage: 1,
+        type: "fill-in-the-gap",
+        subtype: "fg-word-order",
+        promptTemplate: "Arrange the words to mean: {meaning}",
+        options: phraseOrderReviewData.words,
+        correctIndex: 0,
+        reviewData: phraseOrderReviewData,
+        explanation: `Correct order: ${phraseOrderReviewData.words.join(" ")}`
+      });
+    } else if (spellingReviewData) {
+      drafts.push({
+        stage: 1,
+        type: "fill-in-the-gap",
+        subtype: "fg-letter-order",
+        promptTemplate: "Arrange the letters to spell the phrase for: {meaning}",
+        options: spellingReviewData.words,
+        correctIndex: 0,
+        reviewData: spellingReviewData,
+        explanation: phrase.explanation || `Correct spelling: ${spellingReviewData.sentence}`
+      });
+    }
   }
 
-  if (gapFill && reviewData) {
+  if (gapFill && sentenceReviewData) {
     drafts.push(
       {
         stage: 2,
@@ -291,8 +330,8 @@ function buildQuestionDrafts(
         promptTemplate: "Select the missing word: {sentence}",
         options: gapFill.options,
         correctIndex: gapFill.correctIndex,
-        reviewData: { ...reviewData, sentence: gapFill.promptSentence },
-        explanation: phrase.explanation || `The correct word is ${reviewData.sentence}.`
+        reviewData: { ...sentenceReviewData, sentence: gapFill.promptSentence },
+        explanation: phrase.explanation || `The correct word is ${sentenceReviewData.sentence}.`
       },
       {
         stage: 2,
@@ -301,8 +340,8 @@ function buildQuestionDrafts(
         promptTemplate: "Listen and fill in the blank: {sentence}",
         options: gapFill.options,
         correctIndex: gapFill.correctIndex,
-        reviewData: { ...reviewData, sentence: gapFill.promptSentence },
-        explanation: phrase.explanation || `Correct completion: ${reviewData.sentence}.`
+        reviewData: { ...sentenceReviewData, sentence: gapFill.promptSentence },
+        explanation: phrase.explanation || `Correct completion: ${sentenceReviewData.sentence}.`
       }
     );
   } else {
@@ -328,6 +367,19 @@ function buildQuestionDrafts(
     );
   }
 
+  if (spellingReviewData && phraseOrderReviewData) {
+    drafts.push({
+      stage: 2,
+      type: "fill-in-the-gap",
+      subtype: "fg-letter-order",
+      promptTemplate: "Arrange the letters to spell the phrase for: {meaning}",
+      options: spellingReviewData.words,
+      correctIndex: 0,
+      reviewData: spellingReviewData,
+      explanation: phrase.explanation || `Correct spelling: ${spellingReviewData.sentence}`
+    });
+  }
+
   drafts.push(
     {
       stage: 3,
@@ -349,7 +401,20 @@ function buildQuestionDrafts(
     }
   );
 
-  if (gapFill && reviewData) {
+  if (phraseOrderReviewData) {
+    drafts.push({
+      stage: 3,
+      type: "listening",
+      subtype: "ls-fg-word-order",
+      promptTemplate: "Listen and arrange the words to match: {meaning}",
+      options: phraseOrderReviewData.words,
+      correctIndex: 0,
+      reviewData: phraseOrderReviewData,
+      explanation: `Correct order: ${phraseOrderReviewData.words.join(" ")}`
+    });
+  }
+
+  if (gapFill && sentenceReviewData) {
     drafts.push(
       {
         stage: 3,
@@ -358,18 +423,8 @@ function buildQuestionDrafts(
         promptTemplate: "Listen and choose the missing word: {sentence}",
         options: gapFill.options,
         correctIndex: gapFill.correctIndex,
-        reviewData: { ...reviewData, sentence: gapFill.promptSentence },
-        explanation: phrase.explanation || `The correct word completes ${reviewData.sentence}.`
-      },
-      {
-        stage: 3,
-        type: "listening",
-        subtype: "ls-fg-word-order",
-        promptTemplate: "Listen and arrange the words to match: {meaning}",
-        options: reviewData.words,
-        correctIndex: 0,
-        reviewData,
-        explanation: `Correct order: ${reviewData.words.join(" ")}`
+        reviewData: { ...sentenceReviewData, sentence: gapFill.promptSentence },
+        explanation: phrase.explanation || `The correct word completes ${sentenceReviewData.sentence}.`
       },
       {
         stage: 3,
@@ -378,8 +433,8 @@ function buildQuestionDrafts(
         promptTemplate: "Listen and fill in the blank: {sentence}",
         options: gapFill.options,
         correctIndex: gapFill.correctIndex,
-        reviewData: { ...reviewData, sentence: gapFill.promptSentence },
-        explanation: phrase.explanation || `Correct completion: ${reviewData.sentence}.`
+        reviewData: { ...sentenceReviewData, sentence: gapFill.promptSentence },
+        explanation: phrase.explanation || `Correct completion: ${sentenceReviewData.sentence}.`
       }
     );
   } else {
@@ -571,6 +626,7 @@ export class AdminUnitAiContentUseCases {
   private readonly phraseOrchestrator: AiPhraseOrchestrator;
   private readonly lessonAi: AdminLessonAiUseCases;
   private readonly llm: LlmClient;
+  private readonly phraseIntroductions: PhraseIntroductionService;
 
   constructor(
     private readonly lessons: LessonRepository,
@@ -583,6 +639,7 @@ export class AdminUnitAiContentUseCases {
     this.llm = llm;
     this.phraseOrchestrator = new AiPhraseOrchestrator(this.lessons, this.phrases, llm);
     this.lessonAi = new AdminLessonAiUseCases(this.lessons, this.phrases, this.proverbs, this.units, llm);
+    this.phraseIntroductions = new PhraseIntroductionService(this.phrases);
   }
 
   private async getValidatedUnitPlan(input: {
@@ -789,9 +846,15 @@ export class AdminUnitAiContentUseCases {
     const stage1Questions: QuestionEntity[] = [];
     const stage2Questions: QuestionEntity[] = [];
     const stage3Questions: QuestionEntity[] = [];
+    const generatedLessonPhrases = refreshedPhrases.filter((item) => generatedPhraseIdSet.has(item.id));
 
-    for (const phrase of refreshedPhrases.filter((item) => generatedPhraseIdSet.has(item.id))) {
-      const drafts = buildQuestionDrafts(phrase, refreshedPhrases, input.languagePool);
+    for (const phrase of generatedLessonPhrases) {
+      const alreadyIntroduced = wasPhraseIntroducedBeforeLesson(
+        phrase,
+        input.lesson.id,
+        generatedPhraseIdSet.has(phrase.id)
+      );
+      const drafts = buildQuestionDrafts(phrase, refreshedPhrases, input.languagePool, alreadyIntroduced);
       for (const draft of drafts) {
         const created = await this.questions.create({
           lessonId: input.lesson.id,
@@ -827,18 +890,29 @@ export class AdminUnitAiContentUseCases {
       pushBlock(0, { type: "text", content: description });
     }
 
-    for (const phrase of refreshedPhrases.filter((item) => generatedPhraseIdSet.has(item.id))) {
-      pushBlock(0, { type: "phrase", refId: phrase.id });
-      for (const question of stage1Questions.filter((item) => item.phraseId === phrase.id)) {
-        pushBlock(0, { type: "question", refId: question.id });
+    for (const phrase of generatedLessonPhrases) {
+      const alreadyIntroduced = wasPhraseIntroducedBeforeLesson(
+        phrase,
+        input.lesson.id,
+        generatedPhraseIdSet.has(phrase.id)
+      );
+      if (!alreadyIntroduced) {
+        pushBlock(0, { type: "phrase", refId: phrase.id });
+        for (const question of stage1Questions.filter((item) => item.phraseId === phrase.id)) {
+          pushBlock(0, { type: "question", refId: question.id });
+        }
       }
 
-      pushBlock(1, { type: "phrase", refId: phrase.id });
+      if (!alreadyIntroduced) {
+        pushBlock(1, { type: "phrase", refId: phrase.id });
+      }
       for (const question of stage2Questions.filter((item) => item.phraseId === phrase.id)) {
         pushBlock(1, { type: "question", refId: question.id });
       }
 
-      pushBlock(2, { type: "phrase", refId: phrase.id });
+      if (!alreadyIntroduced) {
+        pushBlock(2, { type: "phrase", refId: phrase.id });
+      }
       for (const question of stage3Questions.filter((item) => item.phraseId === phrase.id)) {
         pushBlock(2, { type: "question", refId: question.id });
       }
@@ -856,6 +930,7 @@ export class AdminUnitAiContentUseCases {
         contextNote: item.contextNote
       }))
     });
+    await this.phraseIntroductions.syncStageOneIntroductions(input.lesson.id, nextStages);
 
     return {
       lessonId: input.lesson.id,
@@ -951,9 +1026,14 @@ export class AdminUnitAiContentUseCases {
 
     const lessonPhrases = await this.phrases.findByLessonId(input.lesson.id);
     const generatedPhraseIdSet = new Set(phrases.map((item) => item.id));
-    const generatedFirst = lessonPhrases.filter((item) => generatedPhraseIdSet.has(item.id));
-    const recycled = lessonPhrases.filter((item) => !generatedPhraseIdSet.has(item.id));
-    const focusedLessonPhrases = [...generatedFirst, ...recycled].slice(
+    const newToLesson = lessonPhrases.filter(
+      (item) => !wasPhraseIntroducedBeforeLesson(item, input.lesson.id, generatedPhraseIdSet.has(item.id))
+    );
+    const recycled = lessonPhrases.filter((item) =>
+      wasPhraseIntroducedBeforeLesson(item, input.lesson.id, generatedPhraseIdSet.has(item.id))
+    );
+    const generatedFirst = newToLesson.filter((item) => generatedPhraseIdSet.has(item.id));
+    const focusedLessonPhrases = [...newToLesson, ...recycled].slice(
       0,
       LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
     );
@@ -965,7 +1045,9 @@ export class AdminUnitAiContentUseCases {
     }
 
     const stage1PhraseSet = new Set(
-      focusedLessonPhrases.slice(0, LESSON_GENERATION_LIMITS.MAX_PHRASES_PER_STAGE).map((item) => item.id)
+      generatedFirst
+        .slice(0, LESSON_GENERATION_LIMITS.MAX_PHRASES_PER_STAGE)
+        .map((item) => item.id)
     );
     const stage2PhraseSet = new Set(
       [
@@ -996,7 +1078,12 @@ export class AdminUnitAiContentUseCases {
     const createdQuestions: QuestionEntity[] = [];
 
     for (const phrase of focusedLessonPhrases) {
-      const drafts = buildQuestionDrafts(phrase, focusedLessonPhrases, input.languagePool);
+      const isPreviouslyIntroduced = wasPhraseIntroducedBeforeLesson(
+        phrase,
+        input.lesson.id,
+        generatedPhraseIdSet.has(phrase.id)
+      );
+      const drafts = buildQuestionDrafts(phrase, focusedLessonPhrases, input.languagePool, isPreviouslyIntroduced);
       for (const draft of drafts) {
         const stageTarget =
           draft.stage === 1
@@ -1042,7 +1129,9 @@ export class AdminUnitAiContentUseCases {
 
     const stage2Blocks: LessonBlock[] = [];
     for (const phrase of focusedLessonPhrases.filter((item) => stage2PhraseSet.has(item.id))) {
-      stage2Blocks.push({ type: "phrase", refId: phrase.id });
+      if (!wasPhraseIntroducedBeforeLesson(phrase, input.lesson.id, generatedPhraseIdSet.has(phrase.id))) {
+        stage2Blocks.push({ type: "phrase", refId: phrase.id });
+      }
       for (const question of stage2Questions.filter((q) => q.phraseId === phrase.id)) {
         stage2Blocks.push({ type: "question", refId: question.id });
       }
@@ -1050,7 +1139,9 @@ export class AdminUnitAiContentUseCases {
 
     const stage3Blocks: LessonBlock[] = [];
     for (const phrase of focusedLessonPhrases.filter((item) => stage3PhraseSet.has(item.id))) {
-      stage3Blocks.push({ type: "phrase", refId: phrase.id });
+      if (!wasPhraseIntroducedBeforeLesson(phrase, input.lesson.id, generatedPhraseIdSet.has(phrase.id))) {
+        stage3Blocks.push({ type: "phrase", refId: phrase.id });
+      }
       for (const question of stage3Questions.filter((q) => q.phraseId === phrase.id)) {
         stage3Blocks.push({ type: "question", refId: question.id });
       }
@@ -1067,6 +1158,10 @@ export class AdminUnitAiContentUseCases {
       stages: nextStages.filter((stage) => stage.blocks.length > 0),
       proverbs: updatedProverbs
     });
+    await this.phraseIntroductions.syncStageOneIntroductions(
+      input.lesson.id,
+      nextStages.filter((stage) => stage.blocks.length > 0)
+    );
 
     return {
       lessonId: input.lesson.id,

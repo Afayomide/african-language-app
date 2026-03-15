@@ -6,6 +6,7 @@ export type QuestionSubtype =
   | "mc-select-missing-word"
   // Fill in the Gap Interactions (Text-based)
   | "fg-word-order"
+  | "fg-letter-order"
   | "fg-gap-fill"
   // Listening Interactions (Audio-based, nested from MC and FG)
   | "ls-mc-select-translation"

@@ -3,6 +3,7 @@ export const QUESTION_SUBTYPES = [
   "mc-select-translation",
   "mc-select-missing-word",
   "fg-word-order",
+  "fg-letter-order",
   "fg-gap-fill",
   "ls-mc-select-translation",
   "ls-mc-select-missing-word",
@@ -18,6 +19,7 @@ export const MANUALLY_SUPPORTED_QUESTION_SUBTYPES = [
   "mc-select-translation",
   "mc-select-missing-word",
   "fg-word-order",
+  "fg-letter-order",
   "fg-gap-fill",
   "ls-mc-select-translation",
   "ls-mc-select-missing-word",
@@ -57,6 +59,10 @@ export function subtypeRequiresReviewData(subtype: string) {
     "ls-fg-word-order",
     "ls-fg-gap-fill"
   ].includes(subtype);
+}
+
+export function subtypeUsesOrderArrangement(subtype: string) {
+  return subtype === "fg-word-order" || subtype === "ls-fg-word-order" || subtype === "fg-letter-order";
 }
 
 export function subtypeUsesWordOrder(subtype: string) {

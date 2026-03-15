@@ -29,6 +29,7 @@ export default function TutorQuestionsPage() {
     "mc-select-translation": "What is {phrase} in English?",
     "mc-select-missing-word": "Select the missing word: {sentence}",
     "fg-word-order": "Arrange the words to mean: {meaning}",
+    "fg-letter-order": "Arrange the letters to spell the phrase for: {meaning}",
     "fg-gap-fill": "Fill in the blank: {sentence}",
     "ls-mc-select-translation": "Listen to {phrase} and choose the meaning.",
     "ls-mc-select-missing-word": "Listen and choose the word you heard.",
@@ -389,6 +390,7 @@ export default function TutorQuestionsPage() {
                     {formData.type === "fill-in-the-gap" && (
                       <>
                         <SelectItem value="fg-word-order" className="py-2">Word Order</SelectItem>
+                        <SelectItem value="fg-letter-order" className="py-2">Letter Order / Spelling</SelectItem>
                         <SelectItem value="fg-gap-fill" className="py-2">Gap Fill</SelectItem>
                       </>
                     )}

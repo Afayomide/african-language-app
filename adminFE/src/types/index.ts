@@ -144,6 +144,7 @@ export type QuestionSubtype =
   | "mc-select-translation"
   | "mc-select-missing-word"
   | "fg-word-order"
+  | "fg-letter-order"
   | "fg-gap-fill"
   | "ls-mc-select-translation"
   | "ls-mc-select-missing-word"

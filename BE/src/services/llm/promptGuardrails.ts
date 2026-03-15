@@ -107,8 +107,11 @@ export const PROVERB_GUARDRAILS = [
   ...CURRICULUM_QUALITY_RULES,
   "Only generate culturally authentic proverbs or proverb-like sayings.",
   "Do not invent fake proverbs that sound generic.",
+  "A proverb must be a full saying, not an everyday greeting, label, noun phrase, time-of-day expression, or routine conversational phrase.",
+  "Do not return ordinary lesson phrases disguised as proverbs.",
   "text must be in the target language.",
   "translation must be in English and should sound natural.",
-  "contextNote should explain when or why the proverb is used in simple English.",
+  "translation should express a complete idea or wisdom, not just a simple greeting or label.",
+  "contextNote is required and should explain when or why the proverb is used in simple English.",
   "Avoid duplicates and near-duplicates of existing proverbs."
 ];

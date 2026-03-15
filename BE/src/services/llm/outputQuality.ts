@@ -183,6 +183,9 @@ function proverbReasons(
   const text = String(proverb.text || "").trim();
   const translation = String(proverb.translation || "").trim();
   const contextNote = String(proverb.contextNote || "").trim();
+  const textWordCount = splitWords(text).length;
+  const translationWordCount = splitWords(translation).length;
+  const contextWordCount = splitWords(contextNote).length;
   const existing = new Set((input.existingProverbs || []).map(normalize));
   const key = normalize(text);
 
@@ -190,10 +193,16 @@ function proverbReasons(
   if (!translation) reasons.push("missing translation");
   if (existing.has(key)) reasons.push("duplicate proverb in existing data");
   if (seenTexts.has(key)) reasons.push("duplicate proverb in batch");
-  if (text.split(/\s+/).length < 2) reasons.push("proverb too short");
+  if (textWordCount < 2) reasons.push("proverb too short");
   if (!looksEnglishOnly(translation)) reasons.push("translation not in English-like text");
+  if (translationWordCount < 3) reasons.push("translation too short for proverb");
   if (translation.length > 140) reasons.push("translation too long");
+  if (!contextNote) reasons.push("missing context note");
+  if (contextNote && contextWordCount < 5) reasons.push("context note too short");
   if (contextNote.length > 320) reasons.push("context note too long");
+  if (textWordCount < 4 && translationWordCount < 4) {
+    reasons.push("looks like ordinary phrase, not proverb");
+  }
 
   return reasons;
 }

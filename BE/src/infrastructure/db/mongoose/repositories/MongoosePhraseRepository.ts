@@ -11,6 +11,7 @@ import type {
 type PhrasePersistenceDoc = {
   _id: { toString(): string };
   lessonIds?: Array<{ toString(): string } | string> | null;
+  introducedLessonIds?: Array<{ toString(): string } | string> | null;
   deletedLessonIds?: Array<{ toString(): string } | string> | null;
   lessonId?: { toString(): string } | string | null;
   language?: string | null;
@@ -57,6 +58,9 @@ function toEntity(doc: PhrasePersistenceDoc): PhraseEntity {
       : doc.lessonId
         ? [String(doc.lessonId)]
         : [],
+    introducedLessonIds: Array.isArray(doc.introducedLessonIds)
+      ? doc.introducedLessonIds.map((id) => String(id))
+      : [],
     language: String(doc.language || "yoruba") as PhraseEntity["language"],
     text: String(doc.text || ""),
     translations,
@@ -95,6 +99,9 @@ function normalizeText(text: string) {
 export class MongoosePhraseRepository implements PhraseRepository {
   async create(input: PhraseCreateInput): Promise<PhraseEntity> {
     const lessonIds = Array.from(new Set((input.lessonIds || []).map(String).filter(Boolean)));
+    const introducedLessonIds = Array.from(
+      new Set((input.introducedLessonIds || lessonIds).map(String).filter(Boolean))
+    );
     const text = String(input.text).trim();
     const textNormalized = normalizeText(text);
     const translations = normalizeTranslations(input.translations);
@@ -108,6 +115,9 @@ export class MongoosePhraseRepository implements PhraseRepository {
       const mergedLessonIds = Array.from(
         new Set([...(existing.lessonIds || []).map((id: { toString(): string }) => id.toString()), ...lessonIds])
       );
+      const currentIntroducedLessonIds = Array.from(
+        new Set((existing.introducedLessonIds || []).map((id: { toString(): string }) => id.toString()))
+      );
       const mergedDeletedLessonIds = Array.from(
         new Set((existing.deletedLessonIds || []).map((id: { toString(): string }) => id.toString()))
       ).filter((lessonId) => !mergedLessonIds.includes(lessonId));
@@ -117,6 +127,9 @@ export class MongoosePhraseRepository implements PhraseRepository {
       ]);
 
       existing.lessonIds = mergedLessonIds as never;
+      existing.introducedLessonIds = (currentIntroducedLessonIds.length > 0
+        ? currentIntroducedLessonIds
+        : introducedLessonIds) as never;
       existing.deletedLessonIds = mergedDeletedLessonIds as never;
       existing.translations = mergedTranslations as never;
       if (!existing.pronunciation && input.pronunciation) existing.pronunciation = input.pronunciation as never;
@@ -141,6 +154,7 @@ export class MongoosePhraseRepository implements PhraseRepository {
       textNormalized,
       translations,
       lessonIds,
+      introducedLessonIds,
       deletedLessonIds: []
     });
     return toEntity(created.toObject() as PhrasePersistenceDoc);
@@ -226,6 +240,9 @@ export class MongoosePhraseRepository implements PhraseRepository {
 
     if (Array.isArray(update.lessonIds)) {
       current.lessonIds = Array.from(new Set(update.lessonIds.map(String).filter(Boolean))) as never;
+    }
+    if (Array.isArray(update.introducedLessonIds)) {
+      current.introducedLessonIds = Array.from(new Set(update.introducedLessonIds.map(String).filter(Boolean))) as never;
     }
     if (update.language) {
       current.language = update.language as never;

@@ -3,6 +3,7 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 const PhraseSchema = new Schema(
   {
     lessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
+    introducedLessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
     deletedLessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
     text: { type: String, required: true, trim: true },
@@ -49,6 +50,7 @@ const PhraseSchema = new Schema(
 
 // Optimized for phrase listing/filtering paths used by admin/tutor/learner APIs.
 PhraseSchema.index({ lessonIds: 1, isDeleted: 1, createdAt: -1 });
+PhraseSchema.index({ introducedLessonIds: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ deletedLessonIds: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ lessonIds: 1, status: 1, isDeleted: 1, createdAt: -1 });
 PhraseSchema.index({ language: 1, isDeleted: 1, createdAt: -1 });

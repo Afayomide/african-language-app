@@ -39,8 +39,19 @@ async function clearDatabase() {
     const proverbsResult = await ProverbModel.deleteMany({});
     console.log(`Deleted ${proverbsResult.deletedCount} proverbs.`);
 
-    const phrasesResult = await PhraseModel.deleteMany({});
-    console.log(`Deleted ${phrasesResult.deletedCount} phrases.`);
+    const phrasesResult = await PhraseModel.updateMany(
+      {},
+      {
+        $set: {
+          lessonIds: [],
+          introducedLessonIds: [],
+          deletedLessonIds: [],
+          isDeleted: false,
+          deletedAt: null
+        }
+      }
+    );
+    console.log(`Cleared lesson/reference links on ${phrasesResult.modifiedCount} phrases.`);
 
     const lessonsResult = await LessonModel.deleteMany({});
     console.log(`Deleted ${lessonsResult.deletedCount} lessons.`);

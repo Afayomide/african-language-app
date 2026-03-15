@@ -11,6 +11,7 @@ import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repo
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
 import { LessonAuditService } from "../../application/services/LessonAuditService.js";
+import { PhraseIntroductionService } from "../../application/services/PhraseIntroductionService.js";
 import type { Language, Level, LessonBlock, LessonStage, Status } from "../../domain/entities/Lesson.js";
 import {
   isValidLessonStatus
@@ -22,9 +23,10 @@ import {
 } from "../../interfaces/http/utils/pagination.js";
 
 const questionRepo = new MongooseQuestionRepository();
+const phraseRepo = new MongoosePhraseRepository();
 const lessonUseCases = new TutorLessonUseCases(
   new MongooseLessonRepository(),
-  new MongoosePhraseRepository(),
+  phraseRepo,
   new MongooseProverbRepository(),
   questionRepo
 );
@@ -33,10 +35,11 @@ const unitRepo = new MongooseUnitRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
 const lessonAuditService = new LessonAuditService(
   new MongooseLessonRepository(),
-  new MongoosePhraseRepository(),
+  phraseRepo,
   proverbRepo,
   questionRepo
 );
+const phraseIntroductionService = new PhraseIntroductionService(phraseRepo);
 
 type ProverbInput = {
   text?: string;
@@ -229,6 +232,9 @@ export async function createLesson(req: AuthRequest, res: Response) {
 
   if (normalizedProverbs.length > 0) {
     await upsertLessonProverbs(lesson.id, lesson.language, normalizedProverbs);
+  }
+  if (normalizedStages.length > 0) {
+    await phraseIntroductionService.syncStageOneIntroductions(lesson.id, normalizedStages);
   }
 
   return res.status(201).json({ lesson });
@@ -434,6 +440,9 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     if (normalizedProverbs.length > 0) {
       await upsertLessonProverbs(lesson.id, lesson.language, normalizedProverbs);
     }
+  }
+  if (stages !== undefined) {
+    await phraseIntroductionService.syncStageOneIntroductions(lesson.id, normalizedStages);
   }
 
   return res.status(200).json({ lesson });

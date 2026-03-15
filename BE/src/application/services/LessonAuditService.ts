@@ -6,6 +6,7 @@ import type { LessonRepository } from "../../domain/repositories/LessonRepositor
 import type { PhraseRepository } from "../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../domain/repositories/ProverbRepository.js";
 import type { QuestionRepository } from "../../domain/repositories/QuestionRepository.js";
+import { wasPhraseIntroducedBeforeLesson } from "./PhraseIntroductionService.js";
 import {
   subtypeRequiresReviewData,
   subtypeUsesMatching,
@@ -41,6 +42,10 @@ function splitWords(value: string) {
     .split(/\s+/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeSpace(value: string) {
+  return splitWords(value).join(" ");
 }
 
 function addFinding(findings: AuditFinding[], severity: AuditSeverity, code: string, message: string) {
@@ -174,6 +179,14 @@ export class LessonAuditService {
               `Phrase "${phrase.text}" has an invalid translation index in stage ${stageIndex + 1}.`
             );
           }
+          if (stageIndex === 0 && wasPhraseIntroducedBeforeLesson(phrase, lesson.id)) {
+            addFinding(
+              findings,
+              "warning",
+              "reintroduced_phrase_in_stage_one",
+              `Phrase "${phrase.text}" was already introduced in another lesson but appears again as a Stage 1 introduction here.`
+            );
+          }
         }
 
         if (block.type === "proverb" && !proverbMap.has(block.refId)) {
@@ -241,6 +254,25 @@ export class LessonAuditService {
 
           if (subtypeUsesWordOrder(question.subtype) && splitWords(String(question.reviewData?.sentence || "")).length < 2) {
             addFinding(findings, "error", "weak_word_order_data", `Question ${question.id} is a word-order exercise without a real multi-word sentence.`);
+          }
+
+          if (question.subtype === "fg-word-order" || question.subtype === "ls-fg-word-order") {
+            const phraseWordCount = splitWords(phrase.text).length;
+            if (phraseWordCount < 2) {
+              addFinding(
+                findings,
+                "error",
+                "single_word_phrase_uses_word_order",
+                `Question ${question.id} uses word-order for single-word phrase "${phrase.text}". Use spelling order instead.`
+              );
+            } else if (normalizeSpace(String(question.reviewData?.sentence || "")) !== normalizeSpace(phrase.text)) {
+              addFinding(
+                findings,
+                "error",
+                "word_order_phrase_mismatch",
+                `Question ${question.id} uses word-order content that does not match the phrase text "${phrase.text}" exactly.`
+              );
+            }
           }
 
           if (question.type === "listening" && !String(phrase.audio?.url || "").trim()) {

@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "seed:admin": "node --enable-source-maps --import tsx src/scripts/seedAdmin.ts",
     "db:clear": "node --enable-source-maps --import tsx src/scripts/clearDatabase.ts",
+    "proverbs:find-suspicious": "node --enable-source-maps --import tsx src/scripts/findSuspiciousProverbs.ts",
     "backfill:soft-delete": "node --enable-source-maps --import tsx src/scripts/backfillSoftDelete.ts",
     "migrate:phrase-lesson-ids": "node --enable-source-maps --import tsx src/scripts/migratePhraseLessonIds.ts",
     "migrate:lessons-to-unit": "node --enable-source-maps --import tsx src/scripts/migrateLessonsToUnit.ts",

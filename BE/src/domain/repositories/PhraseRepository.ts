@@ -14,6 +14,7 @@ export type PhraseDeletedListFilter = {
 
 export type PhraseCreateInput = {
   lessonIds?: string[];
+  introducedLessonIds?: string[];
   language: PhraseEntity["language"];
   text: string;
   translations: string[];
@@ -28,6 +29,7 @@ export type PhraseCreateInput = {
 
 export type PhraseUpdateInput = Partial<{
   lessonIds: string[];
+  introducedLessonIds: string[];
   language: PhraseEntity["language"];
   text: string;
   translations: string[];

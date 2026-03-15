@@ -30,6 +30,7 @@ const SUBTYPE_TEMPLATES: Record<QuestionSubtype, string> = {
   "mc-select-translation": "What is {phrase} in English?",
   "mc-select-missing-word": "Select the missing word: {sentence}",
   "fg-word-order": "Arrange the words to mean: {meaning}",
+  "fg-letter-order": "Arrange the letters to spell the phrase for: {meaning}",
   "fg-gap-fill": "Fill in the blank: {sentence}",
   "ls-mc-select-translation": "Listen to {phrase} and choose the meaning.",
   "ls-mc-select-missing-word": "Listen and choose the word you heard.",
@@ -75,6 +76,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     if (question.type === "fill-in-the-gap") {
       return [
         { value: "fg-word-order", label: "Word Order" },
+        { value: "fg-letter-order", label: "Letter Order / Spelling" },
         { value: "fg-gap-fill", label: "Gap Fill" }
       ]
     }

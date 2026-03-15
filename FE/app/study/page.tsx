@@ -184,7 +184,9 @@ function StudyPageContent() {
   const isListeningQuestion = Boolean(isExerciseBlock && exerciseData?.type === 'listening')
   const isMatchingQuestion = Boolean(isExerciseBlock && exerciseData?.type === 'matching')
   const isWordOrderQuestion = Boolean(
-    exerciseData?.subtype === 'fg-word-order' || exerciseData?.subtype === 'ls-fg-word-order'
+    exerciseData?.subtype === 'fg-word-order' ||
+    exerciseData?.subtype === 'ls-fg-word-order' ||
+    exerciseData?.subtype === 'fg-letter-order'
   )
   const isChoiceQuestion = Boolean(
     exerciseData &&
@@ -225,6 +227,7 @@ function StudyPageContent() {
     : '0 / 0'
   const listeningHeading = getListeningHeading(exerciseData?.subtype)
   const listeningSupportText = getListeningSupportText(exerciseData?.subtype)
+  const orderPromptPlaceholder = exerciseData?.subtype === 'fg-letter-order' ? 'Select letters below' : 'Select words below'
   const stageQuestionCount = currentStageBlocks.filter((block) => block.type === 'question').length
   const stageXpEarned = stageQuestionCount * XP_PER_BLOCK
   const isLastStage = currentStageIndex >= stageMeta.length - 1
@@ -835,7 +838,7 @@ function StudyPageContent() {
                     <div className="space-y-8">
                       <div className="flex min-h-[140px] flex-wrap content-center items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-border bg-white/80 p-5">
                         {selectedWords.length === 0 && !isAnswered && (
-                          <span className="text-base font-semibold uppercase tracking-wider text-foreground/35">Select words below</span>
+                          <span className="text-base font-semibold uppercase tracking-wider text-foreground/35">{orderPromptPlaceholder}</span>
                         )}
                         {selectedWords.map((wordIdx, idx) => (
                           <Button
