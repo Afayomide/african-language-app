@@ -126,7 +126,7 @@ export default function OnboardingPage() {
                 label="Country of origin"
                 name="countryOfOrigin"
                 type="text"
-                placeholder="Nigeria"
+                placeholder="e.g. Kenya"
                 value={countryOfOrigin}
                 onChange={(event) => setCountryOfOrigin(event.target.value)}
               />

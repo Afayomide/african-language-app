@@ -2,6 +2,7 @@ const CACHE_NAME = "language-app-v2";
 const CORE_ASSETS = [
   "/",
   "/manifest.webmanifest",
+  "/logo.png",
   "/icon-192.png",
   "/icon-512.png",
   "/icon-512-maskable.png",

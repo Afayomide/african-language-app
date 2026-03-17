@@ -5,7 +5,7 @@ import { FeaturesSection } from "@/components/sections/features-section";
 import { HowItWorksSection } from "@/components/sections/how-it-works-section";
 import { InteractiveHeroSection } from "@/components/sections/interactive-hero-section";
 import { CulturalShowcaseSection } from "@/components/sections/cultural-showcase-section";
-import { NigeriaMapSection } from "@/components/sections/nigeria-map-section";
+import { AfricaMapSection } from "@/components/sections/africa-map-section";
 import { Header } from "@/components/navigation/header";
 import { Footer } from "@/components/navigation/footer";
 import { Book, Zap, Users } from "lucide-react";
@@ -66,7 +66,7 @@ export default function LandingPage() {
 
       <InteractiveHeroSection />
 
-      <NigeriaMapSection />
+      <AfricaMapSection />
 
       <CulturalShowcaseSection />
 
@@ -76,7 +76,7 @@ export default function LandingPage() {
 
       <CTASection
         title="Ready to Learn?"
-        description="Join thousands of learners exploring the richness of Nigerian languages."
+        description="Join thousands of learners exploring African languages through culture, conversation, and daily life."
       />
 
       <Footer />

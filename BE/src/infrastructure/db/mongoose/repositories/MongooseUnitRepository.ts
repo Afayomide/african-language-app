@@ -1,12 +1,73 @@
 import UnitModel from "../../../../models/Unit.js";
 import type { Language } from "../../../../domain/entities/Lesson.js";
-import type { UnitEntity } from "../../../../domain/entities/Unit.js";
+import type { UnitAiRunSummary, UnitEntity } from "../../../../domain/entities/Unit.js";
 import type {
+  UnitAiRunUpdateInput,
   UnitCreateInput,
   UnitListFilter,
   UnitRepository,
   UnitUpdateInput
 } from "../../../../domain/repositories/UnitRepository.js";
+
+function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  return {
+    mode: String(input.mode || "generate") as UnitAiRunSummary["mode"],
+    createdBy: String(input.createdBy || ""),
+    createdAt: input.createdAt instanceof Date ? input.createdAt : new Date(String(input.createdAt || new Date().toISOString())),
+    requestedLessons: Number(input.requestedLessons || 0),
+    createdLessons: Number(input.createdLessons || 0),
+    updatedLessons: input.updatedLessons == null ? undefined : Number(input.updatedLessons),
+    clearedLessons: input.clearedLessons == null ? undefined : Number(input.clearedLessons),
+    skippedLessons: Array.isArray(input.skippedLessons)
+      ? input.skippedLessons.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            reason: String(row.reason || ""),
+            topic: row.topic ? String(row.topic) : undefined,
+            title: row.title ? String(row.title) : undefined
+          };
+        })
+      : [],
+    lessonGenerationErrors: Array.isArray(input.lessonGenerationErrors)
+      ? input.lessonGenerationErrors.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            topic: row.topic ? String(row.topic) : undefined,
+            error: String(row.error || "")
+          };
+        })
+      : [],
+    contentErrors: Array.isArray(input.contentErrors)
+      ? input.contentErrors.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            lessonId: row.lessonId ? String(row.lessonId) : undefined,
+            title: row.title ? String(row.title) : undefined,
+            error: String(row.error || "")
+          };
+        })
+      : [],
+    lessons: Array.isArray(input.lessons)
+      ? input.lessons.map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            lessonId: String(row.lessonId || ""),
+            title: String(row.title || ""),
+            phrasesGenerated: Number(row.phrasesGenerated || 0),
+            repeatedPhrasesLinked: Number(row.repeatedPhrasesLinked || 0),
+            newPhrasesSelected: Number(row.newPhrasesSelected || 0),
+            reviewPhrasesSelected: Number(row.reviewPhrasesSelected || 0),
+            phrasesDroppedFromCandidates: Number(row.phrasesDroppedFromCandidates || 0),
+            proverbsGenerated: Number(row.proverbsGenerated || 0),
+            questionsGenerated: Number(row.questionsGenerated || 0),
+            blocksGenerated: Number(row.blocksGenerated || 0)
+          };
+        })
+      : []
+  };
+}
 
 function toEntity(doc: {
   _id: { toString(): string };
@@ -17,6 +78,7 @@ function toEntity(doc: {
   orderIndex: number;
   status: UnitEntity["status"];
   createdBy: { toString(): string };
+  lastAiRun?: unknown;
   publishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -31,6 +93,7 @@ function toEntity(doc: {
     orderIndex: doc.orderIndex,
     status: doc.status,
     createdBy: doc.createdBy.toString(),
+    lastAiRun: normalizeAiRun(doc.lastAiRun),
     publishedAt: doc.publishedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
@@ -67,6 +130,15 @@ export class MongooseUnitRepository implements UnitRepository {
 
   async updateById(id: string, update: UnitUpdateInput): Promise<UnitEntity | null> {
     const unit = await UnitModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    return unit ? toEntity(unit) : null;
+  }
+
+  async updateLastAiRun(id: string, update: UnitAiRunUpdateInput): Promise<UnitEntity | null> {
+    const unit = await UnitModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      { lastAiRun: update.lastAiRun },
+      { new: true }
+    );
     return unit ? toEntity(unit) : null;
   }
 

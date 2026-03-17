@@ -44,6 +44,30 @@ export interface Unit {
   orderIndex: number;
   status: Status;
   createdBy: string;
+  lastAiRun?: {
+    mode: "generate" | "refactor" | "regenerate";
+    createdBy: string;
+    createdAt: string;
+    requestedLessons: number;
+    createdLessons: number;
+    updatedLessons?: number;
+    clearedLessons?: number;
+    skippedLessons: Array<{ reason: string; topic?: string; title?: string }>;
+    lessonGenerationErrors: Array<{ topic?: string; error: string }>;
+    contentErrors: Array<{ lessonId?: string; title?: string; error: string }>;
+    lessons: Array<{
+      lessonId: string;
+      title: string;
+      phrasesGenerated: number;
+      repeatedPhrasesLinked: number;
+      newPhrasesSelected: number;
+      reviewPhrasesSelected: number;
+      phrasesDroppedFromCandidates: number;
+      proverbsGenerated: number;
+      questionsGenerated: number;
+      blocksGenerated: number;
+    }>;
+  } | null;
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;

@@ -56,6 +56,7 @@ export interface PhraseRepository {
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
   restoreById(id: string, lessonIdsToAdd?: string[]): Promise<PhraseEntity | null>;
   restoreByLessonId(lessonId: string): Promise<void>;
+  removeIntroducedLessonIds(lessonIds: string[]): Promise<void>;
   publishById(id: string, reviewedByAdmin: boolean): Promise<PhraseEntity | null>;
   finishById(id: string): Promise<PhraseEntity | null>;
 }

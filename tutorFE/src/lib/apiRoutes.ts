@@ -48,6 +48,7 @@ export const beTutorRoutes = {
 
 export const beTutorAiRoutes = {
   suggestLesson: () => buildBePath("/tutor/ai/lessons/suggest"),
+  refactorLessonContent: (lessonId: string) => buildBePath(`/tutor/ai/lessons/${lessonId}/refactor`),
   generateUnitContent: (unitId: string) => buildBePath(`/tutor/ai/units/${unitId}/generate-content`),
   reviseUnitContent: (unitId: string) => buildBePath(`/tutor/ai/units/${unitId}/revise`),
   generatePhrases: () => buildBePath("/tutor/ai/phrases/generate"),
@@ -95,6 +96,7 @@ export const feTutorRoutes = {
 
 export const feTutorAiRoutes = {
   suggestLesson: () => "/api/tutor/ai/lessons/suggest",
+  refactorLessonContent: (lessonId: string) => `/api/tutor/ai/lessons/${lessonId}/refactor`,
   generateUnitContent: (unitId: string) => `/api/tutor/ai/units/${unitId}/generate-content`,
   reviseUnitContent: (unitId: string) => `/api/tutor/ai/units/${unitId}/revise`,
   generatePhrases: () => "/api/tutor/ai/phrases/generate",

@@ -31,7 +31,7 @@ const culturalItems: CulturalItem[] = [
   },
   {
     title: 'Pidgin Expressions',
-    description: 'Discover the playful and expressive nature of Nigerian Pidgin English.',
+    description: 'Discover the playful and expressive energy of Pidgin in music, film, and everyday conversation.',
     icon: '💬',
     color: 'from-green-500 to-emerald-500',
   },
@@ -58,7 +58,7 @@ export function CulturalShowcaseSection() {
           </h2>
           <p className="text-lg text-foreground/70 max-w-2xl mx-auto">
             Language is more than words—it's the gateway to understanding rich traditions,
-            customs, and the vibrant spirit of Nigerian cultures.
+            customs, and the vibrant spirit of African cultures rooted in place.
           </p>
         </div>
 

@@ -20,6 +20,8 @@ import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus, CheckCircle2, RefreshCcw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
+type PersistedAiRun = NonNullable<Unit["lastAiRun"]>;
+
 export default function EditUnitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -48,12 +50,14 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [contentLessonCount, setContentLessonCount] = useState(3);
   const [contentPhrasesPerLesson, setContentPhrasesPerLesson] = useState(8);
+  const [contentReviewPhrasesPerLesson, setContentReviewPhrasesPerLesson] = useState(2);
   const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(2);
   const [contentTopic, setContentTopic] = useState("");
   const [contentExtraInstructions, setContentExtraInstructions] = useState("");
   const [isReviseDialogOpen, setIsReviseDialogOpen] = useState(false);
   const [isRevisingContent, setIsRevisingContent] = useState(false);
   const [revisionMode, setRevisionMode] = useState<"refactor" | "regenerate">("refactor");
+  const [lastAiRun, setLastAiRun] = useState<PersistedAiRun | null>(null);
 
   const isPublished = useMemo(() => unit?.status === "published", [unit?.status]);
 
@@ -67,6 +71,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         setDescription(data.description || "");
         setLanguage(data.language);
         setLevel(data.level);
+        setLastAiRun(data.lastAiRun || null);
       } catch (error) {
         toast.error("Failed to load unit.")
       } finally {
@@ -188,6 +193,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       const result = await aiService.generateUnitContent(id, {
         lessonCount: contentLessonCount,
         phrasesPerLesson: contentPhrasesPerLesson,
+        reviewPhrasesPerLesson: contentReviewPhrasesPerLesson,
         proverbsPerLesson: contentProverbsPerLesson,
         topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
         extraInstructions: contentExtraInstructions.trim() || undefined
@@ -195,6 +201,17 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       toast.success(
         `Generated content for ${result.createdLessons} lessons (${result.contentErrors.length} content errors).`
       );
+      setLastAiRun({
+        mode: "generate",
+        createdBy: unit?.createdBy || "",
+        createdAt: new Date().toISOString(),
+        requestedLessons: result.requestedLessons,
+        createdLessons: result.createdLessons,
+        skippedLessons: result.skippedLessons,
+        lessonGenerationErrors: result.lessonGenerationErrors,
+        contentErrors: result.contentErrors,
+        lessons: result.lessons
+      });
       setIsGenerateContentDialogOpen(false);
       const refreshed = await lessonService.listLessonsPage({
         language,
@@ -220,6 +237,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         mode: revisionMode,
         lessonCount: contentLessonCount,
         phrasesPerLesson: contentPhrasesPerLesson,
+        reviewPhrasesPerLesson: contentReviewPhrasesPerLesson,
         proverbsPerLesson: contentProverbsPerLesson,
         topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
         extraInstructions: contentExtraInstructions.trim() || undefined
@@ -229,6 +247,19 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
           ? `Refactored ${result.updatedLessons || 0} existing lessons and added ${result.createdLessons} new lessons.`
           : `Regenerated unit content for ${result.createdLessons} lessons after clearing ${result.clearedLessons} existing lessons.`
       );
+      setLastAiRun({
+        mode: revisionMode,
+        createdBy: unit?.createdBy || "",
+        createdAt: new Date().toISOString(),
+        requestedLessons: result.requestedLessons,
+        createdLessons: result.createdLessons,
+        updatedLessons: result.updatedLessons,
+        clearedLessons: result.clearedLessons,
+        skippedLessons: result.skippedLessons,
+        lessonGenerationErrors: result.lessonGenerationErrors,
+        contentErrors: result.contentErrors,
+        lessons: result.lessons
+      });
       setIsReviseDialogOpen(false);
       const refreshed = await lessonService.listLessonsPage({
         language,
@@ -385,6 +416,75 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         </form>
       </Card>
 
+      {lastAiRun ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl font-bold">
+              {lastAiRun.mode === "generate"
+                ? "Last Generation Result"
+                : lastAiRun.mode === "refactor"
+                  ? "Last Refactor Result"
+                  : "Last Regeneration Result"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Lessons Created</div>
+                <div className="text-2xl font-bold">{lastAiRun.createdLessons}</div>
+              </div>
+              {lastAiRun.updatedLessons !== undefined ? (
+                <div className="rounded-xl border p-3">
+                  <div className="text-xs text-muted-foreground">Lessons Updated</div>
+                  <div className="text-2xl font-bold">{lastAiRun.updatedLessons}</div>
+                </div>
+              ) : null}
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Content Errors</div>
+                <div className="text-2xl font-bold">{lastAiRun.contentErrors.length}</div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Skipped Lessons</div>
+                <div className="text-2xl font-bold">{lastAiRun.skippedLessons.length}</div>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader className="bg-primary/5">
+                <TableRow>
+                  <TableHead>Lesson</TableHead>
+                  <TableHead className="text-right">New Selected</TableHead>
+                  <TableHead className="text-right">Review Selected</TableHead>
+                  <TableHead className="text-right">Dropped</TableHead>
+                  <TableHead className="text-right">Questions</TableHead>
+                  <TableHead className="text-right">Blocks</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lastAiRun.lessons.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
+                      No lesson details returned.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  lastAiRun.lessons.map((lesson) => (
+                    <TableRow key={lesson.lessonId}>
+                      <TableCell className="font-medium">{lesson.title}</TableCell>
+                      <TableCell className="text-right">{lesson.newPhrasesSelected}</TableCell>
+                      <TableCell className="text-right">{lesson.reviewPhrasesSelected}</TableCell>
+                      <TableCell className="text-right">{lesson.phrasesDroppedFromCandidates}</TableCell>
+                      <TableCell className="text-right">{lesson.questionsGenerated}</TableCell>
+                      <TableCell className="text-right">{lesson.blocksGenerated}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold text-primary">Unit Lessons</CardTitle>
@@ -519,14 +619,18 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="space-y-2">
                 <Label>Lessons</Label>
                 <Input type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => setContentLessonCount(Number(event.target.value))} />
               </div>
               <div className="space-y-2">
                 <Label>Phrases / Lesson</Label>
-                <Input type="number" min={2} max={30} value={contentPhrasesPerLesson} onChange={(event) => setContentPhrasesPerLesson(Number(event.target.value))} />
+                <Input type="number" min={1} max={8} value={contentPhrasesPerLesson} onChange={(event) => setContentPhrasesPerLesson(Number(event.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Review / Lesson</Label>
+                <Input type="number" min={0} max={4} value={contentReviewPhrasesPerLesson} onChange={(event) => setContentReviewPhrasesPerLesson(Number(event.target.value))} />
               </div>
               <div className="space-y-2">
                 <Label>Proverbs / Lesson</Label>
@@ -556,15 +660,15 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       <Dialog open={isReviseDialogOpen} onOpenChange={setIsReviseDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{revisionMode === "refactor" ? "Refactor Unit with AI" : "Regenerate Unit with AI"}</DialogTitle>
+            <DialogTitle>{revisionMode === "refactor" ? "Targeted Refactor with AI" : "Regenerate Unit with AI"}</DialogTitle>
             <DialogDescription>
               {revisionMode === "refactor"
-                ? "AI will clear the current unit lessons and rebuild the unit with a stronger structure using the existing unit theme as context."
+                ? "AI will inspect the current lessons, propose targeted fixes, and apply precise block or phrase changes without clearing the unit."
                 : "AI will clear the current unit lessons and generate a fresh version of this unit from scratch."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="revise-lesson-count">Lesson count</Label>
                 <Input id="revise-lesson-count" type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => setContentLessonCount(Number(event.target.value || 0))} />
@@ -572,6 +676,10 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
               <div className="space-y-2">
                 <Label htmlFor="revise-phrases-per-lesson">Phrases / lesson</Label>
                 <Input id="revise-phrases-per-lesson" type="number" min={1} max={8} value={contentPhrasesPerLesson} onChange={(event) => setContentPhrasesPerLesson(Number(event.target.value || 0))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revise-review-phrases-per-lesson">Review / lesson</Label>
+                <Input id="revise-review-phrases-per-lesson" type="number" min={0} max={4} value={contentReviewPhrasesPerLesson} onChange={(event) => setContentReviewPhrasesPerLesson(Number(event.target.value || 0))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="revise-proverbs-per-lesson">Proverbs / lesson</Label>
@@ -589,7 +697,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                 rows={5}
                 value={contentExtraInstructions}
                 onChange={(event) => setContentExtraInstructions(event.target.value)}
-                placeholder={revisionMode === "refactor" ? "Tell AI what to improve in the current unit." : "Tell AI what to change in the regenerated unit."}
+                placeholder={revisionMode === "refactor" ? "Examples: replace Ku osan with E kaasan, move the listening block to Stage 3, add a short helper text after Stage 1." : "Tell AI what to change in the regenerated unit."}
               />
             </div>
           </div>

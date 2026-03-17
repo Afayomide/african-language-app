@@ -6,6 +6,7 @@ import type {
   LlmGeneratedPhrase,
   LlmGeneratedProverb,
   LlmLessonSuggestion,
+  LlmUnitRefactorPlan,
   LlmUnitPlanLesson
 } from "./types.js";
 import {
@@ -267,6 +268,64 @@ function buildUnitPlanPrompt(input: {
     .join("\n");
 }
 
+function buildUnitRefactorPrompt(input: {
+  language: string;
+  level: string;
+  lessonCount: number;
+  unitTitle?: string;
+  unitDescription?: string;
+  topic?: string;
+  curriculumInstruction?: string;
+  extraInstructions?: string;
+  themeAnchors?: string[];
+  existingLessonsSnapshot: string;
+  existingLessonTitles?: string[];
+}) {
+  const existingLessonTitles = input.existingLessonTitles?.length
+    ? input.existingLessonTitles.slice(0, 120).join(" | ")
+    : "";
+
+  return [
+    "You are planning a targeted refactor for an existing language-learning unit.",
+    "Do not regenerate the whole unit. Propose minimal, precise lesson edits.",
+    "Return ONLY valid JSON with this shape:",
+    "{\"lessonPatches\":[{\"lessonId\":string,\"lessonTitle\":string?,\"rationale\":string?,\"operations\":[{\"type\":\"add_text_block\",\"stageIndex\":number,\"blockIndex\"?:number,\"content\":string}|{\"type\":\"move_block\",\"fromStageIndex\":number,\"fromBlockIndex\":number,\"toStageIndex\":number,\"toBlockIndex\"?:number}|{\"type\":\"remove_block\",\"stageIndex\":number,\"blockIndex\":number}|{\"type\":\"add_phrase_bundle\",\"phraseText\":string,\"translations\"?:string[],\"explanation\"?:string,\"pronunciation\"?:string}|{\"type\":\"replace_phrase_bundle\",\"oldPhraseText\":string,\"newPhraseText\":string,\"translations\"?:string[],\"explanation\"?:string,\"pronunciation\"?:string}|{\"type\":\"remove_phrase_bundle\",\"phraseText\":string}]}],\"newLessons\":[{\"title\":string,\"description\":string,\"objectives\":[string],\"seedPhrases\":[string],\"focusSummary\":string}]}",
+    "Rules:",
+    ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
+    ...getSuggestionGuardrails(
+      input.level as "beginner" | "intermediate" | "advanced",
+      input.language as "yoruba" | "igbo" | "hausa"
+    ).map((rule) => `- ${rule}`),
+    "- Use lessonIds exactly as provided in the lesson snapshot. Do not invent lessonIds.",
+    "- Only use the allowed operation types.",
+    "- Use add_text_block for short helper text, explanations, or prompts inside an existing stage.",
+    "- Use move_block or remove_block for precise block rearrangement only when necessary.",
+    "- Use add_phrase_bundle to introduce or review a phrase with its standard question bundle.",
+    "- Use replace_phrase_bundle when a lesson currently teaches the wrong phrase or a non-standard variant.",
+    "- Prefer minimal changes. Do not rewrite a whole lesson if one or two operations can fix it.",
+    "- If a phrase should no longer be taught in a lesson, use remove_phrase_bundle.",
+    "- If lessonCount is greater than the number of existing lessons, return newLessons for the extra lessons needed.",
+    "- If lessonCount is not greater than the existing lesson count, return an empty newLessons array.",
+    "- Titles, descriptions, objectives, and rationale must be in English only.",
+    "- Phrase text must be in the target language.",
+    "- translations must be in English.",
+    "- Teach the standard form of the target language first.",
+    `- ${buildThemeAlignmentInstruction({ unitTitle: input.unitTitle, unitDescription: input.unitDescription, topic: input.topic, themeAnchors: input.themeAnchors })}`,
+    `Language: ${input.language}`,
+    `Level: ${input.level}`,
+    `Requested lesson count after refactor: ${input.lessonCount}`,
+    input.unitTitle ? `Unit title: ${input.unitTitle}` : "",
+    input.unitDescription ? `Unit description: ${input.unitDescription}` : "",
+    input.topic ? `Topic: ${input.topic}` : "",
+    input.curriculumInstruction ? `Curriculum instruction: ${input.curriculumInstruction}` : "",
+    input.extraInstructions ? `Targeted refactor instructions: ${input.extraInstructions}` : "",
+    existingLessonTitles ? `Existing lesson titles: ${existingLessonTitles}` : "",
+    `Existing lesson snapshot:\n${input.existingLessonsSnapshot}`
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function createGeminiClient(): LlmClient {
   const client = getClient();
 
@@ -354,6 +413,31 @@ export function createGeminiClient(): LlmClient {
       const text = response.text?.trim() || "";
       const payload = parseJson<{ lessons: LlmUnitPlanLesson[] }>(text, "invalid_llm_json");
       return Array.isArray(payload.lessons) ? payload.lessons : [];
+    },
+    async planUnitRefactor(input: {
+      language: string;
+      level: string;
+      lessonCount: number;
+      unitTitle?: string;
+      unitDescription?: string;
+      topic?: string;
+      curriculumInstruction?: string;
+      extraInstructions?: string;
+      themeAnchors?: string[];
+      existingLessonsSnapshot: string;
+      existingLessonTitles?: string[];
+    }): Promise<LlmUnitRefactorPlan> {
+      const response = await client.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: buildUnitRefactorPrompt(input)
+      });
+
+      const text = response.text?.trim() || "";
+      const payload = parseJson<LlmUnitRefactorPlan>(text, "invalid_llm_json");
+      return {
+        lessonPatches: Array.isArray(payload.lessonPatches) ? payload.lessonPatches : [],
+        newLessons: Array.isArray(payload.newLessons) ? payload.newLessons : []
+      };
     }
   };
 }

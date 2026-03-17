@@ -68,27 +68,14 @@ export function InteractiveHeroSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-8 order-2 lg:order-1">
-            {/* Logo */}
-            <div className="flex justify-start">
-              <div className="inline-flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 blur-xl animate-pulse" />
-                  <div className="relative flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent p-3 shadow-2xl">
-                    <span className="text-xl font-black text-white tracking-tighter">
-                      LinguaHub
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+      
             {/* Main Heading */}
             <div className="space-y-4">
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-black leading-tight text-foreground text-balance">
-                Discover Nigeria's Rich <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">Languages</span>
+                Learn African <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">Languages</span> Through Living Cultures
               </h1>
               <p className="text-lg md:text-xl text-foreground/70 leading-relaxed max-w-xl">
-                From the rhythmic Yoruba of the Southwest to the melodic Hausa of the North, explore the linguistic heritage of Nigeria with our AI-powered platform.
+                Start with Yoruba, Igbo, Hausa, and Pidgin, then build fluency through African stories, voices, and everyday context.
               </p>
             </div>
 

@@ -51,6 +51,10 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [extraInstructions, setExtraInstructions] = useState("")
+  const [isRefactorDialogOpen, setIsRefactorDialogOpen] = useState(false)
+  const [isRefactoring, setIsRefactoring] = useState(false)
+  const [lessonRefactorTopic, setLessonRefactorTopic] = useState("")
+  const [lessonRefactorInstructions, setLessonRefactorInstructions] = useState("")
   const [topicsInput, setTopicsInput] = useState("")
   const [proverbs, setProverbs] = useState<Array<{ text: string; translation: string; contextNote: string }>>([])
   const [blocks, setBlocks] = useState<LessonBlock[]>([])
@@ -334,6 +338,33 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  const handleRefactorLesson = async () => {
+    setIsRefactoring(true)
+    try {
+      const result = await aiService.refactorLessonContent(id, {
+        topic: lessonRefactorTopic.trim() || undefined,
+        extraInstructions: lessonRefactorInstructions.trim() || undefined
+      })
+      await fetchLesson()
+      if (lesson?._id) {
+        await Promise.all([
+          fetchLessonPhrases(lesson._id),
+          questionService.listQuestions({ lessonId: lesson._id }).then(setAllQuestions)
+        ])
+      }
+      setIsRefactorDialogOpen(false)
+      toast.success(
+        result.updatedLesson
+          ? `Lesson refactored with ${result.patch?.operations?.length || 0} targeted changes`
+          : "AI found no targeted lesson changes to apply"
+      )
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to refactor lesson")
+    } finally {
+      setIsRefactoring(false)
+    }
+  }
+
   const handleDeletePhrase = async (phraseId: string) => {
     if (!confirm("Delete this phrase?")) return
     try {
@@ -525,6 +556,54 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
           >
             {isAuditing ? "Auditing..." : "Audit Lesson"}
           </Button>
+          <Dialog open={isRefactorDialogOpen} onOpenChange={setIsRefactorDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl border-2 font-bold hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+              >
+                <Sparkles className="mr-2 h-5 w-5 text-emerald-600" />
+                Refactor Lesson
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Targeted Lesson Refactor</DialogTitle>
+                <DialogDescription>
+                  Ask AI for precise lesson fixes like replacing a phrase, moving a block, or adding helper text.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lesson-refactor-topic">Topic focus (optional)</Label>
+                  <Input
+                    id="lesson-refactor-topic"
+                    value={lessonRefactorTopic}
+                    onChange={(event) => setLessonRefactorTopic(event.target.value)}
+                    placeholder="Optional focus for this refactor"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lesson-refactor-instructions">Extra instructions</Label>
+                  <Textarea
+                    id="lesson-refactor-instructions"
+                    value={lessonRefactorInstructions}
+                    onChange={(event) => setLessonRefactorInstructions(event.target.value)}
+                    rows={5}
+                    placeholder="Examples: replace Ku osan with E kaasan, remove the old phrase bundle, add a short helper text after Stage 1."
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsRefactorDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleRefactorLesson} disabled={isRefactoring}>
+                  {isRefactoring ? "Refactoring..." : "Run Refactor"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
             <DialogTrigger asChild>
               <Button

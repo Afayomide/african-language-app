@@ -133,6 +133,7 @@ export class AiPhraseOrchestrator {
     lesson: LessonEntity;
     seedWords?: string[];
     extraInstructions?: string;
+    maxPhrases?: number;
   }) {
     const existingPhrases = await this.phrases.findByLessonId(input.lesson.id);
     const allLanguagePhrases = await this.phrases.list({ language: input.lesson.language });
@@ -167,7 +168,7 @@ export class AiPhraseOrchestrator {
       extraInstructions: [input.extraInstructions || "", progressionInstructions].filter(Boolean).join(" "),
       lessonTitle: input.lesson.title,
       lessonDescription: input.lesson.description,
-      existingPhrases: allLanguagePhrases.map((phrase) => phrase.text)
+      existingPhrases: existingPhrases.map((phrase) => phrase.text)
     } as const;
     const validated = await this.generateValidatedPhrases("lesson", baseRequest);
 
@@ -183,11 +184,14 @@ export class AiPhraseOrchestrator {
         uniqueInBatch.add(key);
         return true;
       });
+    const capped = input.maxPhrases && input.maxPhrases > 0
+      ? sanitized.slice(0, input.maxPhrases)
+      : sanitized;
 
-    if (sanitized.length === 0) return [];
+    if (capped.length === 0) return [];
 
     const createdOrLinked: PhraseEntity[] = [];
-    for (const phrase of sanitized) {
+    for (const phrase of capped) {
       const textKey = normalizePhraseText(phrase.text);
       const existingByText = phraseByText.get(textKey);
       if (existingByText) {

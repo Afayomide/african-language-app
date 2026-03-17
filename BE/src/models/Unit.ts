@@ -1,5 +1,55 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
+const UnitAiRunLessonSummarySchema = new Schema(
+  {
+    lessonId: { type: String, required: true },
+    title: { type: String, required: true },
+    phrasesGenerated: { type: Number, required: true },
+    repeatedPhrasesLinked: { type: Number, required: true },
+    newPhrasesSelected: { type: Number, required: true },
+    reviewPhrasesSelected: { type: Number, required: true },
+    phrasesDroppedFromCandidates: { type: Number, required: true },
+    proverbsGenerated: { type: Number, required: true },
+    questionsGenerated: { type: Number, required: true },
+    blocksGenerated: { type: Number, required: true }
+  },
+  { _id: false }
+);
+
+const UnitAiRunSummarySchema = new Schema(
+  {
+    mode: { type: String, enum: ["generate", "refactor", "regenerate"], required: true },
+    createdBy: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+    requestedLessons: { type: Number, required: true },
+    createdLessons: { type: Number, required: true },
+    updatedLessons: { type: Number },
+    clearedLessons: { type: Number },
+    skippedLessons: [
+      {
+        reason: { type: String, required: true },
+        topic: { type: String },
+        title: { type: String }
+      }
+    ],
+    lessonGenerationErrors: [
+      {
+        topic: { type: String },
+        error: { type: String, required: true }
+      }
+    ],
+    contentErrors: [
+      {
+        lessonId: { type: String },
+        title: { type: String },
+        error: { type: String, required: true }
+      }
+    ],
+    lessons: { type: [UnitAiRunLessonSummarySchema], default: [] }
+  },
+  { _id: false }
+);
+
 const UnitSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -11,6 +61,7 @@ const UnitSchema = new Schema(
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    lastAiRun: { type: UnitAiRunSummarySchema, default: null },
     publishedAt: { type: Date }
   },
   { timestamps: true }

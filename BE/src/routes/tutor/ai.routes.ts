@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   enhancePhrase,
+  refactorLessonContent,
   generatePhrases,
   generateProverbs,
   generateUnitContent,
@@ -14,6 +15,7 @@ const router = Router();
 router.use(requireAuth, requireTutor);
 
 router.post("/lessons/suggest", suggestLesson);
+router.post("/lessons/:lessonId/refactor", refactorLessonContent);
 router.post("/units/:unitId/generate-content", generateUnitContent);
 router.post("/units/:unitId/revise", reviseUnitContent);
 router.post("/phrases/generate", generatePhrases);

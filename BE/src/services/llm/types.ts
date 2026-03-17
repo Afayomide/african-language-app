@@ -36,6 +36,57 @@ export type LlmUnitPlanLesson = {
   focusSummary?: string;
 };
 
+export type LlmLessonRefactorOperation =
+  | {
+      type: "add_text_block";
+      stageIndex: number;
+      blockIndex?: number;
+      content: string;
+    }
+  | {
+      type: "move_block";
+      fromStageIndex: number;
+      fromBlockIndex: number;
+      toStageIndex: number;
+      toBlockIndex?: number;
+    }
+  | {
+      type: "remove_block";
+      stageIndex: number;
+      blockIndex: number;
+    }
+  | {
+      type: "add_phrase_bundle";
+      phraseText: string;
+      translations?: string[];
+      explanation?: string;
+      pronunciation?: string;
+    }
+  | {
+      type: "replace_phrase_bundle";
+      oldPhraseText: string;
+      newPhraseText: string;
+      translations?: string[];
+      explanation?: string;
+      pronunciation?: string;
+    }
+  | {
+      type: "remove_phrase_bundle";
+      phraseText: string;
+    };
+
+export type LlmLessonRefactorPatch = {
+  lessonId: string;
+  lessonTitle?: string;
+  rationale?: string;
+  operations: LlmLessonRefactorOperation[];
+};
+
+export type LlmUnitRefactorPlan = {
+  lessonPatches: LlmLessonRefactorPatch[];
+  newLessons?: LlmUnitPlanLesson[];
+};
+
 export type GeneratePhrasesInput = {
   lessonId?: string;
   language: "yoruba" | "igbo" | "hausa";
@@ -95,5 +146,18 @@ export type LlmClient = {
     existingProverbTexts?: string[];
     existingLessonsSummary?: string;
   }) => Promise<LlmUnitPlanLesson[]>;
+  planUnitRefactor: (input: {
+    language: string;
+    level: string;
+    lessonCount: number;
+    unitTitle?: string;
+    unitDescription?: string;
+    topic?: string;
+    curriculumInstruction?: string;
+    extraInstructions?: string;
+    themeAnchors?: string[];
+    existingLessonsSnapshot: string;
+    existingLessonTitles?: string[];
+  }) => Promise<LlmUnitRefactorPlan>;
   modelName: string;
 };

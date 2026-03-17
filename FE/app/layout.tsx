@@ -13,8 +13,8 @@ const _geistMono = Geist_Mono({ subsets: ['latin'] })
 const _quicksand = Quicksand({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Learn Nigerian Languages | Language Learning App',
-  description: 'Learn Yoruba, Igbo, Hausa & Pidgin the easy way. AI-powered practice with real cultural context.',
+  title: 'Learn African Languages | Language Learning App',
+  description: 'Learn Yoruba, Igbo, Hausa, and Pidgin with AI-powered practice and real African cultural context.',
   generator: 'v0.app',
   manifest: "/manifest.webmanifest",
   icons: {

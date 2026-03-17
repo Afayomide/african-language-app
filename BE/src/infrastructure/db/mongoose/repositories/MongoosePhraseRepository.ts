@@ -335,6 +335,16 @@ export class MongoosePhraseRepository implements PhraseRepository {
     );
   }
 
+  async removeIntroducedLessonIds(lessonIds: string[]): Promise<void> {
+    const normalizedLessonIds = Array.from(new Set(lessonIds.map(String).filter(Boolean)));
+    if (normalizedLessonIds.length === 0) return;
+
+    await PhraseModel.updateMany(
+      { introducedLessonIds: { $in: normalizedLessonIds } },
+      { $pull: { introducedLessonIds: { $in: normalizedLessonIds } } }
+    );
+  }
+
   async publishById(id: string, reviewedByAdmin: boolean): Promise<PhraseEntity | null> {
     const phrase = await PhraseModel.findOne({ _id: id, isDeleted: { $ne: true } });
     if (!phrase) return null;

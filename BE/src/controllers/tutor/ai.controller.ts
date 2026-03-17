@@ -343,7 +343,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { unitId } = req.params;
-  const { lessonCount, phrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+  const { lessonCount, phrasesPerLesson, reviewPhrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
   if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
@@ -358,6 +358,8 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   const requestedPhrasesPerLesson = Number(
     phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
   );
+  const requestedReviewPhrasesPerLesson =
+    reviewPhrasesPerLesson === undefined ? undefined : Number(reviewPhrasesPerLesson);
   const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20" });
@@ -369,6 +371,18 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   ) {
     return res.status(400).json({
       error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}`
+    });
+  }
+  if (
+    requestedReviewPhrasesPerLesson !== undefined &&
+    (
+      Number.isNaN(requestedReviewPhrasesPerLesson) ||
+      requestedReviewPhrasesPerLesson < 0 ||
+      requestedReviewPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON
+    )
+  ) {
+    return res.status(400).json({
+      error: `reviewPhrasesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON}`
     });
   }
   if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
@@ -391,6 +405,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
       phrasesPerLesson: clampPhrasesPerLesson(requestedPhrasesPerLesson),
+      reviewPhrasesPerLesson: requestedReviewPhrasesPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
@@ -407,7 +422,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { unitId } = req.params;
-  const { mode, lessonCount, phrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+  const { mode, lessonCount, phrasesPerLesson, reviewPhrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
   if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
@@ -425,6 +440,8 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   const requestedPhrasesPerLesson = Number(
     phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
   );
+  const requestedReviewPhrasesPerLesson =
+    reviewPhrasesPerLesson === undefined ? undefined : Number(reviewPhrasesPerLesson);
   const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20" });
@@ -436,6 +453,18 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   ) {
     return res.status(400).json({
       error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}`
+    });
+  }
+  if (
+    requestedReviewPhrasesPerLesson !== undefined &&
+    (
+      Number.isNaN(requestedReviewPhrasesPerLesson) ||
+      requestedReviewPhrasesPerLesson < 0 ||
+      requestedReviewPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON
+    )
+  ) {
+    return res.status(400).json({
+      error: `reviewPhrasesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON}`
     });
   }
   if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
@@ -459,6 +488,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
       phrasesPerLesson: clampPhrasesPerLesson(requestedPhrasesPerLesson),
+      reviewPhrasesPerLesson: requestedReviewPhrasesPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
@@ -468,5 +498,46 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   } catch (error) {
     console.error("Tutor AI reviseUnitContent error", error);
     return res.status(502).json({ error: "llm revision failed" });
+  }
+}
+
+export async function refactorLessonContent(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { lessonId } = req.params;
+  const { topic, extraInstructions } = req.body ?? {};
+
+  if (!validateLessonId(lessonId)) {
+    return res.status(400).json({ error: "invalid lesson id" });
+  }
+  if (topic !== undefined && typeof topic !== "string") {
+    return res.status(400).json({ error: "invalid topic" });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "invalid extra instructions" });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
+
+  const lesson = await lessons.findById(String(lessonId));
+  if (!lesson || lesson.language !== tutorLanguage) {
+    return res.status(404).json({ error: "lesson not found or out of scope" });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.refactorLesson({
+      lessonId: lesson.id,
+      createdBy: req.user.id,
+      topic: typeof topic === "string" ? topic.trim() || undefined : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() || undefined : undefined
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Tutor AI refactorLessonContent error", error);
+    return res.status(502).json({ error: "llm lesson refactor failed" });
   }
 }

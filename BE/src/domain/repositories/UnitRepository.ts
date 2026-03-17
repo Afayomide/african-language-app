@@ -1,5 +1,5 @@
 import type { Language, Status } from "../entities/Lesson.js";
-import type { UnitEntity } from "../entities/Unit.js";
+import type { UnitAiRunSummary, UnitEntity } from "../entities/Unit.js";
 
 export type UnitListFilter = {
   language?: Language;
@@ -20,12 +20,17 @@ export type UnitUpdateInput = Partial<
   Pick<UnitEntity, "title" | "description" | "language" | "level" | "orderIndex" | "status">
 >;
 
+export type UnitAiRunUpdateInput = {
+  lastAiRun: UnitAiRunSummary | null;
+};
+
 export interface UnitRepository {
   findLastOrderIndex(language: Language): Promise<number | null>;
   create(input: UnitCreateInput): Promise<UnitEntity>;
   list(filter: UnitListFilter): Promise<UnitEntity[]>;
   findById(id: string): Promise<UnitEntity | null>;
   updateById(id: string, update: UnitUpdateInput): Promise<UnitEntity | null>;
+  updateLastAiRun(id: string, update: UnitAiRunUpdateInput): Promise<UnitEntity | null>;
   softDeleteById(id: string): Promise<UnitEntity | null>;
   publishById(id: string, now: Date): Promise<UnitEntity | null>;
   findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>>;

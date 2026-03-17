@@ -248,6 +248,36 @@ export class LessonAuditService {
             }
           }
 
+          if (
+            question.subtype === "mc-select-missing-word" ||
+            question.subtype === "ls-mc-select-missing-word" ||
+            question.subtype === "ls-fg-gap-fill"
+          ) {
+            const phraseWordCount = splitWords(phrase.text).length;
+            const reviewSentence = String(question.reviewData?.sentence || "");
+            const reviewWords = Array.isArray(question.reviewData?.words)
+              ? question.reviewData?.words.map((item) => String(item || "").trim()).filter(Boolean)
+              : [];
+            const normalizedReviewPhrase = reviewWords.length > 0
+              ? normalizeSpace(reviewWords.join(" "))
+              : normalizeSpace(reviewSentence.replace(/____/g, String(question.options[question.correctIndex] || "").trim()));
+            if (phraseWordCount < 2) {
+              addFinding(
+                findings,
+                "error",
+                "single_word_phrase_uses_missing_word",
+                `Question ${question.id} uses a missing-word exercise for single-word phrase "${phrase.text}".`
+              );
+            } else if (normalizedReviewPhrase !== normalizeSpace(phrase.text)) {
+              addFinding(
+                findings,
+                "error",
+                "missing_word_phrase_mismatch",
+                `Question ${question.id} uses missing-word content that does not match the phrase text "${phrase.text}" exactly.`
+              );
+            }
+          }
+
           if (subtypeRequiresReviewData(question.subtype) && !validateReviewData(question)) {
             addFinding(findings, "error", "invalid_review_data", `Question ${question.id} requires valid review data.`);
           }

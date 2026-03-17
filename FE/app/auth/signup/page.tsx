@@ -56,7 +56,7 @@ export default function SignUpPage() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="Join thousands learning Nigerian languages"
+      subtitle="Join thousands learning African languages"
       footerText="Already have an account?"
       footerLink={{ text: 'Sign in', href: '/auth/login' }}
     >

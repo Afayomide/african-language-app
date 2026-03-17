@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Learn Nigerian Languages",
+    name: "Learn African Languages",
     short_name: "Language App",
-    description: "Learn Yoruba, Igbo, Hausa and more with guided lessons and audio.",
+    description: "Learn Yoruba, Igbo, Hausa, and Pidgin with guided lessons, audio, and cultural context.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
@@ -29,4 +29,3 @@ export default function manifest(): MetadataRoute.Manifest {
     ]
   };
 }
-
