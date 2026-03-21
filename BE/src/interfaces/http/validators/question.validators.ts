@@ -1,6 +1,7 @@
-export const QUESTION_TYPES = ["multiple-choice", "fill-in-the-gap", "listening", "matching"] as const;
+export const QUESTION_TYPES = ["multiple-choice", "fill-in-the-gap", "listening", "matching", "speaking"] as const;
 export const QUESTION_SUBTYPES = [
   "mc-select-translation",
+  "mc-select-context-response",
   "mc-select-missing-word",
   "fg-word-order",
   "fg-letter-order",
@@ -12,11 +13,13 @@ export const QUESTION_SUBTYPES = [
   "mt-match-image",
   "mt-match-translation",
   "ls-dictation",
-  "ls-tone-recognition"
+  "ls-tone-recognition",
+  "sp-pronunciation-compare"
 ] as const;
 
 export const MANUALLY_SUPPORTED_QUESTION_SUBTYPES = [
   "mc-select-translation",
+  "mc-select-context-response",
   "mc-select-missing-word",
   "fg-word-order",
   "fg-letter-order",
@@ -26,7 +29,8 @@ export const MANUALLY_SUPPORTED_QUESTION_SUBTYPES = [
   "ls-fg-word-order",
   "ls-fg-gap-fill",
   "mt-match-image",
-  "mt-match-translation"
+  "mt-match-translation",
+  "sp-pronunciation-compare"
 ] as const;
 
 export function isValidQuestionType(value: string) {
@@ -48,6 +52,7 @@ export function subtypeMatchesType(type: string, subtype: string) {
   if (type === "fill-in-the-gap") return subtype.startsWith("fg-");
   if (type === "listening") return subtype.startsWith("ls-");
   if (type === "matching") return subtype.startsWith("mt-");
+  if (type === "speaking") return subtype.startsWith("sp-");
   return false;
 }
 
@@ -72,6 +77,7 @@ export function subtypeUsesWordOrder(subtype: string) {
 export function subtypeUsesChoiceOptions(subtype: string) {
   return [
     "mc-select-translation",
+    "mc-select-context-response",
     "mc-select-missing-word",
     "fg-gap-fill",
     "ls-mc-select-translation",
@@ -85,7 +91,7 @@ export function subtypeUsesMatching(subtype: string) {
 }
 
 export type ParsedMatchingPair = {
-  phraseId: string;
+  contentId: string;
   translationIndex: number;
   imageAssetId?: string;
 };
@@ -103,26 +109,26 @@ export function parseQuestionMatchingPairs(interactionData: unknown, subtype: st
   for (const item of payload.matchingPairs) {
     if (!item || typeof item !== "object") return null;
     const pair = item as {
-      phraseId?: unknown;
+      contentId?: unknown;
       translationIndex?: unknown;
       imageAssetId?: unknown;
     };
-    const phraseId = String(pair.phraseId || "").trim();
-    if (!phraseId) return null;
+    const contentId = String(pair.contentId || "").trim();
+    if (!contentId) return null;
 
     const translationIndex = Number(pair.translationIndex ?? 0);
     if (!Number.isInteger(translationIndex) || translationIndex < 0) return null;
 
     const imageAssetId = String(pair.imageAssetId || "").trim();
     if (subtype === "mt-match-image" && !imageAssetId) {
-      parsedPairs.push({ phraseId, translationIndex });
+      parsedPairs.push({ contentId, translationIndex });
       continue;
     }
 
-    parsedPairs.push(imageAssetId ? { phraseId, translationIndex, imageAssetId } : { phraseId, translationIndex });
+    parsedPairs.push(imageAssetId ? { contentId, translationIndex, imageAssetId } : { contentId, translationIndex });
   }
 
-  const uniquePairKeys = new Set(parsedPairs.map((item) => `${item.phraseId}:${item.translationIndex}`));
+  const uniquePairKeys = new Set(parsedPairs.map((item) => `${item.contentId}:${item.translationIndex}`));
   if (parsedPairs.length < 2 || uniquePairKeys.size < 2) return null;
 
   return parsedPairs;
@@ -133,6 +139,55 @@ export function parseQuestionOptions(options: unknown) {
   const sanitized = options.map((item) => String(item).trim()).filter(Boolean);
   if (sanitized.length < 2) return null;
   return sanitized;
+}
+
+function normalizeWhitespace(value: string) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function stripDiacritics(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export function normalizeContextResponseKey(value: string) {
+  return stripDiacritics(normalizeWhitespace(value).toLowerCase()).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function findContextResponseTypoOnlyDistractors(sourceText: string, options: string[]) {
+  const exactSource = normalizeWhitespace(sourceText);
+  const normalizedSource = normalizeContextResponseKey(sourceText);
+  return options.filter((option) => {
+    const normalizedOption = normalizeContextResponseKey(option);
+    if (!normalizedOption || normalizedOption !== normalizedSource) return false;
+    return normalizeWhitespace(option) !== exactSource;
+  });
+}
+
+export function validateContextResponseQuestion(input: {
+  sourceText: string;
+  options: string[];
+  correctIndex: number;
+}) {
+  const sourceText = normalizeWhitespace(input.sourceText);
+  if (!sourceText) return "missing_source_text";
+  if (!Array.isArray(input.options) || input.options.length < 2 || input.options.length > 4) {
+    return "invalid_option_count";
+  }
+  if (!Number.isInteger(input.correctIndex) || input.correctIndex < 0 || input.correctIndex >= input.options.length) {
+    return "invalid_correct_index";
+  }
+  const correctOption = normalizeWhitespace(String(input.options[input.correctIndex] || ""));
+  if (correctOption !== sourceText) {
+    return "correct_option_must_match_source";
+  }
+  if (findContextResponseTypoOnlyDistractors(sourceText, input.options).length > 0) {
+    return "typo_only_distractors_not_allowed";
+  }
+  return null;
 }
 
 export function parseQuestionReviewData(reviewData: unknown) {

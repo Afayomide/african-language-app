@@ -1,2 +1,2 @@
-export { lessonService, phraseService, questionService } from "./admin.service";
+export { contentAudioService, lessonService, expressionService, questionService } from "./admin.service";
 export { authService } from "./auth";

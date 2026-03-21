@@ -3,13 +3,17 @@ import mongoose from "mongoose";
 import LessonModel from "../../models/Lesson.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AdminLessonUseCases } from "../../application/use-cases/admin/lesson/AdminLessonUseCases.js";
+import { ContentCurriculumService } from "../../application/services/ContentCurriculumService.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
+import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
+import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
+import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
 import { LessonAuditService } from "../../application/services/LessonAuditService.js";
-import { PhraseIntroductionService } from "../../application/services/PhraseIntroductionService.js";
 import type { Language, Level, LessonBlock, LessonStage, Status } from "../../domain/entities/Lesson.js";
 import {
   isValidLessonLanguage,
@@ -22,23 +26,38 @@ import {
 } from "../../interfaces/http/utils/pagination.js";
 
 const questionRepo = new MongooseQuestionRepository();
-const phraseRepo = new MongoosePhraseRepository();
+const lessonRepo = new MongooseLessonRepository();
+const lessonContentItems = new MongooseLessonContentItemRepository();
+const wordRepo = new MongooseWordRepository();
+const expressionRepo = new MongooseExpressionRepository();
+const sentenceRepo = new MongooseSentenceRepository();
 const lessonUseCases = new AdminLessonUseCases(
-  new MongooseLessonRepository(),
-  phraseRepo,
+  lessonRepo,
+  lessonContentItems,
+  wordRepo,
+  expressionRepo,
+  sentenceRepo,
   new MongooseProverbRepository(),
   questionRepo
 );
 
 const proverbRepo = new MongooseProverbRepository();
 const unitRepo = new MongooseUnitRepository();
-const lessonAuditService = new LessonAuditService(
-  new MongooseLessonRepository(),
-  phraseRepo,
-  proverbRepo,
-  questionRepo
+const contentCurriculum = new ContentCurriculumService(
+  lessonRepo,
+  unitRepo,
+  lessonContentItems,
+  new MongooseUnitContentItemRepository()
 );
-const phraseIntroductionService = new PhraseIntroductionService(phraseRepo);
+const lessonAuditService = new LessonAuditService(
+  lessonRepo,
+  wordRepo,
+  expressionRepo,
+  sentenceRepo,
+  proverbRepo,
+  questionRepo,
+  contentCurriculum
+);
 
 type ProverbInput = {
   text?: string;
@@ -49,6 +68,7 @@ type ProverbInput = {
 type BlockInput = {
   type?: string;
   content?: string;
+  contentType?: string;
   refId?: string;
   translationIndex?: number;
 };
@@ -72,6 +92,7 @@ function normalizeBlocks(blocks: unknown): LessonBlock[] {
       return {
         type,
         content,
+        contentType: row.contentType ? String(row.contentType).trim() : undefined,
         refId,
         translationIndex:
           Number.isInteger(Number(row.translationIndex)) && Number(row.translationIndex) >= 0
@@ -80,11 +101,16 @@ function normalizeBlocks(blocks: unknown): LessonBlock[] {
       };
     })
     .filter((block) => {
-      if (!["text", "phrase", "proverb", "question"].includes(block.type)) {
+      if (!["text", "content", "proverb", "question"].includes(block.type)) {
         return false;
       }
       if (block.type === "text") {
         return block.content.length > 0;
+      }
+      if (block.type === "content") {
+        if (!["word", "expression", "sentence"].includes(String((block as { contentType?: string }).contentType || ""))) {
+          return false;
+        }
       }
       const refId = block.refId;
       return typeof refId === "string" && mongoose.Types.ObjectId.isValid(refId);
@@ -165,6 +191,24 @@ async function upsertLessonProverbs(
   }
 }
 
+async function syncLessonContentItems(lessonId: string, createdBy: string, stages: LessonStage[]) {
+  const lesson = await lessonRepo.findById(lessonId);
+  if (!lesson) return;
+
+  const introduced = contentCurriculum.extractIntroducedContentFromStages(stages);
+  const referenced = contentCurriculum.extractReferencedContentFromStages(stages);
+  const introducedKeys = new Set(introduced.map((item) => `${item.contentType}:${item.contentId}`));
+  const practice = referenced.filter((item) => !introducedKeys.has(`${item.contentType}:${item.contentId}`));
+
+  await contentCurriculum.replaceLessonContentItems({
+    lesson,
+    createdBy,
+    introduced,
+    review: [],
+    practice
+  });
+}
+
 export async function createLesson(req: AuthRequest, res: Response) {
   const { title, description, unitId, topics, proverbs, stages } = req.body ?? {};
 
@@ -231,7 +275,7 @@ export async function createLesson(req: AuthRequest, res: Response) {
     await upsertLessonProverbs(lesson.id, lesson.language, normalizedProverbs);
   }
   if (normalizedStages.length > 0) {
-    await phraseIntroductionService.syncStageOneIntroductions(lesson.id, normalizedStages);
+    await syncLessonContentItems(lesson.id, req.user.id, normalizedStages);
   }
 
   return res.status(201).json({ lesson });
@@ -405,7 +449,7 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     }
   }
   if (stages !== undefined) {
-    await phraseIntroductionService.syncStageOneIntroductions(lesson.id, normalizedStages);
+    await syncLessonContentItems(lesson.id, String(lesson.createdBy || req.user?.id || ""), normalizedStages);
   }
 
   return res.status(200).json({ lesson });
@@ -472,14 +516,33 @@ export async function publishLesson(req: Request, res: Response) {
   if (result === "proverbs_not_published") {
     return res.status(400).json({ error: "proverbs not published" });
   }
-  if (result === "phrases_not_published") {
-    return res.status(400).json({ error: "phrases not published" });
+  if (result === "content_not_published") {
+    return res.status(400).json({ error: "content not published" });
+  }
+  if (result === "audio_not_covered") {
+    return res.status(400).json({ error: "audio not covered" });
   }
   if (result === "questions_not_published") {
     return res.status(400).json({ error: "questions not published" });
   }
 
   return res.status(200).json({ lesson: result });
+}
+
+export async function requestLessonAudio(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "unauthorized" });
+
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "invalid id" });
+  }
+
+  const lesson = await lessonUseCases.requestAudio(id);
+  if (!lesson) {
+    return res.status(404).json({ error: "lesson not found" });
+  }
+
+  return res.status(200).json({ lesson });
 }
 
 export async function auditLesson(req: Request, res: Response) {

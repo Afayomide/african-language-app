@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { phraseService } from "@/services";
+import { expressionService } from "@/services";
 import { Mic2, CheckCircle, Clock3, XCircle } from "lucide-react";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
     queueCount: 0,
+    chapterCount: 0,
+    unitCount: 0,
     accepted: 0,
     pending: 0,
     rejected: 0
@@ -17,12 +19,14 @@ export default function DashboardPage() {
     async function fetchStats() {
       try {
         const [queue, submissions] = await Promise.all([
-          phraseService.getQueue(),
-          phraseService.listMySubmissions()
+          expressionService.getQueue(),
+          expressionService.listMySubmissions()
         ]);
 
         setStats({
           queueCount: queue.length,
+          chapterCount: new Set(queue.flatMap((item) => item.chapters.map((chapter) => chapter._id))).size,
+          unitCount: new Set(queue.flatMap((item) => item.units.map((unit) => unit._id))).size,
           accepted: submissions.filter((item) => item.status === "accepted").length,
           pending: submissions.filter((item) => item.status === "pending").length,
           rejected: submissions.filter((item) => item.status === "rejected").length
@@ -37,16 +41,16 @@ export default function DashboardPage() {
 
   const cards = [
     { title: "Queue", value: stats.queueCount, icon: Mic2 },
-    { title: "Accepted", value: stats.accepted, icon: CheckCircle },
-    { title: "Pending Review", value: stats.pending, icon: Clock3 },
-    { title: "Rejected", value: stats.rejected, icon: XCircle }
+    { title: "Chapters", value: stats.chapterCount, icon: CheckCircle },
+    { title: "Units", value: stats.unitCount, icon: Clock3 },
+    { title: "Accepted", value: stats.accepted, icon: XCircle }
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Voice Dashboard</h1>
-        <p className="text-muted-foreground mt-2">Track phrase recording progress for your language.</p>
+        <p className="text-muted-foreground mt-2">Track recording work with chapter, unit, and lesson context for your language.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

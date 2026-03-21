@@ -24,6 +24,7 @@ export function getStandardLanguageRules(language: Language) {
   if (language === "yoruba") {
     return [
       "Use Standard Yoruba orthography and the most widely taught standard Yoruba wording.",
+      "Preserve Yoruba tone marks and underdots wherever the standard written form requires them. Do not strip diacritics.",
       "For common greetings, prefer standard forms such as Ẹ káàárọ̀, Ẹ káàsán, and Ẹ káalẹ́ when those meanings are intended.",
       "Avoid dialect-only, archaic, or nonstandard greeting variants unless explicitly requested."
     ];
@@ -32,6 +33,7 @@ export function getStandardLanguageRules(language: Language) {
   if (language === "igbo") {
     return [
       "Use Standard Igbo (Igbo Izugbe) vocabulary and spelling.",
+      "Preserve Igbo diacritics and standard written distinctions whenever they are part of the intended standard form.",
       "Prefer the most widely taught standard written form over regional dialect variants unless explicitly requested."
     ];
   }
@@ -45,13 +47,10 @@ export function getStandardLanguageRules(language: Language) {
 export function getLevelPedagogyRules(level: Level) {
   if (level === "beginner") {
     return [
-      "Teach survival vocabulary first.",
-      "At least 70 percent of outputs should be single words or very short chunks of 1 to 3 words.",
-      "Avoid full sentences unless they are extremely high-frequency fixed expressions.",
-      "For beginner level, seed phrases must be mostly single words or short chunks up to 3 words.",
-      "For beginner level, no more than one seed phrase may be longer than 3 words.",
-      "For beginner level, do not use full question-and-answer sentences as seed phrases.",
-      "Prefer greetings, pronouns, yes/no, thanks, sorry, please, common requests, time words, people words, daily action words, and short identity or location chunks."
+      "Teach survival language first.",
+      "For beginner level, keep target words and expressions short, high-frequency, and easy to reuse in multiple real conversations.",
+      "Beginner content should still support sentence-based teaching. Prefer target items that can quickly appear inside practical everyday sentences.",
+      "Prefer greetings, pronouns, yes/no, thanks, sorry, please, common requests, daily needs, money, transport, food, home life, health, work, school, family, safety, and short identity or location chunks."
     ];
   }
 
@@ -71,11 +70,40 @@ export function getLevelPedagogyRules(level: Level) {
   ];
 }
 
+export function getCulturalSituationRules(language: Language) {
+  const sharedRules = [
+    "Ground lesson content in practical daily situations people actually face, not generic textbook filler.",
+    "Prefer communicative situations such as transport problems, market buying, family interaction, school, work, greetings, money pressure, food, health, power outages, water issues, directions, lateness, apologies, and asking for help.",
+    "Prefer culturally plausible everyday speech from the language community over globally generic app-store phrasebook content.",
+    "If a sentence references a struggle or need, keep it realistic, respectful, and teachable."
+  ];
+
+  if (language === "yoruba") {
+    return [
+      ...sharedRules,
+      "For Yoruba, prefer situations that sound locally plausible in southwestern Nigerian everyday life without forcing slang or dialect."
+    ];
+  }
+
+  if (language === "igbo") {
+    return [
+      ...sharedRules,
+      "For Igbo, prefer situations that sound locally plausible in southeastern Nigerian everyday life without forcing dialect-only phrasing."
+    ];
+  }
+
+  return [
+    ...sharedRules,
+    "For Hausa, prefer situations that sound locally plausible in everyday Hausa-speaking communities without forcing highly regional or literary forms."
+  ];
+}
+
 export function getPhrasePromptGuardrails(input: GeneratePhrasesInput) {
   return [
     ...CURRICULUM_QUALITY_RULES,
     ...getStandardLanguageRules(input.language),
     ...getLevelPedagogyRules(input.level),
+    ...getCulturalSituationRules(input.language),
     "text must be in the target language only.",
     "translations must be English only.",
     "translations must be an array of distinct concise meanings.",
@@ -93,13 +121,15 @@ export function getSuggestionGuardrails(level: Level, language: Language) {
     ...CURRICULUM_QUALITY_RULES,
     ...getStandardLanguageRules(language),
     ...getLevelPedagogyRules(level),
+    ...getCulturalSituationRules(language),
     "Think like a curriculum designer, not a thesaurus.",
     "The title, description, and objectives must be in English only.",
     "Never write the title in the target language.",
     "The lesson or unit should feel like the next logical step in a coherent curriculum.",
     "Do not recycle an existing lesson or unit by changing only the title.",
     "Introduce only a manageable amount of new vocabulary.",
-    "Design for repetition and later review, not maximum coverage in one lesson."
+    "Design for repetition and later review, not maximum coverage in one lesson.",
+    "Prefer chapter, unit, and lesson plans that teach learners how to handle real life situations in that language community."
   ];
 }
 

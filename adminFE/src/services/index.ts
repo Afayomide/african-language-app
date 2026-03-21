@@ -1,9 +1,12 @@
 // Client-side API wrappers used by UI components.
 // These call Next.js API routes under /api/*.
 export {
+  chapterService,
   lessonService,
   unitService,
-  phraseService,
+  expressionService,
+  wordService,
+  sentenceService,
   imageService,
   proverbService,
   questionService,

@@ -12,16 +12,18 @@ export const beVoiceRoutes = {
   signup: () => buildBePath("/voice/auth/signup"),
   login: () => buildBePath("/voice/auth/login"),
   me: () => buildBePath("/voice/auth/me"),
-  queue: () => buildBePath("/voice/phrases/queue"),
-  submissions: () => buildBePath("/voice/phrases/submissions"),
-  createSubmission: (id: string) => buildBePath(`/voice/phrases/${id}/submissions`)
+  queue: () => buildBePath("/voice/content/queue"),
+  submissions: () => buildBePath("/voice/content/submissions"),
+  createSubmission: (contentType: string, contentId: string) =>
+    buildBePath(`/voice/content/${contentType}/${contentId}/submissions`)
 };
 
 export const feVoiceRoutes = {
   signup: () => "/api/voice/auth/signup",
   login: () => "/api/voice/auth",
   me: () => "/api/voice/auth/me",
-  queue: () => "/api/voice/phrases/queue",
-  submissions: () => "/api/voice/phrases/submissions",
-  createSubmission: (id: string) => `/api/voice/phrases/${id}/submissions`
+  queue: () => "/api/voice/content/queue",
+  submissions: () => "/api/voice/content/submissions",
+  createSubmission: (contentType: string, contentId: string) =>
+    `/api/voice/content/${contentType}/${contentId}/submissions`
 };

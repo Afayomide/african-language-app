@@ -7,6 +7,7 @@ import {
   getLessonById,
   listLessons,
   publishLesson,
+  requestLessonAudio,
   reorderLessons,
   updateLesson
 } from "../../controllers/admin/lesson.controller.js";
@@ -23,6 +24,7 @@ router.put("/reorder", reorderLessons);
 router.get("/:id/audit", auditLesson);
 router.get("/:id", getLessonById);
 router.put("/:id", updateLesson);
+router.put("/:id/request-audio", requestLessonAudio);
 router.delete("/:id", deleteLesson);
 
 router.put("/:id/publish", publishLesson);

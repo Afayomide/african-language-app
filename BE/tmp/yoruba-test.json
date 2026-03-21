@@ -1,0 +1,9 @@
+{
+  "model": "gemini-2.5-flash-preview-tts",
+  "voice": "Kore",
+  "language": "yoruba",
+  "sampleRate": 24000,
+  "mimeType": "audio/L16;codec=pcm;rate=24000",
+  "text": "Ẹ Káàáro? báwo ni?",
+  "prompt": "Read the following yoruba text exactly as written.\nDo not translate it. Do not explain it.\nText:\nẸ Káàáro? báwo ni?"
+}

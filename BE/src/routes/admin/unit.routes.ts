@@ -8,8 +8,8 @@ import {
   listUnits,
   publishUnit,
   reorderUnits,
+  restoreDeletedExpression,
   restoreDeletedLesson,
-  restoreDeletedPhrase,
   updateUnit
 } from "../../controllers/admin/unit.controller.js";
 import { requireAdmin, requireAuth } from "../../utils/authMiddleware.js";
@@ -23,7 +23,7 @@ router.get("/", listUnits);
 router.put("/reorder", reorderUnits);
 router.get("/:id/deleted-entries", getDeletedEntries);
 router.post("/:id/deleted-lessons/:lessonId/restore", restoreDeletedLesson);
-router.post("/:id/deleted-phrases/:phraseId/restore", restoreDeletedPhrase);
+router.post("/:id/deleted-expressions/:expressionId/restore", restoreDeletedExpression);
 router.get("/:id", getUnitById);
 router.put("/:id", updateUnit);
 router.put("/:id/finish", finishUnit);

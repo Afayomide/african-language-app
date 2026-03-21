@@ -1,6 +1,7 @@
 import type { Language, Level, LessonEntity, LessonStage } from "../../../../domain/entities/Lesson.js";
+import type { ExpressionRepository } from "../../../../domain/repositories/ExpressionRepository.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
-import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
+import type { LessonContentItemRepository } from "../../../../domain/repositories/LessonContentItemRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
 import type { LlmClient } from "../../../../services/llm/types.js";
@@ -10,6 +11,7 @@ import {
   validateGeneratedProverbs,
   validateLessonSuggestion
 } from "../../../../services/llm/outputQuality.js";
+import { buildPedagogicalStages } from "../../../services/defaultLessonStages.js";
 
 function normalizeTitle(value: string) {
   return value.trim().toLowerCase();
@@ -43,29 +45,7 @@ function normalizeSuggestedProverb(item: unknown) {
 export function buildInitialStages(objectives: string[]): LessonStage[] {
   const clean = objectives.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 4);
   if (clean.length === 0) {
-    return [
-      {
-        id: "stage-1",
-        title: "Stage 1: Core Vocabulary",
-        description: "Start with the foundational words and phrases.",
-        orderIndex: 0,
-        blocks: []
-      },
-      {
-        id: "stage-2",
-        title: "Stage 2: Practice",
-        description: "Practice with guided exercises.",
-        orderIndex: 1,
-        blocks: []
-      },
-      {
-        id: "stage-3",
-        title: "Stage 3: Listening and Review",
-        description: "Consolidate with listening and review.",
-        orderIndex: 2,
-        blocks: []
-      }
-    ];
+    return buildPedagogicalStages((index) => `stage-${index + 1}`);
   }
 
   return clean.map((objective, index) => ({
@@ -80,7 +60,8 @@ export function buildInitialStages(objectives: string[]): LessonStage[] {
 export class AdminLessonAiUseCases {
   constructor(
     private readonly lessons: LessonRepository,
-    private readonly phrases: PhraseRepository,
+    private readonly lessonContentItems: LessonContentItemRepository,
+    private readonly expressions: ExpressionRepository,
     private readonly proverbs: ProverbRepository,
     private readonly units: UnitRepository,
     private readonly llm: LlmClient
@@ -130,10 +111,15 @@ export class AdminLessonAiUseCases {
     let nextOrderIndex = (lastOrder ?? -1) + 1;
     const existingUnitsInLanguage = await this.units.listByLanguage(input.language);
     const lessonIdsInUnit = existingLessons.map((item) => item.id);
-    const existingPhrasesInUnit = lessonIdsInUnit.length
-      ? await this.phrases.list({ lessonIds: lessonIdsInUnit })
+    const existingLessonContentItems = existingLessons.length
+      ? await this.lessonContentItems.list({ unitId: input.unitId, contentType: "expression" })
       : [];
-    const existingPhraseTexts = existingPhrasesInUnit.map((item) => item.text).filter(Boolean);
+    const existingExpressionsInUnit = existingLessonContentItems.length
+      ? await this.expressions.findByIds(
+          Array.from(new Set(existingLessonContentItems.map((item) => item.contentId)))
+        )
+      : [];
+    const existingPhraseTexts = existingExpressionsInUnit.map((item) => item.text).filter(Boolean);
     const existingProverbTexts = (
       await Promise.all(lessonIdsInUnit.map((lessonId) => this.proverbs.findByLessonId(lessonId)))
     )

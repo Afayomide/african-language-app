@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
@@ -60,4 +60,32 @@ export async function uploadObject(buffer: Buffer, key: string, contentType: str
   );
 
   return resolvePublicUrl(key);
+}
+
+
+export async function deleteObjects(keys: string[]) {
+  const uniqueKeys = Array.from(new Set(keys.map((key) => String(key || "").trim()).filter(Boolean)));
+  if (uniqueKeys.length === 0) return 0;
+  if (!R2_BUCKET) {
+    console.error("Missing R2_BUCKET");
+    throw new Error("Missing R2_BUCKET");
+  }
+
+  const s3 = getClient();
+  let deletedCount = 0;
+  for (let index = 0; index < uniqueKeys.length; index += 1000) {
+    const batch = uniqueKeys.slice(index, index + 1000);
+    const result = await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: R2_BUCKET,
+        Delete: {
+          Objects: batch.map((key) => ({ Key: key })),
+          Quiet: true
+        }
+      })
+    );
+    deletedCount += Array.isArray(result.Deleted) ? result.Deleted.length : 0;
+  }
+
+  return deletedCount;
 }

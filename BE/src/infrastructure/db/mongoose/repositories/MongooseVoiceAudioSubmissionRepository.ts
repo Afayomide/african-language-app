@@ -1,24 +1,18 @@
 import VoiceAudioSubmissionModel from "../../../../models/voice/VoiceAudioSubmission.js";
 import type { VoiceAudioSubmissionEntity } from "../../../../domain/entities/VoiceAudioSubmission.js";
 import type { VoiceAudioSubmissionRepository } from "../../../../domain/repositories/VoiceAudioSubmissionRepository.js";
+import { mapContentAudio } from "./mapContentAudio.js";
 
 function toEntity(doc: any): VoiceAudioSubmissionEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
-    phraseId: doc.phraseId.toString(),
+    contentType: doc.contentType,
+    contentId: doc.contentId.toString(),
     voiceArtistUserId: doc.voiceArtistUserId.toString(),
     voiceArtistProfileId: doc.voiceArtistProfileId.toString(),
     language: doc.language,
-    audio: {
-      provider: String(doc.audio?.provider || ""),
-      model: String(doc.audio?.model || ""),
-      voice: String(doc.audio?.voice || ""),
-      locale: String(doc.audio?.locale || ""),
-      format: String(doc.audio?.format || ""),
-      url: String(doc.audio?.url || ""),
-      s3Key: String(doc.audio?.s3Key || "")
-    },
+    audio: mapContentAudio(doc.audio),
     status: doc.status,
     rejectionReason: String(doc.rejectionReason || ""),
     reviewedBy: doc.reviewedBy ? doc.reviewedBy.toString() : undefined,
@@ -30,7 +24,8 @@ function toEntity(doc: any): VoiceAudioSubmissionEntity {
 
 export class MongooseVoiceAudioSubmissionRepository implements VoiceAudioSubmissionRepository {
   async create(input: {
-    phraseId: string;
+    contentType: "word" | "expression" | "sentence";
+    contentId: string;
     voiceArtistUserId: string;
     voiceArtistProfileId: string;
     language: "yoruba" | "igbo" | "hausa";
@@ -43,13 +38,15 @@ export class MongooseVoiceAudioSubmissionRepository implements VoiceAudioSubmiss
   async list(filter: {
     status?: "pending" | "accepted" | "rejected";
     voiceArtistUserId?: string;
-    phraseId?: string;
+    contentType?: "word" | "expression" | "sentence";
+    contentId?: string;
     language?: "yoruba" | "igbo" | "hausa";
   }): Promise<VoiceAudioSubmissionEntity[]> {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;
     if (filter.voiceArtistUserId) query.voiceArtistUserId = filter.voiceArtistUserId;
-    if (filter.phraseId) query.phraseId = filter.phraseId;
+    if (filter.contentType) query.contentType = filter.contentType;
+    if (filter.contentId) query.contentId = filter.contentId;
     if (filter.language) query.language = filter.language;
 
     const submissions = await VoiceAudioSubmissionModel.find(query).sort({ createdAt: -1 }).lean();

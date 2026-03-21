@@ -1,12 +1,12 @@
 import type { LessonEntity } from "../../domain/entities/Lesson.js";
-import type { PhraseEntity } from "../../domain/entities/Phrase.js";
+import type { ExpressionEntity } from "../../domain/entities/Expression.js";
+import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
 import type { LessonRepository } from "../../domain/repositories/LessonRepository.js";
-import type { PhraseRepository } from "../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../domain/repositories/ProverbRepository.js";
 import type { QuestionRepository } from "../../domain/repositories/QuestionRepository.js";
 
 type StageRefIds = {
-  phraseIds: string[];
+  expressionIds: string[];
   proverbIds: string[];
 };
 
@@ -15,19 +15,19 @@ function uniqueIds(ids: string[]) {
 }
 
 function collectStageRefIds(lesson: LessonEntity): StageRefIds {
-  const phraseIds: string[] = [];
+  const expressionIds: string[] = [];
   const proverbIds: string[] = [];
 
   for (const stage of lesson.stages || []) {
     for (const block of stage.blocks || []) {
       if (!("refId" in block) || !block.refId) continue;
-      if (block.type === "phrase") phraseIds.push(block.refId);
+      if (block.type === "content" && block.contentType === "expression") expressionIds.push(block.refId);
       if (block.type === "proverb") proverbIds.push(block.refId);
     }
   }
 
   return {
-    phraseIds: uniqueIds(phraseIds),
+    expressionIds: uniqueIds(expressionIds),
     proverbIds: uniqueIds(proverbIds)
   };
 }
@@ -43,37 +43,28 @@ function sortDeleted<T extends { deletedAt?: Date | null; updatedAt: Date }>(row
 export class UnitDeletedEntriesService {
   constructor(
     private readonly lessons: LessonRepository,
-    private readonly phrases: PhraseRepository,
+    private readonly expressions: ExpressionRepository,
     private readonly proverbs: ProverbRepository,
     private readonly questions: QuestionRepository
   ) {}
 
-  async list(unitId: string): Promise<{ lessons: LessonEntity[]; phrases: PhraseEntity[] }> {
+  async list(unitId: string): Promise<{ lessons: LessonEntity[]; expressions: ExpressionEntity[] }> {
     const [activeLessons, deletedLessons] = await Promise.all([
       this.lessons.listByUnitId(unitId),
       this.lessons.listDeletedByUnitId(unitId)
     ]);
 
-    const unitLessonIds = uniqueIds([...activeLessons, ...deletedLessons].map((lesson) => lesson.id));
-    const deletedStagePhraseIds = uniqueIds(
-      deletedLessons.flatMap((lesson) => collectStageRefIds(lesson).phraseIds)
+    const expressionIds = uniqueIds(
+      [...activeLessons, ...deletedLessons].flatMap((lesson) => collectStageRefIds(lesson).expressionIds)
     );
 
-    const phraseBuckets = await Promise.all([
-      unitLessonIds.length > 0 ? this.phrases.listDeleted({ lessonIds: unitLessonIds }) : Promise.resolve([]),
-      deletedStagePhraseIds.length > 0 ? this.phrases.listDeleted({ ids: deletedStagePhraseIds }) : Promise.resolve([])
-    ]);
-
-    const deletedPhraseMap = new Map<string, PhraseEntity>();
-    for (const bucket of phraseBuckets) {
-      for (const phrase of bucket) {
-        deletedPhraseMap.set(phrase.id, phrase);
-      }
-    }
+    const deletedExpressions = expressionIds.length > 0
+      ? await this.expressions.listDeleted({ ids: expressionIds })
+      : [];
 
     return {
       lessons: sortDeleted(deletedLessons),
-      phrases: sortDeleted(Array.from(deletedPhraseMap.values()))
+      expressions: sortDeleted(deletedExpressions)
     };
   }
 
@@ -86,16 +77,15 @@ export class UnitDeletedEntriesService {
     const restoredLesson = await this.lessons.restoreById(lessonId, (lastOrderIndex ?? -1) + 1);
     if (!restoredLesson) return null;
 
-    const { phraseIds, proverbIds } = collectStageRefIds(targetLesson);
+    const { expressionIds, proverbIds } = collectStageRefIds(targetLesson);
 
     await Promise.all([
-      this.phrases.restoreByLessonId(restoredLesson.id),
       this.proverbs.restoreByLessonId(restoredLesson.id),
       this.questions.restoreByLessonId(restoredLesson.id)
     ]);
 
-    for (const phraseId of phraseIds) {
-      await this.phrases.restoreById(phraseId, [restoredLesson.id]);
+    for (const expressionId of expressionIds) {
+      await this.expressions.restoreById(expressionId);
     }
 
     for (const proverbId of proverbIds) {
@@ -105,26 +95,10 @@ export class UnitDeletedEntriesService {
     return restoredLesson;
   }
 
-  async restorePhrase(unitId: string, phraseId: string): Promise<PhraseEntity | null> {
-    const { lessons: deletedLessons, phrases: deletedPhrases } = await this.list(unitId);
-    const targetPhrase = deletedPhrases.find((phrase) => phrase.id === phraseId);
-    if (!targetPhrase) return null;
-
-    const activeLessons = await this.lessons.listByUnitId(unitId);
-    const unitLessons = [...activeLessons, ...deletedLessons];
-    const referencedLessonIds = uniqueIds(
-      unitLessons
-        .filter((lesson) =>
-          lesson.stages.some((stage) =>
-            stage.blocks.some((block) => block.type === "phrase" && block.refId === phraseId)
-          )
-        )
-        .map((lesson) => lesson.id)
-    );
-    const fallbackLessonIds = uniqueIds(unitLessons.map((lesson) => lesson.id));
-    return this.phrases.restoreById(
-      phraseId,
-      referencedLessonIds.length > 0 ? referencedLessonIds : fallbackLessonIds
-    );
+  async restoreExpression(unitId: string, expressionId: string): Promise<ExpressionEntity | null> {
+    const { expressions } = await this.list(unitId);
+    const targetExpression = expressions.find((expression) => expression.id === expressionId);
+    if (!targetExpression) return null;
+    return this.expressions.restoreById(expressionId);
   }
 }

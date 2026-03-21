@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { lessonService, unitService } from "@/services";
-import { Lesson, Language, Status, Unit } from "@/types";
+import { chapterService, lessonService, unitService } from "@/services";
+import { Chapter, Lesson, Language, Status, Unit } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +54,8 @@ export default function LessonsByLanguagePage({
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapterFilter, setChapterFilter] = useState<"all" | string>("all");
   const [unitFilter, setUnitFilter] = useState<"all" | string>("all");
 
   const isValidLanguageParam = isLanguage(languageParam);
@@ -82,34 +84,50 @@ export default function LessonsByLanguagePage({
 
   const fetchUnits = useCallback(async () => {
     try {
-      const data = await unitService.listUnits()
+      const data = await unitService.listUnits({
+        chapterId: chapterFilter === "all" ? undefined : chapterFilter
+      })
       setUnits(data)
     } catch (error) {
       toast.error("Failed to fetch units")
+    }
+  }, [chapterFilter]);
+
+  const fetchChapters = useCallback(async () => {
+    try {
+      const data = await chapterService.listChapters();
+      setChapters(data);
+    } catch (error) {
+      toast.error("Failed to fetch chapters");
     }
   }, []);
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
+    fetchChapters();
     fetchUnits();
     fetchLessons();
-  }, [fetchLessons, fetchUnits, isValidLanguageParam]);
+  }, [fetchChapters, fetchLessons, fetchUnits, isValidLanguageParam]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, language, statusFilter, unitFilter]);
+  }, [search, language, statusFilter, chapterFilter, unitFilter]);
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
     const qPage = Number(searchParams.get("page") || "1");
     const qLimit = Number(searchParams.get("limit") || "20");
     const qStatus = searchParams.get("status");
+    const qChapterId = searchParams.get("chapterId");
+    const qUnitId = searchParams.get("unitId");
     setSearch(q);
     setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
     setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20);
     if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
       setStatusFilter(qStatus);
     }
+    if (qChapterId) setChapterFilter(qChapterId);
+    if (qUnitId) setUnitFilter(qUnitId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -119,6 +137,8 @@ export default function LessonsByLanguagePage({
     else params.delete("q");
     if (statusFilter !== "all") params.set("status", statusFilter);
     else params.delete("status");
+    if (chapterFilter !== "all") params.set("chapterId", chapterFilter);
+    else params.delete("chapterId");
     if (unitFilter !== "all") params.set("unitId", unitFilter);
     else params.delete("unitId");
     params.set("page", String(page));
@@ -126,7 +146,24 @@ export default function LessonsByLanguagePage({
     const nextQuery = params.toString();
     if (nextQuery === searchParams.toString()) return;
     router.replace(`${pathname}?${nextQuery}`);
-  }, [search, statusFilter, unitFilter, page, limit, pathname, router, searchParams]);
+  }, [search, statusFilter, chapterFilter, unitFilter, page, limit, pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (unitFilter !== "all" && !units.some((unit) => unit._id === unitFilter)) {
+      setUnitFilter("all");
+    }
+  }, [unitFilter, units]);
+
+  useEffect(() => {
+    if (chapterFilter === "all") return;
+    if (units.length === 0) {
+      setUnitFilter("all");
+      return;
+    }
+    if (unitFilter === "all") {
+      setUnitFilter(units[0]._id);
+    }
+  }, [chapterFilter, unitFilter, units]);
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this lesson?")) return;
@@ -251,7 +288,7 @@ export default function LessonsByLanguagePage({
           </Button>
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{LANGUAGE_LABELS[language]} Lessons</h1>
-            <p className="text-muted-foreground font-medium">Manage and organize lessons for {LANGUAGE_LABELS[language]}.</p>
+            <p className="text-muted-foreground font-medium">Manage lessons inside the right chapter and unit for {LANGUAGE_LABELS[language]}.</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -272,7 +309,7 @@ export default function LessonsByLanguagePage({
             Bulk Finish
           </Button>
           <Button asChild className="h-12 rounded-xl px-6 font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
-            <Link href={`/lessons/new?language=${language}${unitFilter !== "all" ? `&unitId=${unitFilter}` : ""}`}>
+            <Link href={`/lessons/new?language=${language}${chapterFilter !== "all" ? `&chapterId=${chapterFilter}` : ""}${unitFilter !== "all" ? `&unitId=${unitFilter}` : ""}`}>
               <Plus className="mr-2 h-5 w-5" />
               Create New Lesson
             </Link>
@@ -298,7 +335,22 @@ export default function LessonsByLanguagePage({
             onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           />
           <div className="pb-4">
-            <Select value={unitFilter} onValueChange={setUnitFilter}>
+            <div className="flex flex-wrap gap-3">
+              <Select value={chapterFilter} onValueChange={setChapterFilter}>
+                <SelectTrigger className="h-10 w-[280px]">
+                  <SelectValue placeholder="Filter by chapter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All chapters</SelectItem>
+                  {chapters.map((chapter) => (
+                    <SelectItem key={chapter._id} value={chapter._id}>
+                      {chapter.orderIndex + 1}. {chapter.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={unitFilter} onValueChange={setUnitFilter}>
               <SelectTrigger className="h-10 w-[280px]">
                 <SelectValue placeholder="Filter by unit" />
               </SelectTrigger>
@@ -310,7 +362,8 @@ export default function LessonsByLanguagePage({
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+              </Select>
+            </div>
           </div>
           <div className="pb-4">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | Status)}>
@@ -340,6 +393,7 @@ export default function LessonsByLanguagePage({
               </TableHead>
               <TableHead className="w-24 font-bold text-primary pl-8">Order</TableHead>
               <TableHead className="font-bold text-primary">Title</TableHead>
+              <TableHead className="font-bold text-primary">Unit</TableHead>
               <TableHead className="font-bold text-primary">Level</TableHead>
               <TableHead className="font-bold text-primary">Status</TableHead>
               <TableHead className="font-bold text-primary">Created At</TableHead>
@@ -350,7 +404,7 @@ export default function LessonsByLanguagePage({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={9} className="h-48 text-center text-muted-foreground font-medium">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     Loading lessons...
@@ -359,7 +413,7 @@ export default function LessonsByLanguagePage({
               </TableRow>
             ) : lessons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={9} className="h-48 text-center text-muted-foreground font-medium">
                   No lessons found for this language.
                 </TableCell>
               </TableRow>
@@ -400,6 +454,11 @@ export default function LessonsByLanguagePage({
                   </TableCell>
                   <TableCell className="font-bold text-foreground">{lesson.title}</TableCell>
                   <TableCell>
+                    <Badge variant="outline" className="font-semibold border-primary/20 text-primary bg-primary/5">
+                      {units.find((unit) => unit._id === lesson.unitId)?.title || "Unknown unit"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className="capitalize font-semibold border-accent/30 text-accent bg-accent/5">
                       {lesson.level}
                     </Badge>
@@ -418,8 +477,8 @@ export default function LessonsByLanguagePage({
                           <Edit className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" asChild title="View Phrases" className={TABLE_ACTION_ICON_CLASS.view}>
-                        <Link href={`/phrases/lang/${language}?lessonId=${lesson._id}`}>
+                      <Button variant="ghost" size="icon" asChild title="View Expressions" className={TABLE_ACTION_ICON_CLASS.view}>
+                        <Link href={`/expressions/lang/${language}?lessonId=${lesson._id}`}>
                           <ExternalLink className="h-4 w-4" />
                         </Link>
                       </Button>

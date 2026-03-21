@@ -1,7 +1,5 @@
 import type { QuestionInteractionData, QuestionMatchingPair } from "../../domain/entities/Question.js";
-import type { ImageAssetRepository } from "../../domain/repositories/ImageAssetRepository.js";
-import type { PhraseImageLinkRepository } from "../../domain/repositories/PhraseImageLinkRepository.js";
-import type { PhraseRepository } from "../../domain/repositories/PhraseRepository.js";
+import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
 import type { ParsedMatchingPair } from "../../interfaces/http/validators/question.validators.js";
 
 function getTranslationByIndex(translations: string[], index: number) {
@@ -20,73 +18,32 @@ export async function buildMatchingInteractionData(input: {
   matchingPairs: ParsedMatchingPair[];
   subtype: string;
   lessonId: string;
-  phrases: PhraseRepository;
-  phraseImageLinks: PhraseImageLinkRepository;
-  imageAssets: ImageAssetRepository;
+  expressions: ExpressionRepository;
 }) {
+  if (input.subtype === "mt-match-image") {
+    return "matching_image_not_supported" as const;
+  }
+
   const resolvedPairs: QuestionMatchingPair[] = [];
 
   for (let index = 0; index < input.matchingPairs.length; index += 1) {
     const pair = input.matchingPairs[index];
-    const phrase = await input.phrases.findById(pair.phraseId);
-    if (!phrase || !phrase.lessonIds.includes(input.lessonId)) {
-      return "phrase_not_found" as const;
+    const expression = await input.expressions.findById(pair.contentId);
+    if (!expression) {
+      return "content_not_found" as const;
     }
-    if (pair.translationIndex < 0 || pair.translationIndex >= phrase.translations.length) {
+    if (pair.translationIndex < 0 || pair.translationIndex >= expression.translations.length) {
       return "invalid_translation_index" as const;
     }
 
-    let image: QuestionMatchingPair["image"] = null;
-    if (input.subtype === "mt-match-image") {
-      const candidateLink = pair.imageAssetId
-        ? await input.phraseImageLinks.findActiveByPhraseAndAsset(
-            phrase.id,
-            pair.imageAssetId,
-            pair.translationIndex
-          ) ||
-          await input.phraseImageLinks.findActiveByPhraseAndAsset(
-            phrase.id,
-            pair.imageAssetId,
-            null
-          )
-        : null;
-
-      const fallbackLinks = candidateLink
-        ? [candidateLink]
-        : await input.phraseImageLinks.listByPhraseId(phrase.id);
-
-      const preferredLink =
-        fallbackLinks.find((item) => item.translationIndex === pair.translationIndex && item.isPrimary) ||
-        fallbackLinks.find((item) => item.translationIndex === pair.translationIndex) ||
-        fallbackLinks.find((item) => item.translationIndex === null && item.isPrimary) ||
-        fallbackLinks.find((item) => item.translationIndex === null) ||
-        fallbackLinks.find((item) => item.isPrimary) ||
-        fallbackLinks[0];
-
-      if (!preferredLink) {
-        return "matching_image_required" as const;
-      }
-
-      const imageAsset = await input.imageAssets.findById(preferredLink.imageAssetId);
-      if (!imageAsset) {
-        return "matching_image_required" as const;
-      }
-
-      image = {
-        imageAssetId: imageAsset.id,
-        url: imageAsset.url,
-        thumbnailUrl: imageAsset.thumbnailUrl,
-        altText: imageAsset.altText
-      };
-    }
-
     resolvedPairs.push({
-      pairId: sanitizePairId(`${phrase.id}-${pair.translationIndex}-${index + 1}`),
-      phraseId: phrase.id,
-      phraseText: phrase.text,
+      pairId: sanitizePairId(`${expression.id}-${pair.translationIndex}-${index + 1}`),
+      contentType: "expression",
+      contentId: expression.id,
+      contentText: expression.text,
       translationIndex: pair.translationIndex,
-      translation: getTranslationByIndex(phrase.translations, pair.translationIndex),
-      image
+      translation: getTranslationByIndex(expression.translations, pair.translationIndex),
+      image: null
     });
   }
 
@@ -100,9 +57,13 @@ export async function buildMatchingInteractionData(input: {
   }
 
   return {
-    phraseId: resolvedPairs[0].phraseId,
+    sourceType: "expression" as const,
+    sourceId: String(resolvedPairs[0].contentId || ""),
     translationIndex: resolvedPairs[0].translationIndex,
-    relatedPhraseIds: Array.from(new Set(resolvedPairs.map((item) => item.phraseId))),
+    relatedSourceRefs: resolvedPairs
+      .map((item) => item.contentId)
+      .filter((item): item is string => Boolean(item))
+      .map((id) => ({ type: "expression" as const, id })),
     interactionData: {
       matchingPairs: resolvedPairs
     } satisfies QuestionInteractionData

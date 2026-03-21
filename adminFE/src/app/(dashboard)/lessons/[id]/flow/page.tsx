@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, phraseService, proverbService, questionService } from "@/services"
-import { Lesson, LessonBlock, LessonStage, Phrase, Proverb, ExerciseQuestion } from "@/types"
+import { lessonService, expressionService, proverbService, questionService } from "@/services"
+import { Lesson, LessonBlock, LessonStage, Expression, Proverb, ExerciseQuestion } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,7 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
-  const [allPhrases, setAllPhrases] = useState<Phrase[]>([])
+  const [allExpressions, setAllExpressions] = useState<Expression[]>([])
   const [allProverbs, setAllProverbs] = useState<Proverb[]>([])
   const [allQuestions, setAllQuestions] = useState<ExerciseQuestion[]>([])
 
@@ -50,11 +50,11 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
       }])
 
       const [p, prv, q] = await Promise.all([
-        phraseService.listPhrases(id, undefined, lessonData.language),
+        expressionService.listExpressions(id, undefined, lessonData.language),
         proverbService.listProverbs(id, undefined, lessonData.language),
         questionService.listQuestions({ lessonId: id })
       ])
-      setAllPhrases(p)
+      setAllExpressions(p)
       setAllProverbs(prv)
       setAllQuestions(q)
     } catch (error) {
@@ -72,6 +72,12 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     if (type === "text") {
       const next = [...stages]
       next[activeStageIndex] = { ...active, blocks: [...blocks, { type: "text", content: "" }] }
+      setStages(next)
+      return
+    }
+    if (type === "content") {
+      const next = [...stages]
+      next[activeStageIndex] = { ...active, blocks: [...blocks, { type: "content", contentType: "expression", refId: "" }] }
       setStages(next)
       return
     }
@@ -132,7 +138,7 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     if (!Number.isInteger(nextIndex) || nextIndex < 0) return
     const blocks = Array.isArray(active.blocks) ? [...active.blocks] : []
     const block = blocks[index]
-    if (!block || block.type !== "phrase") return
+    if (!block || block.type !== "content") return
     blocks[index] = {
       ...block,
       translationIndex: nextIndex
@@ -234,7 +240,7 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={handleAddStage}>+ Stage</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={handleRemoveStage} disabled={stages.length <= 1}>- Stage</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("text")}>+ Text</Button>
-                <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("phrase")}>+ Phrase</Button>
+                <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("content")}>+ Expression</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("proverb")}>+ Proverb</Button>
                 <Button size="sm" variant="outline" className="text-xs font-bold" onClick={() => handleAddBlock("question")}>+ Question</Button>
               </div>
@@ -283,10 +289,10 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                     ) : (
                       <Select value={block.refId} onValueChange={(v) => handleBlockChange(index, v)}>
                         <SelectTrigger className="border-2 rounded-xl h-12">
-                          <SelectValue placeholder={`Select a ${block.type} from this lesson...`} />
+                          <SelectValue placeholder={block.type === "content" ? "Select an expression from this lesson..." : `Select a ${block.type} from this lesson...`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          {block.type === "phrase" && allPhrases.map(p => (
+                          {block.type === "content" && block.contentType === "expression" && allExpressions.map(p => (
                             <SelectItem key={p._id} value={p._id}>
                               {p.text} — {p.translations.join(" | ")}
                             </SelectItem>
@@ -299,16 +305,16 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                               {q.promptTemplate} ({q.type === "listening" ? "listening" : q.type.replaceAll("-", " ")})
                             </SelectItem>
                           ))}
-                          {((block.type === "phrase" && allPhrases.length === 0) ||
+                          {((block.type === "content" && block.contentType === "expression" && allExpressions.length === 0) ||
                             (block.type === "proverb" && allProverbs.length === 0) ||
                             (block.type === "question" && allQuestions.length === 0)) && (
-                            <SelectItem value="none" disabled>No {block.type}s found for this lesson</SelectItem>
+                            <SelectItem value="none" disabled>No matching content found for this lesson</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
                     )}
 
-                    {block.type === "phrase" && block.refId && (
+                    {block.type === "content" && block.contentType === "expression" && block.refId && (
                       <Select
                         value={String(block.translationIndex ?? 0)}
                         onValueChange={(v) => handleBlockTranslationIndexChange(index, v)}
@@ -317,7 +323,7 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                           <SelectValue placeholder="Select translation index" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          {(allPhrases.find((p) => p._id === block.refId)?.translations || []).map((item, translationIndex) => (
+                          {(allExpressions.find((p) => p._id === block.refId)?.translations || []).map((item, translationIndex) => (
                             <SelectItem key={`${block.refId}-${translationIndex}`} value={String(translationIndex)}>
                               Index {translationIndex}: {item}
                             </SelectItem>

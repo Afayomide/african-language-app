@@ -14,9 +14,13 @@ function toEntity(doc: any): QuestionEntity {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     lessonId: doc.lessonId.toString(),
-    phraseId: doc.phraseId.toString(),
-    relatedPhraseIds: Array.isArray(doc.relatedPhraseIds)
-      ? doc.relatedPhraseIds.map((item: { toString(): string }) => item.toString())
+    sourceType: doc.sourceType ?? undefined,
+    sourceId: doc.sourceId ? doc.sourceId.toString() : undefined,
+    relatedSourceRefs: Array.isArray(doc.relatedSourceRefs)
+      ? doc.relatedSourceRefs.map((item: { type?: string; id?: { toString(): string } | string }) => ({
+          type: item.type === "sentence" ? "sentence" : item.type === "word" ? "word" : "expression",
+          id: typeof item.id === "string" ? item.id : String(item.id?.toString() || "")
+        }))
       : [],
     translationIndex: Number.isInteger(translationIndex) && translationIndex >= 0 ? translationIndex : 0,
     type: doc.type,
@@ -31,8 +35,9 @@ function toEntity(doc: any): QuestionEntity {
             ? doc.interactionData.matchingPairs.map(
                 (item: {
                   pairId?: string;
-                  phraseId?: { toString(): string } | string;
-                  phraseText?: string;
+                  contentType?: string;
+                  contentId?: { toString(): string } | string;
+                  contentText?: string;
                   translationIndex?: number;
                   translation?: string;
                   image?: {
@@ -43,8 +48,20 @@ function toEntity(doc: any): QuestionEntity {
                   } | null;
                 }) => ({
                   pairId: String(item.pairId || ""),
-                  phraseId: typeof item.phraseId === "string" ? item.phraseId : String(item.phraseId?.toString() || ""),
-                  phraseText: String(item.phraseText || ""),
+                  contentType:
+                    item.contentType === "sentence"
+                      ? "sentence"
+                      : item.contentType === "word"
+                        ? "word"
+                        : item.contentType === "expression"
+                          ? "expression"
+                          : undefined,
+                  contentId: item.contentId
+                    ? typeof item.contentId === "string"
+                      ? item.contentId
+                      : item.contentId.toString()
+                    : undefined,
+                  contentText: item.contentText ? String(item.contentText) : undefined,
                   translationIndex: Number(item.translationIndex || 0),
                   translation: String(item.translation || ""),
                   image: item.image?.url
@@ -82,6 +99,7 @@ export class MongooseQuestionRepository implements QuestionRepository {
     if (filter.lessonId) query.lessonId = filter.lessonId;
     if (filter.lessonIds) query.lessonId = { $in: filter.lessonIds };
     if (filter.type) query.type = filter.type;
+    if (filter.subtype) query.subtype = filter.subtype;
     if (filter.status) query.status = filter.status;
 
     const questions = await ExerciseQuestionModel.find(query).sort({ createdAt: -1 });
@@ -162,9 +180,20 @@ export class MongooseQuestionRepository implements QuestionRepository {
     );
   }
 
-  async softDeleteByPhraseId(phraseId: string, now: Date): Promise<void> {
+  async softDeleteBySource(sourceType: NonNullable<QuestionEntity["sourceType"]>, sourceId: string, now: Date): Promise<void> {
     await ExerciseQuestionModel.updateMany(
-      { $or: [{ phraseId }, { relatedPhraseIds: phraseId }], isDeleted: { $ne: true } },
+      {
+        isDeleted: { $ne: true },
+        $or: [
+          { sourceType, sourceId },
+          { relatedSourceRefs: { $elemMatch: { type: sourceType, id: sourceId } } },
+          {
+            "interactionData.matchingPairs": {
+              $elemMatch: { contentType: sourceType, contentId: sourceId }
+            }
+          }
+        ]
+      },
       { isDeleted: true, deletedAt: now }
     );
   }

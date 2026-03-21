@@ -1,16 +1,17 @@
 import type { Language } from "./Lesson.js";
-import type { PhraseAudio } from "./Phrase.js";
+import type { ContentAudio, ContentType } from "./Content.js";
 
 export type VoiceAudioSubmissionStatus = "pending" | "accepted" | "rejected";
 
 export type VoiceAudioSubmissionEntity = {
   id: string;
   _id?: string;
-  phraseId: string;
+  contentType: ContentType;
+  contentId: string;
   voiceArtistUserId: string;
   voiceArtistProfileId: string;
   language: Language;
-  audio: PhraseAudio;
+  audio: ContentAudio;
   status: VoiceAudioSubmissionStatus;
   rejectionReason: string;
   reviewedBy?: string;

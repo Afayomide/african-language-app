@@ -2,8 +2,8 @@
 
 import { use, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, phraseService, questionService } from "@/services"
-import { ExerciseQuestion, Lesson, Phrase, QuestionSubtype, QuestionType } from "@/types"
+import { lessonService, expressionService, questionService } from "@/services"
+import { ExerciseQuestion, Lesson, Expression, QuestionSubtype, QuestionType } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,20 +14,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Save } from "lucide-react"
 import { toast } from "sonner"
 
-type PhraseOption = {
+type ExpressionOption = {
   _id: string
   text: string
   translations: string[]
-  images?: Phrase["images"]
+  images?: Expression["images"]
 }
 
 type MatchingItemDraft = {
-  phraseId: string
+  sourceId: string
   translationIndex: number
 }
 
 const SUBTYPE_TEMPLATES: Record<QuestionSubtype, string> = {
   "mc-select-translation": "What is {phrase} in English?",
+  "mc-select-context-response": "You need the polite form in this real-life situation. Which do you say?",
   "mc-select-missing-word": "Select the missing word: {sentence}",
   "fg-word-order": "Arrange the words to mean: {meaning}",
   "fg-letter-order": "Arrange the letters to spell the phrase for: {meaning}",
@@ -39,11 +40,15 @@ const SUBTYPE_TEMPLATES: Record<QuestionSubtype, string> = {
   "mt-match-image": "Match each phrase to the correct image.",
   "mt-match-translation": "Match each phrase to the correct translation.",
   "ls-dictation": "Listen and type what you hear",
-  "ls-tone-recognition": "Which syllable has the rising tone?"
+  "ls-tone-recognition": "Which syllable has the rising tone?",
+  "sp-pronunciation-compare": "Say {phrase} aloud. Match the tutor's tone and pronunciation."
 }
 
-function getPhraseId(value: ExerciseQuestion["phraseId"]) {
-  return typeof value === "string" ? value : value?._id || ""
+function getSourceId(question: ExerciseQuestion) {
+  if (question.sourceId) return question.sourceId
+  const source = question.source
+  if (source && typeof source !== "string" && source._id) return source._id
+  return ""
 }
 
 export default function EditQuestionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +56,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
   const [question, setQuestion] = useState<ExerciseQuestion | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [phrases, setPhrases] = useState<PhraseOption[]>([])
+  const [expressions, setExpressions] = useState<ExpressionOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [optionsCsv, setOptionsCsv] = useState("")
@@ -62,14 +67,19 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const [matchingItems, setMatchingItems] = useState<MatchingItemDraft[]>([])
 
   const isMatchingQuestion = question?.type === "matching"
+  const isContextScenarioQuestion = question?.subtype === "mc-select-context-response"
   const requiresReviewData = question ? ["mc-select-missing-word", "fg-word-order", "fg-gap-fill", "ls-fg-word-order", "ls-fg-gap-fill"].includes(question.subtype) : false
-  const usesChoiceOptions = question ? ["mc-select-translation", "mc-select-missing-word", "fg-gap-fill", "ls-mc-select-translation", "ls-mc-select-missing-word", "ls-fg-gap-fill"].includes(question.subtype) : false
+  const usesChoiceOptions = question ? ["mc-select-translation", "mc-select-context-response", "mc-select-missing-word", "fg-gap-fill", "ls-mc-select-translation", "ls-mc-select-missing-word", "ls-fg-gap-fill"].includes(question.subtype) : false
+  const selectedExpressionText = question
+    ? expressions.find((expression) => expression._id === getSourceId(question))?.text || ""
+    : ""
 
   const subtypeOptions = useMemo(() => {
     if (!question) return []
     if (question.type === "multiple-choice") {
       return [
         { value: "mc-select-translation", label: "Select Translation" },
+        { value: "mc-select-context-response", label: "Select Appropriate Response" },
         { value: "mc-select-missing-word", label: "Select Missing Word" }
       ]
     }
@@ -87,6 +97,9 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         { value: "ls-fg-word-order", label: "Listen & Order Sentence" },
         { value: "ls-fg-gap-fill", label: "Listen & Gap Fill" }
       ]
+    }
+    if (question.type === "speaking") {
+      return [{ value: "sp-pronunciation-compare", label: "Pronunciation Compare" }]
     }
     return [
       { value: "mt-match-image", label: "Match Word To Image" },
@@ -111,7 +124,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         setMatchingItems(
           Array.isArray(loadedQuestion.interactionData?.matchingPairs)
             ? loadedQuestion.interactionData.matchingPairs.map((pair) => ({
-                phraseId: pair.phraseId,
+                sourceId: pair.contentId || "",
                 translationIndex: pair.translationIndex
               }))
             : []
@@ -119,7 +132,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
         const lessonId = loadedQuestion.lessonId
         if (lessonId) {
-          await loadPhrasesForLesson(lessonId)
+          await loadExpressionsForLesson(lessonId)
         }
       } catch {
         toast.error("Failed to load question.")
@@ -131,34 +144,34 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     void load()
   }, [id, router])
 
-  async function loadPhrasesForLesson(lessonId: string) {
+  async function loadExpressionsForLesson(lessonId: string) {
     try {
-      const lessonPhrases = await phraseService.listPhrases(lessonId)
-      setPhrases(
-        lessonPhrases.map((phrase) => ({
-          _id: phrase._id,
-          text: phrase.text,
-          translations: phrase.translations || [],
-          images: phrase.images || []
+      const lessonExpressions = await expressionService.listExpressions(lessonId)
+      setExpressions(
+        lessonExpressions.map((expression) => ({
+          _id: expression._id,
+          text: expression.text,
+          translations: expression.translations || [],
+          images: expression.images || []
         }))
       )
     } catch {
-      toast.error("Failed to load phrases.")
-      setPhrases([])
+      toast.error("Failed to load expressions.")
+      setExpressions([])
     }
   }
 
-  function toggleMatchingPhrase(phraseId: string, checked: boolean) {
+  function toggleMatchingExpression(sourceId: string, checked: boolean) {
     setMatchingItems((current) =>
       checked
-        ? [...current, { phraseId, translationIndex: 0 }]
-        : current.filter((item) => item.phraseId !== phraseId)
+        ? [...current, { sourceId, translationIndex: 0 }]
+        : current.filter((item) => item.sourceId !== sourceId)
     )
   }
 
-  function updateMatchingTranslationIndex(phraseId: string, translationIndex: number) {
+  function updateMatchingTranslationIndex(sourceId: string, translationIndex: number) {
     setMatchingItems((current) =>
-      current.map((item) => (item.phraseId === phraseId ? { ...item, translationIndex } : item))
+      current.map((item) => (item.sourceId === sourceId ? { ...item, translationIndex } : item))
     )
   }
 
@@ -166,30 +179,30 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     event.preventDefault()
     if (!question) return
 
-    if (!isMatchingQuestion && !getPhraseId(question.phraseId)) {
-      toast.error("Select a phrase.")
+    if (!isMatchingQuestion && !getSourceId(question)) {
+      toast.error("Select an expression.")
       return
     }
 
     if (isMatchingQuestion && matchingItems.length < 2) {
-      toast.error("Select at least two phrases for a matching question.")
+      toast.error("Select at least two expressions for a matching question.")
       return
     }
 
     if (isMatchingQuestion && question.subtype === "mt-match-image") {
       const missingImages = matchingItems.some((item) => {
-        const phrase = phrases.find((entry) => entry._id === item.phraseId)
-        return !phrase?.images || phrase.images.length === 0
+        const expression = expressions.find((entry) => entry._id === item.sourceId)
+        return !expression?.images || expression.images.length === 0
       })
       if (missingImages) {
-        toast.error("Each selected phrase needs at least one linked image.")
+        toast.error("Each selected expression needs at least one linked image.")
         return
       }
     }
 
     const payload: {
       lessonId: string
-      phraseId: string
+      sourceId: string
       translationIndex: number
       type: QuestionType
       subtype: QuestionSubtype
@@ -203,17 +216,17 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         correctOrder: number[]
         meaning: string
       }
-      relatedPhraseIds?: string[]
+      relatedSourceRefs?: Array<{ type: "word" | "expression" | "sentence"; id: string }>
       interactionData?: {
         matchingPairs?: Array<{
-          phraseId: string
+          contentId: string
           translationIndex: number
           imageAssetId?: string
         }>
       }
     } = {
       lessonId: question.lessonId,
-      phraseId: isMatchingQuestion ? matchingItems[0]?.phraseId || "" : getPhraseId(question.phraseId),
+      sourceId: isMatchingQuestion ? matchingItems[0]?.sourceId || "" : getSourceId(question),
       translationIndex: isMatchingQuestion ? matchingItems[0]?.translationIndex || 0 : question.translationIndex,
       type: question.type,
       subtype: question.subtype,
@@ -240,6 +253,17 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     } else if (usesChoiceOptions) {
       payload.options = optionsCsv.split(",").map((item) => item.trim()).filter(Boolean)
       payload.correctIndex = question.correctIndex
+      if (isContextScenarioQuestion) {
+        if (payload.options.length < 2 || payload.options.length > 4) {
+          toast.error("Context-response questions must have between 2 and 4 options.")
+          return
+        }
+        const correctOption = String(payload.options[payload.correctIndex] || "").trim()
+        if (!selectedExpressionText || correctOption !== selectedExpressionText) {
+          toast.error("For context-response questions, the correct option must exactly match the selected expression text.")
+          return
+        }
+      }
     } else {
       payload.options = []
       payload.correctIndex = 0
@@ -247,15 +271,15 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
     if (isMatchingQuestion) {
       const matchingPairs = matchingItems.map((item) => {
-        const phrase = phrases.find((entry) => entry._id === item.phraseId)
-        const preferredImage = phrase?.images?.find((image) => image.isPrimary) || phrase?.images?.[0]
+        const expression = expressions.find((entry) => entry._id === item.sourceId)
+        const preferredImage = expression?.images?.find((image) => image.isPrimary) || expression?.images?.[0]
         return {
-          phraseId: item.phraseId,
+          contentId: item.sourceId,
           translationIndex: item.translationIndex,
           imageAssetId: question.subtype === "mt-match-image" ? preferredImage?.imageAssetId : undefined
         }
       })
-      payload.relatedPhraseIds = matchingPairs.map((item) => item.phraseId)
+      payload.relatedSourceRefs = matchingPairs.map((item) => ({ type: "expression" as const, id: item.contentId }))
       payload.interactionData = { matchingPairs }
       payload.options = []
       payload.correctIndex = 0
@@ -285,7 +309,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         </Button>
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">Edit Question</h1>
-          <p className="text-muted-foreground">Update prompt, options, phrase mapping and explanation.</p>
+          <p className="text-muted-foreground">Update prompt, options, source mapping and explanation.</p>
         </div>
       </div>
 
@@ -304,11 +328,11 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                     setQuestion((current) => current ? {
                       ...current,
                       lessonId: value,
-                      phraseId: "",
+                      sourceId: "",
                       translationIndex: 0
                     } : current)
                     setMatchingItems([])
-                    await loadPhrasesForLesson(value)
+                    await loadExpressionsForLesson(value)
                   }}
                 >
                   <SelectTrigger><SelectValue placeholder="Select lesson" /></SelectTrigger>
@@ -322,22 +346,29 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
               {!isMatchingQuestion && (
                 <div className="space-y-2">
-                  <Label>Phrase</Label>
+                  <Label>Expression</Label>
                   <Select
-                    value={getPhraseId(question.phraseId)}
-                    onValueChange={(value) => setQuestion({ ...question, phraseId: value, translationIndex: 0 })}
+                    value={getSourceId(question)}
+                    onValueChange={(value) => setQuestion({ ...question, sourceId: value, translationIndex: 0 })}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select phrase" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select expression" /></SelectTrigger>
                     <SelectContent>
-                      {phrases.map((phrase) => (
-                        <SelectItem key={phrase._id} value={phrase._id}>
-                          {phrase.text} ({phrase.translations.join(" | ")})
+                      {expressions.map((expression) => (
+                        <SelectItem key={expression._id} value={expression._id}>
+                          {expression.text} ({expression.translations.join(" | ")})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               )}
+
+              {isContextScenarioQuestion ? (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground/75">
+                  <p className="font-semibold text-foreground">Context-response authoring</p>
+                  <p className="mt-1">Keep the prompt in English as a short real-life situation. Keep the options in the target language. The correct option must exactly match the selected expression, and the distractors should be contextually wrong, not spelling variants.</p>
+                </div>
+              ) : null}
 
               {!isMatchingQuestion && (
                 <div className="space-y-2">
@@ -348,7 +379,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                   >
                     <SelectTrigger><SelectValue placeholder="Select translation index" /></SelectTrigger>
                     <SelectContent>
-                      {(phrases.find((phrase) => phrase._id === getPhraseId(question.phraseId))?.translations || []).map((item, index) => (
+                      {(expressions.find((expression) => expression._id === getSourceId(question))?.translations || []).map((item, index) => (
                         <SelectItem key={`edit-translation-${index}`} value={String(index)}>
                           Index {index}: {item}
                         </SelectItem>
@@ -373,7 +404,9 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                           ? "fg-word-order"
                           : type === "listening"
                             ? "ls-mc-select-translation"
-                            : "mt-match-image"
+                            : type === "speaking"
+                              ? "sp-pronunciation-compare"
+                              : "mt-match-image"
                     setQuestion({
                       ...question,
                       type,
@@ -388,6 +421,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                     <SelectItem value="fill-in-the-gap">Fill in the Gap</SelectItem>
                     <SelectItem value="listening">Listening</SelectItem>
                     <SelectItem value="matching">Matching</SelectItem>
+                    <SelectItem value="speaking">Speaking</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -422,41 +456,41 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
             {isMatchingQuestion && (
               <div className="space-y-4 rounded-2xl border border-secondary/40 p-4">
                 <div className="space-y-1">
-                  <Label>Matching Phrases</Label>
+                  <Label>Matching Expressions</Label>
                   <p className="text-sm text-muted-foreground">
-                    Select at least two phrases. For image matching, each phrase needs a linked image.
+                    Select at least two expressions. For image matching, each expression needs a linked image.
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {phrases.map((phrase) => {
-                    const selected = matchingItems.find((item) => item.phraseId === phrase._id)
+                  {expressions.map((expression) => {
+                    const selected = matchingItems.find((item) => item.sourceId === expression._id)
                     return (
-                      <div key={phrase._id} className="rounded-xl border bg-background p-3">
+                      <div key={expression._id} className="rounded-xl border bg-background p-3">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <label className="flex items-start gap-3">
                             <input
                               type="checkbox"
                               checked={Boolean(selected)}
-                              onChange={(event) => toggleMatchingPhrase(phrase._id, event.target.checked)}
+                              onChange={(event) => toggleMatchingExpression(expression._id, event.target.checked)}
                             />
                             <div>
-                              <p className="font-semibold">{phrase.text}</p>
-                              <p className="text-sm text-muted-foreground">{phrase.translations.join(" | ")}</p>
+                              <p className="font-semibold">{expression.text}</p>
+                              <p className="text-sm text-muted-foreground">{expression.translations.join(" | ")}</p>
                             </div>
                           </label>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">{phrase.images?.length || 0} image(s)</Badge>
+                            <Badge variant="outline">{expression.images?.length || 0} image(s)</Badge>
                             {selected && (
                               <Select
                                 value={String(selected.translationIndex)}
-                                onValueChange={(value) => updateMatchingTranslationIndex(phrase._id, Number(value))}
+                                onValueChange={(value) => updateMatchingTranslationIndex(expression._id, Number(value))}
                               >
                                 <SelectTrigger className="w-[220px]">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {phrase.translations.map((translation, index) => (
-                                    <SelectItem key={`${phrase._id}-${index}`} value={String(index)}>
+                                  {expression.translations.map((translation: string, index: number) => (
+                                    <SelectItem key={`${expression._id}-${index}`} value={String(index)}>
                                       {index}: {translation}
                                     </SelectItem>
                                   ))}
@@ -475,8 +509,13 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
             {usesChoiceOptions && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Options (comma separated)</Label>
+                  <Label>{isContextScenarioQuestion ? "Response Options (comma separated)" : "Options (comma separated)"}</Label>
                   <Input value={optionsCsv} onChange={(event) => setOptionsCsv(event.target.value)} />
+                  {isContextScenarioQuestion ? (
+                    <p className="text-xs text-muted-foreground">
+                      Use 2 to 4 target-language responses. The correct option should be exactly: <span className="font-semibold text-foreground">{selectedExpressionText || "the selected expression"}</span>.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>Correct Index</Label>

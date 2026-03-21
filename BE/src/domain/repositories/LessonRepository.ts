@@ -11,6 +11,7 @@ export type LessonCreateInput = {
   unitId: string;
   language: Language;
   level: LessonEntity["level"];
+  kind?: LessonEntity["kind"];
   orderIndex: number;
   description: string;
   topics?: string[];
@@ -21,7 +22,7 @@ export type LessonCreateInput = {
 };
 
 export type LessonUpdateInput = Partial<
-  Pick<LessonEntity, "title" | "unitId" | "language" | "level" | "orderIndex" | "description" | "topics" | "proverbs" | "stages" | "status">
+  Pick<LessonEntity, "title" | "unitId" | "language" | "level" | "kind" | "orderIndex" | "description" | "topics" | "proverbs" | "stages" | "status">
 >;
 
 export interface LessonRepository {

@@ -2,7 +2,7 @@ import type { LessonRepository } from "../../../../domain/repositories/LessonRep
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
 import type { LessonProgressRepository } from "../../../../domain/repositories/LessonProgressRepository.js";
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
-import type { Language } from "../../../../domain/entities/Lesson.js";
+import type { Language, LessonEntity } from "../../../../domain/entities/Lesson.js";
 
 function isoDay(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -25,6 +25,23 @@ function weekDays() {
     d.setDate(now.getDate() - (6 - idx));
     return { day: days[d.getDay()], dateKey: toDayKey(isoDay(d)) };
   });
+}
+
+function buildOrderedPublishedLessons(
+  units: Array<{ id: string; orderIndex: number }>,
+  lessons: LessonEntity[]
+) {
+  const unitOrderMap = new Map(units.map((unit) => [unit.id, unit.orderIndex]));
+  return lessons
+    .filter((lesson) => unitOrderMap.has(lesson.unitId))
+    .slice()
+    .sort((a, b) => {
+      const unitOrderDiff = (unitOrderMap.get(a.unitId) ?? 0) - (unitOrderMap.get(b.unitId) ?? 0);
+      if (unitOrderDiff !== 0) return unitOrderDiff;
+      const lessonOrderDiff = (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
+      if (lessonOrderDiff !== 0) return lessonOrderDiff;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
 }
 
 export class LearnerDashboardUseCases {
@@ -53,12 +70,13 @@ export class LearnerDashboardUseCases {
       publishedLessons.map((l) => l.id)
     );
 
+    const orderedLessons = buildOrderedPublishedLessons(publishedUnits, publishedLessons);
     const completed = new Set(progresses.filter((p) => p.status === "completed").map((p) => p.lessonId));
     const progressByLessonId = new Map(progresses.map((p) => [p.lessonId, p]));
 
-    const nextLesson = publishedLessons.find((lesson) => !completed.has(lesson.id)) || null;
+    const nextLesson = orderedLessons.find((lesson) => !completed.has(lesson.id)) || null;
     const unitsById = new Map(publishedUnits.map((unit) => [unit.id, unit]));
-    const completedLessons = publishedLessons
+    const completedLessons = orderedLessons
       .filter((lesson) => completed.has(lesson.id))
       .map((lesson) => {
         const item = progressByLessonId.get(lesson.id);
@@ -102,7 +120,7 @@ export class LearnerDashboardUseCases {
         ].filter(Boolean);
 
     const units = publishedUnits.map((unit) => {
-      const unitLessons = publishedLessons
+      const unitLessons = orderedLessons
         .filter((lesson) => lesson.unitId === unit.id)
         .sort((a, b) => a.orderIndex - b.orderIndex)
         .map((lesson) => {

@@ -9,6 +9,12 @@ import { useSearchParams } from 'next/navigation'
 import { learnerLessonService } from '@/services'
 import { getCulturalSoundPath } from '@/lib/culturalSounds'
 
+type NextLesson = {
+  id: string
+  title: string
+  kind?: 'core' | 'review'
+}
+
 function LessonCompleteContent() {
   const searchParams = useSearchParams()
   const lessonId = searchParams.get("lessonId")
@@ -18,6 +24,7 @@ function LessonCompleteContent() {
   const [xpEarned, setXpEarned] = useState(initialXp)
   const [currentStreak, setCurrentStreak] = useState(0)
   const [totalXp, setTotalXp] = useState(0)
+  const [nextLesson, setNextLesson] = useState<NextLesson | null>(null)
 
   useEffect(() => {
     const lessonCompleteSound = getCulturalSoundPath(language, 'celebration')
@@ -40,6 +47,13 @@ function LessonCompleteContent() {
         }
       })
       .catch((error) => console.error("Failed to complete lesson", error))
+
+    learnerLessonService
+      .getNextLesson()
+      .then((payload) => {
+        setNextLesson(payload?.lesson || null)
+      })
+      .catch((error) => console.error("Failed to load next lesson", error))
   }, [initialXp, language, lessonId])
 
   return (
@@ -132,17 +146,26 @@ function LessonCompleteContent() {
 
         {/* Action Buttons */}
         <div className="space-y-3">
+          {nextLesson?.kind === 'review' ? (
+            <Link href={`/lesson-overview?lessonId=${nextLesson.id}`} className="w-full">
+              <Button size="lg" variant="outline" className="w-full gap-2 bg-transparent">
+                <RotateCcw className="h-4 w-4" />
+                Review Mistakes
+              </Button>
+            </Link>
+          ) : (
+            <Button size="lg" variant="outline" className="w-full gap-2 bg-transparent" disabled>
+              <RotateCcw className="h-4 w-4" />
+              Review Mistakes
+            </Button>
+          )}
+
           <Link href="/dashboard" className="w-full">
             <Button size="lg" className="w-full gap-2">
               Back to Dashboard
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
-
-          <Button size="lg" variant="outline" className="w-full gap-2 bg-transparent">
-            <RotateCcw className="h-4 w-4" />
-            Review Mistakes
-          </Button>
         </div>
 
         {/* Motivational Message */}

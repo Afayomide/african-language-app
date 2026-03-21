@@ -1,16 +1,45 @@
 import type { Language, Level, LessonEntity, LessonStage, Status } from "../../../../domain/entities/Lesson.js";
+import type { ContentType } from "../../../../domain/entities/Content.js";
+import { ContentLookupService } from "../../../services/ContentLookupService.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
-import type { PhraseRepository } from "../../../../domain/repositories/PhraseRepository.js";
+import type { ExpressionRepository } from "../../../../domain/repositories/ExpressionRepository.js";
+import type { LessonContentItemRepository } from "../../../../domain/repositories/LessonContentItemRepository.js";
 import type { ProverbRepository } from "../../../../domain/repositories/ProverbRepository.js";
 import type { QuestionRepository } from "../../../../domain/repositories/QuestionRepository.js";
+import type { SentenceRepository } from "../../../../domain/repositories/SentenceRepository.js";
+import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 
 export class AdminLessonUseCases {
+  private readonly contentLookup: ContentLookupService;
+
   constructor(
     private readonly lessons: LessonRepository,
-    private readonly phrases: PhraseRepository,
+    private readonly lessonContentItems: LessonContentItemRepository,
+    private readonly words: WordRepository,
+    private readonly expressions: ExpressionRepository,
+    private readonly sentences: SentenceRepository,
     private readonly proverbs: ProverbRepository,
     private readonly questions: QuestionRepository
-  ) {}
+  ) {
+    this.contentLookup = new ContentLookupService(words, expressions, sentences);
+  }
+
+  private listContentRefs(lesson: LessonEntity) {
+    return Array.from(
+      new Map(
+        (lesson.stages || [])
+          .flatMap((stage) => stage.blocks || [])
+          .flatMap((block) => {
+            if (block.type !== "content" || !block.refId) return [];
+            return [[`${block.contentType}:${block.refId}`, { type: block.contentType as ContentType, id: block.refId as string }] as const];
+          })
+      ).values()
+    );
+  }
+
+  private hasAcceptedHumanAudio(audio: { referenceType?: string; reviewStatus?: string; url?: string } | undefined) {
+    return Boolean(audio?.url && audio.referenceType === "human_reference" && audio.reviewStatus === "accepted");
+  }
 
   async create(input: {
     title: string;
@@ -80,7 +109,7 @@ export class AdminLessonUseCases {
     if (!lesson) return null;
 
     const now = new Date();
-    await this.phrases.softDeleteByLessonId(lesson.id, now);
+    await this.lessonContentItems.deleteByLessonId(lesson.id);
     await this.proverbs.softDeleteByLessonId(lesson.id, now);
     await this.questions.softDeleteByLessonId(lesson.id, now);
     await this.lessons.compactOrderIndexesByUnit(lesson.unitId);
@@ -99,12 +128,16 @@ export class AdminLessonUseCases {
 
   async publish(id: string) {
     const lesson = await this.getById(id);
+    if (!lesson) return null;
     for (const stage of lesson?.stages || []) {
       for (const block of stage.blocks || []) {
-        if (block.type === "phrase" && block.refId) {
-          const phrase = await this.phrases.findById(block.refId);
-          if (phrase?.status !== "published") {
-            return "phrases_not_published" as const;
+        if (block.type === "content" && block.refId) {
+          const content = await this.contentLookup.findByRef(block.contentType, block.refId);
+          if (content?.status !== "published") {
+            return "content_not_published" as const;
+          }
+          if (!this.hasAcceptedHumanAudio(content.audio)) {
+            return "audio_not_covered" as const;
           }
         }
         if (block.type === "proverb" && block.refId) {
@@ -123,6 +156,25 @@ export class AdminLessonUseCases {
     }
     const published = await this.lessons.publishById(id, new Date());
     return published;
+  }
+
+  async requestAudio(id: string) {
+    const lesson = await this.getById(id);
+    if (!lesson) return null;
+
+    const refs = this.listContentRefs(lesson);
+    for (const ref of refs) {
+      const content = await this.contentLookup.findByRef(ref.type, ref.id);
+      if (!content || this.hasAcceptedHumanAudio(content.audio)) continue;
+      await this.contentLookup.updateAudioByRef(ref.type, ref.id, {
+        ...content.audio,
+        workflowStatus: "requested",
+        reviewStatus: content.audio?.reviewStatus === "accepted" ? "accepted" : "unreviewed",
+        referenceType: content.audio?.referenceType || "none"
+      });
+    }
+
+    return this.getById(id);
   }
 
   async reorder(unitId: string, lessonIds: string[]): Promise<LessonEntity[] | null> {

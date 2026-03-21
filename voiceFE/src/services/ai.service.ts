@@ -2,10 +2,10 @@ export const aiService = {
   async suggestLesson() {
     throw new Error("ai_not_available_for_voice_artist");
   },
-  async generatePhrases() {
+  async generateExpressions() {
     throw new Error("ai_not_available_for_voice_artist");
   },
-  async enhancePhrase() {
+  async enhanceExpression() {
     throw new Error("ai_not_available_for_voice_artist");
   }
 };

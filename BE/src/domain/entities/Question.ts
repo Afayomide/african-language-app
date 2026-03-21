@@ -1,23 +1,23 @@
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
+import type { ContentType } from "./Content.js";
+
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching" | "speaking";
 
 export type QuestionSubtype =
-  // Multiple Choice Interactions (Text-based)
   | "mc-select-translation"
+  | "mc-select-context-response"
   | "mc-select-missing-word"
-  // Fill in the Gap Interactions (Text-based)
   | "fg-word-order"
   | "fg-letter-order"
   | "fg-gap-fill"
-  // Listening Interactions (Audio-based, nested from MC and FG)
   | "ls-mc-select-translation"
   | "ls-mc-select-missing-word"
   | "ls-fg-word-order"
   | "ls-fg-gap-fill"
-  // Matching interactions
   | "mt-match-image"
   | "mt-match-translation"
   | "ls-dictation"
-  | "ls-tone-recognition";
+  | "ls-tone-recognition"
+  | "sp-pronunciation-compare";
 
 export type QuestionReviewData = {
   sentence: string;
@@ -35,11 +35,17 @@ export type QuestionMatchingImage = {
 
 export type QuestionMatchingPair = {
   pairId: string;
-  phraseId: string;
-  phraseText: string;
+  contentType?: ContentType;
+  contentId?: string;
+  contentText?: string;
   translationIndex: number;
   translation: string;
   image?: QuestionMatchingImage | null;
+};
+
+export type QuestionSourceRef = {
+  type: ContentType;
+  id: string;
 };
 
 export type QuestionInteractionData = {
@@ -50,8 +56,9 @@ export type QuestionEntity = {
   id: string;
   _id?: string;
   lessonId: string;
-  phraseId: string;
-  relatedPhraseIds?: string[];
+  sourceType?: ContentType;
+  sourceId?: string;
+  relatedSourceRefs?: QuestionSourceRef[];
   translationIndex: number;
   type: QuestionType;
   subtype: QuestionSubtype;

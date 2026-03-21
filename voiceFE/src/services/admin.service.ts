@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import { feVoiceRoutes } from "@/lib/apiRoutes";
-import { Phrase } from "@/types";
+import { ContentType, VoiceQueueItem, VoiceSubmissionItem } from "@/types";
 
 type PaginationMeta = {
   page: number;
@@ -20,27 +20,15 @@ type PaginatedResult<T> = {
 type AudioUploadPayload = {
   base64: string;
   mimeType?: string;
-};
-
-type QueueItem = {
-  phrase: Phrase;
-  latestSubmission: null | {
-    id: string;
-    status: "pending" | "accepted" | "rejected";
-    rejectionReason: string;
-    createdAt: string;
-  };
-};
-
-type SubmissionItem = {
-  id: string;
-  status: "pending" | "accepted" | "rejected";
-  rejectionReason: string;
-  createdAt: string;
-  phrase: Phrase | null;
-  audio: {
-    url: string;
-    format: string;
+  analysis?: {
+    durationMs?: number;
+    sampleRate?: number;
+    channelCount?: number;
+    peak?: number;
+    rms?: number;
+    waveformPeaks?: number[];
+    pitchContour?: Array<{ timeMs: number; hz: number; midi?: number; confidence?: number }>;
+    spectrogram?: Array<{ timeMs: number; bins: Array<{ hz: number; amplitude: number }> }>;
   };
 };
 
@@ -50,14 +38,15 @@ export const lessonService = {
   }
 };
 
-export const phraseService = {
+export const contentAudioService = {
+
   async getQueue() {
-    const response = await api.get<{ queue: QueueItem[] }>(feVoiceRoutes.queue());
+    const response = await api.get<{ queue: VoiceQueueItem[] }>(feVoiceRoutes.queue());
     return response.data.queue;
   },
 
   async getQueuePage(params?: { q?: string; page?: number; limit?: number }) {
-    const response = await api.get<{ queue: QueueItem[]; total: number; pagination?: PaginationMeta }>(
+    const response = await api.get<{ queue: VoiceQueueItem[]; total: number; pagination?: PaginationMeta }>(
       feVoiceRoutes.queue(),
       { params }
     );
@@ -72,19 +61,19 @@ export const phraseService = {
         hasPrevPage: false,
         hasNextPage: false
       }
-    } satisfies PaginatedResult<QueueItem>;
+    } satisfies PaginatedResult<VoiceQueueItem>;
   },
 
-  async createSubmission(phraseId: string, audioUpload: AudioUploadPayload) {
+  async createSubmission(contentType: ContentType, contentId: string, audioUpload: AudioUploadPayload) {
     const response = await api.post<{ submission: unknown }>(
-      feVoiceRoutes.createSubmission(phraseId),
+      feVoiceRoutes.createSubmission(contentType, contentId),
       { audioUpload }
     );
     return response.data.submission;
   },
 
   async listMySubmissions(status?: "pending" | "accepted" | "rejected") {
-    const response = await api.get<{ submissions: SubmissionItem[] }>(feVoiceRoutes.submissions(), {
+    const response = await api.get<{ submissions: VoiceSubmissionItem[] }>(feVoiceRoutes.submissions(), {
       params: { status }
     });
     return response.data.submissions;
@@ -96,7 +85,7 @@ export const phraseService = {
     page?: number;
     limit?: number;
   }) {
-    const response = await api.get<{ submissions: SubmissionItem[]; total: number; pagination?: PaginationMeta }>(
+    const response = await api.get<{ submissions: VoiceSubmissionItem[]; total: number; pagination?: PaginationMeta }>(
       feVoiceRoutes.submissions(),
       { params }
     );
@@ -111,12 +100,15 @@ export const phraseService = {
         hasPrevPage: false,
         hasNextPage: false
       }
-    } satisfies PaginatedResult<SubmissionItem>;
+    } satisfies PaginatedResult<VoiceSubmissionItem>;
   }
 };
+
+export const expressionService = contentAudioService;
 
 export const questionService = {
   async listQuestions() {
     return [];
   }
 };
+

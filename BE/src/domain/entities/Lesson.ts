@@ -1,14 +1,18 @@
+import type { ContentType } from "./Content.js";
+
 export const LANGUAGE_VALUES = ["yoruba", "igbo", "hausa"] as const;
 export const LEVEL_VALUES = ["beginner", "intermediate", "advanced"] as const;
 export const STATUS_VALUES = ["draft", "finished", "published"] as const;
+export const LESSON_KIND_VALUES = ["core", "review"] as const;
 
 export type Language = (typeof LANGUAGE_VALUES)[number];
 export type Level = (typeof LEVEL_VALUES)[number];
 export type Status = (typeof STATUS_VALUES)[number];
+export type LessonKind = (typeof LESSON_KIND_VALUES)[number];
 
-export type LessonBlock = 
+export type LessonBlock =
   | { type: "text"; content: string }
-  | { type: "phrase"; refId: string; translationIndex?: number }
+  | { type: "content"; contentType: ContentType; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
@@ -32,6 +36,7 @@ export type LessonEntity = {
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;
   stages: LessonStage[];
+  kind: LessonKind;
   status: Status;
   createdBy: string;
   publishedAt?: Date | null;

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Eye, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { unitService } from "@/services";
-import type { Lesson, Phrase, Unit } from "@/types";
+import type { Expression, Lesson, Unit } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,14 +27,14 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
   const { id } = use(params);
   const [unit, setUnit] = useState<Unit | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [phrases, setPhrases] = useState<Phrase[]>([]);
+  const [expressions, setExpressions] = useState<Expression[]>([]);
   const [lessonSearch, setLessonSearch] = useState("");
-  const [phraseSearch, setPhraseSearch] = useState("");
+  const [expressionSearch, setExpressionSearch] = useState("");
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
-  const [selectedPhrase, setSelectedPhrase] = useState<Phrase | null>(null);
+  const [selectedExpression, setSelectedExpression] = useState<Expression | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [restoringLessonId, setRestoringLessonId] = useState<string | null>(null);
-  const [restoringPhraseId, setRestoringPhraseId] = useState<string | null>(null);
+  const [restoringExpressionId, setRestoringExpressionId] = useState<string | null>(null);
 
   async function loadPage() {
     setIsLoading(true);
@@ -45,7 +45,7 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
       ]);
       setUnit(unitData);
       setLessons(deletedEntries.lessons || []);
-      setPhrases(deletedEntries.phrases || []);
+      setExpressions(deletedEntries.expressions || []);
     } catch {
       toast.error("Failed to load deleted entries.");
     } finally {
@@ -67,15 +67,15 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
     );
   }, [lessons, lessonSearch]);
 
-  const filteredPhrases = useMemo(() => {
-    const query = phraseSearch.trim().toLowerCase();
-    if (!query) return phrases;
-    return phrases.filter((phrase) =>
-      [phrase.text, ...(phrase.translations || [])].some((value) =>
+  const filteredExpressions = useMemo(() => {
+    const query = expressionSearch.trim().toLowerCase();
+    if (!query) return expressions;
+    return expressions.filter((expression) =>
+      [expression.text, ...(expression.translations || [])].some((value) =>
         String(value || "").toLowerCase().includes(query)
       )
     );
-  }, [phrases, phraseSearch]);
+  }, [expressions, expressionSearch]);
 
   async function handleRestoreLesson(lessonId: string) {
     try {
@@ -90,16 +90,16 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
     }
   }
 
-  async function handleRestorePhrase(phraseId: string) {
+  async function handleRestoreExpression(expressionId: string) {
     try {
-      setRestoringPhraseId(phraseId);
-      await unitService.restoreDeletedPhrase(id, phraseId);
-      toast.success("Phrase restored.");
+      setRestoringExpressionId(expressionId);
+      await unitService.restoreDeletedExpression(id, expressionId);
+      toast.success("Expression restored.");
       await loadPage();
     } catch {
-      toast.error("Failed to restore phrase.");
+      toast.error("Failed to restore expression.");
     } finally {
-      setRestoringPhraseId(null);
+      setRestoringExpressionId(null);
     }
   }
 
@@ -120,13 +120,13 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">Deleted Entries</h1>
             <p className="text-muted-foreground">
-              Review and recover deleted lessons and phrases for {unit?.title || "this unit"}.
+              Review and recover deleted lessons and expressions for {unit?.title || "this unit"}.
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Badge variant="secondary">{lessons.length} deleted lessons</Badge>
-          <Badge variant="secondary">{phrases.length} deleted phrases</Badge>
+          <Badge variant="secondary">{expressions.length} deleted expressions</Badge>
         </div>
       </div>
 
@@ -201,19 +201,19 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <CardTitle>Deleted Phrases</CardTitle>
+            <CardTitle>Deleted Expressions</CardTitle>
             <Input
-              value={phraseSearch}
-              onChange={(event) => setPhraseSearch(event.target.value)}
-              placeholder="Search deleted phrases"
+              value={expressionSearch}
+              onChange={(event) => setExpressionSearch(event.target.value)}
+              placeholder="Search deleted expressions"
               className="max-w-sm"
             />
           </div>
         </CardHeader>
         <CardContent>
-          {filteredPhrases.length === 0 ? (
+          {filteredExpressions.length === 0 ? (
             <div className="rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
-              No deleted phrases found for this unit.
+              No deleted expressions found for this unit.
             </div>
           ) : (
             <Table>
@@ -228,13 +228,13 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPhrases.map((phrase) => (
-                  <TableRow key={phrase._id}>
-                    <TableCell className="font-medium">{phrase.text}</TableCell>
-                    <TableCell>{phrase.translations.join(", ") || "—"}</TableCell>
-                    <TableCell>{phrase.lessonIds.length}</TableCell>
-                    <TableCell>{formatDate(phrase.deletedAt)}</TableCell>
-                    <TableCell>{formatDate(phrase.updatedAt)}</TableCell>
+                {filteredExpressions.map((expression) => (
+                  <TableRow key={expression._id}>
+                    <TableCell className="font-medium">{expression.text}</TableCell>
+                    <TableCell>{expression.translations.join(", ") || "—"}</TableCell>
+                    <TableCell>{expression.lessonIds.length}</TableCell>
+                    <TableCell>{formatDate(expression.deletedAt)}</TableCell>
+                    <TableCell>{formatDate(expression.updatedAt)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -242,7 +242,7 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
                           size="icon"
                           variant="outline"
                           className={TABLE_ACTION_ICON_CLASS.view}
-                          onClick={() => setSelectedPhrase(phrase)}
+                          onClick={() => setSelectedExpression(expression)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -251,8 +251,8 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
                           size="icon"
                           variant="outline"
                           className={TABLE_ACTION_ICON_CLASS.finish}
-                          disabled={restoringPhraseId === phrase._id}
-                          onClick={() => void handleRestorePhrase(phrase._id)}
+                          disabled={restoringExpressionId === expression._id}
+                          onClick={() => void handleRestoreExpression(expression._id)}
                         >
                           <RotateCcw className="h-4 w-4" />
                         </Button>
@@ -300,33 +300,33 @@ export default function UnitDeletedEntriesPage({ params }: { params: Promise<{ i
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(selectedPhrase)} onOpenChange={(open) => !open && setSelectedPhrase(null)}>
+      <Dialog open={Boolean(selectedExpression)} onOpenChange={(open) => !open && setSelectedExpression(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedPhrase?.text}</DialogTitle>
+            <DialogTitle>{selectedExpression?.text}</DialogTitle>
           </DialogHeader>
-          {selectedPhrase ? (
+          {selectedExpression ? (
             <div className="space-y-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Translations</p>
-                <p>{selectedPhrase.translations.join(", ") || "—"}</p>
+                <p>{selectedExpression.translations.join(", ") || "—"}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Pronunciation</p>
-                <p>{selectedPhrase.pronunciation || "—"}</p>
+                <p>{selectedExpression.pronunciation || "—"}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Explanation</p>
-                <p>{selectedPhrase.explanation || "—"}</p>
+                <p>{selectedExpression.explanation || "—"}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-muted-foreground">Linked lessons</p>
-                  <p>{selectedPhrase.lessonIds.length}</p>
+                  <p>{selectedExpression.lessonIds.length}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Audio</p>
-                  <p>{selectedPhrase.audio.url ? "Available" : "Missing"}</p>
+                  <p>{selectedExpression.audio.url ? "Available" : "Missing"}</p>
                 </div>
               </div>
             </div>

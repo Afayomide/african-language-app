@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from "react";
-import { imageService, phraseService } from "@/services";
-import type { ImageAsset, Phrase, PhraseImageLink } from "@/types";
+import { imageService, expressionService } from "@/services";
+import type { Expression, ImageAsset, PhraseImageLink } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { ImagePlus, Link2, Trash2, Star } from "lucide-react";
 
 type Props = {
-  phrase: Phrase;
+  expression: Expression;
   onImagesChanged?: (images: PhraseImageLink[]) => void;
 };
 
@@ -35,8 +35,8 @@ async function fileToBase64(file: File) {
   });
 }
 
-export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
-  const [images, setImages] = useState<PhraseImageLink[]>(phrase.images || []);
+export function ExpressionImageManager({ expression, onImagesChanged }: Props) {
+  const [images, setImages] = useState<PhraseImageLink[]>(expression.images || []);
   const [libraryImages, setLibraryImages] = useState<ImageAsset[]>([]);
   const [selectedImageAssetId, setSelectedImageAssetId] = useState("");
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
@@ -49,16 +49,16 @@ export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setImages(phrase.images || []);
-  }, [phrase.images]);
+    setImages(expression.images || []);
+  }, [expression.images]);
 
   useEffect(() => {
     void loadLibraryImages();
   }, []);
 
   const translationOptions = useMemo(
-    () => (Array.isArray(phrase.translations) ? phrase.translations : []).map((translation, index) => ({ index, translation })),
-    [phrase.translations]
+    () => (Array.isArray(expression.translations) ? expression.translations : []).map((translation, index) => ({ index, translation })),
+    [expression.translations]
   );
 
   async function loadLibraryImages() {
@@ -106,7 +106,7 @@ export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
         await loadLibraryImages();
       }
 
-      const nextImages = await phraseService.linkPhraseImage(phrase._id, {
+      const nextImages = await expressionService.linkExpressionImage(expression._id, {
         imageAssetId,
         translationIndex: translationIndexValue === "all" ? null : Number(translationIndexValue),
         isPrimary,
@@ -121,7 +121,7 @@ export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
       setNotes("");
       setTranslationIndexValue("all");
       setIsPrimary(false);
-      toast.success("Image linked to phrase.");
+      toast.success("Image linked to expression.");
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Failed to attach image.");
     } finally {
@@ -131,17 +131,17 @@ export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
 
   async function handleDeleteImage(linkId: string) {
     try {
-      const nextImages = await phraseService.deletePhraseImageLink(phrase._id, linkId);
+      const nextImages = await expressionService.deleteExpressionImageLink(expression._id, linkId);
       applyImages(nextImages);
-      toast.success("Phrase image removed.");
+      toast.success("Expression image removed.");
     } catch (error: any) {
-      toast.error(error.response?.data?.error || "Failed to remove phrase image.");
+      toast.error(error.response?.data?.error || "Failed to remove expression image.");
     }
   }
 
   async function handleSetPrimary(link: PhraseImageLink) {
     try {
-      const nextImages = await phraseService.updatePhraseImageLink(phrase._id, link._id, {
+      const nextImages = await expressionService.updateExpressionImageLink(expression._id, link._id, {
         isPrimary: true,
         translationIndex: link.translationIndex ?? null
       });
@@ -157,7 +157,7 @@ export function PhraseImageManager({ phrase, onImagesChanged }: Props) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ImagePlus className="h-5 w-5" />
-          Phrase Images
+          Expression Images
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

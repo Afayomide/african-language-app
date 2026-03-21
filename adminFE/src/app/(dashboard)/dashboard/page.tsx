@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { lessonService, phraseService } from "@/services"
+import { lessonService, expressionService } from "@/services"
 import { BookOpen, MessageSquare, CheckCircle, Clock } from "lucide-react"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
     totalLessons: 0,
     publishedLessons: 0,
-    totalPhrases: 0,
-    publishedPhrases: 0,
+    totalExpressions: 0,
+    publishedExpressions: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -20,15 +20,15 @@ export default function DashboardPage() {
         const [lessonsTotal, lessonsPublished, phrasesTotal, phrasesPublished] = await Promise.all([
           lessonService.listLessonsPage({ page: 1, limit: 1 }),
           lessonService.listLessonsPage({ status: "published", page: 1, limit: 1 }),
-          phraseService.listPhrasesPage({ page: 1, limit: 1 }),
-          phraseService.listPhrasesPage({ status: "published", page: 1, limit: 1 }),
+          expressionService.listExpressionsPage({ page: 1, limit: 1 }),
+          expressionService.listExpressionsPage({ status: "published", page: 1, limit: 1 }),
         ])
         
         setStats({
           totalLessons: lessonsTotal.total,
           publishedLessons: lessonsPublished.total,
-          totalPhrases: phrasesTotal.total,
-          publishedPhrases: phrasesPublished.total,
+          totalExpressions: phrasesTotal.total,
+          publishedExpressions: phrasesPublished.total,
         })
       } catch (error) {
         console.error("Failed to fetch stats", error)
@@ -57,16 +57,16 @@ export default function DashboardPage() {
       borderColor: "border-border"
     },
     { 
-      title: "Total Phrases", 
-      value: stats.totalPhrases, 
+      title: "Total Expressions", 
+      value: stats.totalExpressions, 
       icon: MessageSquare, 
       color: "text-primary",
       bgColor: "bg-secondary",
       borderColor: "border-border"
     },
     { 
-      title: "Published Phrases", 
-      value: stats.publishedPhrases, 
+      title: "Published Expressions", 
+      value: stats.publishedExpressions, 
       icon: Clock, 
       color: "text-primary",
       bgColor: "bg-secondary",
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 <MessageSquare className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-semibold">Add New Phrases</p>
+                <p className="font-semibold">Add New Expressions</p>
                 <p className="text-sm text-muted-foreground">Expand the vocabulary database</p>
               </div>
             </div>

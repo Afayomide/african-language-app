@@ -1,0 +1,1562 @@
+{
+  "updatedAt": "2026-03-21T14:32:33.812Z",
+  "entries": [
+    {
+      "loggedAt": "2026-03-21T06:31:25.940Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be39fcadc45050d2fff9f2",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and The First Hello",
+          "description": "Learn the essential morning greeting and discover how to apply the honorific filter when speaking to elders versus peers.",
+          "objectives": [
+            "Understand the concept of the honorific filter in the culture.",
+            "Greet an older person politely in the morning.",
+            "Greet a friend or younger person casually in the morning."
+          ],
+          "conversationGoal": "Confidently choose the correct respectful or casual morning greeting when starting your day.",
+          "situations": [
+            "Walking into the kitchen and greeting an older aunt.",
+            "Saying good morning to a younger sibling or friend."
+          ],
+          "sentenceGoals": [
+            "Say 'Good morning' respectfully to an elder.",
+            "Say 'Good morning' casually to a peer or younger person."
+          ],
+          "focusSummary": "Introduction to the morning greeting and the mandatory respectful plural filter for elders versus the casual form for peers."
+        },
+        {
+          "title": "High Sun and The Afternoon Hustle",
+          "description": "Master the daytime greeting used during the hottest parts of the day, applying the respect filter for strangers and older individuals.",
+          "objectives": [
+            "Identify the correct time window for afternoon greetings.",
+            "Use the respectful afternoon greeting with strangers or bosses.",
+            "Use the casual afternoon greeting with younger siblings or close friends."
+          ],
+          "conversationGoal": "Navigate mid-day social interactions by greeting stall owners, bosses, and peers with the appropriate level of respect.",
+          "situations": [
+            "Approaching a stall owner at a market in the heat of the day.",
+            "Greeting a younger sibling when returning home from an errand.",
+            "Saying good afternoon to a boss or older colleague at work."
+          ],
+          "sentenceGoals": [
+            "Say 'Good afternoon' respectfully to a market vendor or boss.",
+            "Say 'Good afternoon' casually to a close friend or younger sibling.",
+            "Ask a respectful short follow-up question to acknowledge an elder's presence."
+          ],
+          "focusSummary": "Afternoon greetings between 12 PM and 4 PM focusing on the contrast between addressing a boss or stranger respectfully versus a younger person casually."
+        },
+        {
+          "title": "The Cooling Evening",
+          "description": "Learn the specific early evening greeting used as the sun goes down and people return home from work.",
+          "objectives": [
+            "Recognize the early evening time frame from 4 PM to 7 PM.",
+            "Greet older neighbors respectfully in the early evening.",
+            "Greet peers casually as the day cools down."
+          ],
+          "conversationGoal": "Correctly use the transition evening greeting when interacting with neighbors or peers after work.",
+          "situations": [
+            "Greeting an older neighbor who is sitting outside their house as you return from work.",
+            "Saying good evening casually to a friend you meet on the street.",
+            "Acknowledging an elder who is relaxing on their porch."
+          ],
+          "sentenceGoals": [
+            "Say the early evening greeting respectfully to an older neighbor.",
+            "Say the early evening greeting casually to a friend.",
+            "Acknowledge someone resting after a long day of work respectfully."
+          ],
+          "focusSummary": "Early evening greetings between 4 PM and 7 PM emphasizing the shift in time of day while maintaining the honorific filter for elders."
+        },
+        {
+          "title": "The Nighttime Greeting",
+          "description": "Conclude the 24-hour cycle by learning the standard nighttime greeting used after dark for elders, family groups, and friends.",
+          "objectives": [
+            "Use the nighttime greeting correctly for interactions after 7 PM.",
+            "Apply the respectful plural when greeting a group of people at night.",
+            "Greet an individual elder or parent respectfully at night."
+          ],
+          "conversationGoal": "Appropriately greet family members, groups, and individuals once the sun has completely set.",
+          "situations": [
+            "Greeting a group of elders or family members encountered late at night.",
+            "Saying good night casually to a roommate or sibling.",
+            "Entering a family living room after dark and greeting everyone present."
+          ],
+          "sentenceGoals": [
+            "Say 'Good evening' respectfully to a group of elders or family members.",
+            "Say 'Good evening' casually to a sibling or peer.",
+            "Address multiple people at once using the plural respect marker."
+          ],
+          "focusSummary": "General nighttime greetings from 7 PM onwards focusing on the time-of-day expression used after dark and addressing groups versus individuals."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and The First Hello",
+              "description": "Learn the essential morning greeting and discover how to apply the honorific filter when speaking to elders versus peers.",
+              "objectives": [
+                "Understand the concept of the honorific filter in the culture.",
+                "Greet an older person politely in the morning.",
+                "Greet a friend or younger person casually in the morning."
+              ],
+              "conversationGoal": "Confidently choose the correct respectful or casual morning greeting when starting your day.",
+              "situations": [
+                "Walking into the kitchen and greeting an older aunt.",
+                "Saying good morning to a younger sibling or friend."
+              ],
+              "sentenceGoals": [
+                "Say 'Good morning' respectfully to an elder.",
+                "Say 'Good morning' casually to a peer or younger person."
+              ],
+              "focusSummary": "Introduction to the morning greeting and the mandatory respectful plural filter for elders versus the casual form for peers."
+            },
+            {
+              "title": "High Sun and The Afternoon Hustle",
+              "description": "Master the daytime greeting used during the hottest parts of the day, applying the respect filter for strangers and older individuals.",
+              "objectives": [
+                "Identify the correct time window for afternoon greetings.",
+                "Use the respectful afternoon greeting with strangers or bosses.",
+                "Use the casual afternoon greeting with younger siblings or close friends."
+              ],
+              "conversationGoal": "Navigate mid-day social interactions by greeting stall owners, bosses, and peers with the appropriate level of respect.",
+              "situations": [
+                "Approaching a stall owner at a market in the heat of the day.",
+                "Greeting a younger sibling when returning home from an errand.",
+                "Saying good afternoon to a boss or older colleague at work."
+              ],
+              "sentenceGoals": [
+                "Say 'Good afternoon' respectfully to a market vendor or boss.",
+                "Say 'Good afternoon' casually to a close friend or younger sibling.",
+                "Ask a respectful short follow-up question to acknowledge an elder's presence."
+              ],
+              "focusSummary": "Afternoon greetings between 12 PM and 4 PM focusing on the contrast between addressing a boss or stranger respectfully versus a younger person casually."
+            },
+            {
+              "title": "The Cooling Evening",
+              "description": "Learn the specific early evening greeting used as the sun goes down and people return home from work.",
+              "objectives": [
+                "Recognize the early evening time frame from 4 PM to 7 PM.",
+                "Greet older neighbors respectfully in the early evening.",
+                "Greet peers casually as the day cools down."
+              ],
+              "conversationGoal": "Correctly use the transition evening greeting when interacting with neighbors or peers after work.",
+              "situations": [
+                "Greeting an older neighbor who is sitting outside their house as you return from work.",
+                "Saying good evening casually to a friend you meet on the street.",
+                "Acknowledging an elder who is relaxing on their porch."
+              ],
+              "sentenceGoals": [
+                "Say the early evening greeting respectfully to an older neighbor.",
+                "Say the early evening greeting casually to a friend.",
+                "Acknowledge someone resting after a long day of work respectfully."
+              ],
+              "focusSummary": "Early evening greetings between 4 PM and 7 PM emphasizing the shift in time of day while maintaining the honorific filter for elders."
+            },
+            {
+              "title": "The Nighttime Greeting",
+              "description": "Conclude the 24-hour cycle by learning the standard nighttime greeting used after dark for elders, family groups, and friends.",
+              "objectives": [
+                "Use the nighttime greeting correctly for interactions after 7 PM.",
+                "Apply the respectful plural when greeting a group of people at night.",
+                "Greet an individual elder or parent respectfully at night."
+              ],
+              "conversationGoal": "Appropriately greet family members, groups, and individuals once the sun has completely set.",
+              "situations": [
+                "Greeting a group of elders or family members encountered late at night.",
+                "Saying good night casually to a roommate or sibling.",
+                "Entering a family living room after dark and greeting everyone present."
+              ],
+              "sentenceGoals": [
+                "Say 'Good evening' respectfully to a group of elders or family members.",
+                "Say 'Good evening' casually to a sibling or peer.",
+                "Address multiple people at once using the plural respect marker."
+              ],
+              "focusSummary": "General nighttime greetings from 7 PM onwards focusing on the time-of-day expression used after dark and addressing groups versus individuals."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T08:01:17.944Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69be39fcadc45050d2fff9f2",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "The Morning Filter: Elders Versus Friends",
+          "description": "Learn the essential morning greeting and discover how adding one simple sound changes a casual 'good morning' into a deeply respectful greeting for elders at this early stage of the day.",
+          "objectives": [
+            "Grasp the concept of the Yoruba honorific filter.",
+            "Differentiate between casual and respectful morning greetings.",
+            "Greet older family members and peers appropriately upon waking up."
+          ],
+          "conversationGoal": "Confidently greet an older person respectfully and a friend casually in the morning.",
+          "situations": [
+            "Waking up and greeting parents or older relatives in the home.",
+            "Greeting a peer or sibling early in the day."
+          ],
+          "sentenceGoals": [
+            "Good morning (to an elder).",
+            "Good morning (to a friend).",
+            "Did you sleep well?"
+          ],
+          "focusSummary": "Introduction to the morning greeting and the mandatory respectful plural pronoun filter for elders versus the casual form for peers."
+        },
+        {
+          "title": "The Afternoon Hustle: Respecting Strangers",
+          "description": "Master the daytime greeting used during the hottest parts of the day, applying the respect filter automatically for strangers, stall owners, and older individuals.",
+          "objectives": [
+            "Use the correct afternoon greeting based on the time of day.",
+            "Apply the respect filter automatically when speaking to strangers.",
+            "Understand the social rule of acknowledging people when entering a new space."
+          ],
+          "conversationGoal": "Navigate mid-day social interactions by greeting stall owners and strangers with the appropriate level of respect.",
+          "situations": [
+            "Entering a shop or market stall in the afternoon.",
+            "Passing an older stranger on the street during the day.",
+            "Greeting a colleague at work after mid-day."
+          ],
+          "sentenceGoals": [
+            "Good afternoon (respectful to a stranger or vendor).",
+            "Good afternoon (casual to a peer).",
+            "Well done / Greetings on your work (respectful)."
+          ],
+          "focusSummary": "Afternoon greetings focusing on the contrast between addressing a stranger respectfully versus a peer casually in public spaces."
+        },
+        {
+          "title": "The Evening Shift: Acknowledging the Community",
+          "description": "Learn the specific transition greeting used at the early evening stage as the sun goes down and people return home from work, adjusting your respect filter for neighbors.",
+          "objectives": [
+            "Recognize the shift from afternoon to early evening greetings.",
+            "Practice using the evening greeting with neighbors and community members.",
+            "Reinforce the difference between casual and honorific address in community settings."
+          ],
+          "conversationGoal": "Correctly use the transition evening greeting when interacting with neighbors and elders after work.",
+          "situations": [
+            "Returning home and greeting an older neighbor sitting outside.",
+            "Seeing a friend on the street during the late afternoon cool down."
+          ],
+          "sentenceGoals": [
+            "Good evening (respectful to a neighbor).",
+            "Good evening (casual to a friend).",
+            "Welcome back (respectful)."
+          ],
+          "focusSummary": "Early evening greetings emphasizing the shift in time of day while maintaining the honorific filter for elders and casual forms for friends."
+        },
+        {
+          "title": "The Nighttime Close: Individuals Versus Groups",
+          "description": "Conclude the 24-hour cycle by learning the standard nighttime greeting and discovering how the respect filter doubles as the literal way to greet groups of people.",
+          "objectives": [
+            "Use the correct nighttime greeting once the sun has set.",
+            "Understand that the honorific respect marker is also used for addressing multiple people.",
+            "Say good night properly to end the day."
+          ],
+          "conversationGoal": "Appropriately greet family groups at night and wish an elder a respectful good night.",
+          "situations": [
+            "Entering a living room where multiple family members are sitting at night.",
+            "Saying good night to parents before going to sleep.",
+            "Saying good night to a sibling or friend."
+          ],
+          "sentenceGoals": [
+            "Good evening (to a group or elder).",
+            "Good evening (to one friend).",
+            "Till morning / Sleep well (parting phrase)."
+          ],
+          "focusSummary": "Nighttime greetings focusing on the dual use of the respect filter for elders and for groups, ending with nighttime parting phrases."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "The Morning Filter: Elders Versus Friends",
+              "description": "Learn the essential morning greeting and discover how adding one simple sound changes a casual 'good morning' into a deeply respectful greeting for elders at this early stage of the day.",
+              "objectives": [
+                "Grasp the concept of the Yoruba honorific filter.",
+                "Differentiate between casual and respectful morning greetings.",
+                "Greet older family members and peers appropriately upon waking up."
+              ],
+              "conversationGoal": "Confidently greet an older person respectfully and a friend casually in the morning.",
+              "situations": [
+                "Waking up and greeting parents or older relatives in the home.",
+                "Greeting a peer or sibling early in the day."
+              ],
+              "sentenceGoals": [
+                "Good morning (to an elder).",
+                "Good morning (to a friend).",
+                "Did you sleep well?"
+              ],
+              "focusSummary": "Introduction to the morning greeting and the mandatory respectful plural pronoun filter for elders versus the casual form for peers."
+            },
+            {
+              "title": "The Afternoon Hustle: Respecting Strangers",
+              "description": "Master the daytime greeting used during the hottest parts of the day, applying the respect filter automatically for strangers, stall owners, and older individuals.",
+              "objectives": [
+                "Use the correct afternoon greeting based on the time of day.",
+                "Apply the respect filter automatically when speaking to strangers.",
+                "Understand the social rule of acknowledging people when entering a new space."
+              ],
+              "conversationGoal": "Navigate mid-day social interactions by greeting stall owners and strangers with the appropriate level of respect.",
+              "situations": [
+                "Entering a shop or market stall in the afternoon.",
+                "Passing an older stranger on the street during the day.",
+                "Greeting a colleague at work after mid-day."
+              ],
+              "sentenceGoals": [
+                "Good afternoon (respectful to a stranger or vendor).",
+                "Good afternoon (casual to a peer).",
+                "Well done / Greetings on your work (respectful)."
+              ],
+              "focusSummary": "Afternoon greetings focusing on the contrast between addressing a stranger respectfully versus a peer casually in public spaces."
+            },
+            {
+              "title": "The Evening Shift: Acknowledging the Community",
+              "description": "Learn the specific transition greeting used at the early evening stage as the sun goes down and people return home from work, adjusting your respect filter for neighbors.",
+              "objectives": [
+                "Recognize the shift from afternoon to early evening greetings.",
+                "Practice using the evening greeting with neighbors and community members.",
+                "Reinforce the difference between casual and honorific address in community settings."
+              ],
+              "conversationGoal": "Correctly use the transition evening greeting when interacting with neighbors and elders after work.",
+              "situations": [
+                "Returning home and greeting an older neighbor sitting outside.",
+                "Seeing a friend on the street during the late afternoon cool down."
+              ],
+              "sentenceGoals": [
+                "Good evening (respectful to a neighbor).",
+                "Good evening (casual to a friend).",
+                "Welcome back (respectful)."
+              ],
+              "focusSummary": "Early evening greetings emphasizing the shift in time of day while maintaining the honorific filter for elders and casual forms for friends."
+            },
+            {
+              "title": "The Nighttime Close: Individuals Versus Groups",
+              "description": "Conclude the 24-hour cycle by learning the standard nighttime greeting and discovering how the respect filter doubles as the literal way to greet groups of people.",
+              "objectives": [
+                "Use the correct nighttime greeting once the sun has set.",
+                "Understand that the honorific respect marker is also used for addressing multiple people.",
+                "Say good night properly to end the day."
+              ],
+              "conversationGoal": "Appropriately greet family groups at night and wish an elder a respectful good night.",
+              "situations": [
+                "Entering a living room where multiple family members are sitting at night.",
+                "Saying good night to parents before going to sleep.",
+                "Saying good night to a sibling or friend."
+              ],
+              "sentenceGoals": [
+                "Good evening (to a group or elder).",
+                "Good evening (to one friend).",
+                "Till morning / Sleep well (parting phrase)."
+              ],
+              "focusSummary": "Nighttime greetings focusing on the dual use of the respect filter for elders and for groups, ending with nighttime parting phrases."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T08:17:38.664Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5368d0cc0a961e2c63fe",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "topic": "Greetings",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and the First Hello",
+          "description": "Because Yoruba values respect, start the day by learning to navigate morning greetings. Discover how to choose the right form of respect for an elder versus a peer.",
+          "objectives": [
+            "Greet an elder respectfully in the morning.",
+            "Greet a peer or younger person in the morning.",
+            "Introduce yourself as a student using gender-neutral pronouns."
+          ],
+          "conversationGoal": "Successfully greet an older aunt and a younger sibling in the morning using the correct respect levels.",
+          "situations": [
+            "Walking into the kitchen and greeting an older aunt.",
+            "Greeting a younger sibling or friend early in the day."
+          ],
+          "sentenceGoals": [
+            "Good morning (respectful to an elder).",
+            "Good morning (casual to a peer).",
+            "I am a student."
+          ],
+          "focusSummary": "Morning greetings contrasting respectful forms for elders with casual forms for peers."
+        },
+        {
+          "title": "High Sun and the Afternoon Hustle",
+          "description": "Master daytime greetings in public and professional spaces. You will be able to distinguish between respectfully addressing a stranger and casually greeting a younger sibling.",
+          "objectives": [
+            "Greet strangers and elders respectfully in the afternoon heat.",
+            "Use the casual afternoon greeting for peers or children.",
+            "Identify someone else's role using Yoruba's gender-neutral language."
+          ],
+          "conversationGoal": "Greet a market stall owner with respect and a younger sibling casually during the afternoon hustle.",
+          "situations": [
+            "Approaching a stall owner at a market in the heat of the day.",
+            "Greeting a younger sibling returning from school.",
+            "Saying hello to a boss at work."
+          ],
+          "sentenceGoals": [
+            "Good afternoon (respectful to a stranger or elder).",
+            "Good afternoon (casual to a younger person).",
+            "She is a child."
+          ],
+          "focusSummary": "Afternoon greetings contrasting respectful interactions in the market with casual interactions at home."
+        },
+        {
+          "title": "The Cooling Evening",
+          "description": "Transition into the early evening by acknowledging neighbors. Apply the respect loop to community members as the workday comes to an end.",
+          "objectives": [
+            "Use the early evening greeting correctly between 4 PM and 7 PM.",
+            "Acknowledge people in the community respectfully as you return home.",
+            "Address someone respectfully as a person of authority."
+          ],
+          "conversationGoal": "Greet an older neighbor sitting outside their house during the early evening transition.",
+          "situations": [
+            "Greeting an older neighbor sitting outside as you return from work.",
+            "Saying good early evening to a peer on the walk home."
+          ],
+          "sentenceGoals": [
+            "Good early evening (respectful to an older neighbor).",
+            "Good early evening (casual to a peer).",
+            "You are a leader."
+          ],
+          "focusSummary": "Early evening greetings focusing on community respect and the transition from work to home life."
+        },
+        {
+          "title": "The Nighttime Greeting",
+          "description": "Complete the 24-hour respect loop with nighttime greetings. By the end of this lesson, you will be able to respectfully address groups and elders after dark.",
+          "objectives": [
+            "Greet family members and elders respectfully at night.",
+            "Use the plural or respectful pronoun for groups of people.",
+            "Complete the daily cycle of Yoruba honorific greetings."
+          ],
+          "conversationGoal": "Greet a group of elders or family members encountered late at night using the correct respectful form.",
+          "situations": [
+            "Greeting a group of elders gathered late at night.",
+            "Saying good evening to peers or younger siblings before resting.",
+            "Arriving at a family compound after dark."
+          ],
+          "sentenceGoals": [
+            "Good night (respectful to a group or elder).",
+            "Good night (casual to a peer).",
+            "He is an elder."
+          ],
+          "focusSummary": "General nighttime greetings emphasizing respect for groups and elders at the end of the day."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and the First Hello",
+              "description": "Because Yoruba values respect, start the day by learning to navigate morning greetings. Discover how to choose the right form of respect for an elder versus a peer.",
+              "objectives": [
+                "Greet an elder respectfully in the morning.",
+                "Greet a peer or younger person in the morning.",
+                "Introduce yourself as a student using gender-neutral pronouns."
+              ],
+              "conversationGoal": "Successfully greet an older aunt and a younger sibling in the morning using the correct respect levels.",
+              "situations": [
+                "Walking into the kitchen and greeting an older aunt.",
+                "Greeting a younger sibling or friend early in the day."
+              ],
+              "sentenceGoals": [
+                "Good morning (respectful to an elder).",
+                "Good morning (casual to a peer).",
+                "I am a student."
+              ],
+              "focusSummary": "Morning greetings contrasting respectful forms for elders with casual forms for peers."
+            },
+            {
+              "title": "High Sun and the Afternoon Hustle",
+              "description": "Master daytime greetings in public and professional spaces. You will be able to distinguish between respectfully addressing a stranger and casually greeting a younger sibling.",
+              "objectives": [
+                "Greet strangers and elders respectfully in the afternoon heat.",
+                "Use the casual afternoon greeting for peers or children.",
+                "Identify someone else's role using Yoruba's gender-neutral language."
+              ],
+              "conversationGoal": "Greet a market stall owner with respect and a younger sibling casually during the afternoon hustle.",
+              "situations": [
+                "Approaching a stall owner at a market in the heat of the day.",
+                "Greeting a younger sibling returning from school.",
+                "Saying hello to a boss at work."
+              ],
+              "sentenceGoals": [
+                "Good afternoon (respectful to a stranger or elder).",
+                "Good afternoon (casual to a younger person).",
+                "She is a child."
+              ],
+              "focusSummary": "Afternoon greetings contrasting respectful interactions in the market with casual interactions at home."
+            },
+            {
+              "title": "The Cooling Evening",
+              "description": "Transition into the early evening by acknowledging neighbors. Apply the respect loop to community members as the workday comes to an end.",
+              "objectives": [
+                "Use the early evening greeting correctly between 4 PM and 7 PM.",
+                "Acknowledge people in the community respectfully as you return home.",
+                "Address someone respectfully as a person of authority."
+              ],
+              "conversationGoal": "Greet an older neighbor sitting outside their house during the early evening transition.",
+              "situations": [
+                "Greeting an older neighbor sitting outside as you return from work.",
+                "Saying good early evening to a peer on the walk home."
+              ],
+              "sentenceGoals": [
+                "Good early evening (respectful to an older neighbor).",
+                "Good early evening (casual to a peer).",
+                "You are a leader."
+              ],
+              "focusSummary": "Early evening greetings focusing on community respect and the transition from work to home life."
+            },
+            {
+              "title": "The Nighttime Greeting",
+              "description": "Complete the 24-hour respect loop with nighttime greetings. By the end of this lesson, you will be able to respectfully address groups and elders after dark.",
+              "objectives": [
+                "Greet family members and elders respectfully at night.",
+                "Use the plural or respectful pronoun for groups of people.",
+                "Complete the daily cycle of Yoruba honorific greetings."
+              ],
+              "conversationGoal": "Greet a group of elders or family members encountered late at night using the correct respectful form.",
+              "situations": [
+                "Greeting a group of elders gathered late at night.",
+                "Saying good evening to peers or younger siblings before resting.",
+                "Arriving at a family compound after dark."
+              ],
+              "sentenceGoals": [
+                "Good night (respectful to a group or elder).",
+                "Good night (casual to a peer).",
+                "He is an elder."
+              ],
+              "focusSummary": "General nighttime greetings emphasizing respect for groups and elders at the end of the day."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:05:23.397Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c2550bfea3a075214b1",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "topic": "Greetings",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and The First Hello",
+          "description": "Learn how to start the day respectfully in a Yoruba household by greeting elders and peers correctly in the morning.",
+          "objectives": [
+            "Acknowledge elders with respectful morning greetings.",
+            "Greet peers and younger siblings casually.",
+            "Understand the importance of the respectful plural pronoun in early greetings."
+          ],
+          "conversationGoal": "Greet household members appropriately based on their age when waking up.",
+          "situations": [
+            "Walking into the kitchen to see an older aunt.",
+            "Greeting a sibling or peer in the hallway."
+          ],
+          "sentenceGoals": [
+            "Good morning to you, elder.",
+            "Good morning, my friend.",
+            "Good morning to everyone."
+          ],
+          "focusSummary": "Mastering respectful and casual morning greetings."
+        },
+        {
+          "title": "High Sun and The Afternoon Hustle",
+          "description": "Navigate public and professional spaces during the hottest part of the day by using the correct afternoon greetings.",
+          "objectives": [
+            "Greet older market vendors and bosses respectfully in the afternoon.",
+            "Use casual afternoon greetings with friends and coworkers.",
+            "Recognize the daytime greeting window from noon to late afternoon."
+          ],
+          "conversationGoal": "Greet people correctly in public spaces and markets during the afternoon.",
+          "situations": [
+            "Approaching an older stall owner at the market in the heat of the day.",
+            "Saying hello to a younger coworker or sibling after lunch."
+          ],
+          "sentenceGoals": [
+            "Good afternoon to you, elder.",
+            "Good afternoon to you all.",
+            "Good afternoon, my friend."
+          ],
+          "focusSummary": "Mastering respectful and casual afternoon greetings."
+        },
+        {
+          "title": "The Cooling Evening",
+          "description": "Acknowledge neighbors and colleagues correctly as the day cools down in the early evening.",
+          "objectives": [
+            "Greet older neighbors respectfully in the late afternoon and early evening.",
+            "Use casual early evening greetings with peers.",
+            "Differentiate between afternoon and early evening greeting times."
+          ],
+          "conversationGoal": "Acknowledge people appropriately during the early evening transition.",
+          "situations": [
+            "Greeting an older neighbor sitting outside their house as you return from work.",
+            "Greeting a younger sibling when arriving home."
+          ],
+          "sentenceGoals": [
+            "Good early evening to you, elder.",
+            "Good early evening, my friend.",
+            "Good early evening to everyone."
+          ],
+          "focusSummary": "Mastering respectful and casual early evening greetings."
+        },
+        {
+          "title": "The Nighttime Greeting",
+          "description": "Conclude the daily respect loop by learning the proper greetings to use after dark with family and elders.",
+          "objectives": [
+            "Address groups of elders respectfully at night.",
+            "Greet family members casually after dark.",
+            "Understand the social expectation of nighttime greetings in a household."
+          ],
+          "conversationGoal": "Greet groups, elders, and peers appropriately after the sun goes down.",
+          "situations": [
+            "Greeting a group of elders or family members encountered late at night.",
+            "Saying good evening to a sibling after dinner."
+          ],
+          "sentenceGoals": [
+            "Good evening to you, elder.",
+            "Good evening to you all.",
+            "Good evening, my peer."
+          ],
+          "focusSummary": "Mastering respectful and casual nighttime greetings."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and The First Hello",
+              "description": "Learn how to start the day respectfully in a Yoruba household by greeting elders and peers correctly in the morning.",
+              "objectives": [
+                "Acknowledge elders with respectful morning greetings.",
+                "Greet peers and younger siblings casually.",
+                "Understand the importance of the respectful plural pronoun in early greetings."
+              ],
+              "conversationGoal": "Greet household members appropriately based on their age when waking up.",
+              "situations": [
+                "Walking into the kitchen to see an older aunt.",
+                "Greeting a sibling or peer in the hallway."
+              ],
+              "sentenceGoals": [
+                "Good morning to you, elder.",
+                "Good morning, my friend.",
+                "Good morning to everyone."
+              ],
+              "focusSummary": "Mastering respectful and casual morning greetings."
+            },
+            {
+              "title": "High Sun and The Afternoon Hustle",
+              "description": "Navigate public and professional spaces during the hottest part of the day by using the correct afternoon greetings.",
+              "objectives": [
+                "Greet older market vendors and bosses respectfully in the afternoon.",
+                "Use casual afternoon greetings with friends and coworkers.",
+                "Recognize the daytime greeting window from noon to late afternoon."
+              ],
+              "conversationGoal": "Greet people correctly in public spaces and markets during the afternoon.",
+              "situations": [
+                "Approaching an older stall owner at the market in the heat of the day.",
+                "Saying hello to a younger coworker or sibling after lunch."
+              ],
+              "sentenceGoals": [
+                "Good afternoon to you, elder.",
+                "Good afternoon to you all.",
+                "Good afternoon, my friend."
+              ],
+              "focusSummary": "Mastering respectful and casual afternoon greetings."
+            },
+            {
+              "title": "The Cooling Evening",
+              "description": "Acknowledge neighbors and colleagues correctly as the day cools down in the early evening.",
+              "objectives": [
+                "Greet older neighbors respectfully in the late afternoon and early evening.",
+                "Use casual early evening greetings with peers.",
+                "Differentiate between afternoon and early evening greeting times."
+              ],
+              "conversationGoal": "Acknowledge people appropriately during the early evening transition.",
+              "situations": [
+                "Greeting an older neighbor sitting outside their house as you return from work.",
+                "Greeting a younger sibling when arriving home."
+              ],
+              "sentenceGoals": [
+                "Good early evening to you, elder.",
+                "Good early evening, my friend.",
+                "Good early evening to everyone."
+              ],
+              "focusSummary": "Mastering respectful and casual early evening greetings."
+            },
+            {
+              "title": "The Nighttime Greeting",
+              "description": "Conclude the daily respect loop by learning the proper greetings to use after dark with family and elders.",
+              "objectives": [
+                "Address groups of elders respectfully at night.",
+                "Greet family members casually after dark.",
+                "Understand the social expectation of nighttime greetings in a household."
+              ],
+              "conversationGoal": "Greet groups, elders, and peers appropriately after the sun goes down.",
+              "situations": [
+                "Greeting a group of elders or family members encountered late at night.",
+                "Saying good evening to a sibling after dinner."
+              ],
+              "sentenceGoals": [
+                "Good evening to you, elder.",
+                "Good evening to you all.",
+                "Good evening, my peer."
+              ],
+              "focusSummary": "Mastering respectful and casual nighttime greetings."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:07:27.964Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c2550bfea3a075214b1",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "topic": "Greetings",
+      "lessonCount": 1,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and the First Hello",
+          "description": "Start your day right in a Yoruba household by mastering the morning greeting. Learn to confidently choose between the respectful form for elders and the casual form for peers.",
+          "objectives": [
+            "Greet an elder properly in the morning to show respect.",
+            "Greet a peer or younger person casually in the morning.",
+            "Understand the use of the honorific marker in daily greetings."
+          ],
+          "conversationGoal": "Successfully greet an older family member respectfully and a sibling casually upon waking up.",
+          "situations": [
+            "Walking into the kitchen and greeting an older aunt.",
+            "Seeing a sibling or friend in the morning and saying hello."
+          ],
+          "sentenceGoals": [
+            "Good morning (respectful).",
+            "Good morning (casual)."
+          ],
+          "focusSummary": "Mastering the morning greetings Ẹ káàárọ̀ (respectful) and Káàárọ̀ (casual)."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and the First Hello",
+              "description": "Start your day right in a Yoruba household by mastering the morning greeting. Learn to confidently choose between the respectful form for elders and the casual form for peers.",
+              "objectives": [
+                "Greet an elder properly in the morning to show respect.",
+                "Greet a peer or younger person casually in the morning.",
+                "Understand the use of the honorific marker in daily greetings."
+              ],
+              "conversationGoal": "Successfully greet an older family member respectfully and a sibling casually upon waking up.",
+              "situations": [
+                "Walking into the kitchen and greeting an older aunt.",
+                "Seeing a sibling or friend in the morning and saying hello."
+              ],
+              "sentenceGoals": [
+                "Good morning (respectful).",
+                "Good morning (casual)."
+              ],
+              "focusSummary": "Mastering the morning greetings Ẹ káàárọ̀ (respectful) and Káàárọ̀ (casual)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:09:34.248Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c2550bfea3a075214b1",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "topic": "Greetings",
+      "lessonCount": 1,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and the First Hello",
+          "description": "Start your day by learning the essential morning greetings. You will practice the crucial difference between greeting an elder respectfully and greeting a peer casually, establishing a strong foundation for daily social interactions.",
+          "objectives": [
+            "Greet an elder with respect in the morning.",
+            "Greet a peer or younger sibling casually in the morning.",
+            "Ask an elder respectfully if they woke up well."
+          ],
+          "conversationGoal": "Appropriately greet an older relative and a younger sibling in the morning using the correct level of respect.",
+          "situations": [
+            "Walking into the kitchen and greeting an older aunt.",
+            "Seeing a younger sibling or friend first thing in the morning.",
+            "Responding to a morning greeting from a family member."
+          ],
+          "sentenceGoals": [
+            "Good morning. (respectful)",
+            "Good morning. (casual)",
+            "Did you wake up well? (respectful)",
+            "Yes, good morning."
+          ],
+          "focusSummary": "Mastering the respectful versus casual morning greetings and the honorific pronoun."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and the First Hello",
+              "description": "Start your day by learning the essential morning greetings. You will practice the crucial difference between greeting an elder respectfully and greeting a peer casually, establishing a strong foundation for daily social interactions.",
+              "objectives": [
+                "Greet an elder with respect in the morning.",
+                "Greet a peer or younger sibling casually in the morning.",
+                "Ask an elder respectfully if they woke up well."
+              ],
+              "conversationGoal": "Appropriately greet an older relative and a younger sibling in the morning using the correct level of respect.",
+              "situations": [
+                "Walking into the kitchen and greeting an older aunt.",
+                "Seeing a younger sibling or friend first thing in the morning.",
+                "Responding to a morning greeting from a family member."
+              ],
+              "sentenceGoals": [
+                "Good morning. (respectful)",
+                "Good morning. (casual)",
+                "Did you wake up well? (respectful)",
+                "Yes, good morning."
+              ],
+              "focusSummary": "Mastering the respectful versus casual morning greetings and the honorific pronoun."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:12:12.380Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c2550bfea3a075214b1",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "topic": "Greetings",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise & The First Hello",
+          "description": "Learn to navigate the crucial first greeting of the day in a Yoruba household. You will master the vital distinction between addressing an elder respectfully and greeting a peer casually.",
+          "objectives": [
+            "Recognize the standard Yoruba morning greetings.",
+            "Apply the respectful honorific pronoun when addressing elders.",
+            "Differentiate between formal and informal morning greetings in a family setting."
+          ],
+          "conversationGoal": "Greet family members appropriately in the morning based on their age and status.",
+          "situations": [
+            "Walking into the kitchen and greeting an older aunt.",
+            "Saying good morning to a sibling or friend of the same age.",
+            "Greeting your parents as they wake up."
+          ],
+          "sentenceGoals": [
+            "Good morning (to an elder or a group).",
+            "Good morning (to a peer or younger person).",
+            "Good morning, sir.",
+            "Good morning, ma."
+          ],
+          "focusSummary": "Morning greetings focusing on the honorific marker versus casual forms in a daily household context."
+        },
+        {
+          "title": "High Sun & The Afternoon Hustle",
+          "description": "Step outside the house and learn the proper greetings used from noon to late afternoon, perfect for navigating markets, workplaces, and public spaces with respect.",
+          "objectives": [
+            "Identify the correct greeting for the afternoon hours.",
+            "Use the honorific marker to show respect to stall owners, bosses, or strangers.",
+            "Practice casual afternoon greetings for younger siblings or close friends."
+          ],
+          "conversationGoal": "Exchange appropriate afternoon greetings in public spaces or at work, adjusting for respect and familiarity.",
+          "situations": [
+            "Approaching an older stall owner at a busy market in the heat of the day.",
+            "Greeting a boss or an unfamiliar adult in a professional setting.",
+            "Saying a quick hello to a younger sibling or close co-worker."
+          ],
+          "sentenceGoals": [
+            "Good afternoon (to an elder, boss, or stranger).",
+            "Good afternoon (to a peer or younger person).",
+            "Good afternoon, my friend.",
+            "Good afternoon to you all."
+          ],
+          "focusSummary": "Afternoon greetings emphasizing the respectful approach for strangers and elders in public or professional spaces."
+        },
+        {
+          "title": "The Cooling Evening",
+          "description": "Master the early evening transition greetings used when the sun begins to set, an essential social skill for showing respect when returning home from work or school.",
+          "objectives": [
+            "Recognize the early evening greeting used between late afternoon and dusk.",
+            "Apply respectful phrasing when greeting elders resting outside.",
+            "Distinguish the early evening transition greeting from the midday and nighttime ones."
+          ],
+          "conversationGoal": "Greet neighbors and acquaintances properly during the early evening transition period.",
+          "situations": [
+            "Greeting an older neighbor sitting outside their house as you return from work.",
+            "Saying good early evening to a peer while walking through the neighborhood.",
+            "Greeting a shopkeeper as the sun begins to go down."
+          ],
+          "sentenceGoals": [
+            "Good early evening (to an elder or older neighbor).",
+            "Good early evening (to a peer).",
+            "Welcome back from work.",
+            "Good early evening, sir."
+          ],
+          "focusSummary": "Early evening transition greetings, focusing on neighborly respect as people return home from their day."
+        },
+        {
+          "title": "The Nighttime Greeting",
+          "description": "Complete your 24-hour respect loop by learning the standard greeting for the nighttime, ensuring you always show proper respect to groups and elders after dark.",
+          "objectives": [
+            "Identify the standard greeting used after dark.",
+            "Use the plural/honorific pronoun correctly when greeting a group of people.",
+            "Demonstrate respect when encountering elders or family members late at night."
+          ],
+          "conversationGoal": "Deliver the correct respectful nighttime greeting to groups or elders before turning in for the day.",
+          "situations": [
+            "Greeting a group of elders or family members gathered in the living room late at night.",
+            "Greeting an older family member who has just arrived after dark.",
+            "Saying good evening casually to a friend at night."
+          ],
+          "sentenceGoals": [
+            "Good night/evening (to an elder or a group).",
+            "Good night/evening (to a peer).",
+            "Good night/evening to you all.",
+            "Have a good night's rest."
+          ],
+          "focusSummary": "Nighttime greetings emphasizing the honorific marker for late-day encounters with family, groups, or elders."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise & The First Hello",
+              "description": "Learn to navigate the crucial first greeting of the day in a Yoruba household. You will master the vital distinction between addressing an elder respectfully and greeting a peer casually.",
+              "objectives": [
+                "Recognize the standard Yoruba morning greetings.",
+                "Apply the respectful honorific pronoun when addressing elders.",
+                "Differentiate between formal and informal morning greetings in a family setting."
+              ],
+              "conversationGoal": "Greet family members appropriately in the morning based on their age and status.",
+              "situations": [
+                "Walking into the kitchen and greeting an older aunt.",
+                "Saying good morning to a sibling or friend of the same age.",
+                "Greeting your parents as they wake up."
+              ],
+              "sentenceGoals": [
+                "Good morning (to an elder or a group).",
+                "Good morning (to a peer or younger person).",
+                "Good morning, sir.",
+                "Good morning, ma."
+              ],
+              "focusSummary": "Morning greetings focusing on the honorific marker versus casual forms in a daily household context."
+            },
+            {
+              "title": "High Sun & The Afternoon Hustle",
+              "description": "Step outside the house and learn the proper greetings used from noon to late afternoon, perfect for navigating markets, workplaces, and public spaces with respect.",
+              "objectives": [
+                "Identify the correct greeting for the afternoon hours.",
+                "Use the honorific marker to show respect to stall owners, bosses, or strangers.",
+                "Practice casual afternoon greetings for younger siblings or close friends."
+              ],
+              "conversationGoal": "Exchange appropriate afternoon greetings in public spaces or at work, adjusting for respect and familiarity.",
+              "situations": [
+                "Approaching an older stall owner at a busy market in the heat of the day.",
+                "Greeting a boss or an unfamiliar adult in a professional setting.",
+                "Saying a quick hello to a younger sibling or close co-worker."
+              ],
+              "sentenceGoals": [
+                "Good afternoon (to an elder, boss, or stranger).",
+                "Good afternoon (to a peer or younger person).",
+                "Good afternoon, my friend.",
+                "Good afternoon to you all."
+              ],
+              "focusSummary": "Afternoon greetings emphasizing the respectful approach for strangers and elders in public or professional spaces."
+            },
+            {
+              "title": "The Cooling Evening",
+              "description": "Master the early evening transition greetings used when the sun begins to set, an essential social skill for showing respect when returning home from work or school.",
+              "objectives": [
+                "Recognize the early evening greeting used between late afternoon and dusk.",
+                "Apply respectful phrasing when greeting elders resting outside.",
+                "Distinguish the early evening transition greeting from the midday and nighttime ones."
+              ],
+              "conversationGoal": "Greet neighbors and acquaintances properly during the early evening transition period.",
+              "situations": [
+                "Greeting an older neighbor sitting outside their house as you return from work.",
+                "Saying good early evening to a peer while walking through the neighborhood.",
+                "Greeting a shopkeeper as the sun begins to go down."
+              ],
+              "sentenceGoals": [
+                "Good early evening (to an elder or older neighbor).",
+                "Good early evening (to a peer).",
+                "Welcome back from work.",
+                "Good early evening, sir."
+              ],
+              "focusSummary": "Early evening transition greetings, focusing on neighborly respect as people return home from their day."
+            },
+            {
+              "title": "The Nighttime Greeting",
+              "description": "Complete your 24-hour respect loop by learning the standard greeting for the nighttime, ensuring you always show proper respect to groups and elders after dark.",
+              "objectives": [
+                "Identify the standard greeting used after dark.",
+                "Use the plural/honorific pronoun correctly when greeting a group of people.",
+                "Demonstrate respect when encountering elders or family members late at night."
+              ],
+              "conversationGoal": "Deliver the correct respectful nighttime greeting to groups or elders before turning in for the day.",
+              "situations": [
+                "Greeting a group of elders or family members gathered in the living room late at night.",
+                "Greeting an older family member who has just arrived after dark.",
+                "Saying good evening casually to a friend at night."
+              ],
+              "sentenceGoals": [
+                "Good night/evening (to an elder or a group).",
+                "Good night/evening (to a peer).",
+                "Good night/evening to you all.",
+                "Have a good night's rest."
+              ],
+              "focusSummary": "Nighttime greetings emphasizing the honorific marker for late-day encounters with family, groups, or elders."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:51:24.019Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c1a50bfea3a075214ad",
+      "unitTitle": "Me, You, and the Elders",
+      "lessonCount": 3,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Finding Yourself Among Peers",
+          "description": "It is time to find your place in the room. In this lesson, you will define who you are and learn how to address someone your own age using the peer-level 'You' without ever sounding overly formal.",
+          "objectives": [
+            "State your own name clearly",
+            "Address a peer using the casual 'You'",
+            "Ask a younger person or peer for their identity"
+          ],
+          "conversationGoal": "Confidently identify yourself and address a peer or younger person in the room.",
+          "situations": [
+            "Introducing yourself to a new colleague of the same age",
+            "Asking a young person in the neighborhood who they are"
+          ],
+          "sentenceGoals": [
+            "I am your friend.",
+            "Who are you?",
+            "You are my friend."
+          ],
+          "focusSummary": "Introducing the basic personal pronouns for 'I' (Èmi/Mo) and the casual peer-level 'You' (Ìwọ/O) to establish personal identity."
+        },
+        {
+          "title": "The Choice to Respect the Elders",
+          "description": "Navigating the high-stakes choice between casual chat and showing proper respect is crucial. By the end of this lesson, you will be able to confidently address the elders and Ogas using the respectful 'You'.",
+          "objectives": [
+            "Recognize when a situation requires the respectful 'You'",
+            "Address an older person or boss correctly",
+            "Ask an elder for their identity with full respect"
+          ],
+          "conversationGoal": "Successfully make the choice to use respectful pronouns when addressing an elder or superior.",
+          "situations": [
+            "Speaking to a friend's parent in their home",
+            "Addressing the boss or an older customer at work",
+            "Greeting an elder who is visiting your family"
+          ],
+          "sentenceGoals": [
+            "Who are you, sir/ma?",
+            "You are an elder.",
+            "Are you the boss?"
+          ],
+          "focusSummary": "Mastering the respectful 'You' (Ẹ/Ẹyin) to show proper cultural respect to elders and superiors, contrasting it directly with the peer-level 'You'."
+        },
+        {
+          "title": "Defining Who They Are",
+          "description": "Master the universal, gender-neutral pronoun to define who someone else is. You will be able to point out third parties, from peers to elders, confidently without ever worrying about gendering a sentence.",
+          "objectives": [
+            "Identify a peer using the gender-neutral 'He/She/It'",
+            "Identify an elder using the respectful plural pronoun",
+            "Ask someone to identify a third person in the room"
+          ],
+          "conversationGoal": "Point out and identify other people in the room using gender-neutral third-person pronouns for both peers and elders.",
+          "situations": [
+            "Pointing out a coworker to a new friend",
+            "Identifying a senior family member arriving at a gathering",
+            "Asking a friend who the new person at the party is"
+          ],
+          "sentenceGoals": [
+            "Who is he/she?",
+            "He/she is my friend.",
+            "They are an elder."
+          ],
+          "focusSummary": "Introducing the universal, gender-neutral 'Ó' (He/She/It) for peers and the respectful 'Wọ́n' (They/Respectful He/She) to define third parties."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Finding Yourself Among Peers",
+              "description": "It is time to find your place in the room. In this lesson, you will define who you are and learn how to address someone your own age using the peer-level 'You' without ever sounding overly formal.",
+              "objectives": [
+                "State your own name clearly",
+                "Address a peer using the casual 'You'",
+                "Ask a younger person or peer for their identity"
+              ],
+              "conversationGoal": "Confidently identify yourself and address a peer or younger person in the room.",
+              "situations": [
+                "Introducing yourself to a new colleague of the same age",
+                "Asking a young person in the neighborhood who they are"
+              ],
+              "sentenceGoals": [
+                "I am your friend.",
+                "Who are you?",
+                "You are my friend."
+              ],
+              "focusSummary": "Introducing the basic personal pronouns for 'I' (Èmi/Mo) and the casual peer-level 'You' (Ìwọ/O) to establish personal identity."
+            },
+            {
+              "title": "The Choice to Respect the Elders",
+              "description": "Navigating the high-stakes choice between casual chat and showing proper respect is crucial. By the end of this lesson, you will be able to confidently address the elders and Ogas using the respectful 'You'.",
+              "objectives": [
+                "Recognize when a situation requires the respectful 'You'",
+                "Address an older person or boss correctly",
+                "Ask an elder for their identity with full respect"
+              ],
+              "conversationGoal": "Successfully make the choice to use respectful pronouns when addressing an elder or superior.",
+              "situations": [
+                "Speaking to a friend's parent in their home",
+                "Addressing the boss or an older customer at work",
+                "Greeting an elder who is visiting your family"
+              ],
+              "sentenceGoals": [
+                "Who are you, sir/ma?",
+                "You are an elder.",
+                "Are you the boss?"
+              ],
+              "focusSummary": "Mastering the respectful 'You' (Ẹ/Ẹyin) to show proper cultural respect to elders and superiors, contrasting it directly with the peer-level 'You'."
+            },
+            {
+              "title": "Defining Who They Are",
+              "description": "Master the universal, gender-neutral pronoun to define who someone else is. You will be able to point out third parties, from peers to elders, confidently without ever worrying about gendering a sentence.",
+              "objectives": [
+                "Identify a peer using the gender-neutral 'He/She/It'",
+                "Identify an elder using the respectful plural pronoun",
+                "Ask someone to identify a third person in the room"
+              ],
+              "conversationGoal": "Point out and identify other people in the room using gender-neutral third-person pronouns for both peers and elders.",
+              "situations": [
+                "Pointing out a coworker to a new friend",
+                "Identifying a senior family member arriving at a gathering",
+                "Asking a friend who the new person at the party is"
+              ],
+              "sentenceGoals": [
+                "Who is he/she?",
+                "He/she is my friend.",
+                "They are an elder."
+              ],
+              "focusSummary": "Introducing the universal, gender-neutral 'Ó' (He/She/It) for peers and the respectful 'Wọ́n' (They/Respectful He/She) to define third parties."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T09:53:39.876Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69be5c1a50bfea3a075214ad",
+      "unitTitle": "Me, You, and the Elders",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "The Universal Third Person",
+          "description": "Learn to talk about yourself and others using the universal, gender-neutral pronoun for he, she, and it.",
+          "objectives": [
+            "Understand how to identify yourself using the pronoun for 'I' or 'Me'.",
+            "Master the universal pronoun 'He/She/It' without worrying about gender.",
+            "Confidently talk about a third person in a simple statement."
+          ],
+          "conversationGoal": "State who you are and point out a third person using a gender-neutral pronoun.",
+          "situations": [
+            "Introducing yourself to a new acquaintance.",
+            "Pointing out a friend or sibling in the room to someone else."
+          ],
+          "sentenceGoals": [
+            "I am here.",
+            "He or she is fine.",
+            "It is me."
+          ],
+          "focusSummary": "Introducing 'Èmi' (I/Me) and the universal, gender-neutral 'Ó' (He/She/It)."
+        },
+        {
+          "title": "The 'You' Choice: Peer vs. Elder",
+          "description": "Master the crucial social choice between talking to peers and showing respect to elders when saying 'You'.",
+          "objectives": [
+            "Learn to use the peer-level 'You' when talking to friends or younger people.",
+            "Use the respect-level 'You' to show proper courtesy to elders, strangers, or groups.",
+            "Navigate the high-stakes choice between casual and formal pronouns in daily life."
+          ],
+          "conversationGoal": "Address friends and elders correctly using the appropriate 'You' pronoun.",
+          "situations": [
+            "Talking to a friend or classmate at school.",
+            "Addressing an older woman or an Oga on the street to show respect."
+          ],
+          "sentenceGoals": [
+            "You (peer) are here.",
+            "You (elder) are fine.",
+            "Are you (elder) coming?"
+          ],
+          "focusSummary": "Navigating the two ways to say 'You': 'Ìwọ' for peers and 'Ẹ' for elders or groups."
+        },
+        {
+          "title": "The Identity Marker",
+          "description": "Learn how to use simple identity markers to state what things or people are without using complex verbs.",
+          "objectives": [
+            "Use the basic identity marker to define objects and people.",
+            "Understand the grammatical rule that the identity marker typically follows the noun.",
+            "Learn how to use 'to be' when stating who someone is."
+          ],
+          "conversationGoal": "Identify people and objects in a room using simple identity sentence structures.",
+          "situations": [
+            "Telling someone what an object in the room is.",
+            "Explaining someone's role or identity to a visitor."
+          ],
+          "sentenceGoals": [
+            "It is a chair.",
+            "It is a child.",
+            "Who is it?"
+          ],
+          "focusSummary": "Using 'ni' and 'jẹ́' to establish identity, focusing on the structure of placing the noun before 'ni'."
+        },
+        {
+          "title": "Roles and Belonging",
+          "description": "Combine your new pronouns and identity markers to claim your social role, like being a guest or a family member.",
+          "objectives": [
+            "Identify yourself as a guest in a new space.",
+            "Identify others as children or family members.",
+            "Combine pronouns with identity markers to explain exactly who people are in a household."
+          ],
+          "conversationGoal": "Introduce yourself as a guest upon arriving at a house and identify the status of others.",
+          "situations": [
+            "Arriving at a house and answering the host when they ask who is at the door.",
+            "Identifying someone else as a child of the house."
+          ],
+          "sentenceGoals": [
+            "I am a guest.",
+            "He or she is a child.",
+            "Are you a guest?"
+          ],
+          "focusSummary": "Combining pronouns and the identity marker 'ni' with common social roles like 'Àlejò' (Guest) and 'Ọmọ' (Child)."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "The Universal Third Person",
+              "description": "Learn to talk about yourself and others using the universal, gender-neutral pronoun for he, she, and it.",
+              "objectives": [
+                "Understand how to identify yourself using the pronoun for 'I' or 'Me'.",
+                "Master the universal pronoun 'He/She/It' without worrying about gender.",
+                "Confidently talk about a third person in a simple statement."
+              ],
+              "conversationGoal": "State who you are and point out a third person using a gender-neutral pronoun.",
+              "situations": [
+                "Introducing yourself to a new acquaintance.",
+                "Pointing out a friend or sibling in the room to someone else."
+              ],
+              "sentenceGoals": [
+                "I am here.",
+                "He or she is fine.",
+                "It is me."
+              ],
+              "focusSummary": "Introducing 'Èmi' (I/Me) and the universal, gender-neutral 'Ó' (He/She/It)."
+            },
+            {
+              "title": "The 'You' Choice: Peer vs. Elder",
+              "description": "Master the crucial social choice between talking to peers and showing respect to elders when saying 'You'.",
+              "objectives": [
+                "Learn to use the peer-level 'You' when talking to friends or younger people.",
+                "Use the respect-level 'You' to show proper courtesy to elders, strangers, or groups.",
+                "Navigate the high-stakes choice between casual and formal pronouns in daily life."
+              ],
+              "conversationGoal": "Address friends and elders correctly using the appropriate 'You' pronoun.",
+              "situations": [
+                "Talking to a friend or classmate at school.",
+                "Addressing an older woman or an Oga on the street to show respect."
+              ],
+              "sentenceGoals": [
+                "You (peer) are here.",
+                "You (elder) are fine.",
+                "Are you (elder) coming?"
+              ],
+              "focusSummary": "Navigating the two ways to say 'You': 'Ìwọ' for peers and 'Ẹ' for elders or groups."
+            },
+            {
+              "title": "The Identity Marker",
+              "description": "Learn how to use simple identity markers to state what things or people are without using complex verbs.",
+              "objectives": [
+                "Use the basic identity marker to define objects and people.",
+                "Understand the grammatical rule that the identity marker typically follows the noun.",
+                "Learn how to use 'to be' when stating who someone is."
+              ],
+              "conversationGoal": "Identify people and objects in a room using simple identity sentence structures.",
+              "situations": [
+                "Telling someone what an object in the room is.",
+                "Explaining someone's role or identity to a visitor."
+              ],
+              "sentenceGoals": [
+                "It is a chair.",
+                "It is a child.",
+                "Who is it?"
+              ],
+              "focusSummary": "Using 'ni' and 'jẹ́' to establish identity, focusing on the structure of placing the noun before 'ni'."
+            },
+            {
+              "title": "Roles and Belonging",
+              "description": "Combine your new pronouns and identity markers to claim your social role, like being a guest or a family member.",
+              "objectives": [
+                "Identify yourself as a guest in a new space.",
+                "Identify others as children or family members.",
+                "Combine pronouns with identity markers to explain exactly who people are in a household."
+              ],
+              "conversationGoal": "Introduce yourself as a guest upon arriving at a house and identify the status of others.",
+              "situations": [
+                "Arriving at a house and answering the host when they ask who is at the door.",
+                "Identifying someone else as a child of the house."
+              ],
+              "sentenceGoals": [
+                "I am a guest.",
+                "He or she is a child.",
+                "Are you a guest?"
+              ],
+              "focusSummary": "Combining pronouns and the identity marker 'ni' with common social roles like 'Àlejò' (Guest) and 'Ọmọ' (Child)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-21T14:32:33.809Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69beaa1d4f1aa2c5c564f391",
+      "unitTitle": "Review: Greetings and Identification",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Reviewing Time-Based Greetings",
+          "description": "Practice combining standard morning, afternoon, and evening greetings with the correct respectful or casual pronouns.",
+          "objectives": [
+            "Correctly select greetings based on the time of day.",
+            "Differentiate between addressing a peer and an elder.",
+            "Respond naturally to standard greetings."
+          ],
+          "conversationGoal": "Confidently greet both elders and peers at any time of day using the appropriate level of respect.",
+          "situations": [
+            "Passing an older neighbor in the morning.",
+            "Greeting a friend in the afternoon.",
+            "Arriving home in the evening."
+          ],
+          "sentenceGoals": [
+            "Good morning, elder, how are you?",
+            "Good afternoon, my friend.",
+            "Good evening to you all."
+          ],
+          "focusSummary": "Time-based greetings combined with basic respect markers."
+        },
+        {
+          "title": "Reviewing Personal Identification",
+          "description": "Consolidate the language used to introduce yourself and identify others in a social setting.",
+          "objectives": [
+            "State your own name and identity clearly.",
+            "Introduce a peer to an elder.",
+            "Review singular and plural pronouns in context."
+          ],
+          "conversationGoal": "Introduce yourself and identify others respectfully in a social situation.",
+          "situations": [
+            "Meeting an elder for the first time.",
+            "Introducing a friend to your parents.",
+            "Stating your name when asked."
+          ],
+          "sentenceGoals": [
+            "My name is Ayo.",
+            "I am a student.",
+            "He is my friend."
+          ],
+          "focusSummary": "Self-identification and basic third-person introduction."
+        },
+        {
+          "title": "Combining Greetings and Introductions",
+          "description": "Practice using the 24-hour respect loop immediately followed by an introduction.",
+          "objectives": [
+            "Merge a time-appropriate greeting with a self-introduction.",
+            "Use respectful pronouns when introducing yourself to an elder.",
+            "Ask someone for their name after greeting them."
+          ],
+          "conversationGoal": "Seamlessly transition from greeting someone to introducing yourself or asking who they are.",
+          "situations": [
+            "Arriving at a gathering and introducing yourself.",
+            "Greeting a visitor and asking their name.",
+            "Starting a conversation with a new elder in the community."
+          ],
+          "sentenceGoals": [
+            "Good morning, my name is Ayo.",
+            "Good afternoon, who are you?",
+            "I am fine, thank you."
+          ],
+          "focusSummary": "Chaining greetings with identification questions and statements."
+        },
+        {
+          "title": "The Complete Social Foundation Loop",
+          "description": "A comprehensive review of arriving, greeting everyone respectfully, identifying yourself, and acknowledging the group.",
+          "objectives": [
+            "Greet a group of elders and peers simultaneously.",
+            "Respond to being welcomed.",
+            "Confirm your identity and well-being in a single exchange."
+          ],
+          "conversationGoal": "Successfully navigate a complete arrival and introduction sequence with mixed-age groups.",
+          "situations": [
+            "Entering a family compound where elders and youths are present.",
+            "Being welcomed by a host and confirming how you are doing.",
+            "Saying goodbye after identifying yourself."
+          ],
+          "sentenceGoals": [
+            "Welcome to you all.",
+            "Good evening, elders, I am fine.",
+            "Thank you, I am here."
+          ],
+          "focusSummary": "Holistic review of greetings, respect, and identity in a full conversational flow."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Reviewing Time-Based Greetings",
+              "description": "Practice combining standard morning, afternoon, and evening greetings with the correct respectful or casual pronouns.",
+              "objectives": [
+                "Correctly select greetings based on the time of day.",
+                "Differentiate between addressing a peer and an elder.",
+                "Respond naturally to standard greetings."
+              ],
+              "conversationGoal": "Confidently greet both elders and peers at any time of day using the appropriate level of respect.",
+              "situations": [
+                "Passing an older neighbor in the morning.",
+                "Greeting a friend in the afternoon.",
+                "Arriving home in the evening."
+              ],
+              "sentenceGoals": [
+                "Good morning, elder, how are you?",
+                "Good afternoon, my friend.",
+                "Good evening to you all."
+              ],
+              "focusSummary": "Time-based greetings combined with basic respect markers."
+            },
+            {
+              "title": "Reviewing Personal Identification",
+              "description": "Consolidate the language used to introduce yourself and identify others in a social setting.",
+              "objectives": [
+                "State your own name and identity clearly.",
+                "Introduce a peer to an elder.",
+                "Review singular and plural pronouns in context."
+              ],
+              "conversationGoal": "Introduce yourself and identify others respectfully in a social situation.",
+              "situations": [
+                "Meeting an elder for the first time.",
+                "Introducing a friend to your parents.",
+                "Stating your name when asked."
+              ],
+              "sentenceGoals": [
+                "My name is Ayo.",
+                "I am a student.",
+                "He is my friend."
+              ],
+              "focusSummary": "Self-identification and basic third-person introduction."
+            },
+            {
+              "title": "Combining Greetings and Introductions",
+              "description": "Practice using the 24-hour respect loop immediately followed by an introduction.",
+              "objectives": [
+                "Merge a time-appropriate greeting with a self-introduction.",
+                "Use respectful pronouns when introducing yourself to an elder.",
+                "Ask someone for their name after greeting them."
+              ],
+              "conversationGoal": "Seamlessly transition from greeting someone to introducing yourself or asking who they are.",
+              "situations": [
+                "Arriving at a gathering and introducing yourself.",
+                "Greeting a visitor and asking their name.",
+                "Starting a conversation with a new elder in the community."
+              ],
+              "sentenceGoals": [
+                "Good morning, my name is Ayo.",
+                "Good afternoon, who are you?",
+                "I am fine, thank you."
+              ],
+              "focusSummary": "Chaining greetings with identification questions and statements."
+            },
+            {
+              "title": "The Complete Social Foundation Loop",
+              "description": "A comprehensive review of arriving, greeting everyone respectfully, identifying yourself, and acknowledging the group.",
+              "objectives": [
+                "Greet a group of elders and peers simultaneously.",
+                "Respond to being welcomed.",
+                "Confirm your identity and well-being in a single exchange."
+              ],
+              "conversationGoal": "Successfully navigate a complete arrival and introduction sequence with mixed-age groups.",
+              "situations": [
+                "Entering a family compound where elders and youths are present.",
+                "Being welcomed by a host and confirming how you are doing.",
+                "Saying goodbye after identifying yourself."
+              ],
+              "sentenceGoals": [
+                "Welcome to you all.",
+                "Good evening, elders, I am fine.",
+                "Thank you, I am here."
+              ],
+              "focusSummary": "Holistic review of greetings, respect, and identity in a full conversational flow."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

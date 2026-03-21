@@ -173,14 +173,14 @@ function LessonOverviewContent() {
             )}
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 px-2">Study Materials</h3>
             <div className="grid gap-4">
-              <Link href={`/lesson-phrases?lessonId=${lesson._id}`}>
+              <Link href={`/lesson-expressions?lessonId=${lesson._id}`}>
                 <Card className="p-6 border-4 border-muted hover:border-primary/30 transition-all rounded-[2rem] flex items-center justify-between group bg-white shadow-sm">
                   <div className="flex items-center gap-5">
                     <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                       <BookOpen className="h-7 w-7" />
                     </div>
                     <div>
-                      <p className="text-lg font-black text-foreground">Phrase Audio Library</p>
+                      <p className="text-lg font-black text-foreground">Expression Audio Library</p>
                       <p className="text-sm text-muted-foreground font-medium">Listen to all pronunciations</p>
                     </div>
                   </div>

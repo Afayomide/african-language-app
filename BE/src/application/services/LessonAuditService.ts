@@ -1,17 +1,22 @@
 import { LESSON_GENERATION_LIMITS } from "../../config/lessonGeneration.js";
+import type { ContentType } from "../../domain/entities/Content.js";
 import type { Language, LessonEntity, LessonStage } from "../../domain/entities/Lesson.js";
-import type { PhraseEntity } from "../../domain/entities/Phrase.js";
 import type { QuestionEntity } from "../../domain/entities/Question.js";
+import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
 import type { LessonRepository } from "../../domain/repositories/LessonRepository.js";
-import type { PhraseRepository } from "../../domain/repositories/PhraseRepository.js";
 import type { ProverbRepository } from "../../domain/repositories/ProverbRepository.js";
 import type { QuestionRepository } from "../../domain/repositories/QuestionRepository.js";
-import { wasPhraseIntroducedBeforeLesson } from "./PhraseIntroductionService.js";
+import type { SentenceRepository } from "../../domain/repositories/SentenceRepository.js";
+import type { WordRepository } from "../../domain/repositories/WordRepository.js";
+import { ContentLookupService } from "./ContentLookupService.js";
+import type { ContentCurriculumService } from "./ContentCurriculumService.js";
 import {
+  findContextResponseTypoOnlyDistractors,
   subtypeRequiresReviewData,
   subtypeUsesMatching,
   subtypeUsesChoiceOptions,
-  subtypeUsesWordOrder
+  subtypeUsesWordOrder,
+  validateContextResponseQuestion
 } from "../../interfaces/http/validators/question.validators.js";
 
 type AuditSeverity = "error" | "warning";
@@ -29,9 +34,10 @@ export type LessonAuditResult = {
   metrics: {
     stageCount: number;
     blockCount: number;
-    uniquePhraseCount: number;
+    uniqueContentCount: number;
     questionCount: number;
     listeningQuestionCount: number;
+    scenarioQuestionCount: number;
   };
   findings: AuditFinding[];
 };
@@ -70,13 +76,27 @@ function getSortedStages(lesson: LessonEntity) {
   return [...(lesson.stages || [])].sort((a, b) => a.orderIndex - b.orderIndex);
 }
 
+function getQuestionSourceRef(question: QuestionEntity): { type: ContentType; id: string } | null {
+  if (question.sourceType && question.sourceId) {
+    return { type: question.sourceType, id: question.sourceId };
+  }
+  return null;
+}
+
 export class LessonAuditService {
+  private readonly contentLookup: ContentLookupService;
+
   constructor(
     private readonly lessons: LessonRepository,
-    private readonly phrases: PhraseRepository,
+    private readonly words: WordRepository,
+    private readonly expressions: ExpressionRepository,
+    private readonly sentences: SentenceRepository,
     private readonly proverbs: ProverbRepository,
-    private readonly questions: QuestionRepository
-  ) {}
+    private readonly questions: QuestionRepository,
+    private readonly contentCurriculum: ContentCurriculumService
+  ) {
+    this.contentLookup = new ContentLookupService(words, expressions, sentences);
+  }
 
   async auditLesson(id: string, language?: Language): Promise<LessonAuditResult | null> {
     const lesson = language
@@ -86,7 +106,7 @@ export class LessonAuditService {
 
     const findings: AuditFinding[] = [];
     const stages = getSortedStages(lesson);
-    const phraseRefIds = new Set<string>();
+    const contentRefs = new Map<string, { type: ContentType; id: string }>();
     const questionRefIds = new Set<string>();
     const proverbRefIds = new Set<string>();
     let blockCount = 0;
@@ -105,13 +125,13 @@ export class LessonAuditService {
         addFinding(findings, "error", "empty_stage", `Stage ${index + 1} has no blocks.`);
       }
 
-      const stagePhraseRefs = blocks.filter((block) => block.type === "phrase").map((block) => block.refId);
-      if (stagePhraseRefs.length > LESSON_GENERATION_LIMITS.MAX_PHRASES_PER_STAGE) {
+      const stageContentRefs = blocks.filter((block) => block.type === "content").map((block) => block.refId);
+      if (stageContentRefs.length > LESSON_GENERATION_LIMITS.MAX_CONTENT_PER_STAGE) {
         addFinding(
           findings,
           "error",
-          "too_many_stage_phrases",
-          `Stage ${index + 1} has more than ${LESSON_GENERATION_LIMITS.MAX_PHRASES_PER_STAGE} phrase blocks.`
+          "too_many_stage_content_items",
+          `Stage ${index + 1} has more than ${LESSON_GENERATION_LIMITS.MAX_CONTENT_PER_STAGE} teaching content blocks.`
         );
       }
 
@@ -119,72 +139,88 @@ export class LessonAuditService {
         if (block.type === "text" && !String(block.content || "").trim()) {
           addFinding(findings, "warning", "empty_text_block", `Stage ${index + 1} contains an empty text block.`);
         }
-        if (block.type === "phrase") phraseRefIds.add(block.refId);
+        if (block.type === "content") contentRefs.set(`${block.contentType}:${block.refId}`, { type: block.contentType, id: block.refId });
         if (block.type === "question") questionRefIds.add(block.refId);
         if (block.type === "proverb") proverbRefIds.add(block.refId);
       }
     });
 
-    const [phrases, questions] = await Promise.all([
-      phraseRefIds.size > 0 ? this.phrases.findByIds([...phraseRefIds]) : Promise.resolve([]),
-      questionRefIds.size > 0 ? Promise.all([...questionRefIds].map((questionId) => this.questions.findById(questionId))) : Promise.resolve([])
-    ]);
-    const phraseMap = new Map(phrases.map((phrase) => [phrase.id, phrase]));
+    const questions = await (questionRefIds.size > 0
+      ? Promise.all([...questionRefIds].map((questionId) => this.questions.findById(questionId)))
+      : Promise.resolve([]));
     const questionMap = new Map(questions.filter(Boolean).map((question) => [question!.id, question!]));
     const proverbMap = new Map(
       (await Promise.all([...proverbRefIds].map((proverbId) => this.proverbs.findById(proverbId))))
         .filter(Boolean)
         .map((proverb) => [proverb!.id, proverb!])
     );
+    for (const question of questions.filter(Boolean)) {
+      const sourceRef = getQuestionSourceRef(question!);
+      if (sourceRef) contentRefs.set(`${sourceRef.type}:${sourceRef.id}`, sourceRef);
+      if (Array.isArray(question!.interactionData?.matchingPairs)) {
+        for (const pair of question!.interactionData!.matchingPairs!) {
+          if (pair.contentType && pair.contentId) {
+            contentRefs.set(`${pair.contentType}:${pair.contentId}`, { type: pair.contentType, id: pair.contentId });
+          }
+        }
+      }
+    }
+    const contentMap = await this.contentLookup.findMany(Array.from(contentRefs.values()));
 
-    if (phraseMap.size > LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON) {
+    if (contentMap.size > LESSON_GENERATION_LIMITS.MAX_NEW_SENTENCES_PER_LESSON) {
       addFinding(
         findings,
         "warning",
-        "too_many_unique_phrases",
-        `Lesson uses ${phraseMap.size} unique phrases, above the target maximum of ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}.`
+        "too_many_unique_content_items",
+        `Lesson uses ${contentMap.size} unique teaching items, above the target maximum of ${LESSON_GENERATION_LIMITS.MAX_NEW_SENTENCES_PER_LESSON}.`
       );
     }
 
-    const repeatedPhraseIds = new Set<string>();
-    const priorStagePhraseIds = new Set<string>();
+    const repeatedContentKeys = new Set<string>();
+    const priorStageContentKeys = new Set<string>();
     let listeningQuestionCount = 0;
+    let scenarioQuestionCount = 0;
 
     for (const [stageIndex, stage] of stages.entries()) {
-      const stagePhraseIds = new Set<string>();
+      const stageContentKeys = new Set<string>();
       const stageQuestions = stage.blocks.filter((block) => block.type === "question").map((block) => questionMap.get(block.refId)).filter(Boolean);
       if (stageIndex > 0) {
         for (const block of stage.blocks) {
-          if (block.type === "phrase" && priorStagePhraseIds.has(block.refId)) {
-            repeatedPhraseIds.add(block.refId);
+          if (block.type === "content" && priorStageContentKeys.has(`${block.contentType}:${block.refId}`)) {
+            repeatedContentKeys.add(`${block.contentType}:${block.refId}`);
           }
         }
       }
 
       for (const block of stage.blocks) {
-        if (block.type === "phrase") {
-          stagePhraseIds.add(block.refId);
-          priorStagePhraseIds.add(block.refId);
-          const phrase = phraseMap.get(block.refId);
-          if (!phrase) {
-            addFinding(findings, "error", "missing_phrase_ref", `Stage ${stageIndex + 1} references a missing phrase.`);
+        if (block.type === "content") {
+          const key = `${block.contentType}:${block.refId}`;
+          stageContentKeys.add(key);
+          priorStageContentKeys.add(key);
+          const content = contentMap.get(key);
+          if (!content) {
+            addFinding(findings, "error", "missing_content_ref", `Stage ${stageIndex + 1} references missing ${block.contentType} content.`);
             continue;
           }
           const translationIndex = block.translationIndex ?? 0;
-          if (translationIndex < 0 || translationIndex >= phrase.translations.length) {
+          if (translationIndex < 0 || translationIndex >= content.translations.length) {
             addFinding(
               findings,
               "error",
-              "invalid_phrase_translation_index",
-              `Phrase "${phrase.text}" has an invalid translation index in stage ${stageIndex + 1}.`
+              "invalid_content_translation_index",
+              `${block.contentType} "${content.text}" has an invalid translation index in stage ${stageIndex + 1}.`
             );
           }
-          if (stageIndex === 0 && wasPhraseIntroducedBeforeLesson(phrase, lesson.id)) {
+          if (stageIndex === 0 && (await this.contentCurriculum.wasContentIntroducedBeforeLesson({
+            lesson,
+            contentType: block.contentType,
+            contentId: block.refId
+          }))) {
             addFinding(
               findings,
               "warning",
-              "reintroduced_phrase_in_stage_one",
-              `Phrase "${phrase.text}" was already introduced in another lesson but appears again as a Stage 1 introduction here.`
+              "reintroduced_content_in_stage_one",
+              `${block.contentType} "${content.text}" was already introduced in an earlier lesson but appears again as a Stage 1 introduction here.`
             );
           }
         }
@@ -203,19 +239,23 @@ export class LessonAuditService {
           if (question.type === "listening") {
             listeningQuestionCount += 1;
           }
+          if (question.subtype === "mc-select-context-response") {
+            scenarioQuestionCount += 1;
+          }
 
-          const phrase = phraseMap.get(question.phraseId) || (await this.phrases.findById(question.phraseId));
-          if (!phrase) {
-            addFinding(findings, "error", "missing_question_phrase", `Question ${question.id} references a missing phrase.`);
+          const sourceRef = getQuestionSourceRef(question);
+          const displayEntity = sourceRef ? contentMap.get(`${sourceRef.type}:${sourceRef.id}`) : null;
+          if (!displayEntity) {
+            addFinding(findings, "error", "missing_question_source", `Question ${question.id} references missing source content.`);
             continue;
           }
 
-          if (question.translationIndex < 0 || question.translationIndex >= phrase.translations.length) {
+          if (question.translationIndex < 0 || question.translationIndex >= displayEntity.translations.length) {
             addFinding(
               findings,
               "error",
               "invalid_question_translation_index",
-              `Question ${question.id} uses an invalid translation index for phrase "${phrase.text}".`
+              `Question ${question.id} uses an invalid translation index for "${displayEntity.text}".`
             );
           }
 
@@ -248,12 +288,62 @@ export class LessonAuditService {
             }
           }
 
+          if (question.subtype === "mc-select-context-response") {
+            if (sourceRef?.type === "sentence") {
+              addFinding(
+                findings,
+                "error",
+                "invalid_context_response_source",
+                `Context-response question ${question.id} cannot use a sentence as its primary source.`
+              );
+            }
+
+            const validationError = validateContextResponseQuestion({
+              sourceText: displayEntity.text,
+              options: question.options,
+              correctIndex: question.correctIndex
+            });
+
+            if (validationError === "invalid_option_count") {
+              addFinding(
+                findings,
+                "error",
+                "invalid_context_response_option_count",
+                `Context-response question ${question.id} must have between 2 and 4 options.`
+              );
+            } else if (validationError === "correct_option_must_match_source") {
+              addFinding(
+                findings,
+                "error",
+                "context_response_correct_option_mismatch",
+                `Context-response question ${question.id} does not use the source text "${displayEntity.text}" as the correct option.`
+              );
+            } else if (validationError === "typo_only_distractors_not_allowed") {
+              addFinding(
+                findings,
+                "error",
+                "context_response_typo_distractor",
+                `Context-response question ${question.id} uses a distractor that is only a spelling or diacritic variant of "${displayEntity.text}".`
+              );
+            }
+
+            const typoDistractors = findContextResponseTypoOnlyDistractors(displayEntity.text, question.options);
+            if (typoDistractors.length > 0 && validationError !== "typo_only_distractors_not_allowed") {
+              addFinding(
+                findings,
+                "warning",
+                "context_response_weak_distractors",
+                `Context-response question ${question.id} has weak distractors: ${typoDistractors.join(", ")}.`
+              );
+            }
+          }
+
           if (
             question.subtype === "mc-select-missing-word" ||
             question.subtype === "ls-mc-select-missing-word" ||
             question.subtype === "ls-fg-gap-fill"
           ) {
-            const phraseWordCount = splitWords(phrase.text).length;
+            const contentWordCount = splitWords(displayEntity.text).length;
             const reviewSentence = String(question.reviewData?.sentence || "");
             const reviewWords = Array.isArray(question.reviewData?.words)
               ? question.reviewData?.words.map((item) => String(item || "").trim()).filter(Boolean)
@@ -261,19 +351,19 @@ export class LessonAuditService {
             const normalizedReviewPhrase = reviewWords.length > 0
               ? normalizeSpace(reviewWords.join(" "))
               : normalizeSpace(reviewSentence.replace(/____/g, String(question.options[question.correctIndex] || "").trim()));
-            if (phraseWordCount < 2) {
+            if (contentWordCount < 2) {
               addFinding(
                 findings,
                 "error",
-                "single_word_phrase_uses_missing_word",
-                `Question ${question.id} uses a missing-word exercise for single-word phrase "${phrase.text}".`
+                "single_token_content_uses_missing_word",
+                `Question ${question.id} uses a missing-word exercise for single-word item "${displayEntity.text}".`
               );
-            } else if (normalizedReviewPhrase !== normalizeSpace(phrase.text)) {
+            } else if (normalizedReviewPhrase !== normalizeSpace(displayEntity.text)) {
               addFinding(
                 findings,
                 "error",
                 "missing_word_phrase_mismatch",
-                `Question ${question.id} uses missing-word content that does not match the phrase text "${phrase.text}" exactly.`
+                `Question ${question.id} uses missing-word content that does not match the source text "${displayEntity.text}" exactly.`
               );
             }
           }
@@ -287,26 +377,29 @@ export class LessonAuditService {
           }
 
           if (question.subtype === "fg-word-order" || question.subtype === "ls-fg-word-order") {
-            const phraseWordCount = splitWords(phrase.text).length;
-            if (phraseWordCount < 2) {
+            const contentWordCount = splitWords(displayEntity.text).length;
+            if (contentWordCount < 2) {
               addFinding(
                 findings,
                 "error",
-                "single_word_phrase_uses_word_order",
-                `Question ${question.id} uses word-order for single-word phrase "${phrase.text}". Use spelling order instead.`
+                "single_token_content_uses_word_order",
+                `Question ${question.id} uses word-order for single-word item "${displayEntity.text}". Use spelling order instead.`
               );
-            } else if (normalizeSpace(String(question.reviewData?.sentence || "")) !== normalizeSpace(phrase.text)) {
+            } else if (normalizeSpace(String(question.reviewData?.sentence || "")) !== normalizeSpace(displayEntity.text)) {
               addFinding(
                 findings,
                 "error",
                 "word_order_phrase_mismatch",
-                `Question ${question.id} uses word-order content that does not match the phrase text "${phrase.text}" exactly.`
+                `Question ${question.id} uses word-order content that does not match the source text "${displayEntity.text}" exactly.`
               );
             }
           }
 
-          if (question.type === "listening" && !String(phrase.audio?.url || "").trim()) {
-            addFinding(findings, "error", "missing_listening_audio", `Listening question ${question.id} uses phrase "${phrase.text}" without audio.`);
+          if (question.type === "listening" && !String(displayEntity.audio?.url || "").trim()) {
+            addFinding(findings, "error", "missing_listening_audio", `Listening question ${question.id} uses "${displayEntity.text}" without audio.`);
+          }
+          if (question.type === "speaking" && !String(displayEntity.audio?.url || "").trim()) {
+            addFinding(findings, "error", "missing_speaking_audio", `Speaking question ${question.id} uses "${displayEntity.text}" without reference audio.`);
           }
 
           const allowedPlaceholders = ["{phrase}", "{meaning}", "{sentence}"];
@@ -323,8 +416,8 @@ export class LessonAuditService {
       }
     }
 
-    if (stages.length > 1 && repeatedPhraseIds.size === 0) {
-      addFinding(findings, "warning", "no_phrase_repetition", "No phrase repetition was detected across stages.");
+    if (stages.length > 1 && repeatedContentKeys.size === 0) {
+      addFinding(findings, "warning", "no_content_repetition", "No teaching-item repetition was detected across stages.");
     }
 
     if (listeningQuestionCount === 0) {
@@ -341,9 +434,10 @@ export class LessonAuditService {
       metrics: {
         stageCount: stages.length,
         blockCount,
-        uniquePhraseCount: phraseMap.size,
+        uniqueContentCount: contentMap.size,
         questionCount: questionMap.size,
-        listeningQuestionCount
+        listeningQuestionCount,
+        scenarioQuestionCount
       },
       findings
     };

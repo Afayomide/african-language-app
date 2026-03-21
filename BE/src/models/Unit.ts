@@ -4,11 +4,12 @@ const UnitAiRunLessonSummarySchema = new Schema(
   {
     lessonId: { type: String, required: true },
     title: { type: String, required: true },
-    phrasesGenerated: { type: Number, required: true },
-    repeatedPhrasesLinked: { type: Number, required: true },
-    newPhrasesSelected: { type: Number, required: true },
-    reviewPhrasesSelected: { type: Number, required: true },
-    phrasesDroppedFromCandidates: { type: Number, required: true },
+    contentGenerated: { type: Number, required: true },
+    sentencesGenerated: { type: Number, required: true },
+    existingContentLinked: { type: Number, required: true },
+    newContentSelected: { type: Number, required: true },
+    reviewContentSelected: { type: Number, required: true },
+    contentDroppedFromCandidates: { type: Number, required: true },
     proverbsGenerated: { type: Number, required: true },
     questionsGenerated: { type: Number, required: true },
     blocksGenerated: { type: Number, required: true }
@@ -52,10 +53,14 @@ const UnitAiRunSummarySchema = new Schema(
 
 const UnitSchema = new Schema(
   {
+    chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", default: null, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
     level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true, index: true },
+    kind: { type: String, enum: ["core", "review"], default: "core", index: true },
+    reviewStyle: { type: String, enum: ["none", "star", "gym"], default: "none" },
+    reviewSourceUnitIds: { type: [Schema.Types.ObjectId], ref: "Unit", default: [] },
     orderIndex: { type: Number, default: 0, index: true },
     status: { type: String, enum: ["draft", "finished", "published"], default: "draft", index: true },
     isDeleted: { type: Boolean, default: false, index: true },
@@ -67,6 +72,7 @@ const UnitSchema = new Schema(
   { timestamps: true }
 );
 
+UnitSchema.index({ chapterId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 UnitSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 
 export type UnitDocument = InferSchemaType<typeof UnitSchema> & {

@@ -1,9 +1,12 @@
 import api from "@/lib/api";
-import { feTutorRoutes } from "@/lib/apiRoutes";
+import { feTutorAiRoutes, feTutorRoutes } from "@/lib/apiRoutes";
 import {
+  Chapter,
   Lesson,
   Unit,
-  Phrase,
+  Expression,
+  Word,
+  Sentence,
   Proverb,
   Language,
   Level,
@@ -11,7 +14,8 @@ import {
   ExerciseQuestion,
   QuestionType,
   ImageAsset,
-  PhraseImageLink,
+  ExpressionImageLink,
+  SentenceComponentRef,
   VoiceAudioSubmission,
   LessonAuditResult
 } from "@/types";
@@ -39,7 +43,7 @@ type AudioUploadPayload = {
 
 async function fetchAllPages<T>(
   path: string,
-  key: "lessons" | "phrases" | "proverbs" | "questions",
+  key: "lessons" | "expressions" | "words" | "sentences" | "proverbs" | "questions",
   params?: Record<string, unknown>
 ) {
   const all: T[] = [];
@@ -48,7 +52,9 @@ async function fetchAllPages<T>(
   while (true) {
     const response = await api.get<{
       lessons?: T[];
-      phrases?: T[];
+      expressions?: T[];
+      words?: T[];
+      sentences?: T[];
       proverbs?: T[];
       questions?: T[];
       pagination?: PaginationMeta;
@@ -100,6 +106,11 @@ export const lessonService = {
     return response.data.audit;
   },
 
+  async requestLessonAudio(id: string) {
+    const response = await api.put<{ lesson: Lesson }>(feTutorRoutes.requestLessonAudio(id));
+    return response.data.lesson;
+  },
+
   async createLesson(data: {
     title: string;
     unitId: string;
@@ -145,9 +156,13 @@ export const lessonService = {
 };
 
 export const unitService = {
-  async listUnits(status?: Status) {
+  async listUnits(statusOrFilters?: Status | { status?: Status; chapterId?: string; kind?: Unit["kind"] }) {
+    const params =
+      typeof statusOrFilters === "object" && statusOrFilters !== null
+        ? statusOrFilters
+        : { status: statusOrFilters };
     const response = await api.get<{ units: Unit[] }>(feTutorRoutes.units(), {
-      params: { status }
+      params
     });
     return response.data.units || [];
   },
@@ -158,11 +173,19 @@ export const unitService = {
   },
 
   async getDeletedEntries(id: string) {
-    const response = await api.get<{ lessons: Lesson[]; phrases: Phrase[] }>(feTutorRoutes.unitDeletedEntries(id));
+    const response = await api.get<{ lessons: Lesson[]; expressions: Expression[] }>(feTutorRoutes.unitDeletedEntries(id));
     return response.data;
   },
 
-  async createUnit(data: { title: string; description?: string; level: Level }) {
+  async createUnit(data: {
+    title: string;
+    description?: string;
+    level: Level;
+    chapterId?: string | null;
+    kind?: Unit["kind"];
+    reviewStyle?: Unit["reviewStyle"];
+    reviewSourceUnitIds?: string[];
+  }) {
     const response = await api.post<{ unit: Unit }>(feTutorRoutes.units(), data);
     return response.data.unit;
   },
@@ -181,9 +204,9 @@ export const unitService = {
     return response.data.lesson;
   },
 
-  async restoreDeletedPhrase(unitId: string, phraseId: string) {
-    const response = await api.post<{ phrase: Phrase }>(feTutorRoutes.restoreDeletedUnitPhrase(unitId, phraseId));
-    return response.data.phrase;
+  async restoreDeletedExpression(unitId: string, expressionId: string) {
+    const response = await api.post<{ expression: Expression }>(feTutorRoutes.restoreDeletedUnitExpression(unitId, expressionId));
+    return response.data.expression;
   },
 
   async finishUnit(id: string) {
@@ -196,40 +219,130 @@ export const unitService = {
       unitIds
     });
     return response.data.units || [];
+  },
+
+  async generateBulkUnits(data: {
+    level: Level;
+    chapterId?: string;
+    count?: number;
+    topic?: string;
+  }) {
+    const response = await api.post<{
+      totalRequested: number;
+      createdCount: number;
+      coreCreatedCount?: number;
+      reviewCreatedCount?: number;
+      skippedCount: number;
+      errorCount: number;
+      units: Unit[];
+      skipped: Array<{ reason: string; title?: string }>;
+      errors: Array<{ index: number; error: string }>;
+    }>(feTutorAiRoutes.generateBulkUnits(), data);
+    return response.data;
   }
 };
 
-export const phraseService = {
-  async listPhrases(lessonId?: string, status?: Status) {
-    return fetchAllPages<Phrase>(feTutorRoutes.phrases(), "phrases", { lessonId, status });
+export const chapterService = {
+  async listChapters(status?: Status) {
+    const response = await api.get<{ chapters: Chapter[] }>(feTutorRoutes.chapters(), {
+      params: { status }
+    });
+    return response.data.chapters || [];
   },
 
-  async listPhrasesPage(params?: { lessonId?: string; status?: Status; q?: string; page?: number; limit?: number }) {
-    const response = await api.get<{ phrases: Phrase[]; total: number; pagination?: PaginationMeta }>(
-      feTutorRoutes.phrases(),
+  async getChapter(id: string) {
+    const response = await api.get<{ chapter: Chapter }>(feTutorRoutes.chapter(id));
+    return response.data.chapter;
+  },
+
+  async createChapter(data: { title: string; description?: string; level: Level }) {
+    const response = await api.post<{ chapter: Chapter }>(feTutorRoutes.chapters(), data);
+    return response.data.chapter;
+  },
+
+  async updateChapter(id: string, data: Partial<Chapter>) {
+    const response = await api.put<{ chapter: Chapter }>(feTutorRoutes.chapter(id), data);
+    return response.data.chapter;
+  },
+
+  async deleteChapter(id: string) {
+    await api.delete(feTutorRoutes.chapter(id));
+  },
+
+  async reorderChapters(chapterIds: string[]) {
+    const response = await api.put<{ chapters: Chapter[] }>(feTutorRoutes.reorderChapters(), {
+      chapterIds
+    });
+    return response.data.chapters || [];
+  },
+
+  async generateBulkChapters(data: {
+    level: Level;
+    count?: number;
+    topic?: string;
+    extraInstructions?: string;
+  }) {
+    const response = await api.post<{
+      totalRequested: number;
+      createdCount: number;
+      skippedCount: number;
+      errorCount: number;
+      chapters: Chapter[];
+      skipped: { reason: string; title?: string }[];
+      errors: { index?: number; error: string }[];
+    }>(feTutorAiRoutes.generateBulkChapters(), data);
+    return response.data;
+  }
+};
+
+export const expressionService = {
+  async listExpressions(lessonId?: string, status?: Status) {
+    return fetchAllPages<Expression>(feTutorRoutes.expressions(), "expressions", { lessonId, status });
+  },
+
+  async listExpressionsPage(params?: { lessonId?: string; status?: Status; q?: string; page?: number; limit?: number }) {
+    const response = await api.get<{ expressions: Expression[]; total: number; pagination?: PaginationMeta }>(
+      feTutorRoutes.expressions(),
       { params }
     );
     return {
-      items: response.data.phrases,
-      total: response.data.total ?? response.data.phrases.length,
+      items: response.data.expressions,
+      total: response.data.total ?? response.data.expressions.length,
       pagination: response.data.pagination ?? {
         page: 1,
-        limit: response.data.phrases.length || 20,
-        total: response.data.phrases.length,
+        limit: response.data.expressions.length || 20,
+        total: response.data.expressions.length,
         totalPages: 1,
         hasPrevPage: false,
         hasNextPage: false
       }
-    } satisfies PaginatedResult<Phrase>;
+    } satisfies PaginatedResult<Expression>;
   },
 
-  async getPhrase(id: string) {
-    const response = await api.get<{ phrase: Phrase }>(feTutorRoutes.phrase(id));
-    return response.data.phrase;
+  async getExpression(id: string) {
+    const response = await api.get<{ expression: Expression }>(feTutorRoutes.expression(id));
+    return response.data.expression;
+  },
+
+  async listExpressionImages(id: string) {
+    const response = await api.get<{ expressionId: string; images: ExpressionImageLink[] }>(feTutorRoutes.expressionImages(id));
+    return response.data.images;
   },
 
   async listPhraseImages(id: string) {
-    const response = await api.get<{ phraseId: string; images: PhraseImageLink[] }>(feTutorRoutes.phraseImages(id));
+    return this.listExpressionImages(id);
+  },
+
+  async linkExpressionImage(
+    id: string,
+    data: {
+      imageAssetId: string;
+      translationIndex?: number | null;
+      isPrimary?: boolean;
+      notes?: string;
+    }
+  ) {
+    const response = await api.post<{ images: ExpressionImageLink[] }>(feTutorRoutes.expressionImages(id), data);
     return response.data.images;
   },
 
@@ -242,11 +355,10 @@ export const phraseService = {
       notes?: string;
     }
   ) {
-    const response = await api.post<{ images: PhraseImageLink[] }>(feTutorRoutes.phraseImages(id), data);
-    return response.data.images;
+    return this.linkExpressionImage(id, data);
   },
 
-  async updatePhraseImageLink(
+  async updateExpressionImageLink(
     id: string,
     linkId: string,
     data: {
@@ -256,31 +368,31 @@ export const phraseService = {
       notes?: string;
     }
   ) {
-    const response = await api.put<{ images: PhraseImageLink[] }>(feTutorRoutes.phraseImageLink(id, linkId), data);
+    const response = await api.put<{ images: ExpressionImageLink[] }>(feTutorRoutes.expressionImageLink(id, linkId), data);
     return response.data.images;
   },
 
-  async deletePhraseImageLink(id: string, linkId: string) {
-    const response = await api.delete<{ images: PhraseImageLink[] }>(feTutorRoutes.phraseImageLink(id, linkId));
+  async deleteExpressionImageLink(id: string, linkId: string) {
+    const response = await api.delete<{ images: ExpressionImageLink[] }>(feTutorRoutes.expressionImageLink(id, linkId));
     return response.data.images;
   },
 
-  async createPhrase(data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
-    const response = await api.post<{ phrase: Phrase }>(feTutorRoutes.phrases(), data);
-    return response.data.phrase;
+  async createExpression(data: Partial<Expression> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.post<{ expression: Expression }>(feTutorRoutes.expressions(), data);
+    return response.data.expression;
   },
 
-  async updatePhrase(id: string, data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
-    const response = await api.put<{ phrase: Phrase }>(feTutorRoutes.phrase(id), data);
-    return response.data.phrase;
+  async updateExpression(id: string, data: Partial<Expression> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.put<{ expression: Expression }>(feTutorRoutes.expression(id), data);
+    return response.data.expression;
   },
 
-  async deletePhrase(id: string) {
-    await api.delete(feTutorRoutes.phrase(id));
+  async deleteExpression(id: string) {
+    await api.delete(feTutorRoutes.expression(id));
   },
 
-  async bulkDeletePhrases(ids: string[]) {
-    const response = await api.delete<{ deletedIds: string[] }>(feTutorRoutes.bulkDeletePhrases(), {
+  async bulkDeleteExpressions(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feTutorRoutes.bulkDeleteExpressions(), {
       data: { ids }
     });
     return {
@@ -289,12 +401,12 @@ export const phraseService = {
     };
   },
 
-  async generatePhraseAudio(id: string) {
-    const response = await api.put<{ phrase: Phrase }>(feTutorRoutes.generatePhraseAudio(id));
-    return response.data.phrase;
+  async generateExpressionAudio(id: string) {
+    const response = await api.put<{ expression: Expression }>(feTutorRoutes.generateExpressionAudio(id));
+    return response.data.expression;
   },
 
-  async generateLessonPhraseAudio(lessonId: string) {
+  async generateLessonExpressionAudio(lessonId: string) {
     const response = await api.put<{
       lessonId: string;
       total: number;
@@ -302,15 +414,180 @@ export const phraseService = {
       failedCount: number;
       updatedIds: string[];
       failedIds: string[];
-    }>(feTutorRoutes.bulkPhraseAudio(lessonId));
+    }>(feTutorRoutes.bulkExpressionAudio(lessonId));
     return response.data;
   },
 
-  async finishPhrase(id: string) {
-    const response = await api.put<{ phrase: Phrase }>(feTutorRoutes.finishPhrase(id));
-    return response.data.phrase;
+  async finishExpression(id: string) {
+    const response = await api.put<{ expression: Expression }>(feTutorRoutes.finishExpression(id));
+    return response.data.expression;
+  },
+};
+
+export const wordService = {
+  async listWords(lessonId?: string, status?: Status) {
+    return fetchAllPages<Word>(feTutorRoutes.words(), "words", { lessonId, status });
+  },
+
+  async listWordsPage(params?: { lessonId?: string; status?: Status; q?: string; page?: number; limit?: number }) {
+    const response = await api.get<{ words: Word[]; total: number; pagination?: PaginationMeta }>(
+      feTutorRoutes.words(),
+      { params }
+    );
+    return {
+      items: response.data.words,
+      total: response.data.total ?? response.data.words.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.words.length || 20,
+        total: response.data.words.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Word>;
+  },
+
+  async getWord(id: string) {
+    const response = await api.get<{ word: Word }>(feTutorRoutes.word(id));
+    return response.data.word;
+  },
+
+  async createWord(data: Partial<Word> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.post<{ word: Word }>(feTutorRoutes.words(), data);
+    return response.data.word;
+  },
+
+  async updateWord(id: string, data: Partial<Word> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.put<{ word: Word }>(feTutorRoutes.word(id), data);
+    return response.data.word;
+  },
+
+  async deleteWord(id: string) {
+    await api.delete(feTutorRoutes.word(id));
+  },
+
+  async bulkDeleteWords(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feTutorRoutes.bulkDeleteWords(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
+  },
+
+  async finishWord(id: string) {
+    const response = await api.put<{ word: Word }>(feTutorRoutes.finishWord(id));
+    return response.data.word;
+  },
+
+  async generateWordAudio(id: string) {
+    const response = await api.put<{ word: Word }>(feTutorRoutes.generateWordAudio(id));
+    return response.data.word;
+  },
+
+  async generateLessonWordAudio(lessonId: string) {
+    const response = await api.put<{
+      lessonId: string;
+      total: number;
+      updatedCount: number;
+      failedCount: number;
+      updatedIds: string[];
+      failedIds: string[];
+    }>(feTutorRoutes.bulkWordAudio(lessonId));
+    return response.data;
   }
 };
+
+export const sentenceService = {
+  async listSentences(lessonId?: string, status?: Status) {
+    return fetchAllPages<Sentence>(feTutorRoutes.sentences(), "sentences", { lessonId, status });
+  },
+
+  async listSentencesPage(params?: { lessonId?: string; status?: Status; q?: string; page?: number; limit?: number }) {
+    const response = await api.get<{ sentences: Sentence[]; total: number; pagination?: PaginationMeta }>(
+      feTutorRoutes.sentences(),
+      { params }
+    );
+    return {
+      items: response.data.sentences,
+      total: response.data.total ?? response.data.sentences.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.sentences.length || 20,
+        total: response.data.sentences.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Sentence>;
+  },
+
+  async getSentence(id: string) {
+    const response = await api.get<{ sentence: Sentence }>(feTutorRoutes.sentence(id));
+    return response.data.sentence;
+  },
+
+  async createSentence(
+    data: Partial<Sentence> & {
+      components: SentenceComponentRef[];
+      audioUpload?: AudioUploadPayload;
+    }
+  ) {
+    const response = await api.post<{ sentence: Sentence }>(feTutorRoutes.sentences(), data);
+    return response.data.sentence;
+  },
+
+  async updateSentence(
+    id: string,
+    data: Partial<Sentence> & {
+      components?: SentenceComponentRef[];
+      audioUpload?: AudioUploadPayload;
+    }
+  ) {
+    const response = await api.put<{ sentence: Sentence }>(feTutorRoutes.sentence(id), data);
+    return response.data.sentence;
+  },
+
+  async deleteSentence(id: string) {
+    await api.delete(feTutorRoutes.sentence(id));
+  },
+
+  async bulkDeleteSentences(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feTutorRoutes.bulkDeleteSentences(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
+  },
+
+  async finishSentence(id: string) {
+    const response = await api.put<{ sentence: Sentence }>(feTutorRoutes.finishSentence(id));
+    return response.data.sentence;
+  },
+
+  async generateSentenceAudio(id: string) {
+    const response = await api.put<{ sentence: Sentence }>(feTutorRoutes.generateSentenceAudio(id));
+    return response.data.sentence;
+  },
+
+  async generateLessonSentenceAudio(lessonId: string) {
+    const response = await api.put<{
+      lessonId: string;
+      total: number;
+      updatedCount: number;
+      failedCount: number;
+      updatedIds: string[];
+      failedIds: string[];
+    }>(feTutorRoutes.bulkSentenceAudio(lessonId));
+    return response.data;
+  }
+};
+
+
 
 export const imageService = {
   async listImagesPage(params?: { status?: "draft" | "approved"; q?: string; page?: number; limit?: number }) {
@@ -437,8 +714,8 @@ export const questionService = {
 
   async createQuestion(data: {
     lessonId: string;
-    phraseId: string;
-    relatedPhraseIds?: string[];
+    sourceId?: string;
+    relatedSourceRefs?: Array<{ type: "word" | "expression" | "sentence"; id: string }>;
     translationIndex?: number;
     type: QuestionType;
     subtype: string;
@@ -453,7 +730,7 @@ export const questionService = {
     };
     interactionData?: {
       matchingPairs?: Array<{
-        phraseId: string;
+        contentId?: string;
         translationIndex: number;
         imageAssetId?: string;
       }>;
@@ -482,7 +759,8 @@ export const questionService = {
 export const tutorVoiceAudioService = {
   async listSubmissions(params?: {
     status?: "pending" | "accepted" | "rejected";
-    phraseId?: string;
+    contentType?: "word" | "expression" | "sentence";
+    contentId?: string;
     q?: string;
     page?: number;
     limit?: number;

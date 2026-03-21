@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { unitService } from "@/services";
-import { Language, Level, Status, Unit } from "@/types";
+import { chapterService, unitService } from "@/services";
+import { Chapter, Language, Level, Status, Unit } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,8 @@ export default function UnitsPage() {
   const [limit, setLimit] = useState(20);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [languageFilter, setLanguageFilter] = useState<Language>("yoruba");
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapterFilter, setChapterFilter] = useState<"all" | string>("all");
 
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
@@ -51,18 +53,35 @@ export default function UnitsPage() {
   const fetchUnits = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await unitService.listUnits(statusFilter === "all" ? undefined : statusFilter, languageFilter);
+      const data = await unitService.listUnits({
+        status: statusFilter === "all" ? undefined : statusFilter,
+        language: languageFilter,
+        chapterId: chapterFilter === "all" ? undefined : chapterFilter
+      });
       setUnits(data.sort((a, b) => a.orderIndex - b.orderIndex));
     } catch (error) {
       toast.error("Failed to fetch units.")
     } finally {
       setIsLoading(false);
     }
-  }, [languageFilter, statusFilter]);
+  }, [chapterFilter, languageFilter, statusFilter]);
+
+  const fetchChapters = useCallback(async () => {
+    try {
+      const data = await chapterService.listChapters(undefined, languageFilter);
+      setChapters(data.sort((a, b) => a.orderIndex - b.orderIndex));
+    } catch (error) {
+      toast.error("Failed to fetch chapters.");
+    }
+  }, [languageFilter]);
 
   useEffect(() => {
     void fetchUnits();
   }, [fetchUnits]);
+
+  useEffect(() => {
+    void fetchChapters();
+  }, [fetchChapters]);
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
@@ -70,6 +89,7 @@ export default function UnitsPage() {
     const qLimit = Number(searchParams.get("limit") || "20");
     const qStatus = searchParams.get("status");
     const qLanguage = searchParams.get("language");
+    const qChapterId = searchParams.get("chapterId");
 
     setSearch(q);
     setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
@@ -80,6 +100,9 @@ export default function UnitsPage() {
     }
     if (qLanguage === "yoruba" || qLanguage === "igbo" || qLanguage === "hausa") {
       setLanguageFilter(qLanguage);
+    }
+    if (qChapterId) {
+      setChapterFilter(qChapterId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,6 +116,8 @@ export default function UnitsPage() {
     else params.delete("status");
 
     params.set("language", languageFilter);
+    if (chapterFilter !== "all") params.set("chapterId", chapterFilter);
+    else params.delete("chapterId");
     params.set("page", String(page));
     params.set("limit", String(limit));
 
@@ -103,7 +128,13 @@ export default function UnitsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, languageFilter, statusFilter]);
+  }, [search, languageFilter, statusFilter, chapterFilter]);
+
+  useEffect(() => {
+    if (chapterFilter !== "all" && chapters.length > 0 && !chapters.some((chapter) => chapter._id === chapterFilter)) {
+      setChapterFilter("all");
+    }
+  }, [chapterFilter, chapters]);
 
   const filteredUnits = useMemo(() => {
     if (!search.trim()) return units;
@@ -160,11 +191,16 @@ export default function UnitsPage() {
       const result = await unitService.generateBulkUnits({
         language: languageFilter,
         level: bulkLevel,
+        chapterId: chapterFilter === "all" ? undefined : chapterFilter,
         count: bulkCount,
         topic: bulkTopic.trim() || undefined
       });
 
-      toast.success(`AI created ${result.createdCount} units (${result.skippedCount} skipped, ${result.errorCount} errors).`);
+      const coreCreatedCount = result.coreCreatedCount ?? result.createdCount;
+      const reviewCreatedCount = result.reviewCreatedCount ?? 0;
+      toast.success(
+        `AI created ${coreCreatedCount} core units and ${reviewCreatedCount} review units (${result.skippedCount} skipped, ${result.errorCount} errors).`
+      );
       setIsBulkDialogOpen(false);
       setBulkTopic("");
       setBulkCount(5);
@@ -227,7 +263,7 @@ export default function UnitsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Units</h1>
-          <p className="text-muted-foreground font-medium">Manage and order units by language.</p>
+          <p className="text-muted-foreground font-medium">Manage units inside chapter context, then build lessons under each unit.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -235,7 +271,7 @@ export default function UnitsPage() {
             AI Bulk Units
           </Button>
           <Button asChild className="h-12 rounded-xl px-6 font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
-            <Link href={`/units/new?language=${languageFilter}`}>
+            <Link href={`/units/new?language=${languageFilter}${chapterFilter !== "all" ? `&chapterId=${chapterFilter}` : ""}`}>
               <Plus className="mr-2 h-5 w-5" />
               Create New Unit
             </Link>
@@ -247,12 +283,25 @@ export default function UnitsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>AI Bulk Unit Generation</DialogTitle>
-            <DialogDescription>Generate multiple draft units for {LANGUAGE_LABELS[languageFilter]}.</DialogDescription>
+            <DialogDescription>
+              Generate multiple draft core units for {LANGUAGE_LABELS[languageFilter]}. A sentence-focused review unit will be auto-inserted after every two core units.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="space-y-2">
-              <Label>Level</Label>
-              <Select value={bulkLevel} onValueChange={(value) => setBulkLevel(value as Level)}>
+              <div className="space-y-2">
+                <Label>Chapter</Label>
+                <Input
+                  value={
+                    chapterFilter === "all"
+                      ? "No chapter selected"
+                      : chapters.find((chapter) => chapter._id === chapterFilter)?.title || "Selected chapter"
+                  }
+                  disabled
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Level</Label>
+                <Select value={bulkLevel} onValueChange={(value) => setBulkLevel(value as Level)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="beginner">Beginner</SelectItem>
@@ -316,6 +365,18 @@ export default function UnitsPage() {
                 <SelectItem value="published">Published</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={chapterFilter} onValueChange={setChapterFilter}>
+              <SelectTrigger className="h-10 w-[260px]"><SelectValue placeholder="Filter by chapter" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All chapters</SelectItem>
+                {chapters.map((chapter) => (
+                  <SelectItem key={chapter._id} value={chapter._id}>
+                    {chapter.orderIndex + 1}. {chapter.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -324,7 +385,8 @@ export default function UnitsPage() {
             <TableRow>
               <TableHead className="w-24 font-bold text-primary pl-8">Order</TableHead>
               <TableHead className="font-bold text-primary">Title</TableHead>
-              <TableHead className="font-bold text-primary">Language</TableHead>
+              <TableHead className="font-bold text-primary">Chapter</TableHead>
+              <TableHead className="font-bold text-primary">Type</TableHead>
               <TableHead className="font-bold text-primary">Level</TableHead>
               <TableHead className="font-bold text-primary">Status</TableHead>
               <TableHead className="font-bold text-primary">Created At</TableHead>
@@ -334,7 +396,7 @@ export default function UnitsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">
+                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     Loading units...
@@ -343,7 +405,7 @@ export default function UnitsPage() {
               </TableRow>
             ) : paginatedUnits.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-medium">No units found.</TableCell>
+                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-medium">No units found.</TableCell>
               </TableRow>
             ) : (
               paginatedUnits.map((unit) => (
@@ -364,7 +426,18 @@ export default function UnitsPage() {
                   </TableCell>
                   <TableCell className="font-bold text-foreground">{unit.title}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="capitalize font-semibold border-primary/20 text-primary bg-primary/5">{unit.language}</Badge>
+                    {unit.chapterId ? (
+                      <Badge variant="outline" className="font-semibold border-primary/20 text-primary bg-primary/5">
+                        {chapters.find((chapter) => chapter._id === unit.chapterId)?.title || "Unknown chapter"}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No chapter</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize font-semibold border-amber-300/40 text-amber-700 bg-amber-50">
+                      {unit.kind === "review" ? `${unit.reviewStyle} review` : "core"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize font-semibold border-accent/30 text-accent bg-accent/5">{unit.level}</Badge>

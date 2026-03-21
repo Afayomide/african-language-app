@@ -26,7 +26,7 @@ export type LearnerProfile = {
 
 export type LessonBlock = 
   | { type: "text"; content: string }
-  | { type: "phrase"; refId: string; translationIndex?: number }
+  | { type: "content"; contentType: "word" | "expression" | "sentence"; refId: string; translationIndex?: number }
   | { type: "proverb"; refId: string }
   | { type: "question"; refId: string };
 
@@ -47,16 +47,33 @@ export type LessonStageProgress = {
 
 export type PopulatedLessonBlock = 
   | { type: "text"; content: string }
-  | { type: "phrase"; data: Phrase }
+  | { type: "content"; contentType: "word" | "expression" | "sentence"; data: LearningContent }
   | { type: "proverb"; data: Proverb }
   | { type: "question"; data: ExerciseQuestion };
 
-export interface Phrase {
+export interface LearningContent {
+  id?: string;
   _id: string;
+  kind?: "word" | "expression" | "sentence";
   text: string;
   translations: string[];
   selectedTranslation?: string;
   selectedTranslationIndex?: number;
+  pronunciation?: string;
+  explanation?: string;
+  audio?: {
+    url?: string;
+  };
+  components?: LearningContentComponent[];
+}
+
+export interface LearningContentComponent {
+  id: string;
+  kind: "word" | "expression";
+  text: string;
+  translations: string[];
+  selectedTranslation: string;
+  selectedTranslationIndex: number;
   pronunciation?: string;
   explanation?: string;
   audio?: {
@@ -71,10 +88,11 @@ export interface Proverb {
   contextNote?: string;
 }
 
-export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching";
+export type QuestionType = "multiple-choice" | "fill-in-the-gap" | "listening" | "matching" | "speaking";
 
 export type QuestionSubtype =
   | "mc-select-translation"
+  | "mc-select-context-response"
   | "mc-select-missing-word"
   | "fg-word-order"
   | "fg-letter-order"
@@ -86,12 +104,11 @@ export type QuestionSubtype =
   | "mt-match-image"
   | "mt-match-translation"
   | "ls-dictation"
-  | "ls-tone-recognition";
+  | "ls-tone-recognition"
+  | "sp-pronunciation-compare";
 
 export interface QuestionMatchingPair {
   pairId: string;
-  phraseId: string;
-  phraseText: string;
   translationIndex: number;
   translation: string;
   image?: {
@@ -105,7 +122,6 @@ export interface QuestionMatchingPair {
 export interface QuestionMatchingDisplayItem {
   id: string;
   label: string;
-  phraseId?: string;
   translationIndex?: number;
   image?: {
     imageAssetId?: string;
@@ -118,8 +134,10 @@ export interface QuestionMatchingDisplayItem {
 export interface ExerciseQuestion {
   _id: string;
   lessonId: string;
+  sourceType?: "word" | "expression" | "sentence";
+  sourceId?: string;
+  relatedSourceRefs?: Array<{ type: "word" | "expression" | "sentence"; id: string }>;
   translationIndex?: number;
-  phraseId: string | Phrase;
   type: QuestionType;
   subtype: QuestionSubtype;
   promptTemplate: string;
@@ -142,7 +160,7 @@ export interface ExerciseQuestion {
     rightItems?: QuestionMatchingDisplayItem[];
   };
   prompt?: string;
-  phrase?: Phrase | null;
+  source?: LearningContent | null;
   explanation: string;
 }
 

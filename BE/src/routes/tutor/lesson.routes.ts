@@ -7,6 +7,7 @@ import {
   finishLesson,
   getLessonById,
   listLessons,
+  requestLessonAudio,
   reorderLessons,
   updateLesson
 } from "../../controllers/tutor/lesson.controller.js";
@@ -24,6 +25,7 @@ router.get("/:id/audit", auditLesson);
 router.get("/:id", getLessonById);
 router.put("/:id", updateLesson);
 router.put("/:id/finish", finishLesson);
+router.put("/:id/request-audio", requestLessonAudio);
 router.delete("/:id", deleteLesson);
 
 export default router;

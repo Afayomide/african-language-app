@@ -1,21 +1,17 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import {
+  CONTENT_AUDIO_REFERENCE_TYPE_VALUES,
+  CONTENT_AUDIO_REVIEW_STATUS_VALUES,
+  CONTENT_AUDIO_WORKFLOW_STATUS_VALUES,
+  ContentAudioSchema
+} from "../shared/contentFields.js";
 
-const AudioMetaSchema = new Schema(
-  {
-    provider: { type: String, default: "manual_upload" },
-    model: { type: String, default: "" },
-    voice: { type: String, default: "" },
-    locale: { type: String, default: "" },
-    format: { type: String, default: "" },
-    url: { type: String, default: "" },
-    s3Key: { type: String, default: "" }
-  },
-  { _id: false }
-);
+const CONTENT_TYPE_VALUES = ["word", "expression", "sentence"] as const;
 
 const VoiceAudioSubmissionSchema = new Schema(
   {
-    phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true, index: true },
+    contentType: { type: String, enum: CONTENT_TYPE_VALUES, required: true, index: true },
+    contentId: { type: Schema.Types.ObjectId, required: true, index: true },
     voiceArtistUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     voiceArtistProfileId: {
       type: Schema.Types.ObjectId,
@@ -24,7 +20,22 @@ const VoiceAudioSubmissionSchema = new Schema(
       index: true
     },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
-    audio: { type: AudioMetaSchema, required: true },
+    audio: {
+      type: ContentAudioSchema,
+      required: true,
+      default: () => ({
+        provider: "manual_upload",
+        model: "",
+        voice: "",
+        locale: "",
+        format: "",
+        url: "",
+        s3Key: "",
+        referenceType: CONTENT_AUDIO_REFERENCE_TYPE_VALUES[2],
+        workflowStatus: CONTENT_AUDIO_WORKFLOW_STATUS_VALUES[3],
+        reviewStatus: CONTENT_AUDIO_REVIEW_STATUS_VALUES[1]
+      })
+    },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected"],
@@ -40,7 +51,7 @@ const VoiceAudioSubmissionSchema = new Schema(
 
 VoiceAudioSubmissionSchema.index({ status: 1, createdAt: -1 });
 VoiceAudioSubmissionSchema.index({ voiceArtistUserId: 1, status: 1, createdAt: -1 });
-VoiceAudioSubmissionSchema.index({ phraseId: 1, status: 1, createdAt: -1 });
+VoiceAudioSubmissionSchema.index({ contentType: 1, contentId: 1, status: 1, createdAt: -1 });
 
 export type VoiceAudioSubmissionDocument = InferSchemaType<typeof VoiceAudioSubmissionSchema> & {
   _id: mongoose.Types.ObjectId;

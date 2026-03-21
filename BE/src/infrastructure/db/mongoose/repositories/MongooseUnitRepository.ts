@@ -49,17 +49,18 @@ function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
           };
         })
       : [],
-    lessons: Array.isArray(input.lessons)
+        lessons: Array.isArray(input.lessons)
       ? input.lessons.map((item) => {
           const row = item as Record<string, unknown>;
           return {
             lessonId: String(row.lessonId || ""),
             title: String(row.title || ""),
-            phrasesGenerated: Number(row.phrasesGenerated || 0),
-            repeatedPhrasesLinked: Number(row.repeatedPhrasesLinked || 0),
-            newPhrasesSelected: Number(row.newPhrasesSelected || 0),
-            reviewPhrasesSelected: Number(row.reviewPhrasesSelected || 0),
-            phrasesDroppedFromCandidates: Number(row.phrasesDroppedFromCandidates || 0),
+            contentGenerated: Number(row.contentGenerated || 0),
+            sentencesGenerated: Number(row.sentencesGenerated || 0),
+            existingContentLinked: Number(row.existingContentLinked || 0),
+            newContentSelected: Number(row.newContentSelected || 0),
+            reviewContentSelected: Number(row.reviewContentSelected || 0),
+            contentDroppedFromCandidates: Number(row.contentDroppedFromCandidates || 0),
             proverbsGenerated: Number(row.proverbsGenerated || 0),
             questionsGenerated: Number(row.questionsGenerated || 0),
             blocksGenerated: Number(row.blocksGenerated || 0)
@@ -71,10 +72,14 @@ function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
 
 function toEntity(doc: {
   _id: { toString(): string };
+  chapterId?: { toString(): string } | string | null;
   title: string;
   description: string;
   language: UnitEntity["language"];
   level: UnitEntity["level"];
+  kind?: UnitEntity["kind"];
+  reviewStyle?: UnitEntity["reviewStyle"];
+  reviewSourceUnitIds?: Array<{ toString(): string } | string>;
   orderIndex: number;
   status: UnitEntity["status"];
   createdBy: { toString(): string };
@@ -86,10 +91,14 @@ function toEntity(doc: {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
+    chapterId: doc.chapterId ? String(doc.chapterId) : null,
     title: doc.title,
     description: doc.description,
     language: doc.language,
     level: doc.level,
+    kind: doc.kind || "core",
+    reviewStyle: doc.reviewStyle || "none",
+    reviewSourceUnitIds: Array.isArray(doc.reviewSourceUnitIds) ? doc.reviewSourceUnitIds.map((item) => String(item)) : [],
     orderIndex: doc.orderIndex,
     status: doc.status,
     createdBy: doc.createdBy.toString(),
@@ -101,23 +110,31 @@ function toEntity(doc: {
 }
 
 export class MongooseUnitRepository implements UnitRepository {
-  async findLastOrderIndex(language: Language): Promise<number | null> {
-    const last = await UnitModel.findOne({ language, isDeleted: { $ne: true } }).sort({
-      orderIndex: -1,
-      createdAt: -1
-    });
+  async findLastOrderIndex(language: Language, chapterId?: string | null): Promise<number | null> {
+    const query: Record<string, unknown> = { language, isDeleted: { $ne: true } };
+    if (chapterId === null) query.chapterId = null;
+    else if (chapterId) query.chapterId = chapterId;
+    const last = await UnitModel.findOne(query).sort({ orderIndex: -1, createdAt: -1 });
     return last?.orderIndex ?? null;
   }
 
   async create(input: UnitCreateInput): Promise<UnitEntity> {
-    const created = await UnitModel.create(input);
+    const created = await UnitModel.create({
+      chapterId: input.chapterId ?? null,
+      kind: input.kind ?? "core",
+      reviewStyle: input.reviewStyle ?? "none",
+      reviewSourceUnitIds: input.reviewSourceUnitIds ?? [],
+      ...input
+    });
     return toEntity(created);
   }
 
   async list(filter: UnitListFilter): Promise<UnitEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    if (filter.chapterId) query.chapterId = filter.chapterId;
     if (filter.language) query.language = filter.language;
     if (filter.status) query.status = filter.status;
+    if (filter.kind) query.kind = filter.kind;
 
     const units = await UnitModel.find(query).sort({ language: 1, orderIndex: 1, createdAt: 1 }).lean();
     return units.map(toEntity);
@@ -161,12 +178,7 @@ export class MongooseUnitRepository implements UnitRepository {
   }
 
   async findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>> {
-    const units = await UnitModel.find({
-      _id: { $in: ids },
-      language,
-      isDeleted: { $ne: true }
-    }).select("_id");
-
+    const units = await UnitModel.find({ _id: { $in: ids }, language, isDeleted: { $ne: true } }).select("_id");
     return units.map((unit) => ({ id: unit._id.toString() }));
   }
 
@@ -182,10 +194,12 @@ export class MongooseUnitRepository implements UnitRepository {
   }
 
   async listByLanguage(language: Language): Promise<UnitEntity[]> {
-    const units = await UnitModel.find({ language, isDeleted: { $ne: true } }).sort({
-      orderIndex: 1,
-      createdAt: 1
-    }).lean();
+    const units = await UnitModel.find({ language, isDeleted: { $ne: true } }).sort({ orderIndex: 1, createdAt: 1 }).lean();
+    return units.map(toEntity);
+  }
+
+  async listByChapterId(chapterId: string): Promise<UnitEntity[]> {
+    const units = await UnitModel.find({ chapterId, isDeleted: { $ne: true } }).sort({ orderIndex: 1, createdAt: 1 }).lean();
     return units.map(toEntity);
   }
 }

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Voice Artist Dashboard | Language App",
-  description: "Upload and track phrase audio submissions",
+  description: "Upload and track expression audio submissions",
 };
 
 export default function RootLayout({

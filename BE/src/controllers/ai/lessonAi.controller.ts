@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { getLlmClient } from "../../services/llm/index.js";
+import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
 import { isValidLanguage, isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
@@ -10,7 +10,7 @@ import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
 import { extractThemeAnchors } from "../../services/llm/unitTheme.js";
 
 const lessons = new MongooseLessonRepository();
-const phrases = new MongoosePhraseRepository();
+const expressions = new MongooseExpressionRepository();
 const proverbs = new MongooseProverbRepository();
 const units = new MongooseUnitRepository();
 
@@ -36,10 +36,10 @@ export async function suggestLesson(req: Request, res: Response) {
   const llm = getLlmClient();
 
   try {
-    const [existingUnits, existingLessons, existingPhrases, existingProverbs] = await Promise.all([
+    const [existingUnits, existingLessons, existingExpressions, existingProverbs] = await Promise.all([
       units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa"),
       lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" }),
-      phrases.list({ language: String(language) as "yoruba" | "igbo" | "hausa" }),
+      expressions.list({ language: String(language) as "yoruba" | "igbo" | "hausa" }),
       proverbs.list({ language: String(language) as "yoruba" | "igbo" | "hausa" })
     ]);
     const curriculumInstruction = "Continue the curriculum progressively. Prioritize conversational utility, repetition, and careful vocabulary load. Do not repeat older curriculum items with renamed titles.";
@@ -54,7 +54,7 @@ export async function suggestLesson(req: Request, res: Response) {
       }),
       existingUnitTitles: existingUnits.map((item) => item.title).filter(Boolean),
       existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean),
-      existingPhraseTexts: existingPhrases.map((item) => item.text).filter(Boolean),
+      existingPhraseTexts: existingExpressions.map((item) => item.text).filter(Boolean),
       existingProverbTexts: existingProverbs.map((item) => item.text).filter(Boolean)
     };
     let suggestion = null;

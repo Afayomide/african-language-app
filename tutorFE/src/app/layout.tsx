@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | Language App",
-  description: "Manage lessons and phrases for the language learning app",
+  description: "Manage chapters, units, lessons, and expressions for the language learning app",
 };
 
 export default function RootLayout({

@@ -9,6 +9,7 @@ const LessonSchema = new Schema(
     orderIndex: { type: Number, default: 0, index: true },
     description: { type: String, default: "" },
     topics: { type: [String], default: [] },
+    kind: { type: String, enum: ["core", "review"], default: "core", index: true },
     proverbs: {
       type: [{
         text: { type: String, required: true },
@@ -24,8 +25,9 @@ const LessonSchema = new Schema(
         orderIndex: { type: Number, default: 0 },
         blocks: {
           type: [{
-            type: { type: String, enum: ["text", "phrase", "proverb", "question"], required: true },
+            type: { type: String, enum: ["text", "content", "proverb", "question"], required: true },
             content: { type: String },
+            contentType: { type: String, enum: ["word", "expression", "sentence"], default: null },
             refId: { type: Schema.Types.ObjectId },
             translationIndex: { type: Number, min: 0, default: 0 }
           }],
@@ -43,7 +45,6 @@ const LessonSchema = new Schema(
   { timestamps: true }
 );
 
-// Supports language-scoped listing and ordering.
 LessonSchema.index({ unitId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 LessonSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 

@@ -3,12 +3,21 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 const ExerciseQuestionSchema = new Schema(
   {
     lessonId: { type: Schema.Types.ObjectId, ref: "Lesson", required: true, index: true },
-    phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true, index: true },
-    relatedPhraseIds: { type: [Schema.Types.ObjectId], ref: "Phrase", default: [] },
+    sourceType: { type: String, enum: ["word", "expression", "sentence"], default: null, index: true },
+    sourceId: { type: Schema.Types.ObjectId, default: null, index: true },
+    relatedSourceRefs: {
+      type: [
+        {
+          type: { type: String, enum: ["word", "expression", "sentence"], required: true },
+          id: { type: Schema.Types.ObjectId, required: true }
+        }
+      ],
+      default: []
+    },
     translationIndex: { type: Number, min: 0, default: 0 },
     type: {
       type: String,
-      enum: ["multiple-choice", "fill-in-the-gap", "listening", "matching"],
+      enum: ["multiple-choice", "fill-in-the-gap", "listening", "matching", "speaking"],
       required: true,
       index: true
     },
@@ -16,6 +25,7 @@ const ExerciseQuestionSchema = new Schema(
       type: String,
       enum: [
         "mc-select-translation",
+        "mc-select-context-response",
         "mc-select-missing-word",
         "fg-word-order",
         "fg-letter-order",
@@ -27,7 +37,8 @@ const ExerciseQuestionSchema = new Schema(
         "mt-match-image",
         "mt-match-translation",
         "ls-dictation",
-        "ls-tone-recognition"
+        "ls-tone-recognition",
+        "sp-pronunciation-compare"
       ],
       required: true,
       index: true
@@ -46,8 +57,9 @@ const ExerciseQuestionSchema = new Schema(
         type: [
           {
             pairId: { type: String, required: true, trim: true },
-            phraseId: { type: Schema.Types.ObjectId, ref: "Phrase", required: true },
-            phraseText: { type: String, required: true, trim: true },
+            contentType: { type: String, enum: ["word", "expression", "sentence"], default: null },
+            contentId: { type: Schema.Types.ObjectId, default: null },
+            contentText: { type: String, default: "" },
             translationIndex: { type: Number, required: true, min: 0 },
             translation: { type: String, required: true, trim: true },
             image: {
@@ -69,11 +81,9 @@ const ExerciseQuestionSchema = new Schema(
   { timestamps: true }
 );
 
-// Supports lesson/type scoped listing and learner exercise fetches.
 ExerciseQuestionSchema.index({ lessonId: 1, status: 1, isDeleted: 1, createdAt: 1 });
 ExerciseQuestionSchema.index({ lessonId: 1, type: 1, status: 1, isDeleted: 1, createdAt: 1 });
-ExerciseQuestionSchema.index({ phraseId: 1, isDeleted: 1 });
-ExerciseQuestionSchema.index({ relatedPhraseIds: 1, isDeleted: 1 });
+ExerciseQuestionSchema.index({ sourceType: 1, sourceId: 1, isDeleted: 1 });
 
 export type ExerciseQuestionDocument = InferSchemaType<typeof ExerciseQuestionSchema> & {
   _id: mongoose.Types.ObjectId;

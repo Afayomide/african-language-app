@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, aiService, phraseService, proverbService, questionService } from "@/services"
-import { Lesson, Language, Level, Phrase, LessonBlock, Proverb, ExerciseQuestion, LessonAuditResult } from "@/types"
+import { lessonService, aiService, expressionService, proverbService, questionService } from "@/services"
+import { Lesson, Language, Level, Expression, LessonBlock, Proverb, ExerciseQuestion, LessonAuditResult } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, CheckCircle, Sparkles, Edit, Trash, Volume2, Plus, ArrowUp, ArrowDown, LayoutList } from "lucide-react"
+import { ArrowLeft, Save, CheckCircle, Sparkles, Edit, Trash, Volume2, Plus, ArrowUp, ArrowDown, LayoutList, Mic } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -58,18 +58,18 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const [topicsInput, setTopicsInput] = useState("")
   const [proverbs, setProverbs] = useState<Array<{ text: string; translation: string; contextNote: string }>>([])
   const [blocks, setBlocks] = useState<LessonBlock[]>([])
-  const [phrases, setPhrases] = useState<Phrase[]>([])
+  const [phrases, setExpressions] = useState<Expression[]>([])
   
-  const [allPhrases, setAllPhrases] = useState<Phrase[]>([])
+  const [allExpressions, setAllExpressions] = useState<Expression[]>([])
   const [allProverbs, setAllProverbs] = useState<Proverb[]>([])
   const [allQuestions, setAllQuestions] = useState<ExerciseQuestion[]>([])
-  const [isLoadingPhrases, setIsLoadingPhrases] = useState(false)
-  const [phraseSearch, setPhraseSearch] = useState("")
-  const [phrasePage, setPhrasePage] = useState(1)
-  const [phraseLimit, setPhraseLimit] = useState(20)
-  const [phraseTotal, setPhraseTotal] = useState(0)
-  const [phraseTotalPages, setPhraseTotalPages] = useState(1)
-  const [selectedPhraseIds, setSelectedPhraseIds] = useState<string[]>([])
+  const [isLoadingExpressions, setIsLoadingExpressions] = useState(false)
+  const [phraseSearch, setExpressionSearch] = useState("")
+  const [phrasePage, setExpressionPage] = useState(1)
+  const [phraseLimit, setExpressionLimit] = useState(20)
+  const [phraseTotal, setExpressionTotal] = useState(0)
+  const [phraseTotalPages, setExpressionTotalPages] = useState(1)
+  const [selectedExpressionIds, setSelectedExpressionIds] = useState<string[]>([])
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([])
   const [audit, setAudit] = useState<LessonAuditResult | null>(null)
   const [isAuditing, setIsAuditing] = useState(false)
@@ -80,15 +80,15 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     if (!lesson?._id) return
-    fetchLessonPhrases(lesson._id)
+    fetchLessonExpressions(lesson._id)
   }, [lesson?._id, phraseSearch, phrasePage, phraseLimit])
 
   useEffect(() => {
-    setPhrasePage(1)
+    setExpressionPage(1)
   }, [phraseSearch, lesson?._id])
 
   useEffect(() => {
-    setSelectedPhraseIds((prev) => prev.filter((id) => phrases.some((phrase) => phrase._id === id)))
+    setSelectedExpressionIds((prev) => prev.filter((id) => phrases.some((phrase) => phrase._id === id)))
   }, [phrases])
 
   useEffect(() => {
@@ -100,11 +100,11 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     const loadAllData = async () => {
       try {
         const [p, prv, q] = await Promise.all([
-          phraseService.listPhrases(undefined, undefined, lesson.language),
+          expressionService.listExpressions(undefined, undefined, lesson.language),
           proverbService.listProverbs(undefined, undefined, lesson.language),
           questionService.listQuestions({ lessonId: lesson._id })
         ])
-        setAllPhrases(p)
+        setAllExpressions(p)
         setAllProverbs(prv)
         setAllQuestions(q)
       } catch (err) {
@@ -147,26 +147,26 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  async function fetchLessonPhrases(lessonId: string) {
-    setIsLoadingPhrases(true)
+  async function fetchLessonExpressions(lessonId: string) {
+    setIsLoadingExpressions(true)
     try {
-      const data = await phraseService.listPhrasesPage({
+      const data = await expressionService.listExpressionsPage({
         lessonId,
         q: phraseSearch || undefined,
         page: phrasePage,
         limit: phraseLimit
       })
-      setPhrases(
+      setExpressions(
         [...data.items].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       )
-      setPhraseTotal(data.total)
-      setPhraseTotalPages(data.pagination.totalPages)
+      setExpressionTotal(data.total)
+      setExpressionTotalPages(data.pagination.totalPages)
     } catch (error) {
-      toast.error("Failed to fetch lesson phrases")
+      toast.error("Failed to fetch lesson expressions")
     } finally {
-      setIsLoadingPhrases(false)
+      setIsLoadingExpressions(false)
     }
   }
 
@@ -187,9 +187,13 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const handleAddBlock = (type: LessonBlock["type"]) => {
     if (type === "text") {
       setBlocks([...blocks, { type: "text", content: "" }])
-    } else {
-      setBlocks([...blocks, { type, refId: "" }])
+      return
     }
+    if (type === "content") {
+      setBlocks([...blocks, { type: "content", contentType: "expression", refId: "" }])
+      return
+    }
+    setBlocks([...blocks, { type, refId: "" }])
   }
 
   const handleBlockChange = (index: number, value: string) => {
@@ -281,6 +285,15 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  const handleRequestAudio = async () => {
+    try {
+      await lessonService.requestLessonAudio(id)
+      toast.success("Audio requested for this lesson")
+    } catch (error) {
+      toast.error("Failed to request audio")
+    }
+  }
+
   const handleAISuggest = async () => {
     if (!lesson) return
     if (!lesson.title) {
@@ -317,20 +330,20 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   }
 
 
-  const handleGeneratePhrases = async () => {
+  const handleGenerateExpressions = async () => {
     if (!lesson) return
     setIsGenerating(true)
     try {
-      await aiService.generatePhrases(
+      await aiService.generateExpressions(
         lesson._id,
         lesson.language,
         lesson.level,
         undefined,
         extraInstructions.trim() || undefined
       )
-      toast.success("AI phrases generated")
+      toast.success("AI expressions generated")
       setIsGenerateDialogOpen(false)
-      fetchLessonPhrases(lesson._id)
+      fetchLessonExpressions(lesson._id)
     } catch (error) {
       toast.error("AI phrase generation failed")
     } finally {
@@ -348,7 +361,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
       await fetchLesson()
       if (lesson?._id) {
         await Promise.all([
-          fetchLessonPhrases(lesson._id),
+          fetchLessonExpressions(lesson._id),
           questionService.listQuestions({ lessonId: lesson._id }).then(setAllQuestions)
         ])
       }
@@ -365,29 +378,29 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleDeletePhrase = async (phraseId: string) => {
-    if (!confirm("Delete this phrase?")) return
+  const handleDeleteExpression = async (expressionId: string) => {
+    if (!confirm("Delete this expression?")) return
     try {
-      await phraseService.deletePhrase(phraseId)
-      toast.success("Phrase deleted")
-      if (lesson) fetchLessonPhrases(lesson._id)
+      await expressionService.deleteExpression(expressionId)
+      toast.success("Expression deleted")
+      if (lesson) fetchLessonExpressions(lesson._id)
     } catch (error) {
       toast.error("Failed to delete phrase")
     }
   }
 
-  const togglePhraseSelection = (phraseId: string) => {
-    setSelectedPhraseIds((prev) =>
-      prev.includes(phraseId) ? prev.filter((id) => id !== phraseId) : [...prev, phraseId]
+  const toggleExpressionSelection = (expressionId: string) => {
+    setSelectedExpressionIds((prev) =>
+      prev.includes(expressionId) ? prev.filter((id) => id !== expressionId) : [...prev, expressionId]
     )
   }
 
-  const toggleSelectAllPhrases = () => {
-    if (selectedPhraseIds.length === phrases.length) {
-      setSelectedPhraseIds([])
+  const toggleSelectAllExpressions = () => {
+    if (selectedExpressionIds.length === phrases.length) {
+      setSelectedExpressionIds([])
       return
     }
-    setSelectedPhraseIds(phrases.map((phrase) => phrase._id))
+    setSelectedExpressionIds(phrases.map((phrase) => phrase._id))
   }
 
   const toggleQuestionSelection = (questionId: string) => {
@@ -404,34 +417,34 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     setSelectedQuestionIds(allQuestions.map((question) => question._id))
   }
 
-  const handleBulkDeletePhrases = async () => {
-    if (selectedPhraseIds.length === 0) return
-    if (!confirm(`Delete ${selectedPhraseIds.length} selected phrase(s)?`)) return
+  const handleBulkDeleteExpressions = async () => {
+    if (selectedExpressionIds.length === 0) return
+    if (!confirm(`Delete ${selectedExpressionIds.length} selected phrase(s)?`)) return
     try {
-      await Promise.all(selectedPhraseIds.map((id) => phraseService.deletePhrase(id)))
-      toast.success("Selected phrases deleted")
-      setSelectedPhraseIds([])
-      if (lesson) fetchLessonPhrases(lesson._id)
+      await Promise.all(selectedExpressionIds.map((id) => expressionService.deleteExpression(id)))
+      toast.success("Selected expressions deleted")
+      setSelectedExpressionIds([])
+      if (lesson) fetchLessonExpressions(lesson._id)
     } catch (error) {
-      toast.error("Failed to delete selected phrases")
+      toast.error("Failed to delete selected expressions")
     }
   }
 
-  const handleBulkPublishPhrases = async () => {
+  const handleBulkPublishExpressions = async () => {
     const publishable = phrases
-      .filter((phrase) => selectedPhraseIds.includes(phrase._id) && phrase.status === "finished")
+      .filter((phrase) => selectedExpressionIds.includes(phrase._id) && phrase.status === "finished")
       .map((phrase) => phrase._id)
     if (publishable.length === 0) {
-      toast.error("No selected finished phrases to publish")
+      toast.error("No selected finished expressions to publish")
       return
     }
     try {
-      await Promise.all(publishable.map((id) => phraseService.publishPhrase(id)))
+      await Promise.all(publishable.map((id) => expressionService.publishExpression(id)))
       toast.success(`Published ${publishable.length} phrase(s)`)
-      setSelectedPhraseIds([])
-      if (lesson) fetchLessonPhrases(lesson._id)
+      setSelectedExpressionIds([])
+      if (lesson) fetchLessonExpressions(lesson._id)
     } catch (error) {
-      toast.error("Failed to publish selected phrases")
+      toast.error("Failed to publish selected expressions")
     }
   }
 
@@ -472,11 +485,11 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handlePublishPhrase = async (phraseId: string) => {
+  const handlePublishExpression = async (expressionId: string) => {
     try {
-      await phraseService.publishPhrase(phraseId)
-      toast.success("Phrase published")
-      if (lesson) fetchLessonPhrases(lesson._id)
+      await expressionService.publishExpression(expressionId)
+      toast.success("Expression published")
+      if (lesson) fetchLessonExpressions(lesson._id)
     } catch (error) {
       toast.error("Failed to publish phrase")
     }
@@ -611,14 +624,14 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                 className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 transition-all"
               >
                 <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
-                Generate Phrases
+                Generate Expressions
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Generate Phrases With AI</DialogTitle>
+                <DialogTitle>Generate Expressions With AI</DialogTitle>
                 <DialogDescription>
-                  Add optional generation guidance before creating phrases.
+                  Add optional generation guidance before creating expressions.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
@@ -635,7 +648,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                 <Button variant="outline" onClick={() => setIsGenerateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleGeneratePhrases} disabled={isGenerating}>
+                <Button onClick={handleGenerateExpressions} disabled={isGenerating}>
                   {isGenerating ? "Generating..." : "Generate"}
                 </Button>
               </DialogFooter>
@@ -648,6 +661,14 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
           >
             <LayoutList className="mr-2 h-5 w-5" />
             Build Lesson Flow
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRequestAudio}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-violet-50 hover:text-violet-700 transition-all border-violet-200 text-violet-700"
+          >
+            <Mic className="mr-2 h-5 w-5" />
+            Request Audio
           </Button>
           {lesson.status === "finished" && (
             <Button 
@@ -867,10 +888,10 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
             </CardHeader>
             <CardContent>
               <p className="text-sm text-purple-900 font-medium mb-4">
-                Let AI help you build this lesson faster. Generate phrases automatically based on the lesson level and title.
+                Let AI help you build this lesson faster. Generate expressions automatically based on the lesson level and title.
               </p>
               <Button 
-                onClick={handleGeneratePhrases} 
+                onClick={handleGenerateExpressions} 
                 disabled={isGenerating}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl"
               >
@@ -898,9 +919,10 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>Stages: <span className="font-bold">{audit.metrics.stageCount}</span></div>
                     <div>Blocks: <span className="font-bold">{audit.metrics.blockCount}</span></div>
-                    <div>Phrases: <span className="font-bold">{audit.metrics.uniquePhraseCount}</span></div>
+                    <div>Content Items: <span className="font-bold">{audit.metrics.uniqueContentCount}</span></div>
                     <div>Questions: <span className="font-bold">{audit.metrics.questionCount}</span></div>
-                    <div className="col-span-2">Listening: <span className="font-bold">{audit.metrics.listeningQuestionCount}</span></div>
+                    <div>Listening: <span className="font-bold">{audit.metrics.listeningQuestionCount}</span></div>
+                    <div>Scenario: <span className="font-bold">{audit.metrics.scenarioQuestionCount}</span></div>
                   </div>
                   <div className="max-h-64 space-y-2 overflow-y-auto">
                     {audit.findings.length === 0 ? (
@@ -931,34 +953,34 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
 
       <Card className="border-2 border-primary/10 shadow-xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary/5">
-          <CardTitle className="text-xl font-bold text-primary">Lesson Phrases</CardTitle>
+          <CardTitle className="text-xl font-bold text-primary">Lesson Expressions</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTableControls
             search={phraseSearch}
-            onSearchChange={setPhraseSearch}
+            onSearchChange={setExpressionSearch}
             page={phrasePage}
             limit={phraseLimit}
             onLimitChange={(value) => {
-              setPhraseLimit(value)
-              setPhrasePage(1)
+              setExpressionLimit(value)
+              setExpressionPage(1)
             }}
             totalPages={phraseTotalPages}
             total={phraseTotal}
-            label="Search phrases"
-            onPrev={() => setPhrasePage((prev) => Math.max(1, prev - 1))}
-            onNext={() => setPhrasePage((prev) => Math.min(phraseTotalPages, prev + 1))}
+            label="Search expressions"
+            onPrev={() => setExpressionPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setExpressionPage((prev) => Math.min(phraseTotalPages, prev + 1))}
           />
           <div className="mb-4 mt-4 flex justify-end">
             <div className="flex gap-2">
-              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.delete} onClick={handleBulkDeletePhrases} disabled={selectedPhraseIds.length === 0}>
-                Bulk Delete ({selectedPhraseIds.length})
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.delete} onClick={handleBulkDeleteExpressions} disabled={selectedExpressionIds.length === 0}>
+                Bulk Delete ({selectedExpressionIds.length})
               </Button>
-              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.publish} onClick={handleBulkPublishPhrases} disabled={selectedPhraseIds.length === 0}>
+              <Button variant="outline" className={TABLE_BULK_BUTTON_CLASS.publish} onClick={handleBulkPublishExpressions} disabled={selectedExpressionIds.length === 0}>
                 Bulk Publish
               </Button>
-              <Button onClick={() => router.push(`/phrases/new?language=${lesson.language}&lessonId=${lesson._id}`)}>
-                Add Phrase
+              <Button onClick={() => router.push(`/expressions/new?language=${lesson.language}&lessonId=${lesson._id}`)}>
+                Add Expression
               </Button>
             </div>
           </div>
@@ -968,8 +990,8 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                 <TableHead className="w-12 pl-8">
                   <input
                     type="checkbox"
-                    checked={phrases.length > 0 && selectedPhraseIds.length === phrases.length}
-                    onChange={toggleSelectAllPhrases}
+                    checked={phrases.length > 0 && selectedExpressionIds.length === phrases.length}
+                    onChange={toggleSelectAllExpressions}
                   />
                 </TableHead>
                 <TableHead className="font-bold text-primary pl-8">Text</TableHead>
@@ -981,13 +1003,13 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingPhrases ? (
+              {isLoadingExpressions ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">Loading phrases...</TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center">Loading expressions...</TableCell>
                 </TableRow>
               ) : phrases.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">No phrases for this lesson yet.</TableCell>
+                  <TableCell colSpan={7} className="h-24 text-center">No expressions for this lesson yet.</TableCell>
                 </TableRow>
               ) : (
                 phrases.map((phrase) => (
@@ -995,8 +1017,8 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                     <TableCell className="pl-8">
                       <input
                         type="checkbox"
-                        checked={selectedPhraseIds.includes(phrase._id)}
-                        onChange={() => togglePhraseSelection(phrase._id)}
+                        checked={selectedExpressionIds.includes(phrase._id)}
+                        onChange={() => toggleExpressionSelection(phrase._id)}
                       />
                     </TableCell>
                     <TableCell className="pl-8 font-bold text-foreground">{phrase.text}</TableCell>
@@ -1028,7 +1050,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => router.push(`/phrases/${phrase._id}`)}
+                          onClick={() => router.push(`/expressions/${phrase._id}`)}
                           title="Edit"
                           className={TABLE_ACTION_ICON_CLASS.edit}
                         >
@@ -1038,7 +1060,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handlePublishPhrase(phrase._id)}
+                            onClick={() => handlePublishExpression(phrase._id)}
                             title="Publish"
                             className={TABLE_ACTION_ICON_CLASS.publish}
                           >
@@ -1048,7 +1070,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeletePhrase(phrase._id)}
+                          onClick={() => handleDeleteExpression(phrase._id)}
                           title="Delete"
                           className={TABLE_ACTION_ICON_CLASS.delete}
                         >
@@ -1094,7 +1116,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                 </TableHead>
                 <TableHead className="font-bold text-primary pl-8">Type</TableHead>
                 <TableHead className="font-bold text-primary">Prompt</TableHead>
-                <TableHead className="font-bold text-primary">Phrase</TableHead>
+                <TableHead className="font-bold text-primary">Expression</TableHead>
                 <TableHead className="font-bold text-primary">Status</TableHead>
                 <TableHead className="font-bold text-primary">Created At</TableHead>
                 <TableHead className="font-bold text-primary">Updated At</TableHead>
@@ -1120,7 +1142,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                       {question.type.replaceAll("-", " ")}
                     </TableCell>
                     <TableCell>{question.promptTemplate}</TableCell>
-                    <TableCell>{typeof question.phraseId === "string" ? question.phraseId : question.phraseId.text}</TableCell>
+                    <TableCell>{(typeof question.source === "string" ? question.source : question.source?.text) || "-"}</TableCell>
                     <TableCell>
                       <Badge className={workflowStatusBadgeClass(question.status)}>
                         {question.status}

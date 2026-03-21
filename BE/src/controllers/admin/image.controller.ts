@@ -2,13 +2,13 @@ import type { Response } from "express";
 import mongoose from "mongoose";
 import ImageAssetModel from "../../models/ImageAsset.js";
 import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
-import { MongoosePhraseImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseImageLinkRepository.js";
+import { MongooseExpressionImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionImageLinkRepository.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { parseImageUpload, uploadImageFile } from "../shared/imageUpload.js";
 import { getSearchQuery, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
 const imageRepo = new MongooseImageAssetRepository();
-const phraseImageLinkRepo = new MongoosePhraseImageLinkRepository();
+const phraseImageLinkRepo = new MongooseExpressionImageLinkRepository();
 
 function parseTags(tags: unknown) {
   if (!Array.isArray(tags)) return [];

@@ -1,11 +1,9 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { AdminQuestionUseCases } from "../../application/use-cases/admin/question/AdminQuestionUseCases.js";
+import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
-import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
-import { MongoosePhraseImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseImageLinkRepository.js";
 import type { QuestionType, QuestionSubtype } from "../../domain/entities/Question.js";
 import {
   isManuallySupportedQuestionSubtype,
@@ -14,6 +12,7 @@ import {
   isValidQuestionType,
   parseQuestionOptions,
   parseQuestionReviewData,
+  validateContextResponseQuestion,
   subtypeMatchesType,
   subtypeUsesMatching,
   subtypeRequiresReviewData,
@@ -32,11 +31,29 @@ import { buildLetterOrderReviewData, buildWordOrderReviewData } from "../shared/
 const questionUseCases = new AdminQuestionUseCases(
   new MongooseQuestionRepository(),
   new MongooseLessonRepository(),
-  new MongoosePhraseRepository()
+  new MongooseExpressionRepository()
 );
-const phraseRepo = new MongoosePhraseRepository();
-const imageAssetRepo = new MongooseImageAssetRepository();
-const phraseImageLinkRepo = new MongoosePhraseImageLinkRepository();
+const expressionRepo = new MongooseExpressionRepository();
+
+function buildQuestionSourcePayload(question: { sourceId?: string; translationIndex: number }, expression: { id: string; text: string; translations: string[]; status: string; audio?: { provider?: string; model?: string; voice?: string; locale?: string; format?: string; url?: string; s3Key?: string } } | null) {
+  if (!expression) return question.sourceId || null;
+  return {
+    _id: expression.id,
+    text: expression.text,
+    translations: expression.translations,
+    selectedTranslation: getSelectedTranslation(expression.translations, question.translationIndex),
+    selectedTranslationIndex: question.translationIndex,
+    status: expression.status,
+    audio: expression.audio
+      ? {
+          audioUrl: String(expression.audio.url || ""),
+          audioProvider: String(expression.audio.provider || ""),
+          voice: String(expression.audio.voice || ""),
+          locale: String(expression.audio.locale || "")
+        }
+      : undefined
+  };
+}
 
 function getSelectedTranslation(translations: string[], index: number) {
   if (!Array.isArray(translations) || translations.length === 0) return "";
@@ -46,10 +63,27 @@ function getSelectedTranslation(translations: string[], index: number) {
   return String(translations[0] || "");
 }
 
+function getContextResponseValidationMessage(code: ReturnType<typeof validateContextResponseQuestion>) {
+  switch (code) {
+    case "invalid_option_count":
+      return "Context-response questions require between 2 and 4 options.";
+    case "correct_option_must_match_source":
+      return "For context-response questions, the correct option must exactly match the source expression text.";
+    case "typo_only_distractors_not_allowed":
+      return "Context-response distractors must be contextually different responses, not spelling or diacritic variants of the correct answer.";
+    case "invalid_correct_index":
+      return "invalid correct index";
+    case "missing_source_text":
+      return "source not found";
+    default:
+      return "invalid context-response question";
+  }
+}
+
 export async function createQuestion(req: Request, res: Response) {
   const {
     lessonId,
-    phraseId,
+    sourceId,
     translationIndex,
     type,
     subtype,
@@ -76,8 +110,8 @@ export async function createQuestion(req: Request, res: Response) {
   if (!subtypeMatchesType(String(type), String(subtype))) {
     return res.status(400).json({ error: "Question type and subtype do not match." });
   }
-  if (!subtypeUsesMatching(String(subtype)) && (!phraseId || !mongoose.Types.ObjectId.isValid(String(phraseId)))) {
-    return res.status(400).json({ error: "invalid phrase id" });
+  if (!subtypeUsesMatching(String(subtype)) && (!sourceId || !mongoose.Types.ObjectId.isValid(String(sourceId)))) {
+    return res.status(400).json({ error: "invalid source id" });
   }
   if (!promptTemplate || !String(promptTemplate).trim()) {
     return res.status(400).json({ error: "prompt template required" });
@@ -91,13 +125,13 @@ export async function createQuestion(req: Request, res: Response) {
   let answerIndex = Number(correctIndex);
   let parsedReviewData: ReturnType<typeof parseQuestionReviewData> = null;
   let parsedInteractionData: Awaited<ReturnType<typeof buildMatchingInteractionData>> | null = null;
-  const targetPhrase = !subtypeUsesMatching(String(subtype)) ? await phraseRepo.findById(String(phraseId)) : null;
-  if (!subtypeUsesMatching(String(subtype)) && !targetPhrase) {
-    return res.status(404).json({ error: "phrase not found" });
+  const targetExpression = !subtypeUsesMatching(String(subtype)) ? await expressionRepo.findById(String(sourceId)) : null;
+  if (!subtypeUsesMatching(String(subtype)) && !targetExpression) {
+    return res.status(404).json({ error: "source not found" });
   }
   if (
-    targetPhrase &&
-    (parsedTranslationIndex >= targetPhrase.translations.length)
+    targetExpression &&
+    (parsedTranslationIndex >= targetExpression.translations.length)
   ) {
     return res.status(400).json({ error: "invalid translation index" });
   }
@@ -111,49 +145,50 @@ export async function createQuestion(req: Request, res: Response) {
   if (subtypeUsesMatching(String(subtype))) {
     const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, String(subtype));
     if (!parsedMatchingPairs) {
-      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
     }
     parsedInteractionData = await buildMatchingInteractionData({
       matchingPairs: parsedMatchingPairs,
       subtype: String(subtype),
       lessonId: String(lessonId),
-      phrases: phraseRepo,
-      phraseImageLinks: phraseImageLinkRepo,
-      imageAssets: imageAssetRepo
+      expressions: expressionRepo
     });
-    if (parsedInteractionData === "phrase_not_found") {
-      return res.status(404).json({ error: "phrase not found" });
+    if (parsedInteractionData === "content_not_found") {
+      return res.status(404).json({ error: "source not found" });
     }
     if (parsedInteractionData === "invalid_translation_index") {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    if (parsedInteractionData === "matching_image_required") {
-      return res.status(400).json({ error: "Each image matching pair must have a linked image." });
+    if (parsedInteractionData === "matching_image_not_supported") {
+      return res.status(400).json({ error: "Image matching is not wired in the new content model yet." });
     }
     if (parsedInteractionData === "matching_pairs_required") {
-      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
     }
     parsedOptions = [];
     answerIndex = 0;
   } else if (String(subtype) === "fg-letter-order") {
     parsedReviewData = buildLetterOrderReviewData({
-      phraseText: String(targetPhrase?.text || ""),
-      meaning: getSelectedTranslation(targetPhrase?.translations || [], parsedTranslationIndex)
+      phraseText: String(targetExpression?.text || ""),
+      meaning: getSelectedTranslation(targetExpression?.translations || [], parsedTranslationIndex)
     });
     if (!parsedReviewData) {
-      return res.status(400).json({ error: "This spelling question requires a phrase with at least two letters." });
+      return res.status(400).json({ error: "This spelling question requires a content item with at least two letters." });
     }
     parsedOptions = parsedReviewData.words;
     answerIndex = 0;
   } else if (subtypeUsesOrderArrangement(String(subtype))) {
     parsedReviewData = buildWordOrderReviewData({
-      phraseText: String(targetPhrase?.text || ""),
-      meaning: getSelectedTranslation(targetPhrase?.translations || [], parsedTranslationIndex)
+      phraseText: String(targetExpression?.text || ""),
+      meaning: getSelectedTranslation(targetExpression?.translations || [], parsedTranslationIndex)
     });
     if (!parsedReviewData) {
-      return res.status(400).json({ error: "This word order question requires a multi-word phrase. Use spelling order for single words." });
+      return res.status(400).json({ error: "This word order question requires multi-word content. Use spelling order for single words." });
     }
     parsedOptions = parsedReviewData.words;
+    answerIndex = 0;
+  } else if (String(subtype) === "sp-pronunciation-compare") {
+    parsedOptions = [];
     answerIndex = 0;
   } else if (subtypeUsesChoiceOptions(String(subtype))) {
     if (!parsedOptions) {
@@ -162,14 +197,25 @@ export async function createQuestion(req: Request, res: Response) {
     if (Number.isNaN(answerIndex) || answerIndex < 0 || answerIndex >= parsedOptions.length) {
       return res.status(400).json({ error: "invalid correct index" });
     }
+    if (String(subtype) === "mc-select-context-response") {
+      const validationError = validateContextResponseQuestion({
+        sourceText: String(targetExpression?.text || ""),
+        options: parsedOptions,
+        correctIndex: answerIndex
+      });
+      if (validationError) {
+        return res.status(400).json({ error: getContextResponseValidationMessage(validationError) });
+      }
+    }
   } else {
     return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
   }
 
   const created = await questionUseCases.create({
     lessonId: String(lessonId),
-    phraseId: parsedInteractionData ? parsedInteractionData.phraseId : String(targetPhrase?.id || phraseId),
-    relatedPhraseIds: parsedInteractionData ? parsedInteractionData.relatedPhraseIds : [],
+    sourceType: "expression",
+    sourceId: parsedInteractionData?.sourceId || String(targetExpression?.id || sourceId),
+    relatedSourceRefs: parsedInteractionData?.relatedSourceRefs || [],
     translationIndex: parsedInteractionData ? parsedInteractionData.translationIndex : parsedTranslationIndex,
     type: String(type) as QuestionType,
     subtype: String(subtype) as QuestionSubtype,
@@ -186,11 +232,11 @@ export async function createQuestion(req: Request, res: Response) {
   if (created === "lesson_not_found") {
     return res.status(404).json({ error: "lesson not found" });
   }
-  if (created === "phrase_not_found") {
-    return res.status(404).json({ error: "phrase not found" });
+  if (created === "source_not_found") {
+    return res.status(404).json({ error: "source not found" });
   }
-  if (created === "phrase_not_in_lesson") {
-    return res.status(400).json({ error: "phrase not in lesson" });
+  if (created === "source_not_in_lesson") {
+    return res.status(400).json({ error: "source not in lesson" });
   }
   if (created === "invalid_translation_index") {
     return res.status(400).json({ error: "invalid translation index" });
@@ -230,35 +276,28 @@ export async function listQuestions(req: Request, res: Response) {
     subtype: subtype !== undefined ? (String(subtype) as QuestionSubtype) : undefined,
     status: status !== undefined ? (String(status) as "draft" | "finished" | "published") : undefined
   });
-  const phrases = await phraseRepo.findByIds(questions.map((q) => q.phraseId));
-  const phraseMap = new Map(phrases.map((p) => [p.id, p]));
-  const data = questions.map((q) => ({
-    ...q,
-    _id: q.id,
-    phraseId: phraseMap.get(q.phraseId)
-      ? {
-          _id: phraseMap.get(q.phraseId)?.id,
-          text: phraseMap.get(q.phraseId)?.text,
-          translations: phraseMap.get(q.phraseId)?.translations || [],
-          selectedTranslation: getSelectedTranslation(
-            phraseMap.get(q.phraseId)?.translations || [],
-            q.translationIndex
-          ),
-          selectedTranslationIndex: q.translationIndex,
-          status: phraseMap.get(q.phraseId)?.status
-        }
-      : q.phraseId
-  }));
+  const expressions = await expressionRepo.findByIds(
+    questions.map((question) => question.sourceId).filter((id): id is string => Boolean(id))
+  );
+  const expressionMap = new Map(expressions.map((expression) => [expression.id, expression]));
+  const data = questions.map((question) => {
+    const expression = question.sourceId ? expressionMap.get(question.sourceId) || null : null;
+    return {
+      ...question,
+      _id: question.id,
+      source: buildQuestionSourcePayload(question, expression)
+    };
+  });
   const filtered = q
     ? data.filter((item) => {
-        const phrase = typeof item.phraseId === "string" ? null : item.phraseId;
+        const source = typeof item.source === "string" ? null : item.source;
         return [
           item.type,
           item.status,
           item.promptTemplate,
           item.explanation,
-          phrase?.text,
-          phrase?.selectedTranslation
+          source?.text,
+          source?.selectedTranslation
         ].some((value) => includesSearch(value, q));
       })
     : data;
@@ -280,22 +319,12 @@ export async function getQuestionById(req: Request, res: Response) {
   if (!question) {
     return res.status(404).json({ error: "question not found" });
   }
-  const phrase = await phraseRepo.findById(question.phraseId);
+  const expression = question.sourceId ? await expressionRepo.findById(question.sourceId) : null;
   return res.status(200).json({
     question: {
       ...question,
       _id: question.id,
-      phraseId: phrase
-        ? {
-            _id: phrase.id,
-            text: phrase.text,
-            translations: phrase.translations,
-            selectedTranslation: getSelectedTranslation(phrase.translations, question.translationIndex),
-            selectedTranslationIndex: question.translationIndex,
-            status: phrase.status,
-            audio: phrase.audio
-          }
-        : question.phraseId
+      source: buildQuestionSourcePayload(question, expression)
     }
   });
 }
@@ -306,7 +335,7 @@ export async function updateQuestion(req: Request, res: Response) {
     return res.status(400).json({ error: "invalid id" });
   }
 
-  const { type, subtype, phraseId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData, interactionData } = req.body ?? {};
+  const { type, subtype, sourceId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData, interactionData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const currentQuestion = await questionUseCases.getById(id);
   if (!currentQuestion) {
@@ -339,28 +368,32 @@ export async function updateQuestion(req: Request, res: Response) {
     }
     update.promptTemplate = String(promptTemplate).trim();
   }
-  let targetPhraseId = currentQuestion.phraseId;
-  if (!subtypeUsesMatching(effectiveSubtype) && phraseId !== undefined) {
-    if (!mongoose.Types.ObjectId.isValid(String(phraseId))) {
-      return res.status(400).json({ error: "invalid phrase id" });
+  let targetSourceId = currentQuestion.sourceId;
+  if (!subtypeUsesMatching(effectiveSubtype) && sourceId !== undefined) {
+    if (!mongoose.Types.ObjectId.isValid(String(sourceId))) {
+      return res.status(400).json({ error: "invalid source id" });
     }
-    const phrase = await phraseRepo.findById(String(phraseId));
-    if (!phrase) {
-      return res.status(404).json({ error: "phrase not found" });
+    const expression = await expressionRepo.findById(String(sourceId));
+    if (!expression) {
+      return res.status(404).json({ error: "source not found" });
     }
-    update.phraseId = phrase.id;
-    targetPhraseId = phrase.id;
+    update.sourceType = "expression";
+    update.sourceId = expression.id;
+    targetSourceId = expression.id;
   }
   if (!subtypeUsesMatching(effectiveSubtype) && translationIndex !== undefined) {
+    if (!targetSourceId) {
+      return res.status(400).json({ error: "source not found" });
+    }
     const parsedTranslationIndex = Number(translationIndex);
     if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    const phrase = await phraseRepo.findById(targetPhraseId);
-    if (!phrase) {
-      return res.status(404).json({ error: "phrase not found" });
+    const expression = await expressionRepo.findById(targetSourceId);
+    if (!expression) {
+      return res.status(404).json({ error: "source not found" });
     }
-    if (parsedTranslationIndex >= phrase.translations.length) {
+    if (parsedTranslationIndex >= expression.translations.length) {
       return res.status(400).json({ error: "invalid translation index" });
     }
     update.translationIndex = parsedTranslationIndex;
@@ -386,73 +419,87 @@ export async function updateQuestion(req: Request, res: Response) {
   if (subtypeUsesMatching(effectiveSubtype)) {
     const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, effectiveSubtype);
     if (!parsedMatchingPairs) {
-      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
     }
     parsedInteractionData = await buildMatchingInteractionData({
       matchingPairs: parsedMatchingPairs,
       subtype: effectiveSubtype,
       lessonId: currentQuestion.lessonId,
-      phrases: phraseRepo,
-      phraseImageLinks: phraseImageLinkRepo,
-      imageAssets: imageAssetRepo
+      expressions: expressionRepo
     });
-    if (parsedInteractionData === "phrase_not_found") {
-      return res.status(404).json({ error: "phrase not found" });
+    if (parsedInteractionData === "content_not_found") {
+      return res.status(404).json({ error: "source not found" });
     }
     if (parsedInteractionData === "invalid_translation_index") {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    if (parsedInteractionData === "matching_image_required") {
-      return res.status(400).json({ error: "Each image matching pair must have a linked image." });
+    if (parsedInteractionData === "matching_image_not_supported") {
+      return res.status(400).json({ error: "Image matching is not wired in the new content model yet." });
     }
     if (parsedInteractionData === "matching_pairs_required") {
-      return res.status(400).json({ error: "This matching question requires at least two valid phrase pairs." });
+      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
     }
-    update.phraseId = parsedInteractionData.phraseId;
-    update.relatedPhraseIds = parsedInteractionData.relatedPhraseIds;
+    update.sourceType = parsedInteractionData.sourceType;
+    update.sourceId = parsedInteractionData.sourceId;
+    update.relatedSourceRefs = parsedInteractionData.relatedSourceRefs;
     update.translationIndex = parsedInteractionData.translationIndex;
     update.interactionData = parsedInteractionData.interactionData;
     update.options = [];
     update.correctIndex = 0;
     update.reviewData = undefined;
   } else if (effectiveSubtype === "fg-letter-order") {
-    const targetPhrase = await phraseRepo.findById(targetPhraseId);
-    if (!targetPhrase) {
-      return res.status(404).json({ error: "phrase not found" });
+    if (!targetSourceId) {
+      return res.status(400).json({ error: "source not found" });
+    }
+    const targetExpression = await expressionRepo.findById(targetSourceId);
+    if (!targetExpression) {
+      return res.status(404).json({ error: "source not found" });
     }
     const spellingReview = buildLetterOrderReviewData({
-      phraseText: targetPhrase.text,
-      meaning: getSelectedTranslation(targetPhrase.translations, Number(update.translationIndex ?? currentQuestion.translationIndex))
+      phraseText: targetExpression.text,
+      meaning: getSelectedTranslation(targetExpression.translations, Number(update.translationIndex ?? currentQuestion.translationIndex))
     });
     if (!spellingReview) {
-      return res.status(400).json({ error: "This spelling question requires a phrase with at least two letters." });
+      return res.status(400).json({ error: "This spelling question requires a content item with at least two letters." });
     }
     update.reviewData = spellingReview;
     update.options = spellingReview.words;
     update.correctIndex = 0;
-    update.relatedPhraseIds = [];
+    update.relatedSourceRefs = [];
     update.interactionData = undefined;
   } else if (subtypeUsesOrderArrangement(effectiveSubtype)) {
-    const targetPhrase = await phraseRepo.findById(targetPhraseId);
-    if (!targetPhrase) {
-      return res.status(404).json({ error: "phrase not found" });
+    if (!targetSourceId) {
+      return res.status(400).json({ error: "source not found" });
+    }
+    const targetExpression = await expressionRepo.findById(targetSourceId);
+    if (!targetExpression) {
+      return res.status(404).json({ error: "source not found" });
     }
     const wordOrderReview = buildWordOrderReviewData({
-      phraseText: targetPhrase.text,
+      phraseText: targetExpression.text,
       meaning: getSelectedTranslation(
-        targetPhrase.translations,
+        targetExpression.translations,
         Number(update.translationIndex ?? currentQuestion.translationIndex)
       )
     });
     if (!wordOrderReview) {
-      return res.status(400).json({ error: "This word order question requires a multi-word phrase. Use spelling order for single words." });
+      return res.status(400).json({ error: "This word order question requires multi-word content. Use spelling order for single words." });
     }
     update.reviewData = wordOrderReview;
     update.options = wordOrderReview.words;
     update.correctIndex = 0;
-    update.relatedPhraseIds = [];
+    update.relatedSourceRefs = [];
     update.interactionData = undefined;
+  } else if (effectiveSubtype === "sp-pronunciation-compare") {
+    update.options = [];
+    update.correctIndex = 0;
+    update.relatedSourceRefs = [];
+    update.interactionData = undefined;
+    update.reviewData = undefined;
   } else if (subtypeUsesChoiceOptions(effectiveSubtype)) {
+    const currentSourceText = targetSourceId
+      ? String((await expressionRepo.findById(targetSourceId))?.text || "")
+      : "";
     if (options !== undefined) {
       const parsedOptions = parseQuestionOptions(options);
       if (!parsedOptions) {
@@ -467,6 +514,16 @@ export async function updateQuestion(req: Request, res: Response) {
         }
         update.correctIndex = idx;
       }
+      if (effectiveSubtype === "mc-select-context-response") {
+        const validationError = validateContextResponseQuestion({
+          sourceText: currentSourceText,
+          options: parsedOptions,
+          correctIndex: Number(update.correctIndex ?? currentQuestion.correctIndex)
+        });
+        if (validationError) {
+          return res.status(400).json({ error: getContextResponseValidationMessage(validationError) });
+        }
+      }
     } else if (correctIndex !== undefined) {
       const existingOptions = Array.isArray(update.options) ? update.options : currentQuestion.options || [];
       const idx = Number(correctIndex);
@@ -474,8 +531,28 @@ export async function updateQuestion(req: Request, res: Response) {
         return res.status(400).json({ error: "invalid correct index" });
       }
       update.correctIndex = idx;
+      if (effectiveSubtype === "mc-select-context-response") {
+        const validationError = validateContextResponseQuestion({
+          sourceText: currentSourceText,
+          options: existingOptions,
+          correctIndex: idx
+        });
+        if (validationError) {
+          return res.status(400).json({ error: getContextResponseValidationMessage(validationError) });
+        }
+      }
+    } else if (effectiveSubtype === "mc-select-context-response") {
+      const existingOptions = Array.isArray(update.options) ? update.options : currentQuestion.options || [];
+      const validationError = validateContextResponseQuestion({
+        sourceText: currentSourceText,
+        options: existingOptions,
+        correctIndex: Number(update.correctIndex ?? currentQuestion.correctIndex)
+      });
+      if (validationError) {
+        return res.status(400).json({ error: getContextResponseValidationMessage(validationError) });
+      }
     }
-    update.relatedPhraseIds = [];
+    update.relatedSourceRefs = [];
     update.interactionData = undefined;
   } else {
     return res.status(400).json({ error: "This question subtype is not supported in the learner app yet." });
@@ -517,8 +594,8 @@ export async function publishQuestion(req: Request, res: Response) {
   if (result === "question_not_found") {
     return res.status(404).json({ error: "question not found" });
   }
-  if (result === "linked_phrase_must_be_published") {
-    return res.status(400).json({ error: "linked phrase must be published" });
+  if (result === "linked_source_must_be_published") {
+    return res.status(400).json({ error: "linked source must be published" });
   }
   if (result === "question_not_finished") {
     return res.status(400).json({ error: "question not finished" });

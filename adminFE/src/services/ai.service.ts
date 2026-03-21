@@ -1,18 +1,34 @@
 import api from "@/lib/api";
 import { feAdminRoutes, feAiRoutes } from "@/lib/apiRoutes";
-import { Lesson, Phrase, Proverb, Language, Level } from "@/types";
+import { Lesson, Expression, Proverb, Language, Level, Sentence, Word } from "@/types";
 
 type UnitContentLessonSummary = {
   lessonId: string;
   title: string;
-  phrasesGenerated: number;
-  repeatedPhrasesLinked: number;
-  newPhrasesSelected: number;
-  reviewPhrasesSelected: number;
-  phrasesDroppedFromCandidates: number;
+  contentGenerated: number;
+  sentencesGenerated: number;
+  existingContentLinked: number;
+  newContentSelected: number;
+  reviewContentSelected: number;
+  contentDroppedFromCandidates: number;
   proverbsGenerated: number;
   questionsGenerated: number;
   blocksGenerated: number;
+};
+
+export type UnitPlanLesson = {
+  title: string;
+  description?: string;
+  objectives: string[];
+  conversationGoal: string;
+  situations: string[];
+  sentenceGoals: string[];
+  focusSummary?: string;
+};
+
+export type UnitPlanSequenceLesson = UnitPlanLesson & {
+  lessonMode: "core" | "review";
+  sourceCoreLessonIndexes?: number[];
 };
 
 type UnitContentResult = {
@@ -31,6 +47,14 @@ type UnitRevisionResult = UnitContentResult & {
   revisionMode: "refactor" | "regenerate";
 };
 
+export type UnitContentPlanPreviewResult = {
+  unitId: string;
+  requestedLessons: number;
+  actualLessonCount: number;
+  coreLessons: UnitPlanLesson[];
+  lessonSequence: UnitPlanSequenceLesson[];
+};
+
 type LessonRefactorResult = {
   unitId: string;
   lessonId: string;
@@ -45,26 +69,54 @@ type LessonRefactorResult = {
 };
 
 export const aiService = {
-  async generatePhrases(
-    lessonId: string,
+  async generateExpressions(
+    lessonId: string | undefined,
     language: Language,
     level: Level,
     seedWords?: string[],
     extraInstructions?: string
   ) {
-    const response = await api.post<{ phrases: Phrase[] }>(
-      feAiRoutes.generatePhrases(),
+    const response = await api.post<{ expressions: Expression[] }>(
+      feAiRoutes.generateExpressions(),
       { lessonId, language, level, seedWords, extraInstructions }
     );
-    return response.data.phrases;
+    return response.data.expressions;
   },
 
-  async enhancePhrase(id: string, language: Language, level: Level) {
-    const response = await api.post<{ phrase: Phrase }>(
-      feAiRoutes.enhancePhrase(id),
+  async generateWords(
+    lessonId: string | undefined,
+    language: Language,
+    level: Level,
+    seedWords?: string[],
+    extraInstructions?: string
+  ) {
+    const response = await api.post<{ words: Word[] }>(
+      feAiRoutes.generateWords(),
+      { lessonId, language, level, seedWords, extraInstructions }
+    );
+    return response.data.words;
+  },
+
+  async generateSentences(
+    lessonId: string | undefined,
+    language: Language,
+    level: Level,
+    seedWords?: string[],
+    extraInstructions?: string
+  ) {
+    const response = await api.post<{ sentences: Sentence[] }>(
+      feAiRoutes.generateSentences(),
+      { lessonId, language, level, seedWords, extraInstructions }
+    );
+    return response.data.sentences;
+  },
+
+  async enhanceExpression(id: string, language: Language, level: Level) {
+    const response = await api.post<{ expression: Expression }>(
+      feAiRoutes.enhanceExpression(id),
       { language, level }
     );
-    return response.data.phrase;
+    return response.data.expression;
   },
 
   async suggestLesson(topic: string, language: Language, level: Level) {
@@ -87,14 +139,104 @@ export const aiService = {
     unitId: string,
     payload?: {
       lessonCount?: number;
-      phrasesPerLesson?: number;
-      reviewPhrasesPerLesson?: number;
+      newTargetsPerLesson?: number;
+      sentencesPerLesson?: number;
+      reviewContentPerLesson?: number;
+      expressionsPerLesson?: number;
+      reviewExpressionsPerLesson?: number;
       proverbsPerLesson?: number;
       topics?: string[];
       extraInstructions?: string;
     }
   ) {
-    const response = await api.post<UnitContentResult>(feAdminRoutes.generateUnitContent(unitId), payload || {});
+    const requestPayload = payload
+      ? (() => {
+          const {
+            newTargetsPerLesson,
+            expressionsPerLesson,
+            reviewExpressionsPerLesson,
+            ...rest
+          } = payload;
+          return {
+            ...rest,
+            sentencesPerLesson:
+              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+            reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
+          };
+        })()
+      : {};
+    const response = await api.post<UnitContentResult>(feAdminRoutes.generateUnitContent(unitId), requestPayload);
+    return response.data;
+  },
+
+  async previewUnitContentPlan(
+    unitId: string,
+    payload?: {
+      lessonCount?: number;
+      newTargetsPerLesson?: number;
+      sentencesPerLesson?: number;
+      reviewContentPerLesson?: number;
+      expressionsPerLesson?: number;
+      reviewExpressionsPerLesson?: number;
+      proverbsPerLesson?: number;
+      topics?: string[];
+      extraInstructions?: string;
+    }
+  ) {
+    const requestPayload = payload
+      ? (() => {
+          const {
+            newTargetsPerLesson,
+            expressionsPerLesson,
+            reviewExpressionsPerLesson,
+            ...rest
+          } = payload;
+          return {
+            ...rest,
+            sentencesPerLesson:
+              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+            reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
+          };
+        })()
+      : {};
+    const response = await api.post<UnitContentPlanPreviewResult>(
+      feAdminRoutes.previewUnitContentPlan(unitId),
+      requestPayload
+    );
+    return response.data;
+  },
+
+  async applyUnitContentPlan(
+    unitId: string,
+    payload: {
+      lessonCount?: number;
+      newTargetsPerLesson?: number;
+      sentencesPerLesson?: number;
+      reviewContentPerLesson?: number;
+      expressionsPerLesson?: number;
+      reviewExpressionsPerLesson?: number;
+      proverbsPerLesson?: number;
+      topics?: string[];
+      extraInstructions?: string;
+      planLessons: UnitPlanLesson[];
+    }
+  ) {
+    const {
+      newTargetsPerLesson,
+      expressionsPerLesson,
+      reviewExpressionsPerLesson,
+      ...rest
+    } = payload;
+    const requestPayload = {
+      ...rest,
+      sentencesPerLesson:
+        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+      reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
+    };
+    const response = await api.post<UnitContentResult>(
+      feAdminRoutes.applyUnitContentPlan(unitId),
+      requestPayload
+    );
     return response.data;
   },
 
@@ -103,14 +245,29 @@ export const aiService = {
     payload: {
       mode: "refactor" | "regenerate";
       lessonCount?: number;
-      phrasesPerLesson?: number;
-      reviewPhrasesPerLesson?: number;
+      newTargetsPerLesson?: number;
+      sentencesPerLesson?: number;
+      reviewContentPerLesson?: number;
+      expressionsPerLesson?: number;
+      reviewExpressionsPerLesson?: number;
       proverbsPerLesson?: number;
       topics?: string[];
       extraInstructions?: string;
     }
   ) {
-    const response = await api.post<UnitRevisionResult>(feAdminRoutes.reviseUnitContent(unitId), payload);
+    const {
+      newTargetsPerLesson,
+      expressionsPerLesson,
+      reviewExpressionsPerLesson,
+      ...rest
+    } = payload;
+    const requestPayload = {
+      ...rest,
+      sentencesPerLesson:
+        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+      reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
+    };
+    const response = await api.post<UnitRevisionResult>(feAdminRoutes.reviseUnitContent(unitId), requestPayload);
     return response.data;
   },
 

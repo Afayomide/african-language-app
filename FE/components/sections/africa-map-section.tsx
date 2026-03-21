@@ -50,10 +50,17 @@ export function AfricaMapSection() {
                 className="object-contain p-8"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
-              <div className="absolute left-6 top-6 rounded-full border border-primary/20 bg-background/90 px-4 py-2 shadow-sm backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                  Africa
-                </p>
+              <div className="absolute left-6 top-6 flex flex-wrap items-center gap-3">
+                <div className="rounded-full border border-primary/20 bg-background/90 px-4 py-2 shadow-sm backdrop-blur">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                    Africa
+                  </p>
+                </div>
+                <div className="rounded-full border border-border/30 bg-white/75 px-4 py-2 shadow-sm backdrop-blur">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground/55">
+                    Mosaic of Identities
+                  </p>
+                </div>
               </div>
               <div className="absolute bottom-6 left-6 right-6 rounded-3xl border border-border/40 bg-background/88 p-5 shadow-lg backdrop-blur">
                 <p className="text-sm font-semibold text-foreground">Start from the map</p>

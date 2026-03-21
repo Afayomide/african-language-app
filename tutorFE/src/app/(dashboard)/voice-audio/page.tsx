@@ -135,7 +135,8 @@ export default function TutorVoiceAudioPage() {
           <Table>
             <TableHeader className="bg-primary/5">
               <TableRow>
-                <TableHead className="font-bold text-primary pl-8">Phrase</TableHead>
+                <TableHead className="font-bold text-primary pl-8">Content</TableHead>
+                <TableHead className="font-bold text-primary">Type</TableHead>
                 <TableHead className="font-bold text-primary">Meaning</TableHead>
                 <TableHead className="font-bold text-primary">Voice Artist</TableHead>
                 <TableHead className="font-bold text-primary">Status</TableHead>
@@ -146,17 +147,18 @@ export default function TutorVoiceAudioPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6}>Loading...</TableCell>
+                  <TableCell colSpan={7}>Loading...</TableCell>
                 </TableRow>
               ) : items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>No submissions found.</TableCell>
+                  <TableCell colSpan={7}>No submissions found.</TableCell>
                 </TableRow>
               ) : (
                 items.map((submission) => (
                   <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
-                    <TableCell className="pl-8 font-bold text-foreground">{submission.phrase?.text || "-"}</TableCell>
-                    <TableCell>{submission.phrase?.selectedTranslation || submission.phrase?.translations?.[0] || "-"}</TableCell>
+                    <TableCell className="pl-8 font-bold text-foreground">{submission.content?.text || "-"}</TableCell>
+                    <TableCell className="capitalize">{submission.contentType}</TableCell>
+                    <TableCell>{submission.content?.selectedTranslation || submission.content?.translations?.[0] || "-"}</TableCell>
                     <TableCell>{submission.voiceArtist?.email || "-"}</TableCell>
                     <TableCell>
                       <Badge className={reviewStatusBadgeClass(submission.status)}>

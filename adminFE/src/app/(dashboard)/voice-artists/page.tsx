@@ -280,7 +280,8 @@ export default function VoiceArtistsPage() {
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead className="font-bold text-primary pl-8">Phrase</TableHead>
+              <TableHead className="font-bold text-primary pl-8">Content</TableHead>
+              <TableHead className="font-bold text-primary">Type</TableHead>
               <TableHead className="font-bold text-primary">Voice Artist</TableHead>
               <TableHead className="font-bold text-primary">Language</TableHead>
               <TableHead className="font-bold text-primary">Audio</TableHead>
@@ -291,21 +292,22 @@ export default function VoiceArtistsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">Loading...</TableCell>
+                <TableCell colSpan={7} className="h-24 text-center">Loading...</TableCell>
               </TableRow>
             ) : submissions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">No pending submissions.</TableCell>
+                <TableCell colSpan={7} className="h-24 text-center">No pending submissions.</TableCell>
               </TableRow>
             ) : (
               submissions.map((submission) => (
                 <TableRow key={submission.id} className="group transition-colors hover:bg-secondary/30">
                   <TableCell className="pl-8">
-                    <div className="font-semibold">{submission.phrase?.text || "-"}</div>
+                    <div className="font-semibold">{submission.content?.text || "-"}</div>
                     <div className="text-xs text-muted-foreground">
-                      {submission.phrase?.selectedTranslation || submission.phrase?.translations?.[0] || ""}
+                      {submission.content?.selectedTranslation || submission.content?.translations?.[0] || ""}
                     </div>
                   </TableCell>
+                  <TableCell className="capitalize">{submission.contentType}</TableCell>
                   <TableCell>{submission.voiceArtist?.email || "-"}</TableCell>
                   <TableCell className="capitalize">{submission.language}</TableCell>
                   <TableCell>

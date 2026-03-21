@@ -3,20 +3,22 @@ import type {
   VoiceAudioSubmissionEntity,
   VoiceAudioSubmissionStatus
 } from "../entities/VoiceAudioSubmission.js";
-import type { PhraseAudio } from "../entities/Phrase.js";
+import type { ContentAudio, ContentType } from "../entities/Content.js";
 
 export interface VoiceAudioSubmissionRepository {
   create(input: {
-    phraseId: string;
+    contentType: ContentType;
+    contentId: string;
     voiceArtistUserId: string;
     voiceArtistProfileId: string;
     language: Language;
-    audio: PhraseAudio;
+    audio: ContentAudio;
   }): Promise<VoiceAudioSubmissionEntity>;
   list(filter: {
     status?: VoiceAudioSubmissionStatus;
     voiceArtistUserId?: string;
-    phraseId?: string;
+    contentType?: ContentType;
+    contentId?: string;
     language?: Language;
   }): Promise<VoiceAudioSubmissionEntity[]>;
   findById(id: string): Promise<VoiceAudioSubmissionEntity | null>;

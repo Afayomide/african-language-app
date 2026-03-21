@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   lessonService,
   aiService,
-  phraseService,
+  expressionService,
   questionService,
 } from "@/services";
-import { Lesson, Language, Level, Phrase, ExerciseQuestion, LessonAuditResult } from "@/types";
+import { Lesson, Language, Level, Expression, ExerciseQuestion, LessonAuditResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,9 @@ import {
   Trash,
   Volume2,
   Plus,
+  Mic,
   LayoutList,
+  BookOpen,
 } from "lucide-react";
 import {
   Table,
@@ -84,16 +86,16 @@ export default function EditLessonPage({
   const [proverbs, setProverbs] = useState<
     Array<{ text: string; translation: string; contextNote: string }>
   >([]);
-  const [phrases, setPhrases] = useState<Phrase[]>([]);
-  const [isLoadingPhrases, setIsLoadingPhrases] = useState(false);
-  const [phraseSearch, setPhraseSearch] = useState("");
-  const [phrasePage, setPhrasePage] = useState(1);
-  const [phraseLimit, setPhraseLimit] = useState(20);
-  const [phraseTotal, setPhraseTotal] = useState(0);
-  const [phraseTotalPages, setPhraseTotalPages] = useState(1);
+  const [phrases, setExpressions] = useState<Expression[]>([]);
+  const [isLoadingExpressions, setIsLoadingExpressions] = useState(false);
+  const [phraseSearch, setExpressionSearch] = useState("");
+  const [phrasePage, setExpressionPage] = useState(1);
+  const [phraseLimit, setExpressionLimit] = useState(20);
+  const [phraseTotal, setExpressionTotal] = useState(0);
+  const [phraseTotalPages, setExpressionTotalPages] = useState(1);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([]);
-  const [selectedPhraseIds, setSelectedPhraseIds] = useState<string[]>([]);
+  const [selectedExpressionIds, setSelectedExpressionIds] = useState<string[]>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [audit, setAudit] = useState<LessonAuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -122,7 +124,7 @@ export default function EditLessonPage({
 
   useEffect(() => {
     if (!lesson?._id) return;
-    fetchLessonPhrases(lesson._id);
+    fetchLessonExpressions(lesson._id);
   }, [lesson?._id, phraseSearch, phrasePage, phraseLimit]);
 
   useEffect(() => {
@@ -131,11 +133,11 @@ export default function EditLessonPage({
   }, [lesson?._id]);
 
   useEffect(() => {
-    setPhrasePage(1);
+    setExpressionPage(1);
   }, [phraseSearch, lesson?._id]);
 
   useEffect(() => {
-    setSelectedPhraseIds((prev) =>
+    setSelectedExpressionIds((prev) =>
       prev.filter((item) => phrases.some((phrase) => phrase._id === item)),
     );
   }, [phrases]);
@@ -163,27 +165,27 @@ export default function EditLessonPage({
     }
   }
 
-  async function fetchLessonPhrases(lessonId: string) {
-    setIsLoadingPhrases(true);
+  async function fetchLessonExpressions(lessonId: string) {
+    setIsLoadingExpressions(true);
     try {
-      const data = await phraseService.listPhrasesPage({
+      const data = await expressionService.listExpressionsPage({
         lessonId,
         q: phraseSearch || undefined,
         page: phrasePage,
         limit: phraseLimit,
       });
-      setPhrases(
+      setExpressions(
         [...data.items].sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         ),
       );
-      setPhraseTotal(data.total);
-      setPhraseTotalPages(data.pagination.totalPages);
+      setExpressionTotal(data.total);
+      setExpressionTotalPages(data.pagination.totalPages);
     } catch (error) {
-      toast.error("Failed to fetch lesson phrases");
+      toast.error("Failed to fetch lesson expressions");
     } finally {
-      setIsLoadingPhrases(false);
+      setIsLoadingExpressions(false);
     }
   }
 
@@ -260,6 +262,15 @@ export default function EditLessonPage({
     }
   };
 
+  const handleRequestAudio = async () => {
+    try {
+      await lessonService.requestLessonAudio(id);
+      toast.success("Audio requested for this lesson");
+    } catch {
+      toast.error("Failed to request audio");
+    }
+  };
+
   const handleFinishQuestion = async (questionId: string) => {
     try {
       await questionService.finishQuestion(questionId);
@@ -329,18 +340,19 @@ export default function EditLessonPage({
     }
   };
 
-  const handleGeneratePhrases = async () => {
+  const handleGenerateExpressions = async () => {
     if (!lesson) return;
     setIsGenerating(true);
     try {
-      await aiService.generatePhrases(
+      await aiService.generateExpressions(
         lesson._id,
+        lesson.level,
         undefined,
         extraInstructions.trim() || undefined,
       );
-      toast.success("AI phrases generated");
+      toast.success("AI expressions generated");
       setIsGenerateDialogOpen(false);
-      fetchLessonPhrases(lesson._id);
+      fetchLessonExpressions(lesson._id);
     } catch (error) {
       toast.error("AI phrase generation failed");
     } finally {
@@ -358,7 +370,7 @@ export default function EditLessonPage({
       await fetchLesson();
       if (lesson?._id) {
         await Promise.all([
-          fetchLessonPhrases(lesson._id),
+          fetchLessonExpressions(lesson._id),
           fetchLessonQuestions(lesson._id),
         ]);
       }
@@ -375,31 +387,31 @@ export default function EditLessonPage({
     }
   };
 
-  const handleDeletePhrase = async (phraseId: string) => {
-    if (!confirm("Delete this phrase?")) return;
+  const handleDeleteExpression = async (expressionId: string) => {
+    if (!confirm("Delete this expression?")) return;
     try {
-      await phraseService.deletePhrase(phraseId);
-      toast.success("Phrase deleted");
-      if (lesson) fetchLessonPhrases(lesson._id);
+      await expressionService.deleteExpression(expressionId);
+      toast.success("Expression deleted");
+      if (lesson) fetchLessonExpressions(lesson._id);
     } catch (error) {
       toast.error("Failed to delete phrase");
     }
   };
 
-  const togglePhraseSelection = (phraseId: string) => {
-    setSelectedPhraseIds((prev) =>
-      prev.includes(phraseId)
-        ? prev.filter((id) => id !== phraseId)
-        : [...prev, phraseId],
+  const toggleExpressionSelection = (expressionId: string) => {
+    setSelectedExpressionIds((prev) =>
+      prev.includes(expressionId)
+        ? prev.filter((id) => id !== expressionId)
+        : [...prev, expressionId],
     );
   };
 
-  const toggleSelectAllPhrases = () => {
-    if (selectedPhraseIds.length === phrases.length) {
-      setSelectedPhraseIds([]);
+  const toggleSelectAllExpressions = () => {
+    if (selectedExpressionIds.length === phrases.length) {
+      setSelectedExpressionIds([]);
       return;
     }
-    setSelectedPhraseIds(phrases.map((phrase) => phrase._id));
+    setSelectedExpressionIds(phrases.map((phrase) => phrase._id));
   };
 
   const toggleQuestionSelection = (questionId: string) => {
@@ -418,32 +430,32 @@ export default function EditLessonPage({
     setSelectedQuestionIds(questions.map((question) => question._id));
   };
 
-  const handleBulkDeletePhrases = async () => {
-    if (selectedPhraseIds.length === 0) return;
-    if (!confirm(`Delete ${selectedPhraseIds.length} selected phrase(s)?`)) return;
+  const handleBulkDeleteExpressions = async () => {
+    if (selectedExpressionIds.length === 0) return;
+    if (!confirm(`Delete ${selectedExpressionIds.length} selected phrase(s)?`)) return;
     try {
-      await Promise.all(selectedPhraseIds.map((phraseId) => phraseService.deletePhrase(phraseId)));
-      toast.success("Selected phrases deleted");
-      setSelectedPhraseIds([]);
-      if (lesson?._id) await fetchLessonPhrases(lesson._id);
+      await Promise.all(selectedExpressionIds.map((expressionId) => expressionService.deleteExpression(expressionId)));
+      toast.success("Selected expressions deleted");
+      setSelectedExpressionIds([]);
+      if (lesson?._id) await fetchLessonExpressions(lesson._id);
     } catch (error) {
-      toast.error("Failed to delete selected phrases");
+      toast.error("Failed to delete selected expressions");
     }
   };
 
-  const handleBulkFinishPhrases = async () => {
+  const handleBulkFinishExpressions = async () => {
     const finishable = phrases
-      .filter((phrase) => selectedPhraseIds.includes(phrase._id) && phrase.status === "draft")
+      .filter((phrase) => selectedExpressionIds.includes(phrase._id) && phrase.status === "draft")
       .map((phrase) => phrase._id);
     if (finishable.length === 0) {
-      toast.error("No selected draft phrases to finish");
+      toast.error("No selected draft expressions to finish");
       return;
     }
     try {
-      await Promise.all(finishable.map((phraseId) => phraseService.finishPhrase(phraseId)));
+      await Promise.all(finishable.map((expressionId) => expressionService.finishExpression(expressionId)));
       toast.success(`Marked ${finishable.length} phrase(s) as finished`);
-      setSelectedPhraseIds([]);
-      if (lesson?._id) await fetchLessonPhrases(lesson._id);
+      setSelectedExpressionIds([]);
+      if (lesson?._id) await fetchLessonExpressions(lesson._id);
     } catch (error) {
       toast.error("Failed to mark selected phrases as finished");
     }
@@ -480,11 +492,11 @@ export default function EditLessonPage({
     }
   };
 
-  const handleFinishPhrase = async (phraseId: string) => {
+  const handleFinishExpression = async (expressionId: string) => {
     try {
-      await phraseService.finishPhrase(phraseId);
-      toast.success("Phrase sent to admin for publish");
-      if (lesson) fetchLessonPhrases(lesson._id);
+      await expressionService.finishExpression(expressionId);
+      toast.success("Expression sent to admin for publish");
+      if (lesson) fetchLessonExpressions(lesson._id);
     } catch (error) {
       toast.error("Failed to mark phrase as finished");
     }
@@ -603,14 +615,14 @@ export default function EditLessonPage({
                 className="h-11 rounded-xl border-2 font-bold hover:bg-purple-50 hover:text-purple-600 transition-all"
               >
                 <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
-                Generate Phrases
+                Generate Expressions
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Generate Phrases With AI</DialogTitle>
+                <DialogTitle>Generate Expressions With AI</DialogTitle>
                 <DialogDescription>
-                  Add optional generation guidance before creating phrases.
+                  Add optional generation guidance before creating expressions.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
@@ -632,7 +644,7 @@ export default function EditLessonPage({
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleGeneratePhrases} disabled={isGenerating}>
+                <Button onClick={handleGenerateExpressions} disabled={isGenerating}>
                   {isGenerating ? "Generating..." : "Generate"}
                 </Button>
               </DialogFooter>
@@ -655,6 +667,22 @@ export default function EditLessonPage({
           >
             <LayoutList className="mr-2 h-5 w-5" />
             Build Lesson Flow
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/lessons/${id}/review`)}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-violet-50 hover:text-violet-700 transition-all border-violet-200 text-violet-700"
+          >
+            <BookOpen className="mr-2 h-5 w-5" />
+            Review Lesson Flow
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRequestAudio}
+            className="h-11 rounded-xl border-2 font-bold hover:bg-violet-50 hover:text-violet-700 transition-all border-violet-200 text-violet-700"
+          >
+            <Mic className="mr-2 h-5 w-5" />
+            Request Audio
           </Button>
           <Button
             onClick={handleSubmit}
@@ -971,9 +999,10 @@ export default function EditLessonPage({
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>Stages: <span className="font-bold">{audit.metrics.stageCount}</span></div>
                     <div>Blocks: <span className="font-bold">{audit.metrics.blockCount}</span></div>
-                    <div>Phrases: <span className="font-bold">{audit.metrics.uniquePhraseCount}</span></div>
+                    <div>Content Items: <span className="font-bold">{audit.metrics.uniqueContentCount}</span></div>
                     <div>Questions: <span className="font-bold">{audit.metrics.questionCount}</span></div>
-                    <div className="col-span-2">Listening: <span className="font-bold">{audit.metrics.listeningQuestionCount}</span></div>
+                    <div>Listening: <span className="font-bold">{audit.metrics.listeningQuestionCount}</span></div>
+                    <div>Scenario: <span className="font-bold">{audit.metrics.scenarioQuestionCount}</span></div>
                   </div>
                   <div className="max-h-64 space-y-2 overflow-y-auto">
                     {audit.findings.length === 0 ? (
@@ -1007,41 +1036,41 @@ export default function EditLessonPage({
       <Card className="border-2 border-primary/10 shadow-xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary/5">
           <CardTitle className="text-xl font-bold text-primary">
-            Lesson Phrases
+            Lesson Expressions
           </CardTitle>
         </CardHeader>
         <CardContent>
           <DataTableControls
             search={phraseSearch}
-            onSearchChange={setPhraseSearch}
+            onSearchChange={setExpressionSearch}
             page={phrasePage}
             limit={phraseLimit}
             onLimitChange={(value) => {
-              setPhraseLimit(value);
-              setPhrasePage(1);
+              setExpressionLimit(value);
+              setExpressionPage(1);
             }}
             totalPages={phraseTotalPages}
             total={phraseTotal}
-            label="Search phrases"
-            onPrev={() => setPhrasePage((prev) => Math.max(1, prev - 1))}
+            label="Search expressions"
+            onPrev={() => setExpressionPage((prev) => Math.max(1, prev - 1))}
             onNext={() =>
-              setPhrasePage((prev) => Math.min(phraseTotalPages, prev + 1))
+              setExpressionPage((prev) => Math.min(phraseTotalPages, prev + 1))
             }
           />
           <div className="mb-4 mt-4 flex justify-end">
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={handleBulkDeletePhrases}
-                disabled={selectedPhraseIds.length === 0}
+                onClick={handleBulkDeleteExpressions}
+                disabled={selectedExpressionIds.length === 0}
                 className={TABLE_BULK_BUTTON_CLASS.delete}
               >
-                Bulk Delete ({selectedPhraseIds.length})
+                Bulk Delete ({selectedExpressionIds.length})
               </Button>
               <Button
                 variant="outline"
-                onClick={handleBulkFinishPhrases}
-                disabled={selectedPhraseIds.length === 0}
+                onClick={handleBulkFinishExpressions}
+                disabled={selectedExpressionIds.length === 0}
                 className={TABLE_BULK_BUTTON_CLASS.finish}
               >
                 Bulk Finish
@@ -1049,11 +1078,11 @@ export default function EditLessonPage({
               <Button
                 onClick={() =>
                   router.push(
-                    `/phrases/new?language=${lesson.language}&lessonId=${lesson._id}`,
+                    `/expressions/new?language=${lesson.language}&lessonId=${lesson._id}`,
                   )
                 }
               >
-                Add Phrase
+                Add Expression
               </Button>
             </div>
           </div>
@@ -1065,9 +1094,9 @@ export default function EditLessonPage({
                     type="checkbox"
                     checked={
                       phrases.length > 0 &&
-                      selectedPhraseIds.length === phrases.length
+                      selectedExpressionIds.length === phrases.length
                     }
-                    onChange={toggleSelectAllPhrases}
+                    onChange={toggleSelectAllExpressions}
                   />
                 </TableHead>
                 <TableHead className="font-bold text-primary pl-8">
@@ -1089,16 +1118,16 @@ export default function EditLessonPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingPhrases ? (
+              {isLoadingExpressions ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
-                    Loading phrases...
+                    Loading expressions...
                   </TableCell>
                 </TableRow>
               ) : phrases.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
-                    No phrases for this lesson yet.
+                    No expressions for this lesson yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -1110,8 +1139,8 @@ export default function EditLessonPage({
                     <TableCell className="pl-8">
                       <input
                         type="checkbox"
-                        checked={selectedPhraseIds.includes(phrase._id)}
-                        onChange={() => togglePhraseSelection(phrase._id)}
+                        checked={selectedExpressionIds.includes(phrase._id)}
+                        onChange={() => toggleExpressionSelection(phrase._id)}
                       />
                     </TableCell>
                     <TableCell className="pl-8 font-bold text-foreground">
@@ -1147,7 +1176,7 @@ export default function EditLessonPage({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => router.push(`/phrases/${phrase._id}`)}
+                          onClick={() => router.push(`/expressions/${phrase._id}`)}
                           title="Edit"
                           className={TABLE_ACTION_ICON_CLASS.edit}
                         >
@@ -1157,7 +1186,7 @@ export default function EditLessonPage({
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleFinishPhrase(phrase._id)}
+                            onClick={() => handleFinishExpression(phrase._id)}
                             title="Mark as finished"
                             className={TABLE_ACTION_ICON_CLASS.finish}
                           >
@@ -1167,7 +1196,7 @@ export default function EditLessonPage({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeletePhrase(phrase._id)}
+                          onClick={() => handleDeleteExpression(phrase._id)}
                           title="Delete"
                           className={TABLE_ACTION_ICON_CLASS.delete}
                         >
@@ -1230,7 +1259,7 @@ export default function EditLessonPage({
                   Type
                 </TableHead>
                 <TableHead className="font-bold text-primary">Prompt</TableHead>
-                <TableHead className="font-bold text-primary">Phrase</TableHead>
+                <TableHead className="font-bold text-primary">Expression</TableHead>
                 <TableHead className="font-bold text-primary">Status</TableHead>
                 <TableHead className="font-bold text-primary">
                   Created At
@@ -1268,9 +1297,7 @@ export default function EditLessonPage({
                     </TableCell>
                     <TableCell>{question.promptTemplate}</TableCell>
                     <TableCell>
-                      {typeof question.phraseId === "string"
-                        ? question.phraseId
-                        : question.phraseId.text}
+                      {(typeof question.source === "string" ? question.source : question.source?.text) || "-"}
                     </TableCell>
                     <TableCell>
                       <Badge

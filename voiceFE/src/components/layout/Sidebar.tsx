@@ -8,7 +8,7 @@ import { authService } from "@/services/auth";
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Phrases", href: "/phrases", icon: Mic2 }
+  { name: "Recording Queue", href: "/content", icon: Mic2 }
 ];
 
 export default function Sidebar() {

@@ -10,8 +10,9 @@ export type QuestionListFilter = {
 
 export type QuestionCreateInput = {
   lessonId: string;
-  phraseId: string;
-  relatedPhraseIds?: string[];
+  sourceType?: QuestionEntity["sourceType"];
+  sourceId?: string;
+  relatedSourceRefs?: QuestionEntity["relatedSourceRefs"];
   translationIndex?: number;
   type: QuestionEntity["type"];
   subtype: QuestionEntity["subtype"];
@@ -25,8 +26,9 @@ export type QuestionCreateInput = {
 };
 
 export type QuestionUpdateInput = Partial<{
-  phraseId: string;
-  relatedPhraseIds: string[];
+  sourceType: QuestionEntity["sourceType"];
+  sourceId: string;
+  relatedSourceRefs: QuestionEntity["relatedSourceRefs"];
   translationIndex: number;
   type: QuestionEntity["type"];
   subtype: QuestionEntity["subtype"];
@@ -46,7 +48,7 @@ export interface QuestionRepository {
   updateById(id: string, update: QuestionUpdateInput): Promise<QuestionEntity | null>;
   softDeleteById(id: string, now: Date): Promise<QuestionEntity | null>;
   softDeleteByLessonId(lessonId: string, now: Date): Promise<void>;
-  softDeleteByPhraseId(phraseId: string, now: Date): Promise<void>;
+  softDeleteBySource(sourceType: NonNullable<QuestionEntity["sourceType"]>, sourceId: string, now: Date): Promise<void>;
   restoreByLessonId(lessonId: string): Promise<void>;
   publishById(id: string): Promise<QuestionEntity | null>;
   finishById(id: string): Promise<QuestionEntity | null>;

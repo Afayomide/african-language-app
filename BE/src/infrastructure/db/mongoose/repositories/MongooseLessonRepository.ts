@@ -16,6 +16,7 @@ type LessonPersistenceDoc = {
   orderIndex: number;
   description?: string | null;
   topics?: string[] | null;
+  kind?: LessonEntity["kind"] | null;
   proverbs?: Array<{ text?: string | null; translation?: string | null; contextNote?: string | null }> | null;
   stages?: Array<{
     _id?: { toString(): string } | string | null;
@@ -23,8 +24,9 @@ type LessonPersistenceDoc = {
     description?: string | null;
     orderIndex?: number | null;
     blocks?: Array<{
-      type?: "text" | "phrase" | "proverb" | "question" | null;
+      type?: "text" | "content" | "proverb" | "question" | null;
       content?: string | null;
+      contentType?: "word" | "expression" | "sentence" | null;
       refId?: { toString(): string } | string | null;
       translationIndex?: number | null;
     }> | null;
@@ -49,18 +51,20 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
     : [];
 
   const mapBlocks = (rows: Array<{
-    type?: "text" | "phrase" | "proverb" | "question" | null;
+    type?: "text" | "content" | "proverb" | "question" | null;
     content?: string | null;
+    contentType?: "word" | "expression" | "sentence" | null;
     refId?: { toString(): string } | string | null;
     translationIndex?: number | null;
   }> | null | undefined): LessonBlock[] =>
     Array.isArray(rows)
       ? rows.map((row) => {
-        const blockType = String(row.type || "") as "text" | "phrase" | "proverb" | "question";
-        if (blockType === "phrase") {
+        const blockType = String(row.type || "") as "text" | "content" | "proverb" | "question";
+        if (blockType === "content") {
           const rawIndex = Number(row.translationIndex ?? 0);
           return {
-            type: "phrase" as const,
+            type: "content" as const,
+            contentType: row.contentType === "sentence" || row.contentType === "word" ? row.contentType : "expression",
             refId: row.refId ? String(row.refId) : "",
             translationIndex: Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : 0
           };
@@ -100,6 +104,7 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
     orderIndex: doc.orderIndex,
     description: String(doc.description || ""),
     topics: Array.isArray(doc.topics) ? doc.topics.map(String) : [],
+    kind: doc.kind === "review" ? "review" : "core",
     proverbs: proverbRows,
     stages: stageRows,
     status: doc.status,

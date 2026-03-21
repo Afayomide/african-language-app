@@ -1,6 +1,12 @@
 import type {
+  GenerateChaptersInput,
+  GenerateWordsInput,
+  LlmGeneratedChapter,
+  LlmGeneratedWord,
   GeneratePhrasesInput,
   LlmGeneratedPhrase,
+  GenerateSentencesInput,
+  LlmGeneratedSentence,
   LlmGeneratedProverb,
   LlmLessonSuggestion
 } from "./types.js";
@@ -28,6 +34,36 @@ function containsSentencePunctuation(value: string) {
 
 function normalize(value: string) {
   return String(value || "").trim().toLowerCase();
+}
+
+function inferSentenceComponentType(value: string): "word" | "expression" {
+  return splitWords(value).length <= 1 ? "word" : "expression";
+}
+
+function isIgnorableSentenceGap(value: string) {
+  return String(value || "").replace(/[\s.,!?;:'"()\-–—]+/g, "").length === 0;
+}
+
+function sentenceComponentsCoverText(
+  sentence: string,
+  components: Array<{ text: string }>
+) {
+  const source = String(sentence || "");
+  const lowerSource = source.toLocaleLowerCase();
+  let cursor = 0;
+
+  for (const component of components) {
+    const text = String(component.text || "").trim();
+    if (!text) continue;
+    const matchIndex = lowerSource.indexOf(text.toLocaleLowerCase(), cursor);
+    if (matchIndex < 0) return false;
+
+    const skipped = source.slice(cursor, matchIndex);
+    if (!isIgnorableSentenceGap(skipped)) return false;
+    cursor = matchIndex + text.length;
+  }
+
+  return isIgnorableSentenceGap(source.slice(cursor));
 }
 
 function looksEnglishOnly(value: string) {
@@ -153,6 +189,38 @@ function phraseReasons(
   return reasons;
 }
 
+function wordReasons(
+  word: LlmGeneratedWord,
+  input: GenerateWordsInput,
+  seenTexts: Set<string>
+) {
+  const reasons: string[] = [];
+  const text = String(word.text || "").trim();
+  const words = splitWords(text);
+  const translations = uniqueStrings(
+    Array.isArray(word.translations) ? word.translations.map((item) => String(item || "").trim()) : []
+  );
+  const normalizedText = normalize(text);
+  const existingWords = new Set((input.existingWords || []).map(normalize));
+
+  if (!text) reasons.push("empty text");
+  if (seenTexts.has(normalizedText)) reasons.push("duplicate word in batch");
+  if (existingWords.has(normalizedText)) reasons.push("duplicate word in existing data");
+  if (translations.length === 0) reasons.push("missing translations");
+  if (words.length !== 1) reasons.push("word must be a single token");
+  if (containsSentencePunctuation(text)) reasons.push("word contains sentence punctuation");
+  if (translations.some((item) => hasSlashSeparatedMeaning(item))) reasons.push("slash separated meaning");
+
+  if (word.difficulty !== undefined) {
+    const difficulty = Number(word.difficulty);
+    if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5) {
+      reasons.push("invalid difficulty");
+    }
+  }
+
+  return reasons;
+}
+
 export function validateGeneratedPhrases(
   phrases: LlmGeneratedPhrase[],
   input: GeneratePhrasesInput
@@ -169,6 +237,192 @@ export function validateGeneratedPhrases(
     }
     seenTexts.add(normalize(phrase.text));
     accepted.push(phrase);
+  }
+
+  return { accepted, rejected };
+}
+
+export function validateGeneratedWords(
+  words: LlmGeneratedWord[],
+  input: GenerateWordsInput
+): ValidationResult<LlmGeneratedWord> {
+  const accepted: LlmGeneratedWord[] = [];
+  const rejected: Array<{ item: LlmGeneratedWord; reasons: string[] }> = [];
+  const seenTexts = new Set<string>();
+
+  for (const word of words) {
+    const reasons = wordReasons(word, input, seenTexts);
+    if (reasons.length > 0) {
+      rejected.push({ item: word, reasons });
+      continue;
+    }
+    seenTexts.add(normalize(word.text));
+    accepted.push(word);
+  }
+
+  return { accepted, rejected };
+}
+
+function chapterReasons(
+  chapter: LlmGeneratedChapter,
+  input: GenerateChaptersInput,
+  seenTitles: Set<string>
+) {
+  const reasons: string[] = [];
+  const title = String(chapter.title || "").trim();
+  const description = String(chapter.description || "").trim();
+  const normalizedTitle = normalize(title);
+  const titleWords = splitWords(title);
+  const descriptionWords = splitWords(description);
+  const existingTitles = new Set((input.existingChapterTitles || []).map(normalize));
+  const themeAnchors = extractThemeAnchors({
+    topic: input.topic,
+    curriculumInstruction: input.extraInstructions
+  });
+
+  if (!title) reasons.push("empty title");
+  if (!description) reasons.push("missing description");
+  if (seenTitles.has(normalizedTitle)) reasons.push("duplicate chapter in batch");
+  if (existingTitles.has(normalizedTitle)) reasons.push("duplicate chapter in existing data");
+  if (title && !looksEnglishOnly(title)) reasons.push("title not English-like");
+  if (description && !looksEnglishOnly(description)) reasons.push("description not English-like");
+  if (titleWords.length < 2 || titleWords.length > 8) reasons.push("invalid chapter title length");
+  if (descriptionWords.length < 8) reasons.push("chapter description too short");
+  if (input.topic && themeAnchors.length > 0 && countThemeAnchorMatches([title, description], themeAnchors) === 0) {
+    reasons.push("chapter not aligned with requested theme");
+  }
+
+  return reasons;
+}
+
+export function validateGeneratedChapters(
+  chapters: LlmGeneratedChapter[],
+  input: GenerateChaptersInput
+): ValidationResult<LlmGeneratedChapter> {
+  const accepted: LlmGeneratedChapter[] = [];
+  const rejected: Array<{ item: LlmGeneratedChapter; reasons: string[] }> = [];
+  const seenTitles = new Set<string>();
+
+  for (const chapter of chapters) {
+    const reasons = chapterReasons(chapter, input, seenTitles);
+    if (reasons.length > 0) {
+      rejected.push({ item: chapter, reasons });
+      continue;
+    }
+    seenTitles.add(normalize(chapter.title));
+    accepted.push({
+      title: String(chapter.title).trim(),
+      description: String(chapter.description).trim()
+    });
+  }
+
+  return { accepted, rejected };
+}
+
+function sentenceReasons(
+  sentence: LlmGeneratedSentence,
+  input: GenerateSentencesInput,
+  seenTexts: Set<string>
+) {
+  const reasons: string[] = [];
+  const text = String(sentence.text || "").trim();
+  const translations = uniqueStrings(
+    Array.isArray(sentence.translations) ? sentence.translations.map((item) => String(item || "").trim()) : []
+  );
+  const components = Array.isArray(sentence.components) ? sentence.components : [];
+  const normalizedText = normalize(text);
+  const existingSentences = new Set((input.existingSentences || []).map(normalize));
+  const allowedExpressions = new Set(
+    (input.allowedExpressions || []).map((item) => `expression:${normalize(item.text)}`)
+  );
+  const allowedWords = new Set(
+    (input.allowedWords || []).map((item) => `word:${normalize(item.text)}`)
+  );
+  const hasExplicitInventory = allowedExpressions.size > 0 || allowedWords.size > 0;
+  const words = splitWords(text);
+  const normalizedSentence = normalize(text);
+  const componentTexts = components.map((component) => ({
+    text: String(component?.text || "").trim()
+  }));
+  const normalizedComponents = components.map((component) => {
+    const componentText = String(component?.text || "").trim();
+    return {
+      text: componentText,
+      normalizedText: normalize(componentText),
+      type: inferSentenceComponentType(componentText),
+      role: component?.role === "support" ? "support" : component?.role === "core" ? "core" : "",
+      translations: uniqueStrings(
+        Array.isArray(component?.translations) ? component.translations.map((item) => String(item || "").trim()) : []
+      )
+    };
+  });
+
+  if (!text) reasons.push("empty text");
+  if (seenTexts.has(normalizedText)) reasons.push("duplicate sentence in batch");
+  if (existingSentences.has(normalizedText)) reasons.push("duplicate sentence in existing data");
+  if (translations.length === 0) reasons.push("missing translations");
+  if (components.length === 0) reasons.push("missing components");
+  if (words.length < 2) reasons.push("sentence too short");
+  if (components.length > 0 && !sentenceComponentsCoverText(text, componentTexts)) {
+    reasons.push("components do not cover full sentence");
+  }
+
+  if (input.level === "beginner" && words.length > 8) reasons.push("beginner sentence too long");
+  if (input.level === "intermediate" && words.length > 12) reasons.push("intermediate sentence too long");
+
+  for (const component of normalizedComponents) {
+    const type = component.type;
+    const componentText = component.normalizedText;
+    const componentTranslations = component.translations;
+    const role = component.role;
+    if (!type || !componentText) {
+      reasons.push("invalid component");
+      continue;
+    }
+    if (componentTranslations.length === 0) reasons.push("component missing translations");
+    if (hasExplicitInventory && !role) reasons.push("component missing role");
+    if (!hasExplicitInventory && !role) reasons.push("component missing role");
+    const key = `${type}:${componentText}`;
+    if (hasExplicitInventory && type === "word" && !allowedWords.has(key)) reasons.push("unknown word component");
+    if (hasExplicitInventory && type === "expression" && !allowedExpressions.has(key)) reasons.push("unknown expression component");
+    if (!normalizedSentence.includes(componentText)) reasons.push("component text missing from sentence");
+  }
+
+  if (!hasExplicitInventory) {
+    const supportExpressions = normalizedComponents.filter((component) => component.role === "support" && component.type === "expression");
+    const supportWords = normalizedComponents.filter((component) => component.role === "support" && component.type === "word");
+    const coreComponents = normalizedComponents.filter((component) => component.role === "core");
+    if (supportExpressions.length > 1) reasons.push("too many support expressions");
+    if (supportWords.length > 2) reasons.push("too many support words");
+    if (coreComponents.length === 0) reasons.push("missing core components");
+    if (
+      coreComponents.length === 1 &&
+      coreComponents[0].type === "expression" &&
+      coreComponents[0].normalizedText === normalizedSentence
+    ) {
+      reasons.push("bare expression used as sentence");
+    }
+  }
+
+  return reasons;
+}
+
+export function validateGeneratedSentences(
+  sentences: LlmGeneratedSentence[],
+  input: GenerateSentencesInput
+): ValidationResult<LlmGeneratedSentence> {
+  const accepted: LlmGeneratedSentence[] = [];
+  const rejected: Array<{ item: LlmGeneratedSentence; reasons: string[] }> = [];
+  const seenTexts = new Set<string>();
+
+  for (const sentence of sentences) {
+    const reasons = sentenceReasons(sentence, input, seenTexts);
+    if (reasons.length > 0) {
+      rejected.push({ item: sentence, reasons });
+      continue;
+    }
+    seenTexts.add(normalize(sentence.text));
+    accepted.push(sentence);
   }
 
   return { accepted, rejected };
@@ -250,8 +504,8 @@ export function validateLessonSuggestion(
   const objectives = Array.isArray(suggestion.objectives)
     ? suggestion.objectives.map((item) => String(item || "").trim()).filter(Boolean)
     : [];
-  const seedPhrases = Array.isArray(suggestion.seedPhrases)
-    ? suggestion.seedPhrases.map((item) => String(item || "").trim()).filter(Boolean)
+  const seedExpressions = Array.isArray(suggestion.seedExpressions)
+    ? suggestion.seedExpressions.map((item) => String(item || "").trim()).filter(Boolean)
     : [];
   const normalizedTitle = normalize(title);
   const existingTitles = new Set([
@@ -276,10 +530,10 @@ export function validateLessonSuggestion(
   if (description && !looksEnglishOnly(description)) reasons.push("description not English-like");
   if (objectives.length === 0) reasons.push("missing objectives");
   if (objectives.some((item) => !looksEnglishOnly(item))) reasons.push("objective not English-like");
-  if (seedPhrases.length < 4 || seedPhrases.length > 8) reasons.push("invalid seed phrase count");
-  if (seedPhrases.some((item) => looksEnglishSeedPhrase(item))) reasons.push("seed phrase looks English");
-  if (input.level === "beginner" && seedPhrases.some((item) => splitWords(item).length > 3)) {
-    reasons.push("beginner seed phrase too long");
+  if (seedExpressions.length < 4 || seedExpressions.length > 8) reasons.push("invalid seed expression count");
+  if (seedExpressions.some((item) => looksEnglishSeedPhrase(item))) reasons.push("seed expression looks English");
+  if (input.level === "beginner" && seedExpressions.some((item) => splitWords(item).length > 3)) {
+    reasons.push("beginner seed expression too long");
   }
 
   if (themeAnchors.length > 0) {
@@ -289,9 +543,9 @@ export function validateLessonSuggestion(
     if (titleDescriptionMatches === 0) reasons.push("title and description not aligned with unit theme");
   }
 
-  const duplicateSeedPhrases = seedPhrases.filter((item) => existingPhraseTexts.has(normalize(item)));
-  if (duplicateSeedPhrases.length >= Math.max(3, Math.ceil(seedPhrases.length * 0.6))) {
-    reasons.push("too many existing seed phrases reused");
+  const duplicateSeedPhrases = seedExpressions.filter((item) => existingPhraseTexts.has(normalize(item)));
+  if (duplicateSeedPhrases.length >= Math.max(3, Math.ceil(seedExpressions.length * 0.6))) {
+    reasons.push("too many existing seed expressions reused");
   }
 
   const proverbPayload = Array.isArray(suggestion.proverbs) ? suggestion.proverbs : [];
@@ -307,10 +561,10 @@ export function validateLessonSuggestion(
   }
 
   const nonEnglishObjectives = objectives.filter((item) => !looksEnglishOnly(item));
-  const englishLikeSeedPhrases = seedPhrases.filter((item) => looksEnglishSeedPhrase(item));
+  const englishLikeSeedPhrases = seedExpressions.filter((item) => looksEnglishSeedPhrase(item));
   const tooLongBeginnerSeedPhrases =
     input.level === "beginner"
-      ? seedPhrases.filter((item) => splitWords(item).length > 3)
+      ? seedExpressions.filter((item) => splitWords(item).length > 3)
       : [];
   const reusedSeedPhrases = duplicateSeedPhrases;
   const reusedProverbs = proverbTexts.filter((item) => existingProverbTexts.has(normalize(item)));

@@ -82,8 +82,8 @@ export const learnerLessonService = {
     return response.data;
   },
 
-  async getLessonPhrases(lessonId: string) {
-    const response = await api.get(feLearnerRoutes.lessonPhrases(lessonId));
+  async getLessonExpressions(lessonId: string) {
+    const response = await api.get(feLearnerRoutes.lessonExpressions(lessonId));
     return response.data;
   },
 
@@ -97,6 +97,22 @@ export const learnerLessonService = {
     return response.data;
   },
 
+  async comparePronunciation(
+    contentType: "word" | "expression" | "sentence",
+    contentId: string,
+    payload: {
+      audioUpload?: {
+        base64?: string;
+        mimeType?: string;
+        analysis?: Record<string, unknown>;
+      };
+      audioAnalysis?: Record<string, unknown>;
+    }
+  ) {
+    const response = await api.post(feLearnerRoutes.comparePronunciation(contentType, contentId), payload);
+    return response.data;
+  },
+
   async completeStep(lessonId: string, stepKey: string, score?: number) {
     const response = await api.put(feLearnerRoutes.completeStep(lessonId, stepKey), { score });
     return response.data;
@@ -105,9 +121,32 @@ export const learnerLessonService = {
   async completeStage(
     lessonId: string,
     stageIndex: number,
-    payload?: { xpEarned?: number; minutesSpent?: number }
+    payload?: {
+      xpEarned?: number;
+      minutesSpent?: number;
+      questionResults?: Array<{
+        questionId?: string;
+        sourceType?: "word" | "expression" | "sentence";
+        sourceId?: string;
+        questionType?: string;
+        questionSubtype?: string;
+        attempts?: number;
+        incorrectAttempts?: number;
+        correct?: boolean;
+      }>;
+    }
   ) {
     const response = await api.post(feLearnerRoutes.completeStage(lessonId, stageIndex), payload || {});
+    return response.data;
+  },
+
+  async getAdaptiveReviewSuggestion(lessonId: string) {
+    const response = await api.get(feLearnerRoutes.adaptiveReviewSuggestion(lessonId));
+    return response.data;
+  },
+
+  async getAdaptiveReviewFlow(lessonId: string) {
+    const response = await api.get(feLearnerRoutes.adaptiveReviewFlow(lessonId));
     return response.data;
   },
 

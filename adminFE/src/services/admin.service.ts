@@ -1,9 +1,12 @@
 import api from "@/lib/api";
 import { feAdminRoutes } from "@/lib/apiRoutes";
 import {
+  Chapter,
   Lesson,
   Unit,
-  Phrase,
+  Expression,
+  Word,
+  Sentence,
   Proverb,
   Language,
   Level,
@@ -11,7 +14,8 @@ import {
   ExerciseQuestion,
   QuestionType,
   ImageAsset,
-  PhraseImageLink,
+  ExpressionImageLink,
+  SentenceComponentRef,
   Tutor,
   AdminUserRecord,
   UserRole,
@@ -43,7 +47,7 @@ type AudioUploadPayload = {
 
 async function fetchAllPages<T>(
   path: string,
-  key: "lessons" | "phrases" | "proverbs" | "questions",
+  key: "lessons" | "expressions" | "words" | "sentences" | "proverbs" | "questions",
   params?: Record<string, unknown>
 ) {
   const all: T[] = [];
@@ -52,7 +56,9 @@ async function fetchAllPages<T>(
   while (true) {
     const response = await api.get<{
       lessons?: T[];
-      phrases?: T[];
+      expressions?: T[];
+      words?: T[];
+      sentences?: T[];
       proverbs?: T[];
       questions?: T[];
       pagination?: PaginationMeta;
@@ -102,6 +108,11 @@ export const lessonService = {
   async auditLesson(id: string) {
     const response = await api.get<{ audit: LessonAuditResult }>(feAdminRoutes.auditLesson(id));
     return response.data.audit;
+  },
+
+  async requestLessonAudio(id: string) {
+    const response = await api.put<{ lesson: Lesson }>(feAdminRoutes.requestLessonAudio(id));
+    return response.data.lesson;
   },
 
   async createLesson(data: {
@@ -167,9 +178,16 @@ export const lessonService = {
 };
 
 export const unitService = {
-  async listUnits(status?: Status, language?: Language) {
+  async listUnits(
+    statusOrFilters?: Status | { status?: Status; language?: Language; chapterId?: string; kind?: Unit["kind"] },
+    language?: Language
+  ) {
+    const params =
+      typeof statusOrFilters === "object" && statusOrFilters !== null
+        ? statusOrFilters
+        : { status: statusOrFilters, language };
     const response = await api.get<{ units: Unit[] }>(feAdminRoutes.units(), {
-      params: { status, language }
+      params
     });
     return response.data.units || [];
   },
@@ -180,11 +198,20 @@ export const unitService = {
   },
 
   async getDeletedEntries(id: string) {
-    const response = await api.get<{ lessons: Lesson[]; phrases: Phrase[] }>(feAdminRoutes.unitDeletedEntries(id));
+    const response = await api.get<{ lessons: Lesson[]; expressions: Expression[] }>(feAdminRoutes.unitDeletedEntries(id));
     return response.data;
   },
 
-  async createUnit(data: { title: string; description?: string; language: Language; level: Level }) {
+  async createUnit(data: {
+    title: string;
+    description?: string;
+    language: Language;
+    level: Level;
+    chapterId?: string | null;
+    kind?: Unit["kind"];
+    reviewStyle?: Unit["reviewStyle"];
+    reviewSourceUnitIds?: string[];
+  }) {
     const response = await api.post<{ unit: Unit }>(feAdminRoutes.units(), data);
     return response.data.unit;
   },
@@ -203,9 +230,9 @@ export const unitService = {
     return response.data.lesson;
   },
 
-  async restoreDeletedPhrase(unitId: string, phraseId: string) {
-    const response = await api.post<{ phrase: Phrase }>(feAdminRoutes.restoreDeletedUnitPhrase(unitId, phraseId));
-    return response.data.phrase;
+  async restoreDeletedExpression(unitId: string, expressionId: string) {
+    const response = await api.post<{ expression: Expression }>(feAdminRoutes.restoreDeletedUnitExpression(unitId, expressionId));
+    return response.data.expression;
   },
 
   async finishUnit(id: string) {
@@ -229,12 +256,15 @@ export const unitService = {
   async generateBulkUnits(data: {
     language: Language;
     level: Level;
+    chapterId?: string;
     count?: number;
     topic?: string;
   }) {
     const response = await api.post<{
       totalRequested: number;
       createdCount: number;
+      coreCreatedCount?: number;
+      reviewCreatedCount?: number;
       skippedCount: number;
       errorCount: number;
       units: Unit[];
@@ -245,12 +275,66 @@ export const unitService = {
   }
 };
 
-export const phraseService = {
-  async listPhrases(lessonId?: string, status?: Status, language?: Language) {
-    return fetchAllPages<Phrase>(feAdminRoutes.phrases(), "phrases", { lessonId, status, language });
+export const chapterService = {
+  async listChapters(status?: Status, language?: Language) {
+    const response = await api.get<{ chapters: Chapter[] }>(feAdminRoutes.chapters(), {
+      params: { status, language }
+    });
+    return response.data.chapters || [];
   },
 
-  async listPhrasesPage(params?: {
+  async getChapter(id: string) {
+    const response = await api.get<{ chapter: Chapter }>(feAdminRoutes.chapter(id));
+    return response.data.chapter;
+  },
+
+  async createChapter(data: { title: string; description?: string; language: Language; level: Level }) {
+    const response = await api.post<{ chapter: Chapter }>(feAdminRoutes.chapters(), data);
+    return response.data.chapter;
+  },
+
+  async updateChapter(id: string, data: Partial<Chapter>) {
+    const response = await api.put<{ chapter: Chapter }>(feAdminRoutes.chapter(id), data);
+    return response.data.chapter;
+  },
+
+  async deleteChapter(id: string) {
+    await api.delete(feAdminRoutes.chapter(id));
+  },
+
+  async reorderChapters(chapterIds: string[]) {
+    const response = await api.put<{ chapters: Chapter[] }>(feAdminRoutes.reorderChapters(), {
+      chapterIds
+    });
+    return response.data.chapters || [];
+  },
+
+  async generateBulkChapters(data: {
+    language: Language;
+    level: Level;
+    count?: number;
+    topic?: string;
+    extraInstructions?: string;
+  }) {
+    const response = await api.post<{
+      totalRequested: number;
+      createdCount: number;
+      skippedCount: number;
+      errorCount: number;
+      chapters: Chapter[];
+      skipped: { reason: string; title?: string }[];
+      errors: { index?: number; error: string }[];
+    }>(feAdminRoutes.generateBulkChapters(), data);
+    return response.data;
+  }
+};
+
+export const expressionService = {
+  async listExpressions(lessonId?: string, status?: Status, language?: Language) {
+    return fetchAllPages<Expression>(feAdminRoutes.expressions(), "expressions", { lessonId, status, language });
+  },
+
+  async listExpressionsPage(params?: {
     lessonId?: string;
     status?: Status;
     language?: Language;
@@ -258,31 +342,48 @@ export const phraseService = {
     page?: number;
     limit?: number;
   }) {
-    const response = await api.get<{ phrases: Phrase[]; total: number; pagination?: PaginationMeta }>(
-      feAdminRoutes.phrases(),
+    const response = await api.get<{ expressions: Expression[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.expressions(),
       { params }
     );
     return {
-      items: response.data.phrases,
-      total: response.data.total ?? response.data.phrases.length,
+      items: response.data.expressions,
+      total: response.data.total ?? response.data.expressions.length,
       pagination: response.data.pagination ?? {
         page: 1,
-        limit: response.data.phrases.length || 20,
-        total: response.data.phrases.length,
+        limit: response.data.expressions.length || 20,
+        total: response.data.expressions.length,
         totalPages: 1,
         hasPrevPage: false,
         hasNextPage: false
       }
-    } satisfies PaginatedResult<Phrase>;
+    } satisfies PaginatedResult<Expression>;
   },
 
-  async getPhrase(id: string) {
-    const response = await api.get<{ phrase: Phrase }>(feAdminRoutes.phrase(id));
-    return response.data.phrase;
+  async getExpression(id: string) {
+    const response = await api.get<{ expression: Expression }>(feAdminRoutes.expression(id));
+    return response.data.expression;
+  },
+
+  async listExpressionImages(id: string) {
+    const response = await api.get<{ expressionId: string; images: ExpressionImageLink[] }>(feAdminRoutes.expressionImages(id));
+    return response.data.images;
   },
 
   async listPhraseImages(id: string) {
-    const response = await api.get<{ phraseId: string; images: PhraseImageLink[] }>(feAdminRoutes.phraseImages(id));
+    return this.listExpressionImages(id);
+  },
+
+  async linkExpressionImage(
+    id: string,
+    data: {
+      imageAssetId: string;
+      translationIndex?: number | null;
+      isPrimary?: boolean;
+      notes?: string;
+    }
+  ) {
+    const response = await api.post<{ images: ExpressionImageLink[] }>(feAdminRoutes.expressionImages(id), data);
     return response.data.images;
   },
 
@@ -295,11 +396,10 @@ export const phraseService = {
       notes?: string;
     }
   ) {
-    const response = await api.post<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImages(id), data);
-    return response.data.images;
+    return this.linkExpressionImage(id, data);
   },
 
-  async updatePhraseImageLink(
+  async updateExpressionImageLink(
     id: string,
     linkId: string,
     data: {
@@ -309,31 +409,31 @@ export const phraseService = {
       notes?: string;
     }
   ) {
-    const response = await api.put<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImageLink(id, linkId), data);
+    const response = await api.put<{ images: ExpressionImageLink[] }>(feAdminRoutes.expressionImageLink(id, linkId), data);
     return response.data.images;
   },
 
-  async deletePhraseImageLink(id: string, linkId: string) {
-    const response = await api.delete<{ images: PhraseImageLink[] }>(feAdminRoutes.phraseImageLink(id, linkId));
+  async deleteExpressionImageLink(id: string, linkId: string) {
+    const response = await api.delete<{ images: ExpressionImageLink[] }>(feAdminRoutes.expressionImageLink(id, linkId));
     return response.data.images;
   },
 
-  async createPhrase(data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
-    const response = await api.post<{ phrase: Phrase }>(feAdminRoutes.phrases(), data);
-    return response.data.phrase;
+  async createExpression(data: Partial<Expression> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.post<{ expression: Expression }>(feAdminRoutes.expressions(), data);
+    return response.data.expression;
   },
 
-  async updatePhrase(id: string, data: Partial<Phrase> & { audioUpload?: AudioUploadPayload }) {
-    const response = await api.put<{ phrase: Phrase }>(feAdminRoutes.phrase(id), data);
-    return response.data.phrase;
+  async updateExpression(id: string, data: Partial<Expression> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.put<{ expression: Expression }>(feAdminRoutes.expression(id), data);
+    return response.data.expression;
   },
 
-  async deletePhrase(id: string) {
-    await api.delete(feAdminRoutes.phrase(id));
+  async deleteExpression(id: string) {
+    await api.delete(feAdminRoutes.expression(id));
   },
 
-  async bulkDeletePhrases(ids: string[]) {
-    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeletePhrases(), {
+  async bulkDeleteExpressions(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeleteExpressions(), {
       data: { ids }
     });
     return {
@@ -342,17 +442,17 @@ export const phraseService = {
     };
   },
 
-  async publishPhrase(id: string) {
-    const response = await api.put<{ phrase: Phrase }>(feAdminRoutes.publishPhrase(id));
-    return response.data.phrase;
+  async publishExpression(id: string) {
+    const response = await api.put<{ expression: Expression }>(feAdminRoutes.publishExpression(id));
+    return response.data.expression;
   },
 
-  async generatePhraseAudio(id: string) {
-    const response = await api.put<{ phrase: Phrase }>(feAdminRoutes.generatePhraseAudio(id));
-    return response.data.phrase;
+  async generateExpressionAudio(id: string) {
+    const response = await api.put<{ expression: Expression }>(feAdminRoutes.generateExpressionAudio(id));
+    return response.data.expression;
   },
 
-  async generateLessonPhraseAudio(lessonId: string) {
+  async generateLessonExpressionAudio(lessonId: string) {
     const response = await api.put<{
       lessonId: string;
       total: number;
@@ -360,10 +460,189 @@ export const phraseService = {
       failedCount: number;
       updatedIds: string[];
       failedIds: string[];
-    }>(feAdminRoutes.bulkPhraseAudio(lessonId));
+    }>(feAdminRoutes.bulkExpressionAudio(lessonId));
     return response.data;
   },
 };
+
+export const wordService = {
+  async listWords(lessonId?: string, status?: Status, language?: Language) {
+    return fetchAllPages<Word>(feAdminRoutes.words(), "words", { lessonId, status, language });
+  },
+
+  async listWordsPage(params?: {
+    lessonId?: string;
+    status?: Status;
+    language?: Language;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ words: Word[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.words(),
+      { params }
+    );
+    return {
+      items: response.data.words,
+      total: response.data.total ?? response.data.words.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.words.length || 20,
+        total: response.data.words.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Word>;
+  },
+
+  async getWord(id: string) {
+    const response = await api.get<{ word: Word }>(feAdminRoutes.word(id));
+    return response.data.word;
+  },
+
+  async createWord(data: Partial<Word> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.post<{ word: Word }>(feAdminRoutes.words(), data);
+    return response.data.word;
+  },
+
+  async updateWord(id: string, data: Partial<Word> & { audioUpload?: AudioUploadPayload }) {
+    const response = await api.put<{ word: Word }>(feAdminRoutes.word(id), data);
+    return response.data.word;
+  },
+
+  async deleteWord(id: string) {
+    await api.delete(feAdminRoutes.word(id));
+  },
+
+  async bulkDeleteWords(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeleteWords(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
+  },
+
+  async publishWord(id: string) {
+    const response = await api.put<{ word: Word }>(feAdminRoutes.publishWord(id));
+    return response.data.word;
+  },
+
+  async generateWordAudio(id: string) {
+    const response = await api.put<{ word: Word }>(feAdminRoutes.generateWordAudio(id));
+    return response.data.word;
+  },
+
+  async generateLessonWordAudio(lessonId: string) {
+    const response = await api.put<{
+      lessonId: string;
+      total: number;
+      updatedCount: number;
+      failedCount: number;
+      updatedIds: string[];
+      failedIds: string[];
+    }>(feAdminRoutes.bulkWordAudio(lessonId));
+    return response.data;
+  }
+};
+
+export const sentenceService = {
+  async listSentences(lessonId?: string, status?: Status, language?: Language) {
+    return fetchAllPages<Sentence>(feAdminRoutes.sentences(), "sentences", { lessonId, status, language });
+  },
+
+  async listSentencesPage(params?: {
+    lessonId?: string;
+    status?: Status;
+    language?: Language;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await api.get<{ sentences: Sentence[]; total: number; pagination?: PaginationMeta }>(
+      feAdminRoutes.sentences(),
+      { params }
+    );
+    return {
+      items: response.data.sentences,
+      total: response.data.total ?? response.data.sentences.length,
+      pagination: response.data.pagination ?? {
+        page: 1,
+        limit: response.data.sentences.length || 20,
+        total: response.data.sentences.length,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false
+      }
+    } satisfies PaginatedResult<Sentence>;
+  },
+
+  async getSentence(id: string) {
+    const response = await api.get<{ sentence: Sentence }>(feAdminRoutes.sentence(id));
+    return response.data.sentence;
+  },
+
+  async createSentence(
+    data: Partial<Sentence> & {
+      components: SentenceComponentRef[];
+      audioUpload?: AudioUploadPayload;
+    }
+  ) {
+    const response = await api.post<{ sentence: Sentence }>(feAdminRoutes.sentences(), data);
+    return response.data.sentence;
+  },
+
+  async updateSentence(
+    id: string,
+    data: Partial<Sentence> & {
+      components?: SentenceComponentRef[];
+      audioUpload?: AudioUploadPayload;
+    }
+  ) {
+    const response = await api.put<{ sentence: Sentence }>(feAdminRoutes.sentence(id), data);
+    return response.data.sentence;
+  },
+
+  async deleteSentence(id: string) {
+    await api.delete(feAdminRoutes.sentence(id));
+  },
+
+  async bulkDeleteSentences(ids: string[]) {
+    const response = await api.delete<{ deletedIds: string[] }>(feAdminRoutes.bulkDeleteSentences(), {
+      data: { ids }
+    });
+    return {
+      ...response.data,
+      deletedCount: response.data.deletedIds.length
+    };
+  },
+
+  async publishSentence(id: string) {
+    const response = await api.put<{ sentence: Sentence }>(feAdminRoutes.publishSentence(id));
+    return response.data.sentence;
+  },
+
+  async generateSentenceAudio(id: string) {
+    const response = await api.put<{ sentence: Sentence }>(feAdminRoutes.generateSentenceAudio(id));
+    return response.data.sentence;
+  },
+
+  async generateLessonSentenceAudio(lessonId: string) {
+    const response = await api.put<{
+      lessonId: string;
+      total: number;
+      updatedCount: number;
+      failedCount: number;
+      updatedIds: string[];
+      failedIds: string[];
+    }>(feAdminRoutes.bulkSentenceAudio(lessonId));
+    return response.data;
+  }
+};
+
+
 
 export const imageService = {
   async listImagesPage(params?: { status?: "draft" | "approved"; q?: string; page?: number; limit?: number }) {
@@ -502,8 +781,8 @@ export const questionService = {
 
   async createQuestion(data: {
     lessonId: string;
-    phraseId: string;
-    relatedPhraseIds?: string[];
+    sourceId?: string;
+    relatedSourceRefs?: Array<{ type: "word" | "expression" | "sentence"; id: string }>;
     translationIndex?: number;
     type: QuestionType;
     subtype: string;
@@ -518,7 +797,7 @@ export const questionService = {
     };
     interactionData?: {
       matchingPairs?: Array<{
-        phraseId: string;
+        contentId?: string;
         translationIndex: number;
         imageAssetId?: string;
       }>;
@@ -697,6 +976,8 @@ export const voiceAudioService = {
     status?: "pending" | "accepted" | "rejected";
     language?: Language;
     voiceArtistUserId?: string;
+    contentType?: "word" | "expression" | "sentence";
+    contentId?: string;
   }) {
     const response = await api.get<{ submissions: VoiceAudioSubmission[] }>(
       feAdminRoutes.voiceAudioSubmissions(),
@@ -709,6 +990,8 @@ export const voiceAudioService = {
     status?: "pending" | "accepted" | "rejected";
     language?: Language;
     voiceArtistUserId?: string;
+    contentType?: "word" | "expression" | "sentence";
+    contentId?: string;
     q?: string;
     page?: number;
     limit?: number;

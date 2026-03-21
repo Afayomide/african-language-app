@@ -2,31 +2,54 @@ import type { Response } from "express";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AdminLessonAiUseCases } from "../../application/use-cases/admin/lesson-ai/AdminLessonAiUseCases.js";
-import { AdminUnitAiContentUseCases } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
+import { AdminUnitAiContentUseCases, AiPlanValidationError } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
+import { ChapterAiUseCases } from "../../application/use-cases/shared/ChapterAiUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
+import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
+import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongoosePhraseRepository } from "../../infrastructure/db/mongoose/repositories/MongoosePhraseRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
+import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
+import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
+import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import type { Level } from "../../domain/entities/Lesson.js";
-import { LESSON_GENERATION_LIMITS } from "../../config/lessonGeneration.js";
+import {
+  LESSON_GENERATION_LIMITS,
+  clampNewTargetsPerLesson
+} from "../../config/lessonGeneration.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
+import {
+  buildAutoReviewUnitDescription,
+  buildAutoReviewUnitTitle,
+  getTrailingCoreUnitsSinceLastReview
+} from "../../application/services/reviewUnitScheduling.js";
 
 const lessons = new MongooseLessonRepository();
-const phrases = new MongoosePhraseRepository();
+const lessonContentItems = new MongooseLessonContentItemRepository();
+const expressions = new MongooseExpressionRepository();
 const units = new MongooseUnitRepository();
+const chapters = new MongooseChapterRepository();
 const useCases = new AdminLessonAiUseCases(
   lessons,
-  phrases,
+  lessonContentItems,
+  expressions,
   new MongooseProverbRepository(),
   units,
   getLlmClient()
 );
+const chapterAiUseCases = new ChapterAiUseCases(chapters, getLlmClient());
 const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   lessons,
-  phrases,
+  new MongooseWordRepository(),
+  expressions,
+  new MongooseSentenceRepository(),
+  new MongooseChapterRepository(),
+  lessonContentItems,
+  new MongooseUnitContentItemRepository(),
   new MongooseProverbRepository(),
   new MongooseQuestionRepository(),
   units,
@@ -87,8 +110,9 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized." });
   }
+  const userId = req.user.id;
 
-  const { language, level, count, topic } = req.body ?? {};
+  const { language, level, count, topic, chapterId } = req.body ?? {};
 
   if (!language || !["yoruba", "igbo", "hausa"].includes(String(language))) {
     return res.status(400).json({ error: "Language is invalid." });
@@ -104,16 +128,73 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
   if (topic !== undefined && typeof topic !== "string") {
     return res.status(400).json({ error: "Topic is invalid." });
   }
+  if (chapterId !== undefined && chapterId !== null && chapterId !== "" && typeof chapterId !== "string") {
+    return res.status(400).json({ error: "Chapter id is invalid." });
+  }
+
+  let selectedChapter = null;
+  if (chapterId) {
+    selectedChapter = await chapters.findById(String(chapterId));
+    if (!selectedChapter || selectedChapter.language !== String(language)) {
+      return res.status(400).json({ error: "Chapter is invalid for this language." });
+    }
+  }
 
   const llm = getLlmClient();
   const existingUnits = await units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa");
   const existingLessons = await lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" });
-  let lastOrderIndex = existingUnits.reduce((max, unit) => Math.max(max, unit.orderIndex), -1);
-  const seenTitles = new Set(existingUnits.map((unit) => unit.title.trim().toLowerCase()));
+  const existingUnitsInScope = selectedChapter
+    ? existingUnits.filter((unit) => unit.chapterId === selectedChapter.id)
+    : existingUnits;
+  let lastOrderIndex = existingUnitsInScope.reduce((max, unit) => Math.max(max, unit.orderIndex), -1);
+  const seenTitles = new Set(existingUnitsInScope.map((unit) => unit.title.trim().toLowerCase()));
+  let pendingCoreUnits = getTrailingCoreUnitsSinceLastReview(
+    existingUnitsInScope
+      .slice()
+      .sort((left, right) => left.orderIndex - right.orderIndex || left.createdAt.getTime() - right.createdAt.getTime())
+      .map((unit) => ({ id: unit.id, title: unit.title, kind: unit.kind }))
+  ).slice(-2);
 
   const created = [];
   const skipped: Array<{ reason: string; title?: string }> = [];
   const errors: Array<{ index: number; error: string }> = [];
+  const chapterInstruction = selectedChapter
+    ? `Generate units for the chapter "${selectedChapter.title}". Chapter description: ${selectedChapter.description || "No description provided."}`
+    : "";
+  let coreCreatedCount = 0;
+  let reviewCreatedCount = 0;
+
+  const tryCreateAutoReviewUnit = async () => {
+    if (pendingCoreUnits.length < 2) return;
+    const reviewTitle = buildAutoReviewUnitTitle(pendingCoreUnits, seenTitles);
+    seenTitles.add(reviewTitle.trim().toLowerCase());
+    lastOrderIndex += 1;
+    const reviewUnit = await units.create({
+      chapterId: selectedChapter?.id || null,
+      title: reviewTitle,
+      description: buildAutoReviewUnitDescription(pendingCoreUnits),
+      language: String(language) as "yoruba" | "igbo" | "hausa",
+      level: String(level) as Level,
+      kind: "review",
+      reviewStyle: "star",
+      reviewSourceUnitIds: pendingCoreUnits.map((unit) => unit.id),
+      orderIndex: lastOrderIndex,
+      status: "draft",
+      createdBy: userId
+    });
+    created.push(reviewUnit);
+    reviewCreatedCount += 1;
+    pendingCoreUnits = [];
+  };
+
+  if (pendingCoreUnits.length === 2) {
+    try {
+      await tryCreateAutoReviewUnit();
+    } catch (error) {
+      console.error("Admin AI generateUnitsBulk auto review unit error", error);
+      errors.push({ index: 0, error: "Failed to create an automatic review unit." });
+    }
+  }
 
   for (let index = 0; index < requestedCount; index += 1) {
     const variationTopic = typeof topic === "string" && topic.trim()
@@ -124,7 +205,14 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
       const validationInput = {
         language: String(language) as "yoruba" | "igbo" | "hausa",
         level: String(level) as Level,
-        existingUnitTitles: existingUnits.map((item) => item.title).filter(Boolean),
+        unitTitle: selectedChapter?.title,
+        unitDescription: selectedChapter?.description,
+        topic: variationTopic,
+        curriculumInstruction: [
+          chapterInstruction,
+          "Suggest the next coherent unit in the curriculum sequence. Avoid recycled topics with renamed titles."
+        ].filter(Boolean).join(" "),
+        existingUnitTitles: existingUnitsInScope.map((item) => item.title).filter(Boolean),
         existingLessonTitles: existingLessons.map((item) => item.title).filter(Boolean)
       };
       let suggestion = null;
@@ -133,8 +221,11 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
         const candidate = await llm.suggestLesson({
           language: String(language),
           level: String(level),
+          unitTitle: selectedChapter?.title,
+          unitDescription: selectedChapter?.description,
           topic: variationTopic,
           curriculumInstruction: [
+            chapterInstruction,
             "Suggest the next coherent unit in the curriculum sequence. Avoid recycled topics with renamed titles.",
             retryInstruction
           ].filter(Boolean).join(" ").trim(),
@@ -182,15 +273,21 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
       seenTitles.add(titleKey);
       lastOrderIndex += 1;
       const createdUnit = await units.create({
+        chapterId: selectedChapter?.id || null,
         title: rawTitle,
         description: String(suggestion.description || "").trim(),
         language: String(language) as "yoruba" | "igbo" | "hausa",
         level: String(level) as Level,
         orderIndex: lastOrderIndex,
         status: "draft",
-        createdBy: req.user.id
+        createdBy: userId
       });
       created.push(createdUnit);
+      coreCreatedCount += 1;
+      pendingCoreUnits.push({ id: createdUnit.id, title: createdUnit.title, kind: createdUnit.kind });
+      if (pendingCoreUnits.length === 2) {
+        await tryCreateAutoReviewUnit();
+      }
     } catch (error) {
       console.error("Admin AI generateUnitsBulk error", error);
       errors.push({ index: index + 1, error: "Failed to generate this unit." });
@@ -200,12 +297,53 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
   return res.status(201).json({
     totalRequested: requestedCount,
     createdCount: created.length,
+    coreCreatedCount,
+    reviewCreatedCount,
     skippedCount: skipped.length,
     errorCount: errors.length,
     units: created,
     skipped,
     errors
   });
+}
+
+export async function generateChaptersBulk(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { language, level, count, topic, extraInstructions } = req.body ?? {};
+  if (!language || !["yoruba", "igbo", "hausa"].includes(String(language))) {
+    return res.status(400).json({ error: "Language is invalid." });
+  }
+  if (!level || !isValidLevel(String(level))) {
+    return res.status(400).json({ error: "Level is invalid." });
+  }
+  const requestedCount = Number(count ?? 5);
+  if (Number.isNaN(requestedCount) || requestedCount < 1 || requestedCount > 20) {
+    return res.status(400).json({ error: "Count must be between 1 and 20." });
+  }
+  if (topic !== undefined && typeof topic !== "string") {
+    return res.status(400).json({ error: "Topic is invalid." });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "Extra instructions are invalid." });
+  }
+
+  try {
+    const result = await chapterAiUseCases.generateBulk({
+      language: String(language) as "yoruba" | "igbo" | "hausa",
+      level: String(level) as Level,
+      count: requestedCount,
+      topic: typeof topic === "string" ? topic.trim() : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined,
+      createdBy: req.user.id
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error("Admin AI generateChaptersBulk error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
 }
 
 export async function generateProverbs(req: AuthRequest, res: Response) {
@@ -247,7 +385,16 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
 
   const { unitId } = req.params;
-  const { lessonCount, phrasesPerLesson, reviewPhrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+  const {
+    lessonCount,
+    sentencesPerLesson,
+    reviewContentPerLesson,
+    phrasesPerLesson,
+    reviewPhrasesPerLesson,
+    proverbsPerLesson,
+    topics,
+    extraInstructions
+  } = req.body ?? {};
 
   if (!unitId || typeof unitId !== "string") {
     return res.status(400).json({ error: "Unit id is required." });
@@ -260,35 +407,36 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
 
   const requestedLessonCount = Number(lessonCount ?? 3);
-  const requestedPhrasesPerLesson = Number(
-    phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  const requestedSentencesPerLesson = Number(
+    sentencesPerLesson ?? phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   );
-  const requestedReviewPhrasesPerLesson =
-    reviewPhrasesPerLesson === undefined ? undefined : Number(reviewPhrasesPerLesson);
+  const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
+  const requestedReviewContentPerLesson =
+    rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
   const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
   }
   if (
-    Number.isNaN(requestedPhrasesPerLesson) ||
-    requestedPhrasesPerLesson < LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON ||
-    requestedPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+    Number.isNaN(requestedSentencesPerLesson) ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}.`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
     });
   }
   if (
-    requestedReviewPhrasesPerLesson !== undefined &&
+    requestedReviewContentPerLesson !== undefined &&
     (
-      Number.isNaN(requestedReviewPhrasesPerLesson) ||
-      requestedReviewPhrasesPerLesson < 0 ||
-      requestedReviewPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON
+      Number.isNaN(requestedReviewContentPerLesson) ||
+      requestedReviewContentPerLesson < 0 ||
+      requestedReviewContentPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON
     )
   ) {
     return res.status(400).json({
-      error: `reviewPhrasesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON}.`
+      error: `reviewContentPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON}.`
     });
   }
   if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
@@ -310,8 +458,8 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      phrasesPerLesson: requestedPhrasesPerLesson,
-      reviewPhrasesPerLesson: requestedReviewPhrasesPerLesson,
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
@@ -324,13 +472,217 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
 }
 
+export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { unitId } = req.params;
+  const {
+    lessonCount,
+    sentencesPerLesson,
+    reviewContentPerLesson,
+    phrasesPerLesson,
+    reviewPhrasesPerLesson,
+    proverbsPerLesson,
+    topics,
+    extraInstructions
+  } = req.body ?? {};
+
+  if (!unitId || typeof unitId !== "string") {
+    return res.status(400).json({ error: "Unit id is required." });
+  }
+  if (topics !== undefined && !Array.isArray(topics)) {
+    return res.status(400).json({ error: "Topics must be an array." });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "Extra instructions must be a string." });
+  }
+
+  const requestedLessonCount = Number(lessonCount ?? 3);
+  const requestedSentencesPerLesson = Number(
+    sentencesPerLesson ?? phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
+  );
+  const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
+  const requestedReviewContentPerLesson =
+    rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+
+  if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
+    return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
+  }
+  if (
+    Number.isNaN(requestedSentencesPerLesson) ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
+  ) {
+    return res.status(400).json({
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+    });
+  }
+  if (
+    requestedReviewContentPerLesson !== undefined &&
+    (
+      Number.isNaN(requestedReviewContentPerLesson) ||
+      requestedReviewContentPerLesson < 0 ||
+      requestedReviewContentPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON
+    )
+  ) {
+    return res.status(400).json({
+      error: `reviewContentPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON}.`
+    });
+  }
+  if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
+    return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10." });
+  }
+
+  const unit = await units.findById(String(unitId));
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found." });
+  }
+  if (!isValidLevel(String(unit.level))) {
+    return res.status(400).json({ error: "Unit level is invalid." });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.previewGeneratePlan({
+      unitId: unit.id,
+      language: unit.language,
+      level: String(unit.level) as Level,
+      createdBy: req.user.id,
+      lessonCount: requestedLessonCount,
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      reviewContentPerLesson: requestedReviewContentPerLesson,
+      proverbsPerLesson: requestedProverbsPerLesson,
+      topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Admin AI previewUnitContentPlan error", error);
+    return res.status(502).json({ error: "llm plan generation failed" });
+  }
+}
+
+export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { unitId } = req.params;
+  const {
+    lessonCount,
+    sentencesPerLesson,
+    reviewContentPerLesson,
+    phrasesPerLesson,
+    reviewPhrasesPerLesson,
+    proverbsPerLesson,
+    topics,
+    extraInstructions,
+    planLessons
+  } = req.body ?? {};
+
+  if (!unitId || typeof unitId !== "string") {
+    return res.status(400).json({ error: "Unit id is required." });
+  }
+  if (!Array.isArray(planLessons)) {
+    return res.status(400).json({ error: "planLessons must be an array." });
+  }
+  if (topics !== undefined && !Array.isArray(topics)) {
+    return res.status(400).json({ error: "Topics must be an array." });
+  }
+  if (extraInstructions !== undefined && typeof extraInstructions !== "string") {
+    return res.status(400).json({ error: "Extra instructions must be a string." });
+  }
+
+  const requestedLessonCount = Number(lessonCount ?? 3);
+  const requestedSentencesPerLesson = Number(
+    sentencesPerLesson ?? phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
+  );
+  const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
+  const requestedReviewContentPerLesson =
+    rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+
+  if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
+    return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
+  }
+  if (
+    Number.isNaN(requestedSentencesPerLesson) ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
+  ) {
+    return res.status(400).json({
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+    });
+  }
+  if (
+    requestedReviewContentPerLesson !== undefined &&
+    (
+      Number.isNaN(requestedReviewContentPerLesson) ||
+      requestedReviewContentPerLesson < 0 ||
+      requestedReviewContentPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON
+    )
+  ) {
+    return res.status(400).json({
+      error: `reviewContentPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON}.`
+    });
+  }
+  if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
+    return res.status(400).json({ error: "proverbsPerLesson must be between 0 and 10." });
+  }
+
+  const unit = await units.findById(String(unitId));
+  if (!unit) {
+    return res.status(404).json({ error: "Unit not found." });
+  }
+  if (!isValidLevel(String(unit.level))) {
+    return res.status(400).json({ error: "Unit level is invalid." });
+  }
+
+  try {
+    const result = await unitAiContentUseCases.generateFromApprovedPlan({
+      unitId: unit.id,
+      language: unit.language,
+      level: String(unit.level) as Level,
+      createdBy: req.user.id,
+      lessonCount: requestedLessonCount,
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      reviewContentPerLesson: requestedReviewContentPerLesson,
+      proverbsPerLesson: requestedProverbsPerLesson,
+      topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
+      extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined,
+      planLessons
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof AiPlanValidationError) {
+      return res.status(400).json({ error: error.message, details: error.details });
+    }
+    console.error("Admin AI applyUnitContentPlan error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
+}
+
 export async function reviseUnitContent(req: AuthRequest, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized." });
   }
 
   const { unitId } = req.params;
-  const { mode, lessonCount, phrasesPerLesson, reviewPhrasesPerLesson, proverbsPerLesson, topics, extraInstructions } = req.body ?? {};
+  const {
+    mode,
+    lessonCount,
+    sentencesPerLesson,
+    reviewContentPerLesson,
+    phrasesPerLesson,
+    reviewPhrasesPerLesson,
+    proverbsPerLesson,
+    topics,
+    extraInstructions
+  } = req.body ?? {};
 
   if (!unitId || typeof unitId !== "string") {
     return res.status(400).json({ error: "Unit id is required." });
@@ -346,35 +698,36 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   }
 
   const requestedLessonCount = Number(lessonCount ?? 3);
-  const requestedPhrasesPerLesson = Number(
-    phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+  const requestedSentencesPerLesson = Number(
+    sentencesPerLesson ?? phrasesPerLesson ?? LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   );
-  const requestedReviewPhrasesPerLesson =
-    reviewPhrasesPerLesson === undefined ? undefined : Number(reviewPhrasesPerLesson);
+  const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
+  const requestedReviewContentPerLesson =
+    rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
   const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
   }
   if (
-    Number.isNaN(requestedPhrasesPerLesson) ||
-    requestedPhrasesPerLesson < LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON ||
-    requestedPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON
+    Number.isNaN(requestedSentencesPerLesson) ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `phrasesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_PHRASES_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_PHRASES_PER_LESSON}.`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
     });
   }
   if (
-    requestedReviewPhrasesPerLesson !== undefined &&
+    requestedReviewContentPerLesson !== undefined &&
     (
-      Number.isNaN(requestedReviewPhrasesPerLesson) ||
-      requestedReviewPhrasesPerLesson < 0 ||
-      requestedReviewPhrasesPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON
+      Number.isNaN(requestedReviewContentPerLesson) ||
+      requestedReviewContentPerLesson < 0 ||
+      requestedReviewContentPerLesson > LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON
     )
   ) {
     return res.status(400).json({
-      error: `reviewPhrasesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_PHRASES_PER_LESSON}.`
+      error: `reviewContentPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_REVIEW_CONTENT_PER_LESSON}.`
     });
   }
   if (Number.isNaN(requestedProverbsPerLesson) || requestedProverbsPerLesson < 0 || requestedProverbsPerLesson > 10) {
@@ -397,8 +750,8 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      phrasesPerLesson: requestedPhrasesPerLesson,
-      reviewPhrasesPerLesson: requestedReviewPhrasesPerLesson,
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined

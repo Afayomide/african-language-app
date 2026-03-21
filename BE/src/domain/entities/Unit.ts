@@ -1,13 +1,17 @@
 import type { Language, Level, Status } from "./Lesson.js";
 
+export type UnitKind = "core" | "review";
+export type UnitReviewStyle = "none" | "star" | "gym";
+
 export type UnitAiRunLessonSummary = {
   lessonId: string;
   title: string;
-  phrasesGenerated: number;
-  repeatedPhrasesLinked: number;
-  newPhrasesSelected: number;
-  reviewPhrasesSelected: number;
-  phrasesDroppedFromCandidates: number;
+  contentGenerated: number;
+  sentencesGenerated: number;
+  existingContentLinked: number;
+  newContentSelected: number;
+  reviewContentSelected: number;
+  contentDroppedFromCandidates: number;
   proverbsGenerated: number;
   questionsGenerated: number;
   blocksGenerated: number;
@@ -30,10 +34,14 @@ export type UnitAiRunSummary = {
 export type UnitEntity = {
   id: string;
   _id?: string;
+  chapterId?: string | null;
   title: string;
   description: string;
   language: Language;
   level: Level;
+  kind: UnitKind;
+  reviewStyle: UnitReviewStyle;
+  reviewSourceUnitIds: string[];
   orderIndex: number;
   status: Status;
   createdBy: string;
