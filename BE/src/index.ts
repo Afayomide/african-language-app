@@ -40,9 +40,11 @@ import voiceAuthRouter from "./routes/voice/auth.routes.js";
 import voiceContentRouter from "./routes/voice/content.routes.js";
 
 const app = express();
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || "16mb";
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 app.use((req, res, next) => {
   const shouldLog = process.env.REQUEST_LOGS === "1" || process.env.NODE_ENV !== "production";
   if (!shouldLog) return next();
@@ -102,6 +104,14 @@ app.get("/", (req, res) => {
 });
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "type" in err &&
+    (err as { type?: string }).type === "entity.too.large"
+  ) {
+    return res.status(413).json({ error: "request_entity_too_large" });
+  }
   console.error("Unhandled error", err);
   res.status(500).json({ error: "internal_server_error" });
 });

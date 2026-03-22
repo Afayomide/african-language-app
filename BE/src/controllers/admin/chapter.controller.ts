@@ -98,6 +98,22 @@ export async function deleteChapter(req: Request, res: Response) {
   return res.status(200).json({ message: "Chapter deleted." });
 }
 
+export async function finishChapter(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  const chapter = await chapters.updateById(id, { status: "finished" });
+  if (!chapter) return res.status(404).json({ error: "Chapter not found." });
+  return res.status(200).json({ chapter });
+}
+
+export async function publishChapter(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  const chapter = await chapters.publishById(id, new Date());
+  if (!chapter) return res.status(404).json({ error: "Chapter not found or not ready to publish." });
+  return res.status(200).json({ chapter });
+}
+
 export async function reorderChapters(req: Request, res: Response) {
   const { chapterIds } = req.body ?? {};
   if (!Array.isArray(chapterIds) || chapterIds.length === 0) {

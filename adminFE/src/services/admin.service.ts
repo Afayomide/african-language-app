@@ -298,6 +298,16 @@ export const chapterService = {
     return response.data.chapter;
   },
 
+  async finishChapter(id: string) {
+    const response = await api.put<{ chapter: Chapter }>(feAdminRoutes.finishChapter(id));
+    return response.data.chapter;
+  },
+
+  async publishChapter(id: string) {
+    const response = await api.put<{ chapter: Chapter }>(feAdminRoutes.publishChapter(id));
+    return response.data.chapter;
+  },
+
   async deleteChapter(id: string) {
     await api.delete(feAdminRoutes.chapter(id));
   },

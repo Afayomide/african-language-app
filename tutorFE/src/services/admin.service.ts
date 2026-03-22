@@ -265,6 +265,11 @@ export const chapterService = {
     return response.data.chapter;
   },
 
+  async finishChapter(id: string) {
+    const response = await api.put<{ chapter: Chapter }>(feTutorRoutes.finishChapter(id));
+    return response.data.chapter;
+  },
+
   async deleteChapter(id: string) {
     await api.delete(feTutorRoutes.chapter(id));
   },

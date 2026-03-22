@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   lessonService,
   aiService,
   expressionService,
+  wordService,
+  sentenceService,
   questionService,
 } from "@/services";
-import { Lesson, Language, Level, Expression, ExerciseQuestion, LessonAuditResult } from "@/types";
+import { Lesson, Language, Level, ExerciseQuestion, LessonAuditResult, Status } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +65,20 @@ import {
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
 
+type LessonContentRow = {
+  id: string;
+  contentType: "word" | "expression" | "sentence";
+  text: string;
+  translations: string[];
+  status: Status;
+  createdAt: string;
+  updatedAt: string;
+  audioUrl?: string;
+};
+
+const getLessonContentKey = (contentType: LessonContentRow["contentType"], id: string) =>
+  `${contentType}:${id}`;
+
 export default function EditLessonPage({
   params,
 }: {
@@ -86,16 +102,15 @@ export default function EditLessonPage({
   const [proverbs, setProverbs] = useState<
     Array<{ text: string; translation: string; contextNote: string }>
   >([]);
-  const [phrases, setExpressions] = useState<Expression[]>([]);
-  const [isLoadingExpressions, setIsLoadingExpressions] = useState(false);
-  const [phraseSearch, setExpressionSearch] = useState("");
-  const [phrasePage, setExpressionPage] = useState(1);
-  const [phraseLimit, setExpressionLimit] = useState(20);
-  const [phraseTotal, setExpressionTotal] = useState(0);
-  const [phraseTotalPages, setExpressionTotalPages] = useState(1);
+  const [lessonContents, setLessonContents] = useState<LessonContentRow[]>([]);
+  const [isLoadingLessonContents, setIsLoadingLessonContents] = useState(false);
+  const [contentSearch, setContentSearch] = useState("");
+  const [contentPage, setContentPage] = useState(1);
+  const [contentLimit, setContentLimit] = useState(20);
+  const [contentTypeFilter, setContentTypeFilter] = useState<"all" | "word" | "expression" | "sentence">("all");
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [questions, setQuestions] = useState<ExerciseQuestion[]>([]);
-  const [selectedExpressionIds, setSelectedExpressionIds] = useState<string[]>([]);
+  const [selectedContentKeys, setSelectedContentKeys] = useState<string[]>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [audit, setAudit] = useState<LessonAuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -124,8 +139,8 @@ export default function EditLessonPage({
 
   useEffect(() => {
     if (!lesson?._id) return;
-    fetchLessonExpressions(lesson._id);
-  }, [lesson?._id, phraseSearch, phrasePage, phraseLimit]);
+    fetchLessonContents(lesson._id);
+  }, [lesson?._id]);
 
   useEffect(() => {
     if (!lesson?._id) return;
@@ -133,20 +148,38 @@ export default function EditLessonPage({
   }, [lesson?._id]);
 
   useEffect(() => {
-    setExpressionPage(1);
-  }, [phraseSearch, lesson?._id]);
+    setContentPage(1);
+  }, [contentSearch, contentTypeFilter, lesson?._id]);
 
   useEffect(() => {
-    setSelectedExpressionIds((prev) =>
-      prev.filter((item) => phrases.some((phrase) => phrase._id === item)),
+    setSelectedContentKeys((prev) =>
+      prev.filter((key) =>
+        lessonContents.some((item) => getLessonContentKey(item.contentType, item.id) === key),
+      ),
     );
-  }, [phrases]);
+  }, [lessonContents]);
 
   useEffect(() => {
     setSelectedQuestionIds((prev) =>
       prev.filter((item) => questions.some((question) => question._id === item)),
     );
   }, [questions]);
+
+  const filteredLessonContents = useMemo(() => {
+    const query = contentSearch.trim().toLowerCase();
+    return lessonContents.filter((item) => {
+      if (contentTypeFilter !== "all" && item.contentType !== contentTypeFilter) return false;
+      if (!query) return true;
+      return [item.text, ...item.translations, item.contentType].join(" ").toLowerCase().includes(query);
+    });
+  }, [contentSearch, contentTypeFilter, lessonContents]);
+
+  const contentTotal = filteredLessonContents.length;
+  const contentTotalPages = Math.max(1, Math.ceil(contentTotal / contentLimit));
+  const pagedLessonContents = useMemo(() => {
+    const start = (contentPage - 1) * contentLimit;
+    return filteredLessonContents.slice(start, start + contentLimit);
+  }, [contentLimit, contentPage, filteredLessonContents]);
 
   async function fetchLesson() {
     try {
@@ -165,27 +198,55 @@ export default function EditLessonPage({
     }
   }
 
-  async function fetchLessonExpressions(lessonId: string) {
-    setIsLoadingExpressions(true);
+  async function fetchLessonContents(lessonId: string) {
+    setIsLoadingLessonContents(true);
     try {
-      const data = await expressionService.listExpressionsPage({
-        lessonId,
-        q: phraseSearch || undefined,
-        page: phrasePage,
-        limit: phraseLimit,
-      });
-      setExpressions(
-        [...data.items].sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ),
+      const [expressions, words, sentences] = await Promise.all([
+        expressionService.listExpressions(lessonId),
+        wordService.listWords(lessonId),
+        sentenceService.listSentences(lessonId),
+      ]);
+
+      const combined: LessonContentRow[] = [
+        ...expressions.map((item) => ({
+          id: item._id,
+          contentType: "expression" as const,
+          text: item.text,
+          translations: item.translations || [],
+          status: item.status,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          audioUrl: item.audio?.url,
+        })),
+        ...words.map((item) => ({
+          id: item._id,
+          contentType: "word" as const,
+          text: item.text,
+          translations: item.translations || [],
+          status: item.status,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          audioUrl: item.audio?.url,
+        })),
+        ...sentences.map((item) => ({
+          id: item._id,
+          contentType: "sentence" as const,
+          text: item.text,
+          translations: item.translations || [],
+          status: item.status,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          audioUrl: item.audio?.url,
+        })),
+      ].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      setExpressionTotal(data.total);
-      setExpressionTotalPages(data.pagination.totalPages);
+
+      setLessonContents(combined);
     } catch (error) {
-      toast.error("Failed to fetch lesson expressions");
+      toast.error("Failed to fetch lesson contents");
     } finally {
-      setIsLoadingExpressions(false);
+      setIsLoadingLessonContents(false);
     }
   }
 
@@ -352,7 +413,7 @@ export default function EditLessonPage({
       );
       toast.success("AI expressions generated");
       setIsGenerateDialogOpen(false);
-      fetchLessonExpressions(lesson._id);
+      fetchLessonContents(lesson._id);
     } catch (error) {
       toast.error("AI phrase generation failed");
     } finally {
@@ -370,7 +431,7 @@ export default function EditLessonPage({
       await fetchLesson();
       if (lesson?._id) {
         await Promise.all([
-          fetchLessonExpressions(lesson._id),
+          fetchLessonContents(lesson._id),
           fetchLessonQuestions(lesson._id),
         ]);
       }
@@ -387,31 +448,34 @@ export default function EditLessonPage({
     }
   };
 
-  const handleDeleteExpression = async (expressionId: string) => {
-    if (!confirm("Delete this expression?")) return;
+  const handleDeleteContent = async (contentType: LessonContentRow["contentType"], contentId: string) => {
+    if (!confirm(`Delete this ${contentType}?`)) return;
     try {
-      await expressionService.deleteExpression(expressionId);
-      toast.success("Expression deleted");
-      if (lesson) fetchLessonExpressions(lesson._id);
+      if (contentType === "expression") await expressionService.deleteExpression(contentId);
+      if (contentType === "word") await wordService.deleteWord(contentId);
+      if (contentType === "sentence") await sentenceService.deleteSentence(contentId);
+      toast.success(`${contentType} deleted`);
+      if (lesson) fetchLessonContents(lesson._id);
     } catch (error) {
-      toast.error("Failed to delete phrase");
+      toast.error(`Failed to delete ${contentType}`);
     }
   };
 
-  const toggleExpressionSelection = (expressionId: string) => {
-    setSelectedExpressionIds((prev) =>
-      prev.includes(expressionId)
-        ? prev.filter((id) => id !== expressionId)
-        : [...prev, expressionId],
+  const toggleContentSelection = (contentKey: string) => {
+    setSelectedContentKeys((prev) =>
+      prev.includes(contentKey)
+        ? prev.filter((id) => id !== contentKey)
+        : [...prev, contentKey],
     );
   };
 
-  const toggleSelectAllExpressions = () => {
-    if (selectedExpressionIds.length === phrases.length) {
-      setSelectedExpressionIds([]);
+  const toggleSelectAllContent = () => {
+    const visibleKeys = pagedLessonContents.map((item) => getLessonContentKey(item.contentType, item.id));
+    if (visibleKeys.length > 0 && visibleKeys.every((key) => selectedContentKeys.includes(key))) {
+      setSelectedContentKeys((prev) => prev.filter((key) => !visibleKeys.includes(key)));
       return;
     }
-    setSelectedExpressionIds(phrases.map((phrase) => phrase._id));
+    setSelectedContentKeys((prev) => Array.from(new Set([...prev, ...visibleKeys])));
   };
 
   const toggleQuestionSelection = (questionId: string) => {
@@ -430,34 +494,47 @@ export default function EditLessonPage({
     setSelectedQuestionIds(questions.map((question) => question._id));
   };
 
-  const handleBulkDeleteExpressions = async () => {
-    if (selectedExpressionIds.length === 0) return;
-    if (!confirm(`Delete ${selectedExpressionIds.length} selected phrase(s)?`)) return;
+  const handleBulkDeleteContent = async () => {
+    if (selectedContentKeys.length === 0) return;
+    if (!confirm(`Delete ${selectedContentKeys.length} selected content item(s)?`)) return;
     try {
-      await Promise.all(selectedExpressionIds.map((expressionId) => expressionService.deleteExpression(expressionId)));
-      toast.success("Selected expressions deleted");
-      setSelectedExpressionIds([]);
-      if (lesson?._id) await fetchLessonExpressions(lesson._id);
+      await Promise.all(
+        selectedContentKeys.map(async (key) => {
+          const [contentType, contentId] = key.split(":") as [LessonContentRow["contentType"], string];
+          if (contentType === "expression") return expressionService.deleteExpression(contentId);
+          if (contentType === "word") return wordService.deleteWord(contentId);
+          return sentenceService.deleteSentence(contentId);
+        }),
+      );
+      toast.success("Selected lesson content deleted");
+      setSelectedContentKeys([]);
+      if (lesson?._id) await fetchLessonContents(lesson._id);
     } catch (error) {
-      toast.error("Failed to delete selected expressions");
+      toast.error("Failed to delete selected lesson content");
     }
   };
 
-  const handleBulkFinishExpressions = async () => {
-    const finishable = phrases
-      .filter((phrase) => selectedExpressionIds.includes(phrase._id) && phrase.status === "draft")
-      .map((phrase) => phrase._id);
+  const handleBulkFinishContent = async () => {
+    const finishable = lessonContents.filter(
+      (item) => selectedContentKeys.includes(getLessonContentKey(item.contentType, item.id)) && item.status === "draft",
+    );
     if (finishable.length === 0) {
-      toast.error("No selected draft expressions to finish");
+      toast.error("No selected draft content to finish");
       return;
     }
     try {
-      await Promise.all(finishable.map((expressionId) => expressionService.finishExpression(expressionId)));
-      toast.success(`Marked ${finishable.length} phrase(s) as finished`);
-      setSelectedExpressionIds([]);
-      if (lesson?._id) await fetchLessonExpressions(lesson._id);
+      await Promise.all(
+        finishable.map((item) => {
+          if (item.contentType === "expression") return expressionService.finishExpression(item.id);
+          if (item.contentType === "word") return wordService.finishWord(item.id);
+          return sentenceService.finishSentence(item.id);
+        }),
+      );
+      toast.success(`Marked ${finishable.length} content item(s) as finished`);
+      setSelectedContentKeys([]);
+      if (lesson?._id) await fetchLessonContents(lesson._id);
     } catch (error) {
-      toast.error("Failed to mark selected phrases as finished");
+      toast.error("Failed to mark selected lesson content as finished");
     }
   };
 
@@ -492,13 +569,15 @@ export default function EditLessonPage({
     }
   };
 
-  const handleFinishExpression = async (expressionId: string) => {
+  const handleFinishContent = async (contentType: LessonContentRow["contentType"], contentId: string) => {
     try {
-      await expressionService.finishExpression(expressionId);
-      toast.success("Expression sent to admin for publish");
-      if (lesson) fetchLessonExpressions(lesson._id);
+      if (contentType === "expression") await expressionService.finishExpression(contentId);
+      if (contentType === "word") await wordService.finishWord(contentId);
+      if (contentType === "sentence") await sentenceService.finishSentence(contentId);
+      toast.success(`${contentType} sent to admin for publish`);
+      if (lesson) fetchLessonContents(lesson._id);
     } catch (error) {
-      toast.error("Failed to mark phrase as finished");
+      toast.error(`Failed to mark ${contentType} as finished`);
     }
   };
 
@@ -1036,44 +1115,70 @@ export default function EditLessonPage({
       <Card className="border-2 border-primary/10 shadow-xl rounded-3xl overflow-hidden">
         <CardHeader className="bg-primary/5">
           <CardTitle className="text-xl font-bold text-primary">
-            Lesson Expressions
+            Lesson Contents
           </CardTitle>
         </CardHeader>
         <CardContent>
           <DataTableControls
-            search={phraseSearch}
-            onSearchChange={setExpressionSearch}
-            page={phrasePage}
-            limit={phraseLimit}
+            search={contentSearch}
+            onSearchChange={setContentSearch}
+            page={contentPage}
+            limit={contentLimit}
             onLimitChange={(value) => {
-              setExpressionLimit(value);
-              setExpressionPage(1);
+              setContentLimit(value);
+              setContentPage(1);
             }}
-            totalPages={phraseTotalPages}
-            total={phraseTotal}
-            label="Search expressions"
-            onPrev={() => setExpressionPage((prev) => Math.max(1, prev - 1))}
+            totalPages={contentTotalPages}
+            total={contentTotal}
+            label="Search lesson contents"
+            onPrev={() => setContentPage((prev) => Math.max(1, prev - 1))}
             onNext={() =>
-              setExpressionPage((prev) => Math.min(phraseTotalPages, prev + 1))
+              setContentPage((prev) => Math.min(contentTotalPages, prev + 1))
             }
           />
-          <div className="mb-4 mt-4 flex justify-end">
-            <div className="flex gap-2">
+          <div className="mb-4 mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="lesson-content-type-filter" className="text-sm font-semibold text-muted-foreground">
+                Type
+              </Label>
+              <Select value={contentTypeFilter} onValueChange={(value) => setContentTypeFilter(value as typeof contentTypeFilter)}>
+                <SelectTrigger id="lesson-content-type-filter" className="w-[180px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All contents</SelectItem>
+                  <SelectItem value="word">Words</SelectItem>
+                  <SelectItem value="expression">Expressions</SelectItem>
+                  <SelectItem value="sentence">Sentences</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                onClick={handleBulkDeleteExpressions}
-                disabled={selectedExpressionIds.length === 0}
+                onClick={handleBulkDeleteContent}
+                disabled={selectedContentKeys.length === 0}
                 className={TABLE_BULK_BUTTON_CLASS.delete}
               >
-                Bulk Delete ({selectedExpressionIds.length})
+                Bulk Delete ({selectedContentKeys.length})
               </Button>
               <Button
                 variant="outline"
-                onClick={handleBulkFinishExpressions}
-                disabled={selectedExpressionIds.length === 0}
+                onClick={handleBulkFinishContent}
+                disabled={selectedContentKeys.length === 0}
                 className={TABLE_BULK_BUTTON_CLASS.finish}
               >
                 Bulk Finish
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push(
+                    `/words/new?language=${lesson.language}&lessonId=${lesson._id}`,
+                  )
+                }
+              >
+                Add Word
               </Button>
               <Button
                 onClick={() =>
@@ -1084,6 +1189,16 @@ export default function EditLessonPage({
               >
                 Add Expression
               </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push(
+                    `/sentences/new?language=${lesson.language}&lessonId=${lesson._id}`,
+                  )
+                }
+              >
+                Add Sentence
+              </Button>
             </div>
           </div>
           <Table>
@@ -1093,12 +1208,15 @@ export default function EditLessonPage({
                   <input
                     type="checkbox"
                     checked={
-                      phrases.length > 0 &&
-                      selectedExpressionIds.length === phrases.length
+                      pagedLessonContents.length > 0 &&
+                      pagedLessonContents.every((item) =>
+                        selectedContentKeys.includes(getLessonContentKey(item.contentType, item.id)),
+                      )
                     }
-                    onChange={toggleSelectAllExpressions}
+                    onChange={toggleSelectAllContent}
                   />
                 </TableHead>
+                <TableHead className="font-bold text-primary">Type</TableHead>
                 <TableHead className="font-bold text-primary pl-8">
                   Text
                 </TableHead>
@@ -1118,55 +1236,60 @@ export default function EditLessonPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingExpressions ? (
+              {isLoadingLessonContents ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    Loading expressions...
+                  <TableCell colSpan={8} className="h-24 text-center">
+                    Loading lesson contents...
                   </TableCell>
                 </TableRow>
-              ) : phrases.length === 0 ? (
+              ) : pagedLessonContents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    No expressions for this lesson yet.
+                  <TableCell colSpan={8} className="h-24 text-center">
+                    No lesson content matches this filter yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                phrases.map((phrase) => (
+                pagedLessonContents.map((item) => (
                   <TableRow
-                    key={phrase._id}
+                    key={getLessonContentKey(item.contentType, item.id)}
                     className="group transition-colors hover:bg-secondary/30"
                   >
                     <TableCell className="pl-8">
                       <input
                         type="checkbox"
-                        checked={selectedExpressionIds.includes(phrase._id)}
-                        onChange={() => toggleExpressionSelection(phrase._id)}
+                        checked={selectedContentKeys.includes(getLessonContentKey(item.contentType, item.id))}
+                        onChange={() => toggleContentSelection(getLessonContentKey(item.contentType, item.id))}
                       />
                     </TableCell>
-                    <TableCell className="pl-8 font-bold text-foreground">
-                      {phrase.text}
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {item.contentType}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{phrase.translations.join(" | ")}</TableCell>
+                    <TableCell className="pl-8 font-bold text-foreground">
+                      {item.text}
+                    </TableCell>
+                    <TableCell>{item.translations.join(" | ")}</TableCell>
                     <TableCell>
                       <Badge
-                        className={workflowStatusBadgeClass(phrase.status)}
+                        className={workflowStatusBadgeClass(item.status)}
                       >
-                        {phrase.status}
+                        {item.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(phrase.createdAt).toLocaleDateString()}
+                      {new Date(item.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      {new Date(phrase.updatedAt).toLocaleDateString()}
+                      {new Date(item.updatedAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="pr-8 text-right">
                       <div className="flex justify-end gap-1">
-                        {phrase.audio?.url ? (
+                        {item.audioUrl ? (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handlePlayAudio(phrase.audio.url)}
+                            onClick={() => handlePlayAudio(item.audioUrl!)}
                             title="Play audio"
                             className={TABLE_ACTION_ICON_CLASS.play}
                           >
@@ -1176,17 +1299,17 @@ export default function EditLessonPage({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => router.push(`/expressions/${phrase._id}`)}
+                          onClick={() => router.push(`/${item.contentType === "expression" ? "expressions" : item.contentType === "word" ? "words" : "sentences"}/${item.id}`)}
                           title="Edit"
                           className={TABLE_ACTION_ICON_CLASS.edit}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        {phrase.status === "draft" && (
+                        {item.status === "draft" && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleFinishExpression(phrase._id)}
+                            onClick={() => handleFinishContent(item.contentType, item.id)}
                             title="Mark as finished"
                             className={TABLE_ACTION_ICON_CLASS.finish}
                           >
@@ -1196,7 +1319,7 @@ export default function EditLessonPage({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteExpression(phrase._id)}
+                          onClick={() => handleDeleteContent(item.contentType, item.id)}
                           title="Delete"
                           className={TABLE_ACTION_ICON_CLASS.delete}
                         >

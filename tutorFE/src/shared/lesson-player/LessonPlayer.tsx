@@ -459,6 +459,7 @@ export function LessonPlayer({
   const [isSavingStage, setIsSavingStage] = useState(false)
   const [stageStartedAt, setStageStartedAt] = useState<number | null>(null)
   const [stageTransitionCopy, setStageTransitionCopy] = useState<StageTransitionCopy | null>(null)
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null)
   const stageAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const clearStageAdvanceTimeout = useCallback(() => {
@@ -530,6 +531,17 @@ export function LessonPlayer({
       clearStageAdvanceTimeout()
     }
   }, [clearStageAdvanceTimeout])
+
+  useEffect(() => {
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight)
+    updateViewportHeight()
+    window.addEventListener('resize', updateViewportHeight)
+    window.addEventListener('orientationchange', updateViewportHeight)
+    return () => {
+      window.removeEventListener('resize', updateViewportHeight)
+      window.removeEventListener('orientationchange', updateViewportHeight)
+    }
+  }, [])
 
   useEffect(() => {
     if (!enableUiSounds) return
@@ -616,6 +628,9 @@ export function LessonPlayer({
         : 'New Expression'
   const sourceText = questionSource?.text || ''
   const promptText = exerciseData?.promptTemplate || exerciseData?.prompt || 'Choose the right answer'
+  const isShortViewport = viewportHeight !== null && viewportHeight <= 860
+  const isVeryShortViewport = viewportHeight !== null && viewportHeight <= 740
+  const isUltraShortViewport = viewportHeight !== null && viewportHeight <= 680
   const meaningText =
     exerciseData?.reviewData?.meaning ||
     exerciseData?.interactionData?.meaning ||
@@ -963,50 +978,81 @@ export function LessonPlayer({
   }
 
   return (
-    <main className="relative flex min-h-screen select-none flex-col overflow-hidden bg-background">
+    <main className="relative flex h-[100svh] select-none flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(248,196,113,0.14),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(239,162,129,0.1),transparent_50%)]" />
 
-      <header className="sticky top-0 z-50 shrink-0 border-b border-border/40 bg-background/95 px-4 backdrop-blur">
-        <div className="mx-auto flex h-20 w-full max-w-4xl items-center gap-3">
+      <header
+        className={cx(
+          'sticky top-0 z-50 shrink-0 border-b border-border/40 bg-background/95 px-4 backdrop-blur',
+          isShortViewport && 'px-3',
+        )}
+      >
+        <div
+          className={cx(
+            'mx-auto flex w-full max-w-4xl items-center gap-3',
+            isUltraShortViewport ? 'h-14 gap-2' : isShortViewport ? 'h-16 gap-2.5' : 'h-20',
+          )}
+        >
           <Button
             variant="ghost"
             size="icon"
             onClick={onExit}
-            className="rounded-full text-foreground/50 hover:bg-muted/80 hover:text-foreground"
+            className={cx(
+              'rounded-full text-foreground/50 hover:bg-muted/80 hover:text-foreground',
+              isUltraShortViewport ? 'h-8 w-8' : isShortViewport && 'h-9 w-9',
+            )}
             aria-label={preview ? 'Exit preview' : 'Exit lesson'}
           >
-            <X className="h-7 w-7" />
+            <X className={cx(isUltraShortViewport ? 'h-5 w-5' : isShortViewport ? 'h-6 w-6' : 'h-7 w-7')} />
           </Button>
 
           <div className="flex-1 space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-foreground/50">
+            <div
+              className={cx(
+                'flex items-center justify-between font-bold uppercase tracking-wide text-foreground/50',
+                isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs',
+              )}
+            >
               <span>
                 {lesson?.title || 'Lesson'} • Stage {currentStageIndex + 1} of {Math.max(stageMeta.length, 1)}
               </span>
-              <span>{isStageComplete ? 'Stage complete' : stageBlockPositionLabel}</span>
+              {!isVeryShortViewport ? <span>{isStageComplete ? 'Stage complete' : stageBlockPositionLabel}</span> : null}
             </div>
-            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
+            <div className={cx('relative overflow-hidden rounded-full bg-muted', isUltraShortViewport ? 'h-2' : isShortViewport ? 'h-2.5' : 'h-3')}>
               <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/20" />
             </div>
           </div>
 
-          <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-black text-primary">
-            {xpEarned} XP
-          </div>
+          {!isUltraShortViewport ? (
+            <div
+              className={cx(
+                'rounded-full border border-primary/30 bg-primary/10 font-black text-primary',
+                isShortViewport ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1 text-xs',
+              )}
+            >
+              {xpEarned} XP
+            </div>
+          ) : null}
         </div>
       </header>
 
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 pb-36 pt-8 sm:px-6">
+      <div
+        className={cx(
+          'relative z-10 flex-1 overflow-y-auto px-4 sm:px-6',
+          isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-26 pt-3' : 'pb-32 pt-6',
+        )}
+      >
         <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
           {preview && allowStagePicker && stageMeta.length > 1 ? (
-            <div className="mb-6 flex flex-wrap gap-2">
+            <div className={cx('flex flex-wrap gap-2', isShortViewport ? 'mb-4' : 'mb-6')}>
               {stageMeta.map((stage) => (
                 <button
                   key={`stage-jump-${stage.index}`}
                   type="button"
                   className={cx(
-                    'rounded-full border px-4 py-2 text-sm font-black transition-colors',
+                    'rounded-full border font-black transition-colors',
+                    isUltraShortViewport ? 'px-2.5 py-1 text-[11px]' : isShortViewport ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm',
                     currentStageIndex === stage.index
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-white text-foreground/70 hover:border-primary/40 hover:bg-primary/5',
@@ -1049,18 +1095,23 @@ export function LessonPlayer({
           ) : (
             <>
               {currentBlock.type === 'text' ? (
-                <section className="animate-in fade-in zoom-in-95 space-y-6 py-4 duration-500">
-                  <div className="rounded-3xl border border-blue-100 bg-white/90 p-6 shadow-sm">
-                    <div className="mb-5 flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 text-white">
-                        <Info className="h-6 w-6" />
+                <section className={cx('animate-in fade-in zoom-in-95 duration-500', isUltraShortViewport ? 'space-y-3 py-2' : isShortViewport ? 'space-y-4 py-3' : 'space-y-6 py-4')}>
+                  <div className={cx('rounded-3xl border border-blue-100 bg-white/90 shadow-sm', isUltraShortViewport ? 'p-3.5' : isShortViewport ? 'p-4' : 'p-6')}>
+                    <div className={cx('flex items-center gap-3', isUltraShortViewport ? 'mb-3' : 'mb-5')}>
+                      <div className={cx('flex items-center justify-center rounded-2xl bg-blue-500 text-white', isUltraShortViewport ? 'h-10 w-10' : 'h-12 w-12')}>
+                        <Info className={cx(isUltraShortViewport ? 'h-5 w-5' : 'h-6 w-6')} />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-black text-foreground">Teacher&apos;s Note</h2>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/45">Context</p>
+                        <h2 className={cx('font-black text-foreground', isUltraShortViewport ? 'text-lg' : isShortViewport ? 'text-xl' : 'text-2xl')}>Teacher&apos;s Note</h2>
+                        {!isUltraShortViewport ? <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/45">Context</p> : null}
                       </div>
                     </div>
-                    <p className="rounded-2xl bg-blue-50 p-6 text-lg font-medium leading-relaxed text-foreground/85">
+                    <p
+                      className={cx(
+                        'rounded-2xl bg-blue-50 font-medium leading-relaxed text-foreground/85',
+                        isUltraShortViewport ? 'p-3 text-sm' : isShortViewport ? 'p-4 text-base' : 'p-6 text-lg',
+                      )}
+                    >
                       {currentBlock.content}
                     </p>
                   </div>
@@ -1068,16 +1119,31 @@ export function LessonPlayer({
               ) : null}
 
               {currentBlock.type === 'content' ? (
-                <section className="animate-in fade-in slide-in-from-bottom-6 space-y-8 py-4 duration-500">
+                <section
+                  className={cx(
+                    'animate-in fade-in slide-in-from-bottom-6 duration-500',
+                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
+                  )}
+                >
                   <div className="text-center">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-foreground/45">{currentContentEyebrow}</p>
+                    <p className={cx('font-black uppercase tracking-[0.3em] text-foreground/45', isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs')}>
+                      {currentContentEyebrow}
+                    </p>
                   </div>
 
-                  <div className="space-y-8 rounded-[2rem] border border-primary/10 bg-white/90 p-6 shadow-sm sm:p-10">
+                  <div
+                    className={cx(
+                      'rounded-[2rem] border border-primary/10 bg-white/90 shadow-sm',
+                      isUltraShortViewport ? 'space-y-4 p-3.5 sm:p-4' : isShortViewport ? 'space-y-5 p-4 sm:p-5' : 'space-y-8 p-6 sm:p-10',
+                    )}
+                  >
                     <div className="flex justify-center gap-3">
                       <Button
                         size="lg"
-                        className="h-16 w-16 rounded-2xl p-0 shadow-md shadow-primary/30 transition-transform hover:scale-105"
+                        className={cx(
+                          'rounded-2xl p-0 shadow-md shadow-primary/30 transition-transform hover:scale-105',
+                          isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16',
+                        )}
                         onClick={() => {
                           playClick()
                           playAudioUrl(currentBlock.data?.audio?.url)
@@ -1088,7 +1154,10 @@ export function LessonPlayer({
                       <Button
                         size="lg"
                         variant="outline"
-                        className="h-16 w-16 rounded-2xl border-2 border-border bg-background p-0 text-foreground/60"
+                        className={cx(
+                          'rounded-2xl border-2 border-border bg-background p-0 text-foreground/60',
+                          isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16',
+                        )}
                         onClick={() => {
                           playClick()
                           playAudioUrl(currentBlock.data?.audio?.url, 0.6)
@@ -1102,16 +1171,25 @@ export function LessonPlayer({
                       {currentBlock.data.kind === 'sentence' && Array.isArray(currentBlock.data.components) && currentBlock.data.components.length > 0 ? (
                         <SentenceContentDisplay text={currentBlock.data.text} components={currentBlock.data.components} />
                       ) : (
-                        <h3 className="text-4xl font-black tracking-tight text-primary sm:text-5xl">{currentBlock.data.text}</h3>
+                        <h3
+                          className={cx(
+                            'font-black tracking-tight text-primary',
+                            isUltraShortViewport ? 'text-[1.7rem] leading-tight sm:text-3xl' : isShortViewport ? 'text-3xl leading-tight sm:text-4xl' : 'text-4xl sm:text-5xl',
+                          )}
+                        >
+                          {currentBlock.data.text}
+                        </h3>
                       )}
                       {currentBlock.data.pronunciation ? (
-                        <p className="text-lg font-semibold italic text-foreground/45">{currentBlock.data.pronunciation}</p>
+                        <p className={cx('font-semibold italic text-foreground/45', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
+                          {currentBlock.data.pronunciation}
+                        </p>
                       ) : null}
                     </div>
 
                     <div className="h-px w-full bg-border" />
 
-                    <p className="text-center text-2xl font-black text-foreground/80">
+                    <p className={cx('text-center font-black text-foreground/80', isUltraShortViewport ? 'text-lg' : isShortViewport ? 'text-xl' : 'text-2xl')}>
                       {currentBlock.data.selectedTranslation || currentBlock.data.translations?.[0] || ''}
                     </p>
                   </div>
@@ -1119,17 +1197,38 @@ export function LessonPlayer({
               ) : null}
 
               {currentBlock.type === 'proverb' ? (
-                <section className="animate-in fade-in slide-in-from-bottom-6 space-y-8 py-4 duration-500">
+                <section
+                  className={cx(
+                    'animate-in fade-in slide-in-from-bottom-6 duration-500',
+                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
+                  )}
+                >
                   <div className="text-center">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-700/60">Cultural Wisdom</p>
+                    <p className={cx('font-black uppercase tracking-[0.3em] text-amber-700/60', isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs')}>
+                      Cultural Wisdom
+                    </p>
                   </div>
 
-                  <div className="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-amber-50/80 p-6 shadow-sm sm:p-10">
+                  <div
+                    className={cx(
+                      'relative overflow-hidden rounded-[2rem] border border-amber-200 bg-amber-50/80 shadow-sm',
+                      isUltraShortViewport ? 'p-3.5 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-6 sm:p-10',
+                    )}
+                  >
                     <Quote className="absolute -left-1 -top-1 h-14 w-14 -rotate-12 text-amber-200/70" />
                     <div className="relative space-y-5">
-                      <h3 className="text-2xl font-black leading-snug text-amber-900 sm:text-3xl">{currentBlock.data.text}</h3>
+                      <h3
+                        className={cx(
+                          'font-black leading-snug text-amber-900',
+                          isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl',
+                        )}
+                      >
+                        {currentBlock.data.text}
+                      </h3>
                       <div className="h-px w-20 bg-amber-300" />
-                      <p className="text-lg font-semibold italic text-amber-900/75">{currentBlock.data.translation || ''}</p>
+                      <p className={cx('font-semibold italic text-amber-900/75', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
+                        {currentBlock.data.translation || ''}
+                      </p>
                     </div>
                   </div>
 
@@ -1143,9 +1242,24 @@ export function LessonPlayer({
               ) : null}
 
               {isExerciseBlock ? (
-                <section className="animate-in fade-in space-y-8 py-4 duration-500">
-                  <div className="space-y-4 rounded-3xl border border-border/70 bg-white/90 p-6 shadow-sm sm:p-8">
-                    <h2 className="text-2xl font-black leading-tight text-foreground sm:text-3xl">
+                <section
+                  className={cx(
+                    'animate-in fade-in duration-500',
+                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
+                  )}
+                >
+                  <div
+                    className={cx(
+                      'rounded-3xl border border-border/70 bg-white/90 shadow-sm',
+                      isUltraShortViewport ? 'space-y-2.5 p-3.5 sm:p-4' : isShortViewport ? 'space-y-3 p-4 sm:p-5' : 'space-y-4 p-6 sm:p-8',
+                    )}
+                  >
+                    <h2
+                      className={cx(
+                        'font-black leading-tight text-foreground',
+                        isUltraShortViewport ? 'text-[1.05rem] sm:text-[1.2rem]' : isShortViewport ? 'text-[1.35rem] sm:text-[1.55rem]' : 'text-2xl sm:text-3xl',
+                      )}
+                    >
                       {isListeningQuestion ? (
                         listeningHeading
                       ) : inlineSourceComponent && sourceText && renderedPromptParts.length > 1 ? (
@@ -1163,18 +1277,25 @@ export function LessonPlayer({
                     </h2>
 
                     {isContextResponseQuestion && choiceSupportText ? (
-                      <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Context Choice</p>
-                        <p className="mt-1 text-sm font-semibold text-foreground/70">{choiceSupportText}</p>
+                      <div className={cx('rounded-2xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-2.5' : isShortViewport ? 'p-3' : 'p-4')}>
+                        {!isUltraShortViewport ? <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Context Choice</p> : null}
+                        <p className={cx('font-semibold text-foreground/70', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'mt-1 text-xs' : 'mt-1 text-sm')}>
+                          {choiceSupportText}
+                        </p>
                       </div>
                     ) : null}
 
                     {!isListeningQuestion && !isSpeakingQuestion && questionSentenceText ? (
-                      <div className="rounded-3xl border border-primary/15 bg-primary/5 p-5 sm:p-6">
+                      <div className={cx('rounded-3xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
                         {questionSentenceComponents.length > 0 ? (
                           <SentenceContentDisplay text={questionSentenceText} components={questionSentenceComponents} />
                         ) : (
-                          <p className="text-center text-2xl font-black leading-relaxed text-primary sm:text-3xl">
+                          <p
+                            className={cx(
+                              'text-center font-black leading-relaxed text-primary',
+                              isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl',
+                            )}
+                          >
                             {questionSentenceText}
                           </p>
                         )}
@@ -1182,16 +1303,23 @@ export function LessonPlayer({
                     ) : null}
 
                     {isListeningQuestion ? (
-                      <div className="mt-2 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-white to-secondary/25 p-5 sm:p-6">
+                      <div
+                        className={cx(
+                          'mt-2 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-white to-secondary/25',
+                          isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6',
+                        )}
+                      >
                         <div className="flex flex-wrap items-center justify-between gap-4">
                           <div>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Listening Challenge</p>
-                            <p className="mt-1 text-sm font-semibold text-foreground/65">{listeningSupportText}</p>
+                            {!isShortViewport ? (
+                              <p className="mt-1 text-sm font-semibold text-foreground/65">{listeningSupportText}</p>
+                            ) : null}
                           </div>
                           <div className="flex gap-3">
                             <Button
                               size="lg"
-                              className="h-16 w-16 rounded-2xl p-0 shadow-md shadow-primary/25"
+                              className={cx('rounded-2xl p-0 shadow-md shadow-primary/25', isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16')}
                               onClick={() => {
                                 if (!listeningAudioUrl) return
                                 playClick()
@@ -1206,7 +1334,10 @@ export function LessonPlayer({
                             <Button
                               size="lg"
                               variant="outline"
-                              className="h-16 w-16 rounded-2xl border-2 border-border p-0 text-foreground/55"
+                              className={cx(
+                                'rounded-2xl border-2 border-border p-0 text-foreground/55',
+                                isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16',
+                              )}
                               onClick={() => {
                                 playClick()
                                 playAudioUrl(listeningAudioUrl, 0.6)
@@ -1222,28 +1353,30 @@ export function LessonPlayer({
                           <p className="mt-3 text-sm font-semibold text-red-600">No audio available for this item yet.</p>
                         ) : null}
                         {listeningPromptDetail ? (
-                          <div className="mt-4 rounded-2xl border border-border/50 bg-white/85 px-4 py-3 shadow-sm">
+                          <div className={cx('mt-4 rounded-2xl border border-border/50 bg-white/85 shadow-sm', isShortViewport ? 'px-3 py-2.5' : 'px-4 py-3')}>
                             <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">Your prompt</p>
-                            <p className="mt-2 text-lg font-bold leading-relaxed text-foreground">{listeningPromptDetail}</p>
+                            <p className={cx('mt-2 font-bold leading-relaxed text-foreground', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
+                              {listeningPromptDetail}
+                            </p>
                           </div>
                         ) : null}
                       </div>
                     ) : null}
 
                     {isSpeakingQuestion && speakingTarget ? (
-                      <div className="rounded-3xl border border-secondary/20 bg-secondary/10 p-5">
+                      <div className={cx('rounded-3xl border border-secondary/20 bg-secondary/10', isUltraShortViewport ? 'p-3' : isShortViewport ? 'p-4' : 'p-5')}>
                         <div className="space-y-5">
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                               <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Speaking Practice</p>
-                              <p className="mt-1 text-sm font-semibold text-foreground/65">
+                              <p className={cx('mt-1 font-semibold text-foreground/65', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
                                 Preview the reference audio and target text. Full comparison runs in learner study.
                               </p>
                             </div>
                             <div className="flex gap-3">
                               <Button
                                 size="lg"
-                                className="h-14 w-14 rounded-2xl p-0 shadow-md shadow-primary/25"
+                                className={cx('rounded-2xl p-0 shadow-md shadow-primary/25', isUltraShortViewport ? 'h-10 w-10' : isShortViewport ? 'h-12 w-12' : 'h-14 w-14')}
                                 onClick={() => {
                                   if (!speakingTarget.audioUrl) return
                                   playClick()
@@ -1257,7 +1390,10 @@ export function LessonPlayer({
                               <Button
                                 size="lg"
                                 variant="outline"
-                                className="h-14 w-14 rounded-2xl border-2 border-border p-0 text-foreground/55"
+                                className={cx(
+                                  'rounded-2xl border-2 border-border p-0 text-foreground/55',
+                                  isUltraShortViewport ? 'h-10 w-10' : isShortViewport ? 'h-12 w-12' : 'h-14 w-14',
+                                )}
                                 onClick={() => {
                                   if (!speakingTarget.audioUrl) return
                                   playClick()
@@ -1271,16 +1407,18 @@ export function LessonPlayer({
                             </div>
                           </div>
 
-                          <div className="rounded-3xl border border-primary/15 bg-white/90 p-5 sm:p-6">
+                          <div className={cx('rounded-3xl border border-primary/15 bg-white/90', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
                             {questionSource?.kind === 'sentence' && questionSentenceComponents.length > 0 ? (
                               <SentenceContentDisplay text={questionSentenceText} components={questionSentenceComponents} />
                             ) : (
-                              <p className="text-center text-2xl font-black leading-relaxed text-primary sm:text-3xl">
+                              <p className={cx('text-center font-black leading-relaxed text-primary', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
                                 {speakingTarget.text}
                               </p>
                             )}
                             {meaningText ? (
-                              <p className="mt-4 text-center text-base font-semibold text-foreground/55">{meaningText}</p>
+                              <p className={cx('mt-4 text-center font-semibold text-foreground/55', isUltraShortViewport ? 'text-xs' : isShortViewport ? 'text-sm' : 'text-base')}>
+                                {meaningText}
+                              </p>
                             ) : null}
                           </div>
 
@@ -1293,7 +1431,12 @@ export function LessonPlayer({
                   </div>
 
                   {isChoiceQuestion ? (
-                    <div className="grid gap-3">
+                    <div
+                      className={cx(
+                        'grid gap-3',
+                        (exerciseData?.options.length || 0) > 2 && 'sm:grid-cols-2',
+                      )}
+                    >
                       {isContextResponseQuestion ? (
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Possible responses</p>
                       ) : null}
@@ -1302,7 +1445,8 @@ export function LessonPlayer({
                           key={idx}
                           variant="outline"
                           className={cx(
-                            'h-auto justify-start rounded-2xl border-2 bg-white/90 p-4 text-left text-base font-semibold transition-all sm:p-5 sm:text-lg',
+                            'h-auto justify-start rounded-2xl border-2 bg-white/90 text-left font-semibold transition-all',
+                            isUltraShortViewport ? 'p-2.5 text-[13px] sm:text-sm' : isShortViewport ? 'p-3 text-sm sm:text-base' : 'p-4 text-base sm:p-5 sm:text-lg',
                             selectedOption === idx && !isAnswered && 'border-primary bg-primary/5 text-primary',
                             isAnswered && idx === exerciseData.correctIndex && 'border-green-500 bg-green-50 text-green-700',
                             isAnswered && selectedOption === idx && idx !== exerciseData.correctIndex && 'border-red-500 bg-red-50 text-red-700',
@@ -1314,7 +1458,7 @@ export function LessonPlayer({
                           }}
                           disabled={isAnswered}
                         >
-                          <span className="mr-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-black">
+                          <span className={cx('mr-4 flex shrink-0 items-center justify-center rounded-lg bg-muted font-black', isUltraShortViewport ? 'h-7 w-7 text-xs' : 'h-8 w-8 text-sm')}>
                             {idx + 1}
                           </span>
                           {option}
@@ -1324,7 +1468,7 @@ export function LessonPlayer({
                   ) : null}
 
                   {isMatchingQuestion ? (
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-6">
+                    <div className={cx('grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]', isUltraShortViewport ? 'gap-2.5 lg:gap-3' : isShortViewport ? 'gap-3 lg:gap-4' : 'gap-4 lg:gap-6')}>
                       <div className="min-w-0 space-y-3">
                         <p className="text-xs font-black uppercase tracking-[0.25em] text-foreground/45">Expressions</p>
                         {matchingLeftItems.map((item) => {
@@ -1334,7 +1478,8 @@ export function LessonPlayer({
                               key={item.id}
                               type="button"
                               className={cx(
-                                'w-full rounded-2xl border-2 bg-white/90 p-3 text-left transition-all sm:p-4',
+                                'w-full rounded-2xl border-2 bg-white/90 text-left transition-all',
+                                isUltraShortViewport ? 'p-2 sm:p-2.5' : isShortViewport ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4',
                                 selectedMatchingLeftId === item.id && 'border-primary bg-primary/5 shadow-sm shadow-primary/10',
                                 !selectedMatchingLeftId && matchedRight && 'border-emerald-300 bg-emerald-50',
                                 isAnswered && selectedMatches[item.id] === item.id && 'border-green-500 bg-green-50',
@@ -1343,9 +1488,13 @@ export function LessonPlayer({
                               onClick={() => handleSelectMatchingLeft(item.id)}
                               disabled={isAnswered}
                             >
-                              <p className="break-words text-base font-black text-foreground sm:text-lg">{item.label}</p>
+                              <p className={cx('break-words font-black text-foreground', isUltraShortViewport ? 'text-[13px] sm:text-sm' : isShortViewport ? 'text-sm sm:text-base' : 'text-base sm:text-lg')}>
+                                {item.label}
+                              </p>
                               {matchedRight ? (
-                                <p className="mt-2 text-sm font-semibold text-foreground/55">Matched to: {matchedRight.label}</p>
+                                <p className={cx('mt-2 font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
+                                  Matched to: {matchedRight.label}
+                                </p>
                               ) : null}
                             </button>
                           )
@@ -1367,7 +1516,8 @@ export function LessonPlayer({
                               key={item.id}
                               type="button"
                               className={cx(
-                                'w-full rounded-2xl border-2 bg-white/90 p-3 text-left transition-all sm:p-4',
+                                'w-full rounded-2xl border-2 bg-white/90 text-left transition-all',
+                                isUltraShortViewport ? 'p-2 sm:p-2.5' : isShortViewport ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4',
                                 selectedMatchingLeftId && 'hover:border-primary/60 hover:bg-primary/5',
                                 isUsed && !selectedMatchingLeftId && 'border-emerald-300 bg-emerald-50',
                                 isAnswered && isUsed && 'border-green-500 bg-green-50',
@@ -1378,12 +1528,20 @@ export function LessonPlayer({
                               {item.image?.url ? (
                                 <div className="space-y-3">
                                   <div className="overflow-hidden rounded-2xl border border-border/50 bg-muted/40">
-                                    <img src={item.image.url} alt={item.image.altText} className="h-28 w-full object-cover sm:h-40" />
+                                    <img
+                                      src={item.image.url}
+                                      alt={item.image.altText}
+                                      className={cx('w-full object-cover', isUltraShortViewport ? 'h-20 sm:h-24' : isShortViewport ? 'h-24 sm:h-32' : 'h-28 sm:h-40')}
+                                    />
                                   </div>
-                                  <p className="text-sm font-semibold text-foreground/55">{item.image.altText}</p>
+                                  <p className={cx('font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
+                                    {item.image.altText}
+                                  </p>
                                 </div>
                               ) : (
-                                <p className="break-words text-base font-black text-foreground sm:text-lg">{item.label}</p>
+                                <p className={cx('break-words font-black text-foreground', isUltraShortViewport ? 'text-[13px] sm:text-sm' : isShortViewport ? 'text-sm sm:text-base' : 'text-base sm:text-lg')}>
+                                  {item.label}
+                                </p>
                               )}
                             </button>
                           )
@@ -1393,16 +1551,23 @@ export function LessonPlayer({
                   ) : null}
 
                   {isWordOrderQuestion ? (
-                    <div className="space-y-8">
-                      <div className="flex min-h-[140px] flex-wrap content-center items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-border bg-white/80 p-5">
+                    <div className={cx(isUltraShortViewport ? 'space-y-4' : isShortViewport ? 'space-y-5' : 'space-y-8')}>
+                      <div
+                        className={cx(
+                          'flex flex-wrap content-center items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-border bg-white/80',
+                          isUltraShortViewport ? 'min-h-[88px] p-3' : isShortViewport ? 'min-h-[112px] p-4' : 'min-h-[140px] p-5',
+                        )}
+                      >
                         {selectedWords.length === 0 && !isAnswered ? (
-                          <span className="text-base font-semibold uppercase tracking-wider text-foreground/35">{orderPromptPlaceholder}</span>
+                          <span className={cx('font-semibold uppercase tracking-wider text-foreground/35', isUltraShortViewport ? 'text-xs' : isShortViewport ? 'text-sm' : 'text-base')}>
+                            {orderPromptPlaceholder}
+                          </span>
                         ) : null}
                         {selectedWords.map((wordIdx, idx) => (
                           <Button
                             key={`${wordIdx}-${idx}`}
                             variant="secondary"
-                            className="h-12 rounded-xl px-5 text-base font-black"
+                            className={cx('rounded-xl font-black', isUltraShortViewport ? 'h-9 px-3 text-xs' : isShortViewport ? 'h-10 px-4 text-sm' : 'h-12 px-5 text-base')}
                             onClick={() => {
                               if (isAnswered) return
                               setSelectedWords((prevWords) => prevWords.filter((_, selectedIndex) => selectedIndex !== idx))
@@ -1422,7 +1587,8 @@ export function LessonPlayer({
                               key={idx}
                               variant="outline"
                               className={cx(
-                                'h-12 rounded-xl border-2 px-5 text-base font-black transition-all',
+                                'rounded-xl border-2 font-black transition-all',
+                                isUltraShortViewport ? 'h-9 px-3 text-xs' : isShortViewport ? 'h-10 px-4 text-sm' : 'h-12 px-5 text-base',
                                 isUsed ? 'pointer-events-none opacity-25' : 'bg-white/90 hover:border-primary/60',
                               )}
                               onClick={() => {
@@ -1448,24 +1614,31 @@ export function LessonPlayer({
 
       {isStageComplete && stageTransitionCopy ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/50 px-4 backdrop-blur-[3px]">
-          <div className="relative w-full max-w-md overflow-hidden rounded-[2.2rem] border border-primary/15 bg-[linear-gradient(155deg,rgba(255,255,255,0.98),rgba(255,247,237,0.95))] p-6 text-center shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:p-8">
+          <div
+            className={cx(
+              'relative w-full max-w-md overflow-hidden rounded-[2.2rem] border border-primary/15 bg-[linear-gradient(155deg,rgba(255,255,255,0.98),rgba(255,247,237,0.95))] text-center shadow-[0_24px_80px_rgba(15,23,42,0.18)]',
+              isUltraShortViewport ? 'p-4 sm:p-5' : isShortViewport ? 'p-5 sm:p-6' : 'p-6 sm:p-8',
+            )}
+          >
             <div className="absolute -left-10 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full bg-primary/15 blur-3xl animate-pulse" />
             <div className="absolute -right-6 top-8 h-24 w-24 rounded-full bg-secondary/20 blur-3xl animate-pulse" />
             <div className="absolute inset-x-10 top-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
             <div className="pointer-events-none absolute inset-0 rounded-[2.2rem] border border-white/60" />
-            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center">
+            <div className={cx('relative mx-auto mb-5 flex items-center justify-center', isUltraShortViewport ? 'h-14 w-14' : isShortViewport ? 'h-16 w-16' : 'h-20 w-20')}>
               <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
               <div className="absolute inset-2 rounded-full bg-primary/15 animate-pulse" />
-              <div className="relative rounded-full bg-primary px-4 py-3 text-xl font-black text-primary-foreground shadow-lg shadow-primary/25">
+              <div className={cx('relative rounded-full bg-primary font-black text-primary-foreground shadow-lg shadow-primary/25', isUltraShortViewport ? 'px-2.5 py-1.5 text-base' : isShortViewport ? 'px-3 py-2 text-lg' : 'px-4 py-3 text-xl')}>
                 +{stageXpEarned}
               </div>
             </div>
             <p className="text-xs font-black uppercase tracking-[0.3em] text-primary/60">Stage Complete</p>
-            <h2 className="mt-4 text-3xl font-black text-foreground sm:text-4xl">{stageTransitionCopy.title}</h2>
-            <p className="mt-3 text-sm font-semibold uppercase tracking-[0.16em] text-foreground/50">
+            <h2 className={cx('mt-4 font-black text-foreground', isUltraShortViewport ? 'text-xl sm:text-2xl' : isShortViewport ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl')}>
+              {stageTransitionCopy.title}
+            </h2>
+            <p className={cx('mt-3 font-semibold uppercase tracking-[0.16em] text-foreground/50', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
               {stageTransitionCopy.subtitle}
             </p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className={cx('mt-6 grid gap-3 sm:grid-cols-2', isVeryShortViewport && 'mt-4')}>
               <div className="rounded-3xl border border-green-200 bg-green-50 p-4 text-left">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700/70">Stage XP</p>
                 <p className="mt-2 text-2xl font-black text-green-700">+{stageXpEarned}</p>
@@ -1478,14 +1651,14 @@ export function LessonPlayer({
             <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-primary/10">
               <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-[linear-gradient(90deg,#fb923c_0%,#f59e0b_40%,#34d399_100%)] animate-[pulse_1.1s_ease-in-out_infinite]" />
             </div>
-            <p className="mt-5 text-sm font-semibold text-foreground/55">
+            <p className={cx('mt-5 font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
               {isSavingStage ? 'Saving progress...' : isLastStage ? 'Wrapping up...' : 'Loading next stage...'}
             </p>
             {preview ? (
               <Button
                 size="lg"
                 variant="outline"
-                className="mt-5 h-12 px-6 text-base font-black"
+                className={cx('mt-5 font-black', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base')}
                 onClick={handleAdvanceStage}
                 disabled={isSavingStage}
               >
@@ -1505,7 +1678,12 @@ export function LessonPlayer({
             isAnswered && !isCorrect && 'border-red-200 bg-red-50/95',
           )}
         >
-          <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div
+            className={cx(
+              'mx-auto flex max-w-4xl flex-col sm:flex-row sm:items-center sm:justify-between sm:px-6',
+              isUltraShortViewport ? 'gap-2.5 px-3 py-2.5' : isShortViewport ? 'gap-3 px-3 py-3' : 'gap-4 px-4 py-4',
+            )}
+          >
             <div className="hidden flex-1 items-center gap-3 sm:flex">
               {isAnswered ? (
                 <>
@@ -1518,16 +1696,16 @@ export function LessonPlayer({
                     {isCorrect ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
                   </div>
                   <div>
-                    <p className={cx('text-base font-black', isCorrect ? 'text-green-800' : 'text-red-800')}>
+                    <p className={cx(isUltraShortViewport ? 'text-xs font-black' : isShortViewport ? 'text-sm font-black' : 'text-base font-black', isCorrect ? 'text-green-800' : 'text-red-800')}>
                       {answerStatusLabel}
                     </p>
-                    {!isCorrect && exerciseData?.explanation ? (
+                    {!isCorrect && exerciseData?.explanation && !isVeryShortViewport ? (
                       <p className="text-sm font-medium text-red-800/70">{exerciseData.explanation}</p>
                     ) : null}
                   </div>
                 </>
               ) : (
-                <p className="text-sm font-semibold text-foreground/55">
+                <p className={cx('font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
                   {isSpeakingQuestion
                     ? 'Preview the speaking prompt and reference audio.'
                     : preview
@@ -1543,7 +1721,7 @@ export function LessonPlayer({
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-12 w-full px-6 text-base font-black sm:w-auto"
+                    className={cx('w-full font-black sm:w-auto', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base')}
                     onClick={handleAdvanceStage}
                     disabled={isSavingStage}
                   >
@@ -1552,14 +1730,18 @@ export function LessonPlayer({
                 ) : null}
                 {isExerciseBlock ? (
                   isSpeakingQuestion ? (
-                    <Button size="lg" className="h-12 w-full px-6 text-base font-black sm:w-auto" onClick={handleNext}>
+                    <Button
+                      size="lg"
+                      className={cx('w-full font-black sm:w-auto', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base')}
+                      onClick={handleNext}
+                    >
                       Continue
                       <ArrowRight className="h-5 w-5" />
                     </Button>
                   ) : !isAnswered ? (
                     <Button
                       size="lg"
-                      className="h-12 w-full px-6 text-base font-black sm:w-auto"
+                      className={cx('w-full font-black sm:w-auto', isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base')}
                       onClick={handleCheck}
                       disabled={!canCheck}
                     >
@@ -1569,7 +1751,8 @@ export function LessonPlayer({
                     <Button
                       size="lg"
                       className={cx(
-                        'h-12 w-full px-6 text-base font-black text-white sm:w-auto',
+                        'w-full font-black text-white sm:w-auto',
+                        isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base',
                         isCorrect ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700',
                       )}
                       onClick={handleNext}
@@ -1580,7 +1763,11 @@ export function LessonPlayer({
                     </Button>
                   )
                 ) : (
-                  <Button size="lg" className="h-12 w-full px-6 text-base font-black sm:w-auto" onClick={handleNext}>
+                  <Button
+                    size="lg"
+                    className={cx('w-full font-black sm:w-auto', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-12 px-6 text-base')}
+                    onClick={handleNext}
+                  >
                     Continue
                     <ArrowRight className="h-5 w-5" />
                   </Button>

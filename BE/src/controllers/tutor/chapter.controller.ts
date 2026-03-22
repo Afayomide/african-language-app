@@ -117,6 +117,22 @@ export async function deleteChapter(req: AuthRequest, res: Response) {
   return res.status(200).json({ message: "Chapter deleted." });
 }
 
+export async function finishChapter(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized." });
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
+
+  const existing = await chapters.findById(id);
+  if (!existing || existing.language !== tutorLanguage) return res.status(404).json({ error: "Chapter not found." });
+
+  const chapter = await chapters.updateById(id, { status: "finished" });
+  if (!chapter) return res.status(404).json({ error: "Chapter not found." });
+  return res.status(200).json({ chapter });
+}
+
 export async function reorderChapters(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { chapterIds } = req.body ?? {};

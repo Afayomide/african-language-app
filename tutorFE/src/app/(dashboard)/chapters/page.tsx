@@ -14,7 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
-import { Edit, Plus, Sparkles, Trash2 } from "lucide-react";
+import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
+import { CheckCircle, Edit, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const LEVEL_LABELS: Record<Level, string> = {
@@ -124,6 +125,16 @@ export default function ChaptersPage() {
     }
   }
 
+  async function handleFinish(chapterId: string) {
+    try {
+      await chapterService.finishChapter(chapterId);
+      toast.success("Chapter sent to admin for publish.");
+      await loadChapters();
+    } catch {
+      toast.error("Failed to mark chapter as finished.");
+    }
+  }
+
   async function handleGenerateAi() {
     const count = Number(generationCount);
     if (Number.isNaN(count) || count < 1 || count > 20) {
@@ -228,10 +239,21 @@ export default function ChaptersPage() {
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/units?chapterId=${chapter._id}`}>Open Units</Link>
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(chapter)}>
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(chapter)} className={TABLE_ACTION_ICON_CLASS.edit} title="Edit">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(chapter._id)}>
+                        {chapter.status === "draft" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => void handleFinish(chapter._id)}
+                            className={TABLE_ACTION_ICON_CLASS.finish}
+                            title="Finish"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(chapter._id)} className={TABLE_ACTION_ICON_CLASS.delete} title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
