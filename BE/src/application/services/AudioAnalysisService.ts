@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import ffmpegStatic from "ffmpeg-static";
 import { PitchDetector } from "pitchy";
 import type { AudioAnalysis, AudioSpectrogramFrame } from "../../domain/entities/Content.js";
 
@@ -11,6 +12,7 @@ const MAX_SPECTROGRAM_FRAMES = 48;
 const MAX_WAVEFORM_BUCKETS = 128;
 const MIN_CLARITY = 0.78;
 const SPECTROGRAM_BINS = [100, 150, 200, 300, 400, 500, 650, 800, 1000, 1200, 1500, 1800, 2200, 2600, 3200, 4000];
+const FFMPEG_BINARY_PATH = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 
 function computeWaveformPeaks(samples: Float32Array, bucketCount = MAX_WAVEFORM_BUCKETS) {
   if (samples.length === 0) return [];
@@ -118,7 +120,7 @@ function bufferToFloat32Array(buffer: Buffer) {
 async function decodeToMonoFloat32Pcm(buffer: Buffer) {
   return await new Promise<Float32Array>((resolve, reject) => {
     const ffmpeg = spawn(
-      "ffmpeg",
+      FFMPEG_BINARY_PATH,
       [
         "-v",
         "error",
@@ -146,6 +148,10 @@ async function decodeToMonoFloat32Pcm(buffer: Buffer) {
     ffmpeg.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
     ffmpeg.on("error", (error) => {
       clearTimeout(timeout);
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        reject(new Error(`ffmpeg_binary_not_found:${FFMPEG_BINARY_PATH}`));
+        return;
+      }
       reject(error);
     });
     ffmpeg.on("close", (code) => {

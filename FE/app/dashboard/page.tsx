@@ -113,43 +113,60 @@ export default function DashboardScreen() {
   const completedLessonCount = data?.completedLessons?.length || 0
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_28%),linear-gradient(180deg,#fffdf8_0%,#fffaf2_42%,#ffffff_100%)]">
-      <header className="sticky top-0 z-40 border-b border-border/20 bg-background/90 px-4 py-5 backdrop-blur-xl">
+    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-100/20 via-background to-background">
+      <header className="sticky top-0 z-40 border-b border-white/50 bg-background/80 px-4 py-6 backdrop-blur-md transition-all duration-300">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/65">Learner Space</p>
-            <h1 className="text-2xl font-black text-foreground sm:text-3xl">Your language journey</h1>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/80 transition-colors hover:text-primary">
+              Learner Space
+            </p>
+            <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+              Your language journey
+            </h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-2xl">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full text-muted-foreground transition-transform hover:rotate-45 hover:bg-primary/10 hover:text-primary"
+            >
               <Settings className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="rounded-2xl" onClick={() => void logout()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full text-muted-foreground transition-transform hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => void logout()}
+            >
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <section className="px-4 py-8 sm:py-10">
-        <div className="mx-auto max-w-6xl space-y-8">
-          <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-            <Card className="overflow-hidden border-0 bg-[#8f3f00] p-5 text-white shadow-[0_26px_70px_rgba(143,63,0,0.28)] animate-in fade-in slide-in-from-bottom-4 duration-500 sm:p-8">
-              <div className="relative space-y-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/90">
-                      <Sparkles className="h-3.5 w-3.5" />
+      <section className="px-4 py-8 sm:py-12">
+        <div className="mx-auto max-w-6xl space-y-10">
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+            <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-[#8f3f00] via-[#a34a00] to-[#b85d00] p-6 text-white shadow-[0_20px_60px_-15px_rgba(143,63,0,0.3)] transition-all duration-500 hover:shadow-[0_30px_80px_-20px_rgba(143,63,0,0.4)] sm:p-8">
+              {/* Background Pattern */}
+              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl transition-transform duration-700 group-hover:scale-150" />
+              <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl transition-transform duration-700 group-hover:scale-150" />
+
+              <div className="relative space-y-8">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-4">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white/90 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/20">
+                      <Sparkles className="h-3.5 w-3.5 animate-pulse text-yellow-300" />
                       Ready to continue
                     </div>
                     <div>
-                      <p className="text-sm text-white/85">Current language</p>
-                      <h2 className="text-3xl font-black capitalize text-white sm:text-4xl">
+                      <p className="text-sm font-medium text-white/80">Current language</p>
+                      <h2 className="text-4xl font-black capitalize tracking-tight text-white sm:text-5xl">
                         {data?.stats.currentLanguage || '-'}
                       </h2>
                     </div>
                   </div>
-                  <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[240px]">
+                  <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[260px]">
                     <DashboardStatPill
                       icon={Flame}
                       label="Streak"
@@ -165,28 +182,34 @@ export default function DashboardScreen() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-                  <Link href={nextLessonHref}>
-                    <div className="group rounded-[28px] border border-white/12 bg-white/8 p-5 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-white/25 hover:bg-white/12 hover:-translate-y-1">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
-                          <BookOpen className="h-4 w-4 text-amber-300" />
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                  <Link href={nextLessonHref} className="h-full">
+                    <div className="group/card relative h-full rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10 hover:shadow-xl">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm font-bold text-white/90">
+                          <div className="rounded-lg bg-amber-400/20 p-1.5 text-amber-300">
+                            <BookOpen className="h-4 w-4" />
+                          </div>
                           Next lesson
                         </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 transition-colors group-hover:bg-white/15">
-                          <ArrowRight className="h-5 w-5" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 group-hover/card:scale-110 group-hover/card:bg-white/20">
+                          <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover/card:translate-x-0.5" />
                         </div>
                       </div>
-                      <h3 className="text-2xl font-black text-white">
+                      <h3 className="line-clamp-2 text-2xl font-black leading-tight text-white">
                         {data?.nextLesson?.title || 'No lesson available'}
                       </h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/85">
+                      <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-white/70">
                         {data?.nextLesson?.description || 'You are up to date for now.'}
                       </p>
-                      <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
-                        {data?.nextLesson?.unitTitle ? <span>{data.nextLesson.unitTitle}</span> : null}
+                      <div className="mt-6 flex flex-wrap items-center gap-3">
+                        {data?.nextLesson?.unitTitle ? (
+                          <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/80">
+                            {data.nextLesson.unitTitle}
+                          </span>
+                        ) : null}
                         {data?.nextLesson?.totalStages ? (
-                          <span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
                             {data.nextLesson.progressPercent && data.nextLesson.progressPercent > 0
                               ? `Stage ${(data.nextLesson.currentStageIndex ?? 0) + 1} / ${data.nextLesson.totalStages}`
                               : `${data.nextLesson.totalStages} stages`}
@@ -196,63 +219,80 @@ export default function DashboardScreen() {
                     </div>
                   </Link>
 
-                  <div className="rounded-[28px] border border-white/12 bg-white/8 p-5 shadow-lg backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
-                        <Target className="h-4 w-4 text-emerald-300" />
-                        Today's goal
+                  <div className="flex flex-col justify-between rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-transform duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10">
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm font-bold text-white/90">
+                          <div className="rounded-lg bg-emerald-400/20 p-1.5 text-emerald-300">
+                            <Target className="h-4 w-4" />
+                          </div>
+                          Today's goal
+                        </div>
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
-                        {data?.stats.todayMinutes || 0}/{data?.stats.dailyGoalMinutes || 0} min
-                      </span>
+                      <div className="mt-6 flex items-end gap-2">
+                        <span className="text-4xl font-black text-white">{data?.stats.todayMinutes || 0}</span>
+                        <span className="mb-1.5 text-sm font-medium text-white/60">
+                          / {data?.stats.dailyGoalMinutes || 0} min
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,#facc15_0%,#fb923c_50%,#34d399_100%)] transition-all duration-500"
-                        style={{ width: `${dailyPercent}%` }}
-                      />
+                    
+                    <div className="mt-6 space-y-2">
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-black/20 p-0.5">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-300 to-emerald-400 shadow-[0_0_10px_rgba(251,191,36,0.5)] transition-all duration-1000 ease-out"
+                          style={{ width: `${dailyPercent}%` }}
+                        />
+                      </div>
+                      <p className="text-center text-[10px] font-medium text-white/50">
+                        {dailyPercent < 100 ? 'Keep pushing!' : 'Goal reached! 🎉'}
+                      </p>
                     </div>
-                    <p className="mt-4 text-sm leading-relaxed text-white/85">
-                      Keep the streak alive by clearing one more stage or finishing your next lesson.
-                    </p>
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card className="overflow-hidden border border-primary/15 bg-white/85 p-5 shadow-[0_16px_40px_rgba(249,115,22,0.10)] backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500 sm:p-7">
-              <div className="mb-5 flex items-center justify-between gap-4">
+            <Card className="overflow-hidden border border-border/50 bg-white/60 p-6 shadow-lg backdrop-blur-xl transition-all duration-300 hover:shadow-xl sm:p-8">
+              <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">Momentum</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-primary/60">Momentum</p>
                   <h2 className="text-xl font-black text-foreground">This week</h2>
                 </div>
-                <div className="rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary">
-                  {completedLessonCount} lessons done
+                <div className="rounded-full border border-primary/10 bg-primary/5 px-3 py-1 text-xs font-bold text-primary">
+                  {completedLessonCount} lessons
                 </div>
               </div>
 
-              <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <div className="grid min-w-[460px] grid-cols-7 gap-2">
-                  {(data?.weeklyOverview || []).map((day) => (
+              <div className="-mx-2 overflow-x-auto px-2 pb-2">
+                <div className="grid min-w-[360px] grid-cols-7 gap-3">
+                  {(data?.weeklyOverview || []).map((day, i) => (
                     <div
                       key={day.day}
                       className={cn(
-                        'rounded-2xl border p-3 text-center transition-all',
+                        'group flex flex-col items-center gap-3 rounded-2xl border p-3 transition-all duration-300',
                         day.completed
-                          ? 'border-primary/20 bg-[linear-gradient(180deg,rgba(249,115,22,0.14),rgba(251,191,36,0.12))] shadow-sm'
-                          : 'border-border/40 bg-background/70'
+                          ? 'border-orange-200 bg-orange-50/50 hover:-translate-y-1 hover:shadow-md'
+                          : 'border-transparent bg-transparent hover:bg-muted/50'
                       )}
+                      style={{ transitionDelay: `${i * 50}ms` }}
                     >
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-foreground/45">{day.day}</p>
-                      <div className="mt-3 flex justify-center">
-                        <div
-                          className={cn(
-                            'flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-black',
-                            day.completed ? 'bg-primary text-white' : 'bg-muted text-foreground/45'
-                          )}
-                        >
-                          {day.completed ? day.minutes : '-'}
-                        </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground group-hover:text-foreground">
+                        {day.day}
+                      </span>
+                      <div
+                        className={cn(
+                          'flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black shadow-sm transition-all duration-300 group-hover:scale-110',
+                          day.completed
+                            ? 'bg-gradient-to-br from-orange-400 to-amber-400 text-white shadow-orange-200'
+                            : 'bg-muted text-muted-foreground/40'
+                        )}
+                      >
+                        {day.completed ? (
+                          <CheckCircle2 className="h-5 w-5" />
+                        ) : (
+                          <div className="h-1.5 w-1.5 rounded-full bg-current opacity-30" />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -260,14 +300,15 @@ export default function DashboardScreen() {
               </div>
 
               {data?.achievements?.length ? (
-                <div className="mt-6 space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/45">Highlights</p>
+                <div className="mt-8 space-y-4 border-t border-border/40 pt-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Recent Achievements</p>
                   <div className="flex flex-wrap gap-2">
                     {data.achievements.slice(0, 5).map((achievement) => (
                       <span
                         key={achievement}
-                        className="rounded-full border border-secondary/30 bg-secondary/15 px-3 py-1.5 text-xs font-semibold text-foreground/70 transition-transform duration-300 hover:-translate-y-0.5"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-bold text-primary transition-all hover:bg-primary/10 hover:shadow-sm"
                       >
+                        <Star className="h-3 w-3 fill-primary text-primary" />
                         {achievement}
                       </span>
                     ))}
@@ -277,25 +318,26 @@ export default function DashboardScreen() {
             </Card>
           </section>
 
-          <section className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
+          <section className="space-y-6">
+            <div className="flex items-end justify-between gap-4 border-b border-border/40 pb-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/55">Curriculum</p>
-                <h2 className="flex items-center gap-2 text-2xl font-black text-foreground">
-                  <Layers className="h-5 w-5 text-primary" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Curriculum</p>
+                <h2 className="mt-1 flex items-center gap-2 text-2xl font-black text-foreground">
+                  <Layers className="h-6 w-6 text-primary" />
                   Chapter Map
                 </h2>
               </div>
               {activeUnit ? (
-                <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                  {activeUnit.completedLessons}/{activeUnit.totalLessons} lessons cleared
+                <div className="hidden rounded-full bg-secondary px-3 py-1 text-xs font-bold text-secondary-foreground sm:block">
+                  {activeUnit.completedLessons} / {activeUnit.totalLessons} complete
                 </div>
               ) : null}
             </div>
 
             {data?.units && data.units.length > 0 ? (
-              <div className="space-y-6">
-                <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+              <div className="space-y-8">
+                {/* Unit Selector */}
+                <div className="scrollbar-hide flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
                   {data.units.map((unit) => {
                     const active = activeUnit?.id === unit.id
                     return (
@@ -304,31 +346,49 @@ export default function DashboardScreen() {
                         type="button"
                         onClick={() => setExpandedUnitId(unit.id)}
                         className={cn(
-                          'group min-w-[82vw] max-w-[82vw] snap-start rounded-[28px] border p-5 text-left transition-all duration-300 sm:min-w-[250px] sm:max-w-[250px]',
+                          'group relative min-w-[280px] max-w-[280px] snap-start overflow-hidden rounded-[32px] border p-6 text-left transition-all duration-300',
                           active
-                            ? 'border-primary/30 bg-[linear-gradient(160deg,rgba(249,115,22,0.14),rgba(251,191,36,0.08),#fff)] shadow-[0_18px_40px_rgba(249,115,22,0.16)] sm:-translate-y-1'
-                            : 'border-border/40 bg-white/85 hover:border-primary/20 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:hover:-translate-y-1'
+                            ? 'border-primary/50 bg-white ring-4 ring-primary/10 scale-[1.02] shadow-xl shadow-orange-500/10'
+                            : 'border-border bg-white/50 hover:border-primary/30 hover:bg-white hover:-translate-y-1 hover:shadow-lg'
                         )}
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-foreground/45">
-                              Unit {unit.orderIndex + 1}
-                            </p>
-                            <h3 className="mt-2 text-lg font-black text-foreground">{unit.title}</h3>
+                        <div className={cn(
+                          "absolute right-0 top-0 h-32 w-32 -translate-y-1/2 translate-x-1/2 rounded-full blur-3xl transition-opacity",
+                          active ? "bg-orange-500/10 opacity-100" : "opacity-0"
+                        )} />
+                        
+                        <div className="relative space-y-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className={cn(
+                                "text-[10px] font-bold uppercase tracking-[0.2em] transition-colors",
+                                active ? "text-primary" : "text-muted-foreground"
+                              )}>
+                                Unit {unit.orderIndex + 1}
+                              </p>
+                              <h3 className="mt-1 text-lg font-black leading-tight text-foreground">{unit.title}</h3>
+                            </div>
+                            <div className={cn(
+                              "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                              active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                            )}>
+                              {unit.level}
+                            </div>
                           </div>
-                          <div className="rounded-full bg-background/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/75">
-                            {unit.level}
-                          </div>
-                        </div>
-                        <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-foreground/65">{unit.description}</p>
-                        <div className="mt-5 space-y-2">
-                          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">
-                            <span>Progress</span>
-                            <span>{unit.progressPercent}%</span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-[linear-gradient(90deg,#f97316_0%,#facc15_100%)]" style={{ width: `${unit.progressPercent}%` }} />
+                          
+                          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{unit.description}</p>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              <span>Progress</span>
+                              <span>{unit.progressPercent}%</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                              <div 
+                                className="h-full rounded-full bg-gradient-to-r from-orange-400 to-amber-400 transition-all duration-1000" 
+                                style={{ width: `${unit.progressPercent}%` }} 
+                              />
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -337,120 +397,117 @@ export default function DashboardScreen() {
                 </div>
 
                 {activeUnit ? (
-                  <Card className="overflow-hidden border border-primary/15 bg-white/88 p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500 sm:p-8">
-                    <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-                      <div className="max-w-2xl">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">Active chapter</p>
-                        <h3 className="mt-2 text-2xl font-black text-foreground sm:text-3xl">{activeUnit.title}</h3>
-                        <p className="mt-3 text-sm leading-relaxed text-foreground/65">
-                          {activeUnit.description || 'Unit curriculum'}
-                        </p>
-                      </div>
-                      <div className="w-full rounded-[24px] border border-primary/15 bg-primary/8 px-5 py-4 text-left sm:w-auto sm:text-right">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">Progress</p>
-                        <p className="mt-2 text-3xl font-black text-primary">{activeUnit.progressPercent}%</p>
-                      </div>
-                    </div>
+                  <div className="relative mx-auto max-w-3xl">
+                    {/* Visual Connector Line */}
+                    <div className="absolute left-[24px] top-8 h-[calc(100%-2rem)] w-0.5 -translate-x-1/2 bg-gradient-to-b from-transparent via-border to-transparent md:left-1/2" />
 
-                    <div className="relative">
-                      <div className="absolute left-[1.35rem] top-0 h-full w-px bg-[linear-gradient(180deg,rgba(249,115,22,0.15),rgba(251,191,36,0.3),rgba(15,23,42,0.08))] md:left-1/2 md:-translate-x-1/2" />
+                    <div className="space-y-8 pb-12">
+                      {activeUnit.lessons.map((lesson, index) => {
+                        const isCompleted = lesson.status === 'completed'
+                        const isCurrent = lesson.status === 'in_progress'
+                        const isLocked = lesson.status === 'not_started'
+                        
+                        const alignment = index % 2 === 0 ? 'left' : 'right'
 
-                      <div className="space-y-5 sm:space-y-6">
-                        {activeUnit.lessons.map((lesson, index) => {
-                          const stageLabel = lesson.totalStages
-                            ? lesson.status === 'completed'
-                              ? `${lesson.totalStages}/${lesson.totalStages} stages`
-                              : lesson.status === 'in_progress'
-                                ? `Stage ${(lesson.currentStageIndex ?? 0) + 1} of ${lesson.totalStages}`
-                                : `${lesson.totalStages} stages`
-                            : null
+                        return (
+                          <div
+                            key={lesson.id}
+                            className={cn(
+                              "relative flex items-center gap-6 md:gap-12",
+                              alignment === 'left' ? "md:flex-row" : "md:flex-row-reverse"
+                            )}
+                          >
+                            {/* Desktop Spacer for Alignment */}
+                            <div className="hidden flex-1 md:block" />
 
-                          return (
-                            <div
-                              key={lesson.id}
-                              className="relative grid grid-cols-[3rem_minmax(0,1fr)] gap-3 md:grid-cols-2 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500"
-                              style={{ animationDelay: `${index * 70}ms` }}
-                            >
-                              <div
-                                className={cn(
-                                  'col-start-2 md:col-span-1',
-                                  index % 2 === 0 ? 'md:col-start-1 md:pr-10' : 'md:col-start-2 md:pl-10'
-                                )}
-                              >
-                                <Link href={`/lesson-overview?lessonId=${lesson.id}`}>
-                                  <div
-                                    className={cn(
-                                      'group rounded-[26px] border p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:p-5',
-                                      lesson.status === 'completed' && 'border-emerald-200 bg-emerald-50/70',
-                                      lesson.status === 'in_progress' && 'border-primary/25 bg-[linear-gradient(160deg,rgba(249,115,22,0.10),rgba(251,191,36,0.08),#fff)]',
-                                      lesson.status === 'not_started' && 'border-border/40 bg-white/92'
-                                    )}
-                                  >
-                                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            {/* Center Node */}
+                            <div className="absolute left-[24px] z-10 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border-4 border-background bg-background shadow-lg transition-transform duration-300 hover:scale-110 md:left-1/2">
+                              <div className={cn(
+                                "flex h-full w-full items-center justify-center rounded-full transition-colors",
+                                isCompleted ? "bg-emerald-500 text-white" : 
+                                isCurrent ? "bg-primary text-white animate-pulse" : "bg-muted text-muted-foreground/40"
+                              )}>
+                                {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-black">{lesson.orderIndex + 1}</span>}
+                              </div>
+                            </div>
+
+                            {/* Content Card */}
+                            <div className={cn("flex-1 pl-16 md:pl-0", alignment === 'right' ? "md:pr-12" : "md:pl-12")}>
+                              <Link href={isLocked ? '#' : `/lesson-overview?lessonId=${lesson.id}`} className={cn(isLocked && "pointer-events-none")}>
+                                <div
+                                  className={cn(
+                                    'group relative overflow-hidden rounded-[24px] border p-5 shadow-sm transition-all duration-300',
+                                    isCompleted 
+                                      ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50 hover:shadow-md'
+                                      : isCurrent 
+                                        ? 'border-primary/40 bg-white ring-4 ring-primary/5 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10'
+                                        : 'border-border/60 bg-white/60 opacity-80 grayscale hover:opacity-100 hover:grayscale-0'
+                                  )}
+                                >
+                                  {isCurrent && (
+                                    <div className="absolute -right-12 -top-12 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
+                                  )}
+                                  
+                                  <div className="flex flex-col gap-3">
+                                    <div className="flex items-start justify-between gap-4">
                                       <div>
-                                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-foreground/45">
-                                          Lesson {lesson.orderIndex + 1}
-                                        </p>
-                                        <h4 className="mt-2 text-lg font-black text-foreground sm:text-xl">{lesson.title}</h4>
+                                        <div className="flex items-center gap-2">
+                                          <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-wider",
+                                            isCompleted ? "text-emerald-600" : isCurrent ? "text-primary" : "text-muted-foreground"
+                                          )}>
+                                            Lesson {lesson.orderIndex + 1}
+                                          </span>
+                                          {isCurrent && (
+                                            <span className="relative flex h-2 w-2">
+                                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+                                              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
+                                            </span>
+                                          )}
+                                        </div>
+                                        <h4 className="mt-1 text-lg font-black text-foreground">{lesson.title}</h4>
                                       </div>
                                       <LessonStatusBadge status={lesson.status} />
                                     </div>
-                                    <p className="text-sm leading-relaxed text-foreground/65">{lesson.description || 'Lesson'}</p>
-                                    <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">
-                                      <span>{lesson.level}</span>
-                                      {stageLabel ? <span>{stageLabel}</span> : null}
-                                      {lesson.status === 'completed' ? <span>Cleared</span> : null}
-                                    </div>
-                                    <div className="mt-5 flex items-center justify-between gap-3">
-                                      <div className="h-2 w-24 overflow-hidden rounded-full bg-muted/80 sm:w-28">
-                                        <div
-                                          className={cn(
-                                            'h-full rounded-full',
-                                            lesson.status === 'completed'
-                                              ? 'bg-emerald-500'
-                                              : lesson.status === 'in_progress'
-                                                ? 'bg-[linear-gradient(90deg,#f97316_0%,#facc15_100%)]'
-                                                : 'bg-border'
-                                          )}
-                                          style={{ width: `${lesson.status === 'not_started' ? 24 : Math.max(lesson.progressPercent, 18)}%` }}
-                                        />
+                                    
+                                    <p className="text-sm leading-relaxed text-muted-foreground">{lesson.description || 'Start your lesson'}</p>
+                                    
+                                    <div className="mt-2 flex items-center justify-between gap-4 border-t border-border/50 pt-3">
+                                      <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        <span className="rounded-md bg-secondary px-1.5 py-0.5">{lesson.level}</span>
+                                        {lesson.totalStages && <span>{lesson.totalStages} stages</span>}
                                       </div>
-                                      <span className="inline-flex items-center gap-1 text-sm font-bold text-primary transition-all group-hover:gap-2">
-                                        {LESSON_STATUS_LABELS[lesson.status]}
-                                        <ChevronRight className="h-4 w-4" />
-                                      </span>
+                                      
+                                      {!isLocked && (
+                                        <span className={cn(
+                                          "flex items-center gap-1 text-xs font-bold transition-all group-hover:gap-2",
+                                          isCompleted ? "text-emerald-600" : "text-primary"
+                                        )}>
+                                          {LESSON_STATUS_LABELS[lesson.status]}
+                                          <ArrowRight className="h-3.5 w-3.5" />
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                </Link>
-                              </div>
-
-                              <div className="pointer-events-none col-start-1 row-start-1 flex justify-center md:absolute md:left-1/2 md:top-8 md:w-0 md:-translate-x-1/2">
-                                <div
-                                  className={cn(
-                                    'flex h-11 w-11 items-center justify-center rounded-2xl border-4 border-background shadow-sm transition-transform duration-300',
-                                    lesson.status === 'completed' && 'bg-emerald-500 text-white',
-                                    lesson.status === 'in_progress' && 'scale-110 bg-primary text-white',
-                                    lesson.status === 'not_started' && 'bg-muted text-foreground/50'
-                                  )}
-                                >
-                                  {lesson.status === 'completed' ? (
-                                    <CheckCircle2 className="h-5 w-5" />
-                                  ) : (
-                                    <span className="text-sm font-black">{lesson.orderIndex + 1}</span>
-                                  )}
                                 </div>
-                              </div>
+                              </Link>
                             </div>
-                          )
-                        })}
-                      </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  </Card>
+                  </div>
                 ) : null}
               </div>
             ) : (
-              <Card className="rounded-[28px] border border-border/50 bg-white/85 p-8 text-sm text-foreground/70 shadow-sm">
-                No published units are available yet.
+              <Card className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-[32px] border-dashed border-border p-8 text-center">
+                <div className="rounded-full bg-muted p-4">
+                  <Layers className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground">No units available</h3>
+                  <p className="text-sm text-muted-foreground">Check back later for new content.</p>
+                </div>
               </Card>
             )}
           </section>

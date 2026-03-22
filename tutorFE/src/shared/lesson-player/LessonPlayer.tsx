@@ -291,6 +291,36 @@ function replacePromptToken(prompt: string, token: string, value: string) {
   return prompt.split(token).join(value)
 }
 
+function InlineAudioButton({
+  audioUrl,
+  label,
+  className,
+}: {
+  audioUrl?: string
+  label: string
+  className?: string
+}) {
+  if (!audioUrl) return null
+
+  return (
+    <button
+      type="button"
+      className={cx(
+        'inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-white/90 text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+        className,
+      )}
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        playAudioUrl(audioUrl)
+      }}
+      aria-label={`Play audio for ${label}`}
+    >
+      <Volume2 className="h-4 w-4" />
+    </button>
+  )
+}
+
 function buildStageTransitionCopy(input: {
   mistakesCount: number
   stageNumber: number
@@ -378,26 +408,31 @@ function InlineGlossToken({
 function SentenceContentDisplay({
   text,
   components,
+  audioUrl,
 }: {
   text: string
   components: LearningContentComponent[]
+  audioUrl?: string
 }) {
   const parts = useMemo(() => buildSentenceRenderParts(text, components), [text, components])
 
   return (
     <div className="space-y-4 text-center">
-      <div className="text-4xl font-black tracking-tight text-primary leading-[1.28] sm:text-5xl">
-        {parts.map((part, index) =>
-          part.type === 'text' ? (
-            <span key={`text-${index}`} className="whitespace-pre-wrap text-primary">
-              {part.text}
-            </span>
-          ) : (
-            <SentenceGlossToken key={`component-${part.component.id}-${index}`} component={part.component}>
-              {part.text}
-            </SentenceGlossToken>
-          ),
-        )}
+      <div className="flex items-start justify-center gap-3">
+        <div className="text-4xl font-black tracking-tight text-primary leading-[1.28] sm:text-5xl">
+          {parts.map((part, index) =>
+            part.type === 'text' ? (
+              <span key={`text-${index}`} className="whitespace-pre-wrap text-primary">
+                {part.text}
+              </span>
+            ) : (
+              <SentenceGlossToken key={`component-${part.component.id}-${index}`} component={part.component}>
+                {part.text}
+              </SentenceGlossToken>
+            ),
+          )}
+        </div>
+        <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-1 h-9 w-9 shrink-0" />
       </div>
       <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">
         Hover or tap the highlighted parts for meanings
@@ -1169,7 +1204,11 @@ export function LessonPlayer({
 
                     <div className="space-y-3 text-center">
                       {currentBlock.data.kind === 'sentence' && Array.isArray(currentBlock.data.components) && currentBlock.data.components.length > 0 ? (
-                        <SentenceContentDisplay text={currentBlock.data.text} components={currentBlock.data.components} />
+                        <SentenceContentDisplay
+                          text={currentBlock.data.text}
+                          components={currentBlock.data.components}
+                          audioUrl={currentBlock.data.audio?.url}
+                        />
                       ) : (
                         <h3
                           className={cx(
@@ -1288,7 +1327,11 @@ export function LessonPlayer({
                     {!isListeningQuestion && !isSpeakingQuestion && questionSentenceText ? (
                       <div className={cx('rounded-3xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
                         {questionSentenceComponents.length > 0 ? (
-                          <SentenceContentDisplay text={questionSentenceText} components={questionSentenceComponents} />
+                          <SentenceContentDisplay
+                            text={questionSentenceText}
+                            components={questionSentenceComponents}
+                            audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
+                          />
                         ) : (
                           <p
                             className={cx(
@@ -1409,7 +1452,11 @@ export function LessonPlayer({
 
                           <div className={cx('rounded-3xl border border-primary/15 bg-white/90', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
                             {questionSource?.kind === 'sentence' && questionSentenceComponents.length > 0 ? (
-                              <SentenceContentDisplay text={questionSentenceText} components={questionSentenceComponents} />
+                              <SentenceContentDisplay
+                                text={questionSentenceText}
+                                components={questionSentenceComponents}
+                                audioUrl={questionSource.audio?.url}
+                              />
                             ) : (
                               <p className={cx('text-center font-black leading-relaxed text-primary', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
                                 {speakingTarget.text}
