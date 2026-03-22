@@ -1,8 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Quicksand } from 'next/font/google'
-import { PwaRegister } from "@/components/pwa/register-sw"
-import { InstallPrompt } from "@/components/pwa/install-prompt"
 import { LearnerAuthProvider } from "@/components/auth/learner-auth-provider"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -16,7 +14,6 @@ export const metadata: Metadata = {
   title: 'Learn African Languages | Language Learning App',
   description: 'Learn Yoruba, Igbo, Hausa, and Pidgin with AI-powered practice and real African cultural context.',
   generator: 'v0.app',
-  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon-192.png",
     apple: "/apple-touch-icon.png"
@@ -39,8 +36,6 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         <LearnerAuthProvider>
-          <PwaRegister />
-          <InstallPrompt />
           {children}
           <Toaster richColors position="top-center" />
         </LearnerAuthProvider>

@@ -276,10 +276,7 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
     <div className="space-y-3">
       <div>
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-foreground/45">{component.kind}</p>
-        <div className="mt-1 flex items-center gap-2">
-          <p className="text-lg font-black text-foreground">{component.text}</p>
-          <InlineAudioButton audioUrl={component.audio?.url} label={component.text} />
-        </div>
+        <p className="mt-1 text-lg font-black text-foreground">{component.text}</p>
         {component.pronunciation ? (
           <p className="mt-1 text-sm font-semibold italic text-foreground/55">{component.pronunciation}</p>
         ) : null}
@@ -401,7 +398,6 @@ function SentenceGlossToken({
       >
         {children}
       </button>
-      <InlineAudioButton audioUrl={component.audio?.url} label={component.text} className="h-7 w-7 bg-primary/5" />
       {isOpen ? (
         <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-border/60 bg-background p-4 shadow-xl">
           <SentenceGlossPanel component={component} />
