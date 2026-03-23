@@ -1253,7 +1253,8 @@ export function LessonPlayer({
               size="icon"
               onClick={onExit}
               className={cx(
-                'rounded-full text-foreground/40 hover:bg-muted/80 hover:text-foreground transition-all',
+
+                'rounded-full text-foreground/40 hover:bg-muted/80 hover:text-foreground transition-all text-primary',
                 isUltraShortViewport ? 'h-8 w-8' : isShortViewport && 'h-9 w-9',
               )}
               aria-label={preview ? 'Exit preview' : 'Exit lesson'}
@@ -1262,7 +1263,7 @@ export function LessonPlayer({
             </Button>
 
             <div className="flex-1 space-y-2">
-              <div
+              {/* <div
                 className={cx(
                   'flex items-center justify-between font-black uppercase tracking-widest text-foreground/40',
                   isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs',
@@ -1272,7 +1273,7 @@ export function LessonPlayer({
                   {lesson?.title || 'Lesson'} • Stage {currentStageIndex + 1} of {Math.max(stageMeta.length, 1)}
                 </span>
                 {!isVeryShortViewport ? <span>{isStageComplete ? 'Stage complete' : stageBlockPositionLabel}</span> : null}
-              </div>
+              </div> */}
               <div className={cx('relative overflow-hidden rounded-full bg-muted', isUltraShortViewport ? 'h-2.5' : isShortViewport ? 'h-3' : 'h-4')}>
                 <div className="h-full rounded-full bg-primary transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/10" />
@@ -2006,7 +2007,7 @@ export function LessonPlayer({
               )}
             </div>
 
-            <div className="w-full sm:w-auto py-2">
+            <div className="sm:w-auto py-2">
               {isExerciseBlock ? (
                 isSpeakingQuestion ? (
                   <Button
