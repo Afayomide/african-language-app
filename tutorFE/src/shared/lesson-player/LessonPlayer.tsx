@@ -306,7 +306,7 @@ function InlineAudioButton({
     <button
       type="button"
       className={cx(
-        'inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-white/90 text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+        'inline-flex h-5 w-5 items-center justify-center rounded-full border border-primary/20 bg-white/90 text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
         className,
       )}
       onClick={(event) => {
@@ -316,7 +316,7 @@ function InlineAudioButton({
       }}
       aria-label={`Play audio for ${label}`}
     >
-      <Volume2 className="h-4 w-4" />
+      <Volume2 className="h-3 w-3" />
     </button>
   )
 }
@@ -418,7 +418,8 @@ function SentenceContentDisplay({
 
   return (
     <div className="space-y-4 text-center">
-      <div className="flex items-start justify-center gap-3">
+      <div className="flex items-start justify-center gap-2">
+        <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-1 shrink-0 self-start" />
         <div className="text-4xl font-black tracking-tight text-primary leading-[1.28] sm:text-5xl">
           {parts.map((part, index) =>
             part.type === 'text' ? (
@@ -432,7 +433,6 @@ function SentenceContentDisplay({
             ),
           )}
         </div>
-        <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-1 h-9 w-9 shrink-0" />
       </div>
       <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">
         Hover or tap the highlighted parts for meanings
@@ -1014,11 +1014,17 @@ export function LessonPlayer({
 
   return (
     <main className="relative flex h-[100svh] select-none flex-col overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(248,196,113,0.14),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(239,162,129,0.1),transparent_50%)]" />
+      <div
+        className={cx(
+          'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(248,196,113,0.14),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(239,162,129,0.1),transparent_50%)]',
+          isStageComplete && 'opacity-0',
+        )}
+      />
 
       <header
         className={cx(
           'sticky top-0 z-50 shrink-0 border-b border-border/40 bg-background/95 px-4 backdrop-blur',
+          isStageComplete && 'pointer-events-none opacity-0',
           isShortViewport && 'px-3',
         )}
       >
@@ -1075,6 +1081,7 @@ export function LessonPlayer({
       <div
         className={cx(
           'relative z-10 flex-1 overflow-y-auto px-4 sm:px-6',
+          isStageComplete && 'pointer-events-none opacity-0',
           isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-26 pt-3' : 'pb-32 pt-6',
         )}
       >
@@ -1210,6 +1217,12 @@ export function LessonPlayer({
                           audioUrl={currentBlock.data.audio?.url}
                         />
                       ) : (
+                        <div className="flex items-start justify-center gap-2">
+                          <InlineAudioButton
+                            audioUrl={currentBlock.data.audio?.url}
+                            label={currentBlock.data.text}
+                            className="mt-1 shrink-0 self-start"
+                          />
                         <h3
                           className={cx(
                             'font-black tracking-tight text-primary',
@@ -1218,6 +1231,7 @@ export function LessonPlayer({
                         >
                           {currentBlock.data.text}
                         </h3>
+                        </div>
                       )}
                       {currentBlock.data.pronunciation ? (
                         <p className={cx('font-semibold italic text-foreground/45', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
@@ -1333,6 +1347,12 @@ export function LessonPlayer({
                             audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
                           />
                         ) : (
+                          <div className="flex items-start justify-center gap-2">
+                            <InlineAudioButton
+                              audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
+                              label={questionSentenceText}
+                              className="mt-1 shrink-0 self-start"
+                            />
                           <p
                             className={cx(
                               'text-center font-black leading-relaxed text-primary',
@@ -1341,6 +1361,7 @@ export function LessonPlayer({
                           >
                             {questionSentenceText}
                           </p>
+                          </div>
                         )}
                       </div>
                     ) : null}
@@ -1458,9 +1479,16 @@ export function LessonPlayer({
                                 audioUrl={questionSource.audio?.url}
                               />
                             ) : (
+                              <div className="flex items-start justify-center gap-2">
+                                <InlineAudioButton
+                                  audioUrl={speakingTarget.audioUrl}
+                                  label={speakingTarget.text}
+                                  className="mt-1 shrink-0 self-start"
+                                />
                               <p className={cx('text-center font-black leading-relaxed text-primary', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
                                 {speakingTarget.text}
                               </p>
+                              </div>
                             )}
                             {meaningText ? (
                               <p className={cx('mt-4 text-center font-semibold text-foreground/55', isUltraShortViewport ? 'text-xs' : isShortViewport ? 'text-sm' : 'text-base')}>
@@ -1478,12 +1506,7 @@ export function LessonPlayer({
                   </div>
 
                   {isChoiceQuestion ? (
-                    <div
-                      className={cx(
-                        'grid gap-3',
-                        (exerciseData?.options.length || 0) > 2 && 'sm:grid-cols-2',
-                      )}
-                    >
+                    <div className="grid gap-3">
                       {isContextResponseQuestion ? (
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Possible responses</p>
                       ) : null}
@@ -1660,10 +1683,14 @@ export function LessonPlayer({
       </div>
 
       {isStageComplete && stageTransitionCopy ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/50 px-4 backdrop-blur-[3px]">
+        <div
+          className="fixed inset-0 z-[120] isolate pointer-events-auto"
+          style={{ backgroundColor: 'hsl(var(--background))', opacity: 1 }}
+        >
+          <div className="relative flex min-h-full items-center justify-center px-4">
           <div
             className={cx(
-              'relative w-full max-w-md overflow-hidden rounded-[2.2rem] border border-primary/15 bg-[linear-gradient(155deg,rgba(255,255,255,0.98),rgba(255,247,237,0.95))] text-center shadow-[0_24px_80px_rgba(15,23,42,0.18)]',
+              'relative w-full max-w-md overflow-hidden rounded-[2.2rem] border border-primary/15 bg-[linear-gradient(155deg,rgba(255,255,255,1),rgba(255,247,237,0.98))] text-center shadow-[0_24px_80px_rgba(15,23,42,0.22)]',
               isUltraShortViewport ? 'p-4 sm:p-5' : isShortViewport ? 'p-5 sm:p-6' : 'p-6 sm:p-8',
             )}
           >
@@ -1685,7 +1712,7 @@ export function LessonPlayer({
             <p className={cx('mt-3 font-semibold uppercase tracking-[0.16em] text-foreground/50', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
               {stageTransitionCopy.subtitle}
             </p>
-            <div className={cx('mt-6 grid gap-3 sm:grid-cols-2', isVeryShortViewport && 'mt-4')}>
+            <div className={cx('mt-6 grid gap-3', isVeryShortViewport && 'mt-4')}>
               <div className="rounded-3xl border border-green-200 bg-green-50 p-4 text-left">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700/70">Stage XP</p>
                 <p className="mt-2 text-2xl font-black text-green-700">+{stageXpEarned}</p>
@@ -1712,6 +1739,7 @@ export function LessonPlayer({
                 {isLastStage ? 'Finish Preview Now' : 'Skip Wait'}
               </Button>
             ) : null}
+          </div>
           </div>
         </div>
       ) : null}

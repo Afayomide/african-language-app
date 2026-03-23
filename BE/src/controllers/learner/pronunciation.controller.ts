@@ -62,7 +62,8 @@ export async function comparePronunciation(req: AuthRequest, res: Response) {
   const result = await useCases.compare({
     contentType,
     contentId,
-    studentAnalysis
+    studentAnalysis,
+    studentAudioBuffer: parsedAudioUpload?.buffer || undefined
   });
 
   if (result === "content_not_found") {
@@ -71,11 +72,30 @@ export async function comparePronunciation(req: AuthRequest, res: Response) {
   if (result === "reference_audio_missing") {
     return res.status(409).json({ error: "accepted tutor reference audio is required before comparison" });
   }
-  if (result === "reference_analysis_missing") {
-    return res.status(409).json({ error: "accepted tutor reference audio is missing pitch analysis" });
+  // DTW tone analysis is temporarily disabled.
+  // if (result === "reference_analysis_missing") {
+  //   return res.status(409).json({ error: "accepted tutor reference audio is missing pitch analysis" });
+  // }
+  // if (result === "student_analysis_missing") {
+  //   return res.status(400).json({ error: "student audio or analysis with pitch contour is required" });
+  // }
+  if (result === "student_audio_missing") {
+    return res.status(400).json({ error: "raw student audio is required for transcript validation" });
   }
-  if (result === "student_analysis_missing") {
-    return res.status(400).json({ error: "student audio or analysis with pitch contour is required" });
+  if (typeof result === "object" && "error" in result) {
+    if (result.error === "transcript_service_unavailable") {
+      return res.status(503).json({
+        error: "transcript validation service unavailable",
+        transcriptValidation: result.transcriptValidation
+      });
+    }
+
+    if (result.error === "transcript_mismatch") {
+      return res.status(422).json({
+        error: "spoken content did not match the target phrase closely enough",
+        transcriptValidation: result.transcriptValidation
+      });
+    }
   }
 
   return res.status(200).json(result);

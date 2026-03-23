@@ -59,7 +59,6 @@ export class MongooseLearnerContentPerformanceRepository implements LearnerConte
               firstSeenAt: row.seenAt
             },
             $set: {
-              language: row.language,
               lastSeenAt: row.seenAt,
               lastLessonId: row.lastLessonId,
               lastQuestionType: row.lastQuestionType,

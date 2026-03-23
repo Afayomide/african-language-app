@@ -3,23 +3,27 @@ import type { ExpressionRepository } from "../../../../domain/repositories/Expre
 import type { SentenceRepository } from "../../../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 import { ContentLookupService } from "../../../services/ContentLookupService.js";
+import { GoogleSpeechTranscriptValidationService } from "../../../services/GoogleSpeechTranscriptValidationService.js";
 import { PronunciationComparisonService } from "../../../services/PronunciationComparisonService.js";
 
 export type ComparePronunciationInput = {
   contentType: ContentType;
   contentId: string;
   studentAnalysis: AudioAnalysis | undefined;
+  studentAudioBuffer?: Buffer;
 };
 
 export type ComparePronunciationError =
   | "content_not_found"
   | "reference_audio_missing"
   | "reference_analysis_missing"
-  | "student_analysis_missing";
+  | "student_analysis_missing"
+  | "student_audio_missing";
 
 export class LearnerPronunciationUseCases {
   private readonly contentLookup: ContentLookupService;
   private readonly comparison = new PronunciationComparisonService();
+  private readonly transcriptValidation = new GoogleSpeechTranscriptValidationService();
 
   constructor(
     words: WordRepository,
@@ -38,17 +42,57 @@ export class LearnerPronunciationUseCases {
       return "reference_audio_missing" as const;
     }
 
-    if (!input.studentAnalysis?.pitchContour?.length) {
-      return "student_analysis_missing" as const;
+    // DTW tone scoring is temporarily disabled.
+    // Keep the old pitch-analysis guard here for easy restoration later.
+    // if (!input.studentAnalysis?.pitchContour?.length) {
+    //   return "student_analysis_missing" as const;
+    // }
+    if (!input.studentAudioBuffer?.length) {
+      return "student_audio_missing" as const;
     }
 
-    const comparison = this.comparison.compare({
-      reference: referenceAudio.analysis,
-      student: input.studentAnalysis
+    const transcriptValidation = await this.transcriptValidation.validate({
+      audioBuffer: input.studentAudioBuffer,
+      expectedText: content.text,
+      language: content.language,
+      contentType: content.kind
     });
 
-    if (comparison === "reference_pitch_missing") return "reference_analysis_missing" as const;
-    if (comparison === "student_pitch_missing") return "student_analysis_missing" as const;
+    if (!transcriptValidation.passed) {
+      if (transcriptValidation.reason === "transcript_service_unavailable") {
+        return {
+          error: "transcript_service_unavailable" as const,
+          transcriptValidation
+        };
+      }
+
+      return {
+        error: "transcript_mismatch" as const,
+        transcriptValidation
+      };
+    }
+
+    // DTW tone comparison intentionally commented out.
+    // We are using transcript validation only for now.
+    //
+    // const comparison = this.comparison.compare({
+    //   reference: referenceAudio.analysis,
+    //   student: input.studentAnalysis
+    // });
+    //
+    // if (comparison === "reference_pitch_missing") return "reference_analysis_missing" as const;
+    // if (comparison === "student_pitch_missing") return "student_analysis_missing" as const;
+
+    const comparison = {
+      score: 100,
+      level: "excellent" as const,
+      dtwDistance: 0,
+      normalizedDistance: 0,
+      pathLength: 0,
+      durationRatio: 1,
+      pitchRangeRatio: 1,
+      feedback: []
+    };
 
     return {
       content: {
@@ -69,6 +113,7 @@ export class LearnerPronunciationUseCases {
         referenceType: referenceAudio.referenceType,
         reviewStatus: referenceAudio.reviewStatus
       },
+      transcriptValidation,
       comparison
     };
   }
