@@ -58,11 +58,6 @@ export class MongooseLearnerQuestionMissRepository implements LearnerQuestionMis
               firstMissedAt: row.seenAt
             },
             $set: {
-              lessonId: row.lessonId,
-              questionType: row.questionType,
-              questionSubtype: row.questionSubtype,
-              sourceType: row.sourceType ?? null,
-              sourceId: row.sourceId ?? null,
               lastMissedAt: row.seenAt
             },
             $inc: {

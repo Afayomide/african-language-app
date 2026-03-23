@@ -112,6 +112,10 @@ function normalizeLooseSpokenVariant(input: string) {
   return normalizeText(input, true).replace(/([aeiou])\1+/g, "$1");
 }
 
+function compactNormalizedText(input: string) {
+  return normalizeLooseSpokenVariant(input).replace(/\s+/g, "");
+}
+
 function tokenize(input: string) {
   return normalizeText(input, true)
     .split(" ")
@@ -179,7 +183,7 @@ function tokenCoverage(expected: string, transcript: string) {
 
     transcriptTokens.forEach((candidate, index) => {
       if (used.has(index)) return;
-      const score = similarity(token, candidate);
+      const score = Math.max(similarity(token, candidate), looseSpokenSimilarity(token, candidate));
       if (score > bestScore) {
         bestScore = score;
         bestIndex = index;
@@ -204,31 +208,34 @@ function transcriptPassesValidation(input: {
   const strictTranscript = normalizeText(input.transcript, false);
   const looseExpected = normalizeText(input.expectedText, true);
   const looseTranscript = normalizeText(input.transcript, true);
+  const compactExpected = compactNormalizedText(input.expectedText);
+  const compactTranscript = compactNormalizedText(input.transcript);
 
   const exactLooseMatch = Boolean(looseExpected) && looseExpected === looseTranscript;
+  const exactCompactMatch = Boolean(compactExpected) && compactExpected === compactTranscript;
   const overallSimilarity = Math.max(
     similarity(input.expectedText, input.transcript),
-    looseSpokenSimilarity(input.expectedText, input.transcript)
+    looseSpokenSimilarity(input.expectedText, input.transcript),
+    similarity(compactExpected, compactTranscript)
   );
   const coverage = tokenCoverage(input.expectedText, input.transcript);
   const transcriptTokenCount = tokenize(input.transcript).length;
   const expectedTokenCount = tokenize(input.expectedText).length;
 
-  if (exactLooseMatch || (strictExpected && strictExpected === strictTranscript)) {
+  if (exactLooseMatch || exactCompactMatch || (strictExpected && strictExpected === strictTranscript)) {
     return { passed: true, similarity: 1, tokenCoverage: 1 };
   }
 
   if (input.contentType === "word") {
     const passed =
       overallSimilarity >= 0.8 &&
-      coverage >= 1 &&
       transcriptTokenCount <= Math.max(2, expectedTokenCount + 1);
-    return { passed, similarity: overallSimilarity, tokenCoverage: coverage };
+    return { passed, similarity: overallSimilarity, tokenCoverage: 1 };
   }
 
   if (input.contentType === "expression") {
-    const passed = overallSimilarity >= 0.84 && coverage >= 1;
-    return { passed, similarity: overallSimilarity, tokenCoverage: coverage };
+    const passed = overallSimilarity >= 0.84;
+    return { passed, similarity: overallSimilarity, tokenCoverage: 1 };
   }
 
   const passed = overallSimilarity >= 0.78 && coverage >= 0.8;
