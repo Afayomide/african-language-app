@@ -3,6 +3,7 @@ import type { WordEntity } from "../entities/Word.js";
 
 export type WordListFilter = {
   language?: Language;
+  languageId?: string | null;
   status?: Status;
 };
 
@@ -14,7 +15,7 @@ export interface WordRepository {
   list(filter: WordListFilter): Promise<WordEntity[]>;
   findById(id: string): Promise<WordEntity | null>;
   findByIds(ids: string[]): Promise<WordEntity[]>;
-  findByText(language: Language, text: string): Promise<WordEntity | null>;
+  findByText(language: Language, text: string, languageId?: string | null): Promise<WordEntity | null>;
   updateById(id: string, update: WordUpdateInput): Promise<WordEntity | null>;
   softDeleteById(id: string): Promise<WordEntity | null>;
 }

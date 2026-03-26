@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,800&amp;family=Manrope:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#e6e3d3",
+              "on-secondary-fixed": "#563a00",
+              "on-surface": "#39382f",
+              "primary-fixed-dim": "#ff9a65",
+              "on-tertiary-fixed": "#1a4716",
+              "inverse-primary": "#fd8542",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#ffcc79",
+              "secondary-dim": "#765100",
+              "tertiary": "#416f39",
+              "surface": "#fffbff",
+              "secondary": "#865d00",
+              "on-tertiary-container": "#2d5a27",
+              "surface-bright": "#fffbff",
+              "error-container": "#fa7150",
+              "primary-container": "#ffae86",
+              "on-secondary-container": "#6e4b00",
+              "surface-container-highest": "#ece8db",
+              "tertiary-fixed": "#b9eeab",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-tint": "#a94600",
+              "primary-dim": "#953d00",
+              "background": "#fffbff",
+              "secondary": "#865d00",
+              "outline-variant": "#bcb9ad",
+              "surface-container-low": "#fdf9f1",
+              "on-primary-container": "#692900",
+              "surface-container": "#f7f3ea",
+              "primary-fixed": "#ffae86",
+              "inverse-surface": "#0f0e0b",
+              "tertiary-fixed-dim": "#abdf9e",
+              "outline": "#838175",
+              "error": "#b23d21",
+              "on-primary-fixed-variant": "#772f00",
+              "on-surface-variant": "#66655a",
+              "error-dim": "#821a01",
+              "on-tertiary-fixed-variant": "#376430",
+              "secondary-container": "#ffdeac",
+              "surface-variant": "#ece8db",
+              "tertiary-container": "#b9eeab",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#9f9d97",
+              "tertiary-dim": "#35632e",
+              "on-primary": "#ffffff",
+              "on-background": "#39382f",
+              "primary": "#a94600",
+              "surface-container-high": "#f1eee2",
+              "on-error-container": "#671200",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#ffdeac",
+              "on-primary-fixed": "#481a00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-card {
+        background: rgba(255, 251, 255, 0.7);
+        backdrop-filter: blur(16px);
+      }
+      .custom-shadow {
+        box-shadow: 0px 8px 24px rgba(57, 56, 47, 0.06);
+      }
+      .tile-sink:active {
+        transform: translateY(2px);
+      }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased overflow-hidden">
+<!-- Top Navigation Shell -->
+<header class="w-full h-20 sticky top-0 bg-white/80 dark:bg-stone-950/80 backdrop-blur-xl flex items-center justify-between px-12 ml-64 w-[calc(100%-16rem)] z-50">
+<div class="flex items-center gap-4">
+<span class="text-xl font-bold text-stone-900 dark:text-stone-50 font-headline uppercase tracking-tight">Yoruba Learning</span>
+</div>
+<div class="flex items-center gap-8">
+<div class="flex gap-6">
+<span class="text-stone-500 font-label uppercase text-sm tracking-widest cursor-pointer hover:text-orange-600 transition-colors">Dictionary</span>
+<span class="text-orange-700 font-bold font-label uppercase text-sm tracking-widest cursor-pointer">Lessons</span>
+<span class="text-stone-500 font-label uppercase text-sm tracking-widest cursor-pointer hover:text-orange-600 transition-colors">Community</span>
+</div>
+<div class="flex items-center gap-4 border-l border-outline-variant/20 pl-6">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">settings</span>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a smiling young West African man with clean-cut hair against a soft warm studio light background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9XRpX6FDIswzpdmvjkVsWBTlzCAmersobiiVTfb6cReyxEm8LEyH5Wj3tzNpGHHGf271vYUL0Y96nrVkYQ58cztCUQMx4vlv6ZhJ1-e7uUVrdXM4_ww2pfOIVAkrzv1QtcgrgpYCHYlpcnORhk5AQ3Yc-OPfOQg0EGDVB_ggAwTys6qa1Kwwrv_aYoRQAyZHSBRz8an4mSw_kbVY2brcdOZB0TbWis4wS_QKA5ZUx8UlIgmpaL2Vdo58JTBQCdcRv-vUEVpWnndSL"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-6 h-screen w-64 bg-orange-50 dark:bg-stone-950 z-50">
+<div class="mb-12">
+<span class="text-2xl font-extrabold text-orange-900 dark:text-orange-100 italic font-headline">The Modern Griot</span>
+<p class="text-xs font-bold tracking-wider uppercase text-orange-800/60 mt-1">Yoruba Scholar</p>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<div class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 rounded-xl transition-all duration-300 hover:bg-orange-50/50 group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">dashboard</span>
+<span class="text-xs font-bold tracking-wider uppercase">Dashboard</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 bg-orange-100 dark:bg-orange-900/40 text-orange-900 dark:text-orange-50 rounded-xl transition-all duration-300">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="text-xs font-bold tracking-wider uppercase">Lessons</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 rounded-xl transition-all duration-300 hover:bg-orange-50/50 group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">translate</span>
+<span class="text-xs font-bold tracking-wider uppercase">Vocabulary</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 rounded-xl transition-all duration-300 hover:bg-orange-50/50 group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">bar_chart</span>
+<span class="text-xs font-bold tracking-wider uppercase">Progress</span>
+</div>
+</nav>
+<div class="mt-auto pt-6">
+<button class="w-full py-4 px-6 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-xl font-bold text-sm tracking-wide uppercase tile-sink custom-shadow">
+                Daily Challenge
+            </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 w-[calc(100%-16rem)] h-[calc(100vh-5rem)] flex flex-col items-center justify-center p-12 bg-surface">
+<!-- Exercise Container -->
+<div class="w-full max-w-4xl flex flex-col gap-12">
+<!-- Progress Tracker -->
+<div class="flex items-center gap-6 w-full px-8">
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">close</span>
+</button>
+<div class="flex-1 h-3 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-2/3 rounded-full relative">
+<div class="absolute inset-0 bg-white/20 opacity-50"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-bold text-primary">5</span>
+</div>
+</div>
+<!-- Header Instruction -->
+<div class="text-center space-y-4">
+<span class="text-xs font-bold tracking-[0.15em] uppercase text-on-surface-variant font-label">Spelling Exercise</span>
+<h1 class="text-3xl font-extrabold font-headline text-on-surface">Arrange the letters to spell the phrase for: <span class="text-primary italic">Good morning (casual)</span></h1>
+</div>
+<!-- Content Area: The Staged Scene -->
+<div class="relative bg-surface-container-low rounded-[2.5rem] p-12 custom-shadow overflow-hidden group">
+<!-- Background Decorative Motif -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-secondary-container/20 rounded-full blur-3xl group-hover:bg-secondary-container/30 transition-colors duration-1000"></div>
+<div class="relative z-10 flex flex-col items-center gap-16">
+<!-- Audio & Visual Cue -->
+<div class="flex items-center gap-8">
+<div class="w-24 h-24 rounded-3xl bg-surface-container-highest flex items-center justify-center cursor-pointer hover:scale-105 transition-transform duration-300 border border-outline-variant/10">
+<span class="material-symbols-outlined text-4xl text-primary" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</div>
+<div class="text-left">
+<p class="text-sm font-bold uppercase tracking-widest text-on-surface-variant">Pronunciation</p>
+<p class="text-xl font-medium text-on-surface italic opacity-60">"Káàrọ̀"</p>
+</div>
+</div>
+<!-- Target Slots -->
+<div class="flex gap-4 min-h-[5.5rem] items-center">
+<!-- Filled Slots (Example Progress) -->
+<div class="w-16 h-20 bg-surface-container-lowest rounded-2xl flex items-center justify-center text-3xl font-bold font-headline text-primary custom-shadow border border-primary/10">K</div>
+<div class="w-16 h-20 bg-surface-container-lowest rounded-2xl flex items-center justify-center text-3xl font-bold font-headline text-primary custom-shadow border border-primary/10">á</div>
+<!-- Empty Placeholder Slots -->
+<div class="w-16 h-20 border-2 border-dashed border-outline-variant/30 rounded-2xl"></div>
+<div class="w-16 h-20 border-2 border-dashed border-outline-variant/30 rounded-2xl"></div>
+<div class="w-16 h-20 border-2 border-dashed border-outline-variant/30 rounded-2xl"></div>
+</div>
+<!-- Letter Pool -->
+<div class="grid grid-cols-6 gap-4">
+<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface custom-shadow cursor-pointer hover:bg-orange-50 hover:-translate-y-1 transition-all tile-sink active:scale-95 border border-outline-variant/10">à</div>
+<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface custom-shadow cursor-pointer hover:bg-orange-50 hover:-translate-y-1 transition-all tile-sink active:scale-95 border border-outline-variant/10">ọ̀</div>
+<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface custom-shadow cursor-pointer hover:bg-orange-50 hover:-translate-y-1 transition-all tile-sink active:scale-95 border border-outline-variant/10">r</div>
+<!-- Selected letters visually disabled or grayed -->
+<div class="w-16 h-16 bg-surface-container-highest/40 rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface/20 cursor-default border border-transparent">á</div>
+<div class="w-16 h-16 bg-surface-container-highest/40 rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface/20 cursor-default border border-transparent">K</div>
+<!-- Extra decorative or incorrect option to challenge -->
+<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-2xl font-bold font-headline text-on-surface custom-shadow cursor-pointer hover:bg-orange-50 hover:-translate-y-1 transition-all tile-sink active:scale-95 border border-outline-variant/10">o</div>
+</div>
+</div>
+</div>
+<!-- Action Footer -->
+<div class="flex items-center justify-between px-8">
+<button class="px-8 py-4 rounded-xl text-primary font-bold hover:bg-surface-container-high transition-colors tracking-wide uppercase text-sm">
+                    Skip Exercise
+                </button>
+<div class="flex gap-4">
+<button class="px-8 py-4 rounded-xl bg-surface-container-highest text-primary font-bold hover:bg-surface-container-high transition-colors tracking-wide uppercase text-sm">
+                        Hint
+                    </button>
+<button class="px-12 py-4 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-xl font-extrabold text-sm tracking-widest uppercase tile-sink custom-shadow">
+                        Check Answer
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Hidden as per hierarchy rules for task-focused screens, but included for system demonstration where applicable) -->
+<!-- Suppression rule applied: FAB suppressed on task-focused sub-pages -->
+</body></html>

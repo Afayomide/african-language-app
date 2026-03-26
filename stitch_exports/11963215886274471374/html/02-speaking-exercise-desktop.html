@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html lang="yo"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .text-headline {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-fixed": "#ffdeac",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#9f9d97",
+                        "tertiary-fixed": "#b9eeab",
+                        "tertiary-dim": "#35632e",
+                        "inverse-surface": "#0f0e0b",
+                        "on-error-container": "#671200",
+                        "tertiary-fixed-dim": "#abdf9e",
+                        "on-tertiary-fixed-variant": "#376430",
+                        "on-surface-variant": "#66655a",
+                        "outline": "#838175",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#7a5400",
+                        "surface-container-high": "#f1eee2",
+                        "surface-tint": "#a94600",
+                        "on-primary-fixed": "#481a00",
+                        "primary-dim": "#953d00",
+                        "primary-container": "#ffae86",
+                        "inverse-primary": "#fd8542",
+                        "surface-container": "#f7f3ea",
+                        "on-primary-fixed-variant": "#772f00",
+                        "surface-container-highest": "#ece8db",
+                        "secondary-dim": "#765100",
+                        "outline-variant": "#bcb9ad",
+                        "error": "#b23d21",
+                        "primary-fixed-dim": "#ff9a65",
+                        "primary": "#a94600",
+                        "secondary-container": "#ffdeac",
+                        "on-secondary-fixed": "#563a00",
+                        "on-background": "#39382f",
+                        "error-dim": "#821a01",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#416f39",
+                        "on-surface": "#39382f",
+                        "error-container": "#fa7150",
+                        "background": "#fffbff",
+                        "secondary-fixed-dim": "#ffcc79",
+                        "surface-container-low": "#fdf9f1",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fffbff",
+                        "surface-dim": "#e6e3d3",
+                        "on-tertiary": "#ffffff",
+                        "surface-variant": "#ece8db",
+                        "on-primary-container": "#692900",
+                        "secondary": "#865d00",
+                        "on-tertiary-fixed": "#1a4716",
+                        "surface": "#fffbff",
+                        "primary-fixed": "#ffae86",
+                        "on-tertiary-container": "#2d5a27",
+                        "tertiary-container": "#b9eeab",
+                        "on-secondary-container": "#6e4b00"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col items-center overflow-hidden">
+<!-- Top Navigation Anchor (Manual Implementation of TopAppBar JSON) -->
+<header class="fixed top-0 w-full h-16 z-50 bg-stone-50/80 backdrop-blur-xl flex justify-between items-center px-6 md:px-12 w-full max-w-screen-2xl mx-auto">
+<div class="flex items-center gap-4">
+<span class="font-['Plus_Jakarta_Sans'] font-extrabold text-orange-900 uppercase tracking-widest text-sm">The Modern Griot</span>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-stone-500 hover:bg-stone-200/50 transition-colors p-2 rounded-full active:translate-y-0.5 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+</header>
+<!-- Center Aligned Progress Shell (Manual Implementation of TopAppBar 2 JSON) -->
+<div class="w-full max-w-2xl mx-auto pt-20 px-4 flex flex-col items-center">
+<span class="font-['Manrope'] text-xs font-bold tracking-widest text-orange-600 uppercase mb-4">Exercise Progress</span>
+<div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden relative shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full" style="width: 65%;"></div>
+</div>
+<div class="mt-2 w-full flex justify-end">
+<span class="text-[10px] font-bold text-on-surface-variant opacity-60">65% COMPLETE</span>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center justify-center px-6 pb-20">
+<!-- Editorial Headline -->
+<div class="text-center mb-12">
+<span class="label-md uppercase tracking-[0.15em] text-tertiary font-bold text-[10px] bg-tertiary-container/30 px-3 py-1 rounded-full mb-6 inline-block">Speaking Practice</span>
+<h1 class="text-headline text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight mb-4">Repeat the phrase</h1>
+<p class="text-on-surface-variant font-medium text-lg">Focus on the tonal marks to capture the rhythm.</p>
+</div>
+<!-- Word Focus Section: Asymmetric Bento Style -->
+<div class="w-full grid grid-cols-12 gap-6 items-stretch">
+<!-- Primary Word Card -->
+<div class="col-span-12 md:col-span-8 bg-surface-container-low rounded-[2rem] p-10 flex flex-col justify-center relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-8 opacity-5">
+<span class="material-symbols-outlined text-[120px]" data-icon="record_voice_over">record_voice_over</span>
+</div>
+<div class="relative z-10">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary" data-icon="volume_up">volume_up</span>
+<span class="text-sm font-bold text-primary tracking-wide uppercase">Yoruba</span>
+</div>
+<h2 class="text-headline text-6xl md:text-7xl font-bold text-on-primary-container mb-2">Káàárọ̀</h2>
+<p class="text-2xl text-on-surface-variant font-medium italic">"Good morning"</p>
+</div>
+</div>
+<!-- Context/Image Card -->
+<div class="col-span-12 md:col-span-4 bg-surface-container-highest rounded-[2rem] overflow-hidden min-h-[240px] relative">
+<img class="w-full h-full object-cover mix-blend-multiply opacity-80" data-alt="Warm sunrise over a serene African landscape with acacia trees and soft golden mist, peaceful atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjJXDiLgI8w5R59iwRPkJ8-9iVkfUsOIJow22-m9uGRSyfP1Bmqf1Uxr7nDyMThW_OpE33dfRyFgtwWpWtZgDsYnOgEtG4L5yZy43PgxsIBLCYwAal2jaxkiMoxv76fRjNPspvlv2iDaB7315Lnnr8JFcMU1Ky_jlQ6kgG9Memb7OLdoFFNwxDj5TFWN2rcnjZEcVnq2pZkmFn8dkun4jxj9MhEF93bEn95Not25TZ3E_NiDYprBBGF5em3JL8rX4gVwBaKm6zj_Km"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-highest via-transparent to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6">
+<p class="text-xs font-bold text-on-surface uppercase tracking-widest opacity-70">Cultural Context</p>
+<p class="text-sm font-semibold text-on-surface leading-snug">Used formally or casually upon first meeting in the morning.</p>
+</div>
+</div>
+</div>
+<!-- Action Section: The Modern Mic -->
+<div class="mt-16 flex flex-col items-center gap-8 w-full">
+<div class="relative flex items-center justify-center">
+<!-- Outer Pulse Rings (Decorative Tonal Layers) -->
+<div class="absolute w-32 h-32 bg-primary/10 rounded-full animate-pulse"></div>
+<div class="absolute w-44 h-44 bg-primary/5 rounded-full"></div>
+<!-- Main Microphone Button -->
+<button class="relative w-24 h-24 bg-gradient-to-br from-primary to-primary-dim rounded-full flex items-center justify-center text-on-primary shadow-[0_8px_24px_rgba(169,70,0,0.3)] active:translate-y-1 transition-all duration-150 group">
+<span class="material-symbols-outlined text-4xl" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+<div class="text-center">
+<p class="text-on-surface font-bold text-lg">Tap to start speaking</p>
+<p class="text-on-surface-variant text-sm mt-1">Make sure you are in a quiet environment.</p>
+</div>
+</div>
+</main>
+<!-- Navigation suppression as per Task-Focused/Linear logic: No BottomNavBar rendered -->
+<!-- Floating Achievement Chip (Subtle Tonal Depth) -->
+<div class="fixed bottom-10 right-10 bg-white/60 backdrop-blur-md px-6 py-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-outline-variant/15 flex items-center gap-4">
+<div class="w-10 h-10 bg-secondary-container rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="workspace_premium" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+<div>
+<p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none mb-1">Current Streak</p>
+<p class="text-sm font-extrabold text-on-surface leading-none">12 Days Active</p>
+</div>
+</div>
+</body></html>

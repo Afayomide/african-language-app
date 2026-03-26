@@ -54,6 +54,7 @@ const UnitAiRunSummarySchema = new Schema(
 const UnitSchema = new Schema(
   {
     chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", default: null, index: true },
+    languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
@@ -74,6 +75,7 @@ const UnitSchema = new Schema(
 
 UnitSchema.index({ chapterId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 UnitSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
+UnitSchema.index({ languageId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 
 export type UnitDocument = InferSchemaType<typeof UnitSchema> & {
   _id: mongoose.Types.ObjectId;

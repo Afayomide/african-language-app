@@ -44,7 +44,7 @@ export class SentenceDraftPersistenceService {
     text: string;
     translations: string[];
   }) {
-    const existing = await this.words.findByText(input.lesson.language, input.text);
+    const existing = await this.words.findByText(input.lesson.language, input.text, input.lesson.languageId || null);
     if (existing) {
       const mergedTranslations = uniqueStrings([...existing.translations, ...input.translations]);
       const updated = await this.words.updateById(existing.id, {
@@ -88,7 +88,7 @@ export class SentenceDraftPersistenceService {
     text: string;
     translations: string[];
   }) {
-    const existing = await this.expressions.findByText(input.lesson.language, input.text);
+    const existing = await this.expressions.findByText(input.lesson.language, input.text, input.lesson.languageId || null);
     if (existing) {
       const mergedTranslations = uniqueStrings([...existing.translations, ...input.translations]);
       const updated = await this.expressions.updateById(existing.id, {
@@ -180,7 +180,10 @@ export class SentenceDraftPersistenceService {
     };
     modelName: string;
   }) {
-    const existingLanguageSentences = await this.sentences.list({ language: input.lesson.language });
+    const existingLanguageSentences = await this.sentences.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const byText = new Map(
       [...existingLanguageSentences, ...(input.currentLessonSentences || [])].map((sentence) => [normalize(sentence.text), sentence] as const)
     );

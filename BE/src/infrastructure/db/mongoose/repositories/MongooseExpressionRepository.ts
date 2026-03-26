@@ -9,6 +9,7 @@ import type {
   ExpressionUpdateInput
 } from "../../../../domain/repositories/ExpressionRepository.js";
 import { mapContentAudio } from "./mapContentAudio.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function mapComponents(rows: Array<{ type?: string; refId?: { toString(): string } | string; orderIndex?: number; textSnapshot?: string }> | null | undefined): ContentComponentRef[] {
   return Array.isArray(rows)
@@ -26,6 +27,7 @@ function toEntity(doc: any): ExpressionEntity {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     kind: "expression",
+    languageId: doc.languageId ? String(doc.languageId) : null,
     language: doc.language,
     text: String(doc.text || ""),
     textNormalized: String(doc.textNormalized || ""),
@@ -56,22 +58,27 @@ function toEntity(doc: any): ExpressionEntity {
 
 export class MongooseExpressionRepository implements ExpressionRepository {
   async create(input: ExpressionCreateInput): Promise<ExpressionEntity> {
-    const created = await ExpressionModel.create(input);
+    const languageId = await findLanguageIdByCode(input.language);
+    const created = await ExpressionModel.create({ ...input, languageId: languageId || null });
     return toEntity(created);
   }
 
   async list(filter: ExpressionListFilter): Promise<ExpressionEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.status) query.status = filter.status;
     if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const expressions = await ExpressionModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
     return expressions.map(toEntity);
   }
 
-  async listDeleted(filter?: { ids?: string[]; language?: Language }): Promise<ExpressionEntity[]> {
+  async listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<ExpressionEntity[]> {
     const query: Record<string, unknown> = { isDeleted: true };
-    if (filter?.language) query.language = filter.language;
+    if (filter?.languageId || filter?.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter?.language, languageId: filter?.languageId }));
+    }
     if (Array.isArray(filter?.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const expressions = await ExpressionModel.find(query).sort({ updatedAt: -1, createdAt: -1 }).lean();
     return expressions.map(toEntity);
@@ -88,13 +95,22 @@ export class MongooseExpressionRepository implements ExpressionRepository {
     return expressions.map(toEntity);
   }
 
-  async findByText(language: Language, text: string): Promise<ExpressionEntity | null> {
-    const expression = await ExpressionModel.findOne({ language, textNormalized: text.trim().toLowerCase(), isDeleted: { $ne: true } });
+  async findByText(language: Language, text: string, languageId?: string | null): Promise<ExpressionEntity | null> {
+    const expression = await ExpressionModel.findOne({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      textNormalized: text.trim().toLowerCase(),
+      isDeleted: { $ne: true }
+    });
     return expression ? toEntity(expression) : null;
   }
 
   async updateById(id: string, update: ExpressionUpdateInput): Promise<ExpressionEntity | null> {
-    const expression = await ExpressionModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const expression = await ExpressionModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return expression ? toEntity(expression) : null;
   }
 

@@ -44,9 +44,26 @@ export function sanitizeGeneratedSentence(sentence: LlmGeneratedSentence): LlmGe
           text: String(component?.text || "").trim(),
           type: inferComponentType(String(component?.text || "").trim()),
           translations: uniqueStrings(Array.isArray(component?.translations) ? component.translations : []),
+          fixed: splitWords(String(component?.text || "").trim()).length > 1 ? component?.fixed === true : false,
           role: (component?.role === "support" ? "support" : "core") as "core" | "support"
         }))
         .filter((component) => component.text && component.translations.length > 0)
+    : [];
+  const meaningSegments = Array.isArray(sentence.meaningSegments)
+    ? sentence.meaningSegments
+        .map((segment) => ({
+          text: String(segment?.text || "").trim(),
+          componentIndexes: Array.isArray(segment?.componentIndexes)
+            ? Array.from(
+                new Set(
+                  segment.componentIndexes
+                    .map((value) => Number(value))
+                    .filter((value) => Number.isInteger(value) && value >= 0)
+                )
+              )
+            : []
+        }))
+        .filter((segment) => segment.text && segment.componentIndexes.length > 0)
     : [];
 
   if (!text || translations.length === 0 || components.length === 0) return null;
@@ -57,7 +74,8 @@ export function sanitizeGeneratedSentence(sentence: LlmGeneratedSentence): LlmGe
     literalTranslation: String(sentence.literalTranslation || "").trim(),
     usageNotes: String(sentence.usageNotes || "").trim(),
     explanation: String(sentence.explanation || "").trim(),
-    components
+    components,
+    meaningSegments
   };
 }
 
@@ -82,7 +100,10 @@ export class AiSentenceOrchestrator {
     }
 
     const existingLessonSentences = input.existingLessonSentences || [];
-    const existingLanguageSentences = await this.sentences.list({ language: input.lesson.language });
+    const existingLanguageSentences = await this.sentences.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const expressionMap = new Map(
       input.expressions.map((expression) => [normalizeText(expression.text), expression] as const)
     );
@@ -225,7 +246,10 @@ export class AiSentenceOrchestrator {
     }
 
     const existingLessonSentences = input.existingLessonSentences || [];
-    const existingLanguageSentences = await this.sentences.list({ language: input.lesson.language });
+    const existingLanguageSentences = await this.sentences.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const validated = await this.generateValidatedSentences({
       lessonId: input.lesson.id,
       language: input.lesson.language,

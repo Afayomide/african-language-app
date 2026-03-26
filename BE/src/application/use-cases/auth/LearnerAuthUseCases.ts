@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import type { LearnerProfileEntity } from "../../../domain/entities/LearnerProfile.js";
+import type { LearnerLanguageStateRepository } from "../../../domain/repositories/LearnerLanguageStateRepository.js";
 import type { UserRepository } from "../../../domain/repositories/UserRepository.js";
 import type { LearnerProfileRepository } from "../../../domain/repositories/LearnerProfileRepository.js";
 import { AuthTokenService } from "../../services/AuthTokenService.js";
@@ -10,6 +11,7 @@ export class LearnerAuthUseCases {
   constructor(
     private readonly users: UserRepository,
     private readonly learnerProfiles: LearnerProfileRepository,
+    private readonly learnerLanguageStates: LearnerLanguageStateRepository,
     private readonly tokens: AuthTokenService
   ) {}
 
@@ -53,6 +55,17 @@ export class LearnerAuthUseCases {
       });
     }
 
+    await this.learnerLanguageStates.upsertByUserAndLanguage(
+      user.id,
+      profile.currentLanguage,
+      {
+        userId: user.id,
+        languageCode: profile.currentLanguage,
+        dailyGoalMinutes: profile.dailyGoalMinutes,
+        isEnrolled: true
+      }
+    );
+
     const token = this.tokens.sign(user.id, user.email, "learner");
 
     return {
@@ -92,6 +105,17 @@ export class LearnerAuthUseCases {
       });
     }
 
+    await this.learnerLanguageStates.upsertByUserAndLanguage(
+      user.id,
+      profile.currentLanguage,
+      {
+        userId: user.id,
+        languageCode: profile.currentLanguage,
+        dailyGoalMinutes: profile.dailyGoalMinutes,
+        isEnrolled: true
+      }
+    );
+
     const token = this.tokens.sign(user.id, user.email, "learner");
 
     return {
@@ -120,6 +144,17 @@ export class LearnerAuthUseCases {
         dailyGoalMinutes: 10
       });
     }
+
+    await this.learnerLanguageStates.upsertByUserAndLanguage(
+      input.userId,
+      profile.currentLanguage,
+      {
+        userId: input.userId,
+        languageCode: profile.currentLanguage,
+        dailyGoalMinutes: profile.dailyGoalMinutes,
+        isEnrolled: true
+      }
+    );
 
     return {
       user: {
@@ -176,6 +211,21 @@ export class LearnerAuthUseCases {
     if (!updated) {
       throw new AuthError(500, "Failed to update learner profile.");
     }
+
+    await this.learnerLanguageStates.upsertByUserAndLanguage(
+      userId,
+      updated.currentLanguage,
+      {
+        userId,
+        languageCode: updated.currentLanguage,
+        dailyGoalMinutes: updated.dailyGoalMinutes,
+        isEnrolled: true
+      },
+      {
+        isEnrolled: true,
+        dailyGoalMinutes: updated.dailyGoalMinutes
+      }
+    );
 
     return {
       profile: updated,

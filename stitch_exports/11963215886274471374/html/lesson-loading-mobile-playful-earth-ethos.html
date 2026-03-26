@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Yoruba Mastery - Loading Lesson</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "outline-variant": "#bcb9ad",
+              "error": "#b23d21",
+              "on-tertiary": "#ffffff",
+              "on-secondary-container": "#6e4b00",
+              "on-secondary-fixed": "#563a00",
+              "secondary": "#865d00",
+              "surface-variant": "#ece8db",
+              "on-tertiary-fixed": "#1a4716",
+              "tertiary-fixed-dim": "#abdf9e",
+              "on-secondary": "#ffffff",
+              "inverse-primary": "#fd8542",
+              "tertiary-container": "#b9eeab",
+              "primary-container": "#ffae86",
+              "on-primary-container": "#692900",
+              "inverse-surface": "#0f0e0b",
+              "secondary-dim": "#765100",
+              "primary-fixed": "#ffae86",
+              "surface-dim": "#e6e3d3",
+              "surface-tint": "#a94600",
+              "surface-container": "#f7f3ea",
+              "error-container": "#fa7150",
+              "on-tertiary-fixed-variant": "#376430",
+              "on-primary-fixed-variant": "#772f00",
+              "on-error": "#ffffff",
+              "primary-dim": "#953d00",
+              "on-tertiary-container": "#2d5a27",
+              "outline": "#838175",
+              "inverse-on-surface": "#9f9d97",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-bright": "#fffbff",
+              "primary-fixed-dim": "#ff9a65",
+              "on-primary": "#ffffff",
+              "surface-container-high": "#f1eee2",
+              "tertiary-dim": "#35632e",
+              "secondary-container": "#ffdeac",
+              "on-surface": "#39382f",
+              "surface-container-highest": "#ece8db",
+              "secondary-fixed-dim": "#ffcc79",
+              "on-error-container": "#671200",
+              "tertiary": "#416f39",
+              "surface": "#fffbff",
+              "primary": "#a94600",
+              "tertiary-fixed": "#b9eeab",
+              "surface-container-low": "#fdf9f1",
+              "background": "#fffbff",
+              "on-primary-fixed": "#481a00",
+              "on-background": "#39382f",
+              "secondary-fixed": "#ffdeac",
+              "error-dim": "#821a01",
+              "on-surface-variant": "#66655a"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom progress ring simulation */
+        .progress-ring-circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 70;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- Top Navigation Shell (Suppressed for focused loading state as per "Destination Rule") -->
+<header class="bg-[#fffdfa] dark:bg-[#1a1410] flex justify-between items-center w-full px-6 h-16 fixed top-0 z-50">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#f4ebe1]/50 dark:hover:bg-[#2d241d]/50 transition-colors Active: translate-y-[2px] transition-transform duration-100">
+<span class="material-symbols-outlined text-[#AF4B06] dark:text-[#ff8a3d]">close</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label text-[11px] font-bold tracking-wider uppercase text-[#8c7662]">Loading</span>
+<div class="w-12 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-3/4 h-full bg-primary rounded-full"></div>
+</div>
+<span class="font-plus-jakarta text-headline-md font-bold text-[#1a1410] dark:text-[#fffdfa] ml-2">75%</span>
+</div>
+</header>
+<!-- Main Canvas: Focused Loading Scene -->
+<main class="relative min-h-screen flex flex-col items-center justify-center px-8 py-20 bg-surface">
+<!-- Background Artistic Element (Cultural Motif) -->
+<div class="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+<svg class="text-primary" fill="currentColor" height="400" viewbox="0 0 100 100" width="400">
+<path d="M50 0 L60 40 L100 50 L60 60 L50 100 L40 60 L0 50 L40 40 Z"></path>
+</svg>
+</div>
+<!-- Central Loading Component -->
+<div class="relative z-10 flex flex-col items-center text-center">
+<!-- Animated Progress Container -->
+<div class="relative w-48 h-48 mb-12 flex items-center justify-center">
+<!-- Outer Ring (Tonal Shift) -->
+<div class="absolute inset-0 rounded-full border-[6px] border-surface-container-high"></div>
+<!-- Active Progress Ring -->
+<svg class="absolute inset-0 w-full h-full -rotate-90">
+<circle class="text-primary progress-ring-circle" cx="96" cy="96" fill="none" r="90" stroke="currentColor" stroke-linecap="round" stroke-width="6"></circle>
+</svg>
+<!-- Inner Content: Cultural Icon Pulse -->
+<div class="w-32 h-32 rounded-full bg-surface-container-low flex items-center justify-center shadow-sm relative overflow-hidden">
+<!-- Subtle Gradient Underlay -->
+<div class="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent"></div>
+<span class="material-symbols-outlined text-6xl text-primary scale-110" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="space-y-4 max-w-xs">
+<h1 class="font-headline text-headline-md font-bold text-on-surface tracking-tight">
+                    Preparing your lesson...
+                </h1>
+<p class="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                    Setting the stage for your journey into the heart of Yoruba culture.
+                </p>
+</div>
+<!-- Proverb/Fact Card (Editorial "Modern Griot" style) -->
+<div class="mt-16 w-full max-w-md p-6 rounded-3xl bg-surface-container-low relative">
+<div class="absolute -top-3 left-6 px-3 py-1 bg-secondary-container rounded-full shadow-sm">
+<span class="font-label text-[10px] font-bold tracking-[0.1em] uppercase text-on-secondary-container">Did you know?</span>
+</div>
+<div class="flex gap-4 items-start">
+<div class="mt-1 flex-shrink-0 w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-xl">menu_book</span>
+</div>
+<div class="text-left">
+<p class="font-body text-body-md text-on-surface italic leading-snug">
+                            "Ọmọ t’ó mọ owó fín-nín, ni yóò mọ ayé jẹ."
+                        </p>
+<p class="mt-2 font-body text-body-sm text-on-surface-variant">
+                            Translation: "The child who knows the value of small things will know how to live a great life."
+                        </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative Image Bottom (Tonal Depth) -->
+<div class="absolute bottom-0 left-0 w-full h-32 opacity-20 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="Close-up of vibrant African woven textile patterns with earthy terracotta and deep ochre threads in soft focus" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVDH70G3jk7MMZ3ZAhtbhTiovfEw8HzvPUFgBHOm-6xXya8P6It2PETQIrZrvVa5VIUcLqUgJhuRW7LYFlbWBs96FeVGu7F0aYX1AugRr6s0gViyd1wifi3i89uHVKvjKG5JXkNawYp53Xs1SrZ5DNxZ0gxhVLm4HSKinSKx7er2hyUmtDMAGQc4KawyEGCyi5GWyDNoTGNXRAP-HN1kR8_n-MtlGPWWFbFr_OhGKgxhKkdhZTLHbEhQVzZBZDAZ-HL52N7cVfcDXO" style="mask-image: linear-gradient(to top, black, transparent);"/>
+</div>
+</main>
+<!-- Navigation suppressed for focused state as per "Automatic Suppression" rule -->
+</body></html>

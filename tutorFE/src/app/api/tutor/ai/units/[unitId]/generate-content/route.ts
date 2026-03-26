@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { beTutorAiRoutes } from "@/lib/apiRoutes";
+import { proxyJsonRequest } from "@/lib/server/proxyJsonRequest";
+
+export const maxDuration = 1800;
 
 export async function POST(
   req: Request,
@@ -7,16 +10,15 @@ export async function POST(
 ) {
   const { unitId } = await params;
   const body = await req.json();
-  const response = await fetch(beTutorAiRoutes.generateUnitContent(unitId), {
+  const response = await proxyJsonRequest({
+    url: beTutorAiRoutes.generateUnitContent(unitId),
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       authorization: req.headers.get("authorization") || ""
     },
-    body: JSON.stringify(body)
+    body
   });
 
-  const data = await response.json();
-  return NextResponse.json(data, { status: response.status });
+  return NextResponse.json(response.data, { status: response.status });
 }
 

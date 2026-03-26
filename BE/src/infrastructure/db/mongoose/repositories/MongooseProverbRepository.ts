@@ -6,11 +6,13 @@ import type {
   ProverbRepository,
   ProverbUpdateInput
 } from "../../../../domain/repositories/ProverbRepository.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function toEntity(doc: any): ProverbEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
+    languageId: doc.languageId ? String(doc.languageId) : null,
     lessonIds: Array.isArray(doc.lessonIds)
       ? doc.lessonIds.map((id: { toString(): string }) => id.toString())
       : [],
@@ -33,8 +35,10 @@ function toEntity(doc: any): ProverbEntity {
 export class MongooseProverbRepository implements ProverbRepository {
   async create(input: ProverbCreateInput): Promise<ProverbEntity> {
     const lessonIds = Array.from(new Set(input.lessonIds.map(String).filter(Boolean)));
+    const languageId = await findLanguageIdByCode(input.language);
     const created = await ProverbModel.create({
       ...input,
+      languageId: languageId || null,
       lessonIds,
       deletedLessonIds: []
     });
@@ -44,7 +48,9 @@ export class MongooseProverbRepository implements ProverbRepository {
   async list(filter: ProverbListFilter): Promise<ProverbEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
     if (filter.status) query.status = filter.status;
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.lessonId) query.lessonIds = filter.lessonId;
     if (filter.lessonIds) query.lessonIds = { $in: filter.lessonIds };
 
@@ -67,11 +73,11 @@ export class MongooseProverbRepository implements ProverbRepository {
     return proverbs.map(toEntity);
   }
 
-  async findReusable(language: ProverbEntity["language"], text: string): Promise<ProverbEntity | null> {
+  async findReusable(language: ProverbEntity["language"], text: string, languageId?: string | null): Promise<ProverbEntity | null> {
     const normalizedText = String(text || "").trim().toLowerCase();
     if (!normalizedText) return null;
     const proverb = await ProverbModel.findOne({
-      language,
+      ...(await buildScopedLanguageQuery({ language, languageId })),
       normalizedText,
       isDeleted: { $ne: true }
     });
@@ -83,9 +89,10 @@ export class MongooseProverbRepository implements ProverbRepository {
     if (Array.isArray(update.lessonIds)) {
       payload.lessonIds = Array.from(new Set(update.lessonIds.map(String).filter(Boolean)));
     }
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
     const proverb = await ProverbModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
-      payload,
+      languageId === undefined ? payload : { ...payload, languageId: languageId || null },
       { new: true }
     );
     return proverb ? toEntity(proverb) : null;

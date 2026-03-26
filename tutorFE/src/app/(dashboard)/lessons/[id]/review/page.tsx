@@ -331,6 +331,7 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
       emptyMessage="Lesson preview not available."
       preview
       allowStagePicker
+      continuousMode
     />
   )
 }

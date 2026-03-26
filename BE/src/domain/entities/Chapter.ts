@@ -3,6 +3,7 @@ import type { Language, Level, Status } from "./Lesson.js";
 export type ChapterEntity = {
   id: string;
   _id?: string;
+  languageId?: string | null;
   title: string;
   description: string;
   language: Language;

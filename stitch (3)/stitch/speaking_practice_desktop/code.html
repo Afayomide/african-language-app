@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+
+<html class="light" lang="yo"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-on-surface": "#9f9d97",
+                        "on-background": "#39382f",
+                        "error-container": "#fa7150",
+                        "outline-variant": "#bcb9ad",
+                        "primary-fixed-dim": "#ff9a65",
+                        "surface-container-highest": "#ece8db",
+                        "error-dim": "#821a01",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#ffae86",
+                        "tertiary-fixed": "#b9eeab",
+                        "secondary-dim": "#765100",
+                        "surface-tint": "#a94600",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#692900",
+                        "secondary-fixed-dim": "#ffcc79",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#f7f3ea",
+                        "on-tertiary-container": "#2d5a27",
+                        "on-tertiary-fixed-variant": "#376430",
+                        "secondary-fixed": "#ffdeac",
+                        "on-tertiary-fixed": "#1a4716",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#0f0e0b",
+                        "tertiary-fixed-dim": "#abdf9e",
+                        "background": "#fffbff",
+                        "surface-dim": "#e6e3d3",
+                        "outline": "#838175",
+                        "tertiary-container": "#b9eeab",
+                        "surface-container-low": "#fdf9f1",
+                        "on-secondary-fixed": "#563a00",
+                        "on-error-container": "#671200",
+                        "inverse-primary": "#fd8542",
+                        "on-primary-fixed-variant": "#772f00",
+                        "on-secondary-fixed-variant": "#7a5400",
+                        "on-surface-variant": "#66655a",
+                        "on-secondary-container": "#6e4b00",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#ffdeac",
+                        "surface-bright": "#fffbff",
+                        "surface-container-high": "#f1eee2",
+                        "on-surface": "#39382f",
+                        "surface-variant": "#ece8db",
+                        "tertiary-dim": "#35632e",
+                        "tertiary": "#416f39",
+                        "secondary": "#865d00",
+                        "primary": "#a94600",
+                        "error": "#b23d21",
+                        "surface": "#fffbff",
+                        "primary-container": "#ffae86",
+                        "primary-dim": "#953d00",
+                        "on-primary-fixed": "#481a00"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .mic-shadow {
+            box-shadow: 0px 8px 24px rgba(169, 70, 0, 0.15);
+        }
+        .glass-panel {
+            background: rgba(255, 251, 255, 0.7);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface flex min-h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="h-screen w-72 fixed left-0 top-0 flex flex-col bg-stone-50 dark:bg-stone-900 z-50">
+<div class="flex flex-col h-full py-8">
+<div class="px-8 mb-10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">history_edu</span>
+</div>
+<div>
+<h2 class="text-lg font-bold text-stone-900 dark:text-stone-100 leading-none">The Modern Griot</h2>
+<p class="text-[10px] font-['Manrope'] font-medium tracking-wide uppercase text-stone-500 mt-1">Language Mastery</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Dashboard</span>
+</a>
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Lessons</span>
+</a>
+<a class="bg-orange-100/50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300 border-r-4 border-orange-700 font-bold px-6 py-4 flex items-center gap-4 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mic</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Speaking</span>
+</a>
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">extension</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Matching</span>
+</a>
+</nav>
+<div class="px-6 mt-auto space-y-4">
+<div class="p-4 bg-surface-container rounded-xl">
+<p class="text-xs font-bold text-on-surface mb-2">PRO ACCESS</p>
+<button class="w-full py-2 bg-primary text-on-primary rounded-lg text-xs font-bold tracking-tight active:translate-y-[2px] transition-transform">
+                        Upgrade to Premium
+                    </button>
+</div>
+<div class="pt-4 border-t border-stone-200 dark:border-stone-800">
+<a class="text-stone-500 dark:text-stone-400 py-3 flex items-center gap-4 hover:text-orange-700" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Help</span>
+</a>
+<a class="text-stone-500 dark:text-stone-400 py-3 flex items-center gap-4 hover:text-orange-700" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Logout</span>
+</a>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-72 relative flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 bg-orange-50/80 dark:bg-stone-950/80 backdrop-blur-xl shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center px-8 h-20 w-full">
+<div class="flex items-center gap-8">
+<h1 class="text-2xl font-extrabold text-orange-900 dark:text-orange-100 italic font-['Plus_Jakarta_Sans'] tracking-tight">Yorùbá Learner</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-full text-sm font-bold text-orange-800">
+<span class="material-symbols-outlined text-orange-600" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span>12 Day Streak</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors active:translate-y-[2px]">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors active:translate-y-[2px]">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a young African woman smiling warmly with soft natural lighting and blurred greenery background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBStCDftZqbJlfObKqoASGH4JAxcwJLL35VYdpFAEy3Kj6nt4JjhApZAHZMC61gwIyovrkOKpjgxASIUnjqkQ3YWcvy-d-Do-eQYM8lVgXd_gox_nYgDR7UGdO2xRJ5aTir9IRH0GpTSmn-8LkNDh3BeF_q9MxmajIw_fSWZiXUQ5lhlGw6NspJ5iQ7HsyXxk_Zfmk-rPU6YRvDd4-Nh3EwEAeVH1vghhy62sosic8l3MWS7VDjzvtoTxXiCX9ukIAiljPmQl2J_m0u"/>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-stone-200/50 dark:bg-stone-800/50 h-px w-full"></div>
+</header>
+<!-- Speaking Canvas -->
+<div class="flex-1 p-12 flex flex-col items-center justify-between">
+<!-- Progress & Header -->
+<div class="w-full max-w-4xl flex flex-col items-center">
+<div class="w-full flex justify-between items-center mb-6">
+<button class="flex items-center gap-2 text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">close</span>
+<span class="font-label text-sm font-bold tracking-widest uppercase">Quit Session</span>
+</button>
+<div class="flex-1 mx-12 h-3 bg-surface-container-highest rounded-full overflow-hidden relative">
+<div class="absolute inset-0 bg-primary w-[65%] rounded-full shadow-inner"></div>
+</div>
+<span class="font-headline font-bold text-primary">65%</span>
+</div>
+<div class="text-center mt-8">
+<span class="font-label text-xs font-bold tracking-[0.2em] text-outline uppercase">Speaking Practice</span>
+<h2 class="font-headline text-3xl font-extrabold text-on-surface mt-2 italic">Listen and repeat</h2>
+</div>
+</div>
+<!-- Central Word Focus -->
+<div class="relative w-full max-w-4xl flex flex-col items-center">
+<!-- Asymmetric background element -->
+<div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-container/10 rounded-full blur-[100px]"></div>
+<div class="bg-surface-container-low p-16 rounded-[3rem] w-full flex flex-col items-center relative overflow-hidden">
+<!-- Subtle pattern overlay -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCVQQFp81eYeq_CRrts3Va6YKoH8CVfmv-iqX0vHMe_IW5EEKZ1shS-NH8T5cwT2tIHxxMlxUMztHmS-cwYTguhyYIrTDP62-L6WOnYekwFuVho5olkJjt0BK5qxq0C6f1-6t7X4mjA9KbUUWIU-dAkCcsGX3dqdk0L8Fc_PzqMh4ZlI9suMCOmmBSZ_FN9kJBtj0jSC59pLiNmHkY7PN2WW3vsKAqS0SUb6JaCOUzLboPzFktTvECe_lESC8ojo_aoq-LKck-AP-NV');"></div>
+<div class="flex flex-col items-center gap-8 relative z-10">
+<div class="flex items-center gap-6">
+<h3 class="font-headline text-7xl font-extrabold text-on-surface tracking-tight">Káàárọ̀</h3>
+<button class="w-16 h-16 rounded-2xl bg-surface-container-highest text-primary flex items-center justify-center hover:scale-105 transition-transform active:translate-y-1">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</button>
+</div>
+<p class="font-body text-xl text-on-surface-variant font-medium">"Good morning"</p>
+<!-- Visual Feedback Bar -->
+<div class="flex gap-1 h-8 items-center">
+<div class="w-1 bg-primary-container rounded-full h-2"></div>
+<div class="w-1 bg-primary-container rounded-full h-4"></div>
+<div class="w-1 bg-primary-container rounded-full h-6"></div>
+<div class="w-1 bg-primary-container rounded-full h-4"></div>
+<div class="w-1 bg-primary-container rounded-full h-3"></div>
+</div>
+</div>
+</div>
+<!-- Floating Mic Button -->
+<div class="mt-[-60px] relative z-20">
+<button class="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary-dim text-on-primary flex items-center justify-center mic-shadow hover:scale-110 active:scale-95 transition-all group">
+<div class="absolute inset-0 rounded-full border-4 border-white/20 scale-110 group-hover:scale-125 transition-transform duration-700"></div>
+<span class="material-symbols-outlined text-6xl" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+<div class="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
+<span class="font-label text-xs font-bold text-outline tracking-widest uppercase">Tap to speak</span>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="w-full max-w-4xl flex justify-center pb-12">
+<button class="px-24 py-5 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-headline font-extrabold text-xl tracking-wide shadow-lg active:translate-y-[2px] transition-all flex items-center gap-3">
+                    Continue
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Word Context Chip (Asymmetric layout element) -->
+<div class="absolute bottom-12 left-12 glass-panel p-6 rounded-3xl max-w-xs border border-white/20 hidden xl:block">
+<span class="font-label text-[10px] font-bold text-primary tracking-[0.2em] uppercase block mb-3">Cultural Context</span>
+<p class="font-body text-sm leading-relaxed text-on-surface/80 italic">
+                Derived from "Kí á rọ̀", literally wishing the recipient a smooth and easy morning. Proper tonal pronunciation is key to respect.
+            </p>
+</div>
+</main>
+</body></html>

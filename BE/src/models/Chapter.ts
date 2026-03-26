@@ -4,6 +4,7 @@ const ChapterSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
+    languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
     level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true, index: true },
     orderIndex: { type: Number, default: 0, index: true },
@@ -17,6 +18,7 @@ const ChapterSchema = new Schema(
 );
 
 ChapterSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
+ChapterSchema.index({ languageId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 
 export type ChapterDocument = InferSchemaType<typeof ChapterSchema> & {
   _id: mongoose.Types.ObjectId;

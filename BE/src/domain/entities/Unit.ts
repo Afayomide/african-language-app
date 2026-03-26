@@ -34,6 +34,7 @@ export type UnitAiRunSummary = {
 export type UnitEntity = {
   id: string;
   _id?: string;
+  languageId?: string | null;
   chapterId?: string | null;
   title: string;
   description: string;

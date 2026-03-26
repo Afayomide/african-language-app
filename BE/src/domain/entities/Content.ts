@@ -89,6 +89,7 @@ export type ContentComponentRef = {
 export type ContentBaseEntity = {
   id: string;
   _id?: string;
+  languageId?: string | null;
   language: Language;
   text: string;
   textNormalized: string;

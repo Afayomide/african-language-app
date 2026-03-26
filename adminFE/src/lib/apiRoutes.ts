@@ -85,6 +85,10 @@ export const beAdminRoutes = {
   reviseUnitContent: (unitId: string) => `${BE_API_URL}/admin/ai/units/${unitId}/revise`,
   generateBulkUnits: () => `${BE_API_URL}/admin/ai/units/generate-bulk`,
   generateLessonProverbs: () => `${BE_API_URL}/admin/ai/proverbs/generate`,
+  curriculumJobs: () => `${BE_API_URL}/admin/ai/curriculum-jobs`,
+  curriculumJob: (id: string) => `${BE_API_URL}/admin/ai/curriculum-jobs/${id}`,
+  curriculumJobArtifacts: (id: string) => `${BE_API_URL}/admin/ai/curriculum-jobs/${id}/artifacts`,
+  resumeCurriculumJob: (id: string) => `${BE_API_URL}/admin/ai/curriculum-jobs/${id}/resume`,
 };
 
 export const feAiRoutes = {
@@ -172,4 +176,8 @@ export const feAdminRoutes = {
   reviseUnitContent: (unitId: string) => `/api/admin/ai/units/${unitId}/revise`,
   generateBulkUnits: () => "/api/admin/ai/units/generate-bulk",
   generateLessonProverbs: () => "/api/admin/ai/proverbs/generate",
+  curriculumJobs: () => "/api/admin/ai/curriculum-jobs",
+  curriculumJob: (id: string) => `/api/admin/ai/curriculum-jobs/${id}`,
+  curriculumJobArtifacts: (id: string) => `/api/admin/ai/curriculum-jobs/${id}/artifacts`,
+  resumeCurriculumJob: (id: string) => `/api/admin/ai/curriculum-jobs/${id}/resume`,
 };

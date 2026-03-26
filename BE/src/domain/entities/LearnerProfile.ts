@@ -9,6 +9,7 @@ export type LearnerProfileEntity = {
   id: string;
   _id?: string;
   userId: string;
+  activeLanguageId?: string | null;
   displayName: string;
   proficientLanguage: string;
   countryOfOrigin: string;

@@ -3,6 +3,7 @@ import type { ChapterEntity } from "../entities/Chapter.js";
 
 export type ChapterListFilter = {
   language?: Language;
+  languageId?: string | null;
   status?: Status;
 };
 
@@ -21,10 +22,10 @@ export type ChapterUpdateInput = Partial<
 >;
 
 export interface ChapterRepository {
-  findLastOrderIndex(language: Language): Promise<number | null>;
+  findLastOrderIndex(language: Language, languageId?: string | null): Promise<number | null>;
   create(input: ChapterCreateInput): Promise<ChapterEntity>;
   list(filter: ChapterListFilter): Promise<ChapterEntity[]>;
-  listByLanguage(language: Language): Promise<ChapterEntity[]>;
+  listByLanguage(language: Language, languageId?: string | null): Promise<ChapterEntity[]>;
   findById(id: string): Promise<ChapterEntity | null>;
   updateById(id: string, update: ChapterUpdateInput): Promise<ChapterEntity | null>;
   softDeleteById(id: string): Promise<ChapterEntity | null>;

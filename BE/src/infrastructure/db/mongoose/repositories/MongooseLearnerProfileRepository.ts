@@ -2,10 +2,12 @@ import LearnerProfileModel from "../../../../models/learner/LearnerProfile.js";
 import type { LearnerProfileEntity } from "../../../../domain/entities/LearnerProfile.js";
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
 import type { Language } from "../../../../domain/entities/Lesson.js";
+import { findLanguageIdByCode } from "./languageRef.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
   userId: { toString(): string };
+  activeLanguageId?: { toString(): string } | null;
   displayName: string;
   proficientLanguage?: string;
   countryOfOrigin?: string;
@@ -24,6 +26,7 @@ function toEntity(doc: {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     userId: doc.userId.toString(),
+    activeLanguageId: doc.activeLanguageId ? doc.activeLanguageId.toString() : null,
     displayName: doc.displayName,
     proficientLanguage: String(doc.proficientLanguage || ""),
     countryOfOrigin: String(doc.countryOfOrigin || ""),
@@ -58,7 +61,8 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
     currentLanguage: Language;
     dailyGoalMinutes: number;
   }): Promise<LearnerProfileEntity> {
-    const created = await LearnerProfileModel.create(input);
+    const activeLanguageId = await findLanguageIdByCode(input.currentLanguage);
+    const created = await LearnerProfileModel.create({ ...input, activeLanguageId: activeLanguageId || null });
     return toEntity(created);
   }
 
@@ -80,9 +84,14 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
       achievements: string[];
     }>
   ): Promise<LearnerProfileEntity | null> {
-    const updated = await LearnerProfileModel.findOneAndUpdate({ userId }, update, {
-      new: true
-    });
+    const activeLanguageId = update.currentLanguage ? await findLanguageIdByCode(update.currentLanguage) : undefined;
+    const updated = await LearnerProfileModel.findOneAndUpdate(
+      { userId },
+      activeLanguageId === undefined ? update : { ...update, activeLanguageId: activeLanguageId || null },
+      {
+        new: true
+      }
+    );
     return updated ? toEntity(updated) : null;
   }
 }

@@ -40,8 +40,8 @@ export const learnerAuthService = {
 };
 
 export const learnerDashboardService = {
-  async getOverview() {
-    const response = await api.get(feLearnerRoutes.dashboardOverview());
+  async getOverview(language?: "yoruba" | "igbo" | "hausa") {
+    const response = await api.get(feLearnerRoutes.dashboardOverview(language));
     return response.data;
   },
 

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#e6e3d3",
+              "on-secondary-fixed": "#563a00",
+              "on-surface": "#39382f",
+              "primary-fixed-dim": "#ff9a65",
+              "on-tertiary-fixed": "#1a4716",
+              "inverse-primary": "#fd8542",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#ffcc79",
+              "secondary-dim": "#765100",
+              "tertiary": "#416f39",
+              "surface": "#fffbff",
+              "secondary": "#865d00",
+              "on-tertiary-container": "#2d5a27",
+              "surface-bright": "#fffbff",
+              "error-container": "#fa7150",
+              "primary-container": "#ffae86",
+              "on-secondary-container": "#6e4b00",
+              "surface-container-highest": "#ece8db",
+              "tertiary-fixed": "#b9eeab",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-tint": "#a94600",
+              "primary-dim": "#953d00",
+              "background": "#fffbff",
+              "surface-container-lowest": "#ffffff",
+              "outline-variant": "#bcb9ad",
+              "surface-container-low": "#fdf9f1",
+              "on-primary-container": "#692900",
+              "surface-container": "#f7f3ea",
+              "primary-fixed": "#ffae86",
+              "inverse-surface": "#0f0e0b",
+              "tertiary-fixed-dim": "#abdf9e",
+              "outline": "#838175",
+              "error": "#b23d21",
+              "on-primary-fixed-variant": "#772f00",
+              "on-surface-variant": "#66655a",
+              "error-dim": "#821a01",
+              "on-tertiary-fixed-variant": "#376430",
+              "secondary-container": "#ffdeac",
+              "surface-container-high": "#f1eee2",
+              "on-error-container": "#671200",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#ffdeac",
+              "on-primary-fixed": "#481a00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .btn-primary-gradient {
+            background: linear-gradient(45deg, #a94600, #ffae86);
+        }
+        .glass-nav {
+            background: rgba(255, 251, 255, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased overflow-hidden h-screen flex">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-6 bg-orange-50 dark:bg-stone-950 h-screen w-64 border-r-0 z-50">
+<div class="mb-10">
+<span class="text-2xl font-extrabold text-orange-900 dark:text-orange-100 italic font-headline">The Modern Griot</span>
+<p class="text-xs font-bold tracking-wider uppercase text-orange-700 mt-1 opacity-70">Yoruba Scholar</p>
+</div>
+<nav class="flex flex-col gap-2 flex-1">
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label text-xs font-bold tracking-wider uppercase">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-orange-100 dark:bg-orange-900/40 text-orange-900 dark:text-orange-50 rounded-xl transition-all duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-label text-xs font-bold tracking-wider uppercase">Lessons</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 group" href="#">
+<span class="material-symbols-outlined" data-icon="translate">translate</span>
+<span class="font-label text-xs font-bold tracking-wider uppercase">Vocabulary</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 group" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-label text-xs font-bold tracking-wider uppercase">Progress</span>
+</a>
+</nav>
+<div class="mt-auto">
+<button class="w-full py-3 px-4 bg-orange-900 text-orange-50 rounded-xl font-bold text-sm shadow-lg hover:scale-95 transition-transform duration-200">
+                Daily Challenge
+            </button>
+<div class="mt-6 flex items-center gap-3 px-2">
+<img alt="User Profile Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-orange-200" data-alt="portrait of a confident young African woman with artistic jewelry and vibrant natural hair against a warm neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7eOByk4l0Cy5HjqnoIKFZo0AC4ykDw4jiNLuZk9yklPLuQorqIKMmIAM98XsQYPTyV6jYycLYx5Vsit7EAqXNGbQmf-6WSL5RbwWbzGrmwwtQDR98WP3vOu9Cy27RhqvurkoDwy2gQelrOC2UrtK7GtgkgIkt30ZV5Wtd4OrfqfcmklhRE2GSOCKD2vXmGNJE_VCSggyjDVLqgyhJD-3A4WwZFLZUzyY3Y4dtMAm0XxRR5GOqsqMp-tvLOtvLcCOHhvjOl2CF74BU"/>
+<div>
+<p class="text-xs font-bold text-on-surface">Ayo Adebayo</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-tighter">Lvl 14 Scholar</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-64 flex-1 h-screen flex flex-col relative overflow-hidden bg-surface-dim">
+<!-- TopAppBar (Shared Component) -->
+<header class="flex items-center justify-between px-12 h-20 sticky top-0 bg-white/80 dark:bg-stone-950/80 backdrop-blur-xl z-40">
+<div class="flex items-center gap-4">
+<span class="text-xl font-bold text-stone-900 dark:text-stone-50 font-headline uppercase tracking-tight">Yoruba Learning</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-stone-500">
+<button class="material-symbols-outlined hover:text-orange-600 transition-colors" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined hover:text-orange-600 transition-colors" data-icon="settings">settings</button>
+</div>
+<div class="h-8 w-[1px] bg-outline-variant/30 mx-2"></div>
+<div class="flex items-center gap-3">
+<img alt="User profile" class="w-8 h-8 rounded-lg object-cover" data-alt="close up headshot of an African woman with warm lighting and blurred background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDoE28p5r0pswh44NDwIPmWXzMh861iw762xlcEKNae1qzBELlFXwS97DI46VEqP0ZBngeJmjI9qLfXLjJT0WYj5oF5YiZBaV99FpTMbW4Ajpv3rmJYNwIepYM3H2Lwah5n4U4v8IFTm-uxgKpZX0g9O58wNTvli0-Z6w075j6uj5oeJdF0i7Zuj79jYxqvD5AQnTJXnbITmANpitRGxRByBisso-W9oxRMGHcO8njKMg6gxCJnH4d1FVv90rtyheSDPKz8RDYMJWQh"/>
+</div>
+</div>
+</header>
+<!-- Translation Exercise Section -->
+<section class="flex-1 flex items-center justify-center p-8 relative">
+<!-- Decorative Background Element -->
+<div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[30rem]" style="font-variation-settings: 'wght' 100;">translate</span>
+</div>
+<div class="max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch relative z-10">
+<!-- Progress Header (Over Card) -->
+<div class="md:col-span-12 mb-4">
+<div class="flex justify-between items-end mb-2">
+<span class="font-label text-xs font-bold tracking-[0.1em] text-on-surface-variant uppercase">Lesson 04: Common Greetings</span>
+<span class="font-headline font-bold text-primary text-sm">Step 8 of 12</span>
+</div>
+<div class="h-3 w-full bg-surface-container-highest rounded-full overflow-hidden relative">
+<div class="absolute top-0 left-0 h-full bg-primary rounded-full" style="width: 66%;"></div>
+<div class="absolute inset-0 bg-black/5 rounded-full inner-shadow"></div>
+</div>
+</div>
+<!-- Main Card (The Artifact) -->
+<div class="md:col-span-12 bg-surface-container-low rounded-[2rem] p-10 flex flex-col gap-10">
+<!-- Question Prompt Area -->
+<div class="flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="flex-1 space-y-4">
+<span class="font-label text-[10px] font-extrabold tracking-[0.2em] text-secondary uppercase bg-secondary-container px-3 py-1 rounded-full">Word Focus</span>
+<h2 class="text-3xl md:text-5xl font-headline font-extrabold text-on-surface leading-tight">
+                                What is <span class="text-primary italic">Káàárọ̀</span> in English?
+                            </h2>
+</div>
+<!-- Audio Interaction -->
+<button class="w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center group hover:bg-primary-container transition-all duration-300">
+<span class="material-symbols-outlined text-primary text-4xl group-hover:scale-110 transition-transform" data-icon="volume_up" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</button>
+</div>
+<!-- Multiple Choice Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Option 1 -->
+<button class="group flex items-center p-6 bg-surface-container-lowest rounded-2xl hover:bg-primary-container/20 transition-all duration-300 text-left border-2 border-transparent hover:border-primary-container">
+<span class="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center text-on-surface-variant font-bold mr-5 group-hover:bg-primary group-hover:text-on-primary transition-colors">A</span>
+<span class="text-xl font-bold text-on-surface">Good evening</span>
+</button>
+<!-- Option 2 (SELECTED STATE) -->
+<button class="group flex items-center p-6 bg-primary-container rounded-2xl transition-all duration-300 text-left border-2 border-primary scale-[1.02] shadow-[0px_8px_24px_rgba(169,70,0,0.1)]">
+<span class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary font-bold mr-5">B</span>
+<span class="text-xl font-bold text-on-primary-container">Good morning</span>
+</button>
+<!-- Option 3 -->
+<button class="group flex items-center p-6 bg-surface-container-lowest rounded-2xl hover:bg-primary-container/20 transition-all duration-300 text-left border-2 border-transparent hover:border-primary-container">
+<span class="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center text-on-surface-variant font-bold mr-5 group-hover:bg-primary group-hover:text-on-primary transition-colors">C</span>
+<span class="text-xl font-bold text-on-surface">Good afternoon</span>
+</button>
+<!-- Option 4 -->
+<button class="group flex items-center p-6 bg-surface-container-lowest rounded-2xl hover:bg-primary-container/20 transition-all duration-300 text-left border-2 border-transparent hover:border-primary-container">
+<span class="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center text-on-surface-variant font-bold mr-5 group-hover:bg-primary group-hover:text-on-primary transition-colors">D</span>
+<span class="text-xl font-bold text-on-surface">Good night</span>
+</button>
+</div>
+<!-- Bottom Action Area -->
+<div class="mt-4 flex flex-col md:flex-row items-center justify-between gap-6 pt-6">
+<div class="flex items-center gap-4 text-on-surface-variant/70">
+<span class="material-symbols-outlined" data-icon="lightbulb">lightbulb</span>
+<p class="text-sm font-medium italic">Tip: "Káà" is a common prefix for greetings throughout the day.</p>
+</div>
+<button class="btn-primary-gradient px-12 py-5 rounded-2xl text-on-primary font-bold text-lg shadow-lg hover:translate-y-0.5 active:translate-y-1 transition-all flex items-center gap-3">
+                            Check Answer
+                            <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Subtle Navigation Hint (Desktop) -->
+<div class="md:col-span-12 flex justify-center gap-12 mt-4 text-on-surface-variant opacity-40">
+<div class="flex items-center gap-2">
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold">1-4</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Select Option</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold">ENTER</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Verify</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Floating Feedback (Hidden state but part of design) -->
+<div class="hidden fixed bottom-12 right-12 bg-tertiary-container p-6 rounded-[1.5rem] shadow-2xl border border-tertiary/20 max-w-xs animate-in slide-in-from-bottom-10">
+<div class="flex gap-4">
+<div class="w-12 h-12 rounded-full bg-tertiary flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-white" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-on-tertiary-container">E kú iṣẹ́!</h4>
+<p class="text-sm text-on-tertiary-container/80">Excellent work! You've mastered morning greetings.</p>
+</div>
+</div>
+</div>
+</main>
+</body></html>

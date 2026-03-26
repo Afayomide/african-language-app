@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-21T14:32:33.812Z",
+  "updatedAt": "2026-03-24T13:45:40.908Z",
   "entries": [
     {
       "loggedAt": "2026-03-21T06:31:25.940Z",
@@ -1553,6 +1553,758 @@
                 "Thank you, I am here."
               ],
               "focusSummary": "Holistic review of greetings, respect, and identity in a full conversational flow."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-23T20:05:15.794Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69c19aff0b1570da1005c389",
+      "unitTitle": "Greeting by Time of Day",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Sunrise and the First Awakening",
+          "description": "Learn how to greet family members in the morning, understanding the difference between casual and respectful forms.",
+          "objectives": [
+            "Greet elders respectfully in the morning.",
+            "Greet siblings or peers casually.",
+            "Understand the literal meaning of 'Has your day broken?'"
+          ],
+          "conversationGoal": "Greet family members appropriately in the morning based on their age and status.",
+          "situations": [
+            "Walking into the living room to see an older relative.",
+            "Greeting a sibling or friend first thing in the morning."
+          ],
+          "sentenceGoals": [
+            "Good morning / Have you woken with the light? (respectful).",
+            "Good morning / Have you woken with the light? (casual).",
+            "Yes, I woke up well."
+          ],
+          "focusSummary": "Morning greetings within the family, contrasting respectful greetings for elders with casual greetings for peers."
+        },
+        {
+          "title": "High Sun and the Afternoon Hustle",
+          "description": "Master daytime and afternoon greetings used during active hours in the market or at the office.",
+          "objectives": [
+            "Use the standard afternoon greeting.",
+            "Say 'well done' to someone working or resting.",
+            "Apply the respectful marker when greeting older people in public spaces."
+          ],
+          "conversationGoal": "Approach and greet vendors or colleagues appropriately during the busy afternoon hours.",
+          "situations": [
+            "Approaching an older stall owner at the market to buy fruit during the heat of the day.",
+            "Greeting a co-worker in the office in the afternoon."
+          ],
+          "sentenceGoals": [
+            "Hello / Well done (respectful).",
+            "Hello / Well done (casual).",
+            "Good afternoon (respectful).",
+            "Good afternoon (casual)."
+          ],
+          "focusSummary": "Daytime greetings (12 PM to 4 PM) emphasizing 'Ndewọ' alongside 'Ehihie ọma' in public spaces."
+        },
+        {
+          "title": "The Cooling Evening",
+          "description": "Transition to evening greetings as the workday ends and people begin to rest.",
+          "objectives": [
+            "Greet neighbors and elders in the early evening.",
+            "Understand the transition from work to rest greetings.",
+            "Pronounce evening greetings smoothly."
+          ],
+          "conversationGoal": "Greet people politely in the early evening when returning home or relaxing outside.",
+          "situations": [
+            "Returning from work and greeting an older neighbor sitting on their veranda.",
+            "Saying good evening to a friend on the street."
+          ],
+          "sentenceGoals": [
+            "Good evening (respectful).",
+            "Good evening (casual).",
+            "Welcome back from work.",
+            "Thank you."
+          ],
+          "focusSummary": "Early evening greetings (4 PM to 7 PM) signaling the end of the day's active work."
+        },
+        {
+          "title": "The Nighttime Prayer",
+          "description": "Learn how to bid people a good night and wish them well until the morning light.",
+          "objectives": [
+            "Say goodnight respectfully to a group of elders.",
+            "Say goodnight casually to family or friends.",
+            "Understand the literal meaning of 'Let the day break' as a parting wish."
+          ],
+          "conversationGoal": "Bid people a polite and culturally appropriate goodnight when leaving a gathering or going to sleep.",
+          "situations": [
+            "Leaving a late-night community gathering or family dinner.",
+            "Saying goodnight to siblings before retiring to bed."
+          ],
+          "sentenceGoals": [
+            "Goodnight / Let the day break (respectful).",
+            "Goodnight / Let the day break (casual).",
+            "We will see tomorrow."
+          ],
+          "focusSummary": "General nighttime parting wishes emphasizing the cultural concept of wishing for the day to break safely."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Sunrise and the First Awakening",
+              "description": "Learn how to greet family members in the morning, understanding the difference between casual and respectful forms.",
+              "objectives": [
+                "Greet elders respectfully in the morning.",
+                "Greet siblings or peers casually.",
+                "Understand the literal meaning of 'Has your day broken?'"
+              ],
+              "conversationGoal": "Greet family members appropriately in the morning based on their age and status.",
+              "situations": [
+                "Walking into the living room to see an older relative.",
+                "Greeting a sibling or friend first thing in the morning."
+              ],
+              "sentenceGoals": [
+                "Good morning / Have you woken with the light? (respectful).",
+                "Good morning / Have you woken with the light? (casual).",
+                "Yes, I woke up well."
+              ],
+              "focusSummary": "Morning greetings within the family, contrasting respectful greetings for elders with casual greetings for peers."
+            },
+            {
+              "title": "High Sun and the Afternoon Hustle",
+              "description": "Master daytime and afternoon greetings used during active hours in the market or at the office.",
+              "objectives": [
+                "Use the standard afternoon greeting.",
+                "Say 'well done' to someone working or resting.",
+                "Apply the respectful marker when greeting older people in public spaces."
+              ],
+              "conversationGoal": "Approach and greet vendors or colleagues appropriately during the busy afternoon hours.",
+              "situations": [
+                "Approaching an older stall owner at the market to buy fruit during the heat of the day.",
+                "Greeting a co-worker in the office in the afternoon."
+              ],
+              "sentenceGoals": [
+                "Hello / Well done (respectful).",
+                "Hello / Well done (casual).",
+                "Good afternoon (respectful).",
+                "Good afternoon (casual)."
+              ],
+              "focusSummary": "Daytime greetings (12 PM to 4 PM) emphasizing 'Ndewọ' alongside 'Ehihie ọma' in public spaces."
+            },
+            {
+              "title": "The Cooling Evening",
+              "description": "Transition to evening greetings as the workday ends and people begin to rest.",
+              "objectives": [
+                "Greet neighbors and elders in the early evening.",
+                "Understand the transition from work to rest greetings.",
+                "Pronounce evening greetings smoothly."
+              ],
+              "conversationGoal": "Greet people politely in the early evening when returning home or relaxing outside.",
+              "situations": [
+                "Returning from work and greeting an older neighbor sitting on their veranda.",
+                "Saying good evening to a friend on the street."
+              ],
+              "sentenceGoals": [
+                "Good evening (respectful).",
+                "Good evening (casual).",
+                "Welcome back from work.",
+                "Thank you."
+              ],
+              "focusSummary": "Early evening greetings (4 PM to 7 PM) signaling the end of the day's active work."
+            },
+            {
+              "title": "The Nighttime Prayer",
+              "description": "Learn how to bid people a good night and wish them well until the morning light.",
+              "objectives": [
+                "Say goodnight respectfully to a group of elders.",
+                "Say goodnight casually to family or friends.",
+                "Understand the literal meaning of 'Let the day break' as a parting wish."
+              ],
+              "conversationGoal": "Bid people a polite and culturally appropriate goodnight when leaving a gathering or going to sleep.",
+              "situations": [
+                "Leaving a late-night community gathering or family dinner.",
+                "Saying goodnight to siblings before retiring to bed."
+              ],
+              "sentenceGoals": [
+                "Goodnight / Let the day break (respectful).",
+                "Goodnight / Let the day break (casual).",
+                "We will see tomorrow."
+              ],
+              "focusSummary": "General nighttime parting wishes emphasizing the cultural concept of wishing for the day to break safely."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-24T10:00:55.177Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69be5c1a50bfea3a075214ad",
+      "unitTitle": "Me, You, and the Elders",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "The Universal Third Person",
+          "description": "Learn to talk about yourself and others using the universal, gender-neutral pronoun that works for he, she, and it alike.",
+          "objectives": [
+            "Identify yourself in a simple sentence.",
+            "Point out a third person without specifying their gender.",
+            "Recognize that the universal pronoun applies equally to people and things."
+          ],
+          "conversationGoal": "State who you are and identify what a third person is doing without using their name or gender.",
+          "situations": [
+            "Introducing yourself to a new friend at school or work.",
+            "Pointing out a friend or sibling across the room.",
+            "Telling a host that someone else is waiting outside."
+          ],
+          "sentenceGoals": [
+            "I am here.",
+            "He or she is coming.",
+            "It is good.",
+            "I am eating."
+          ],
+          "focusSummary": "Introducing the pronouns for 'I' and the highly versatile, gender-neutral 'He/She/It'."
+        },
+        {
+          "title": "The Respect Rule for You",
+          "description": "Master the crucial social choice in Yoruba: talking to a peer using casual speech versus showing respect to an elder using the plural form of you.",
+          "objectives": [
+            "Choose the correct pronoun when speaking to a friend.",
+            "Use the respectful form of 'you' when addressing an elder or a group.",
+            "Recognize the social difference between casual and respectful address."
+          ],
+          "conversationGoal": "Address friends casually and respectfully address elders or strangers using the correct form of 'you'.",
+          "situations": [
+            "Asking a classmate or peer a direct question.",
+            "Greeting an older neighbor or shop owner respectfully.",
+            "Addressing a group of people at a small gathering."
+          ],
+          "sentenceGoals": [
+            "Are you going? (to a peer)",
+            "Are you going? (to an elder)",
+            "You are my friend.",
+            "You all are welcome."
+          ],
+          "focusSummary": "Navigating the two ways to say 'You': the casual form for peers or younger people, and the respectful form for elders, strangers, or groups."
+        },
+        {
+          "title": "Stating What Things Are",
+          "description": "Learn how to establish identity in Yoruba using simple sentence structures to point out what things or who people are.",
+          "objectives": [
+            "Identify objects using the basic identity marker.",
+            "State what a person is using the standard verb for 'to be'.",
+            "Construct basic identity sentences by placing the noun before the marker."
+          ],
+          "conversationGoal": "Identify everyday objects and people in a room using simple identity sentence structures.",
+          "situations": [
+            "Telling someone what an unfamiliar object on the table is.",
+            "Identifying a person's profession or status to a friend.",
+            "Clarifying what item you brought to a gathering."
+          ],
+          "sentenceGoals": [
+            "It is a book.",
+            "It is a chair.",
+            "She is a teacher.",
+            "I am a student."
+          ],
+          "focusSummary": "Using simple identity markers and verbs to state what objects or people are, focusing on the unique noun-first sentence structure."
+        },
+        {
+          "title": "Social Roles: Guests and Family",
+          "description": "Combine your new pronouns and identity markers to confidently claim your social role, such as being a guest or a family member.",
+          "objectives": [
+            "Introduce yourself as a guest to a host.",
+            "Identify someone else as a child or family member.",
+            "Combine identity markers with everyday social roles."
+          ],
+          "conversationGoal": "Arrive at a house and identify yourself as the guest while recognizing the roles of others in the home.",
+          "situations": [
+            "Arriving at a house and announcing yourself to the host.",
+            "Explaining who a younger person is in the living room.",
+            "Clarifying your relationship to the household when asked."
+          ],
+          "sentenceGoals": [
+            "I am a guest.",
+            "He is a child.",
+            "Are you the guest?",
+            "We are family."
+          ],
+          "focusSummary": "Combining pronouns and identity markers with common social roles like 'Guest' and 'Child'."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "The Universal Third Person",
+              "description": "Learn to talk about yourself and others using the universal, gender-neutral pronoun that works for he, she, and it alike.",
+              "objectives": [
+                "Identify yourself in a simple sentence.",
+                "Point out a third person without specifying their gender.",
+                "Recognize that the universal pronoun applies equally to people and things."
+              ],
+              "conversationGoal": "State who you are and identify what a third person is doing without using their name or gender.",
+              "situations": [
+                "Introducing yourself to a new friend at school or work.",
+                "Pointing out a friend or sibling across the room.",
+                "Telling a host that someone else is waiting outside."
+              ],
+              "sentenceGoals": [
+                "I am here.",
+                "He or she is coming.",
+                "It is good.",
+                "I am eating."
+              ],
+              "focusSummary": "Introducing the pronouns for 'I' and the highly versatile, gender-neutral 'He/She/It'."
+            },
+            {
+              "title": "The Respect Rule for You",
+              "description": "Master the crucial social choice in Yoruba: talking to a peer using casual speech versus showing respect to an elder using the plural form of you.",
+              "objectives": [
+                "Choose the correct pronoun when speaking to a friend.",
+                "Use the respectful form of 'you' when addressing an elder or a group.",
+                "Recognize the social difference between casual and respectful address."
+              ],
+              "conversationGoal": "Address friends casually and respectfully address elders or strangers using the correct form of 'you'.",
+              "situations": [
+                "Asking a classmate or peer a direct question.",
+                "Greeting an older neighbor or shop owner respectfully.",
+                "Addressing a group of people at a small gathering."
+              ],
+              "sentenceGoals": [
+                "Are you going? (to a peer)",
+                "Are you going? (to an elder)",
+                "You are my friend.",
+                "You all are welcome."
+              ],
+              "focusSummary": "Navigating the two ways to say 'You': the casual form for peers or younger people, and the respectful form for elders, strangers, or groups."
+            },
+            {
+              "title": "Stating What Things Are",
+              "description": "Learn how to establish identity in Yoruba using simple sentence structures to point out what things or who people are.",
+              "objectives": [
+                "Identify objects using the basic identity marker.",
+                "State what a person is using the standard verb for 'to be'.",
+                "Construct basic identity sentences by placing the noun before the marker."
+              ],
+              "conversationGoal": "Identify everyday objects and people in a room using simple identity sentence structures.",
+              "situations": [
+                "Telling someone what an unfamiliar object on the table is.",
+                "Identifying a person's profession or status to a friend.",
+                "Clarifying what item you brought to a gathering."
+              ],
+              "sentenceGoals": [
+                "It is a book.",
+                "It is a chair.",
+                "She is a teacher.",
+                "I am a student."
+              ],
+              "focusSummary": "Using simple identity markers and verbs to state what objects or people are, focusing on the unique noun-first sentence structure."
+            },
+            {
+              "title": "Social Roles: Guests and Family",
+              "description": "Combine your new pronouns and identity markers to confidently claim your social role, such as being a guest or a family member.",
+              "objectives": [
+                "Introduce yourself as a guest to a host.",
+                "Identify someone else as a child or family member.",
+                "Combine identity markers with everyday social roles."
+              ],
+              "conversationGoal": "Arrive at a house and identify yourself as the guest while recognizing the roles of others in the home.",
+              "situations": [
+                "Arriving at a house and announcing yourself to the host.",
+                "Explaining who a younger person is in the living room.",
+                "Clarifying your relationship to the household when asked."
+              ],
+              "sentenceGoals": [
+                "I am a guest.",
+                "He is a child.",
+                "Are you the guest?",
+                "We are family."
+              ],
+              "focusSummary": "Combining pronouns and identity markers with common social roles like 'Guest' and 'Child'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-24T12:28:34.617Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69be5c1a50bfea3a075214ad",
+      "unitTitle": "Me, You, and the Elders",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Identifying Yourself and Others",
+          "description": "Learn the foundational pronouns to state who you are and talk about a third person without worrying about gender.",
+          "objectives": [
+            "Understand how to use the pronoun for 'I'.",
+            "Learn the universal, gender-neutral pronoun for 'He/She/It'.",
+            "State your own identity and point out another person."
+          ],
+          "conversationGoal": "Confidently identify yourself and point out what another person is doing using a gender-neutral pronoun.",
+          "situations": [
+            "Meeting a new neighbor and stating who you are.",
+            "Pointing out a friend across the street to someone.",
+            "Telling a host that a third person is coming inside."
+          ],
+          "sentenceGoals": [
+            "State 'It is me' when someone asks who is there.",
+            "Say that he or she is going somewhere.",
+            "Say that I am leaving now.",
+            "Say that he or she is eating."
+          ],
+          "focusSummary": "Introducing the basic independent pronoun for 'I' and the gender-neutral third-person pronoun for 'He/She/It'."
+        },
+        {
+          "title": "Navigating Respect with You",
+          "description": "Master the crucial social rule of Yoruba: choosing between the casual 'You' for peers and the respectful 'You' for elders and strangers.",
+          "objectives": [
+            "Recognize when to use casual speech versus respectful speech.",
+            "Learn the casual word for 'you' when speaking to peers.",
+            "Learn the respectful word for 'you' when speaking to elders or groups."
+          ],
+          "conversationGoal": "Address a peer casually and an elder respectfully using the correct form of 'you' without causing offense.",
+          "situations": [
+            "Greeting an older shop owner and asking if they are there.",
+            "Calling out to a younger sibling or friend in the house.",
+            "Addressing an elderly neighbor with the proper respectful pronoun."
+          ],
+          "sentenceGoals": [
+            "Say 'It is you' to a peer or friend.",
+            "Respectfully say 'It is you' to an elder.",
+            "Ask a friend if they are going.",
+            "Respectfully ask an elder if they are going."
+          ],
+          "focusSummary": "Learning the casual 'you' for peers and the respectful or plural 'you' for elders, a core pillar of Yoruba social interactions."
+        },
+        {
+          "title": "Using Identity Markers",
+          "description": "Discover how to establish identity using the unique Yoruba sentence structure where the identifying word comes after the noun.",
+          "objectives": [
+            "Understand how to state what something is.",
+            "Learn the primary identity marker used at the end of simple statements.",
+            "Identify basic everyday objects or roles in a room."
+          ],
+          "conversationGoal": "Point to objects or people in a room and correctly state what they are using the primary identity marker.",
+          "situations": [
+            "Clarifying what an object is when asked by a family member.",
+            "Pointing out a chair in a room.",
+            "Explaining to someone who a person is in a simple way."
+          ],
+          "sentenceGoals": [
+            "State that an object is a chair.",
+            "State that it is water.",
+            "Ask 'What is it?' when you do not recognize an object.",
+            "Clarify that something is money."
+          ],
+          "focusSummary": "Using the identity marker to form simple statements that point out what everyday objects and people are."
+        },
+        {
+          "title": "Claiming Your Social Role",
+          "description": "Combine your new pronouns and identity markers to confidently claim your social role in a home, distinguishing between guests and family members.",
+          "objectives": [
+            "Learn the words for 'guest' and 'child' or 'family member'.",
+            "Combine pronouns with the identity marker to state your role.",
+            "Understand the social dynamic of guests and hosts in a Yoruba home."
+          ],
+          "conversationGoal": "Arrive at a house and identify yourself as a guest, or identify someone else as a child of the house.",
+          "situations": [
+            "Arriving at a friend's home and playfully announcing yourself as the guest.",
+            "Being asked who is at the door and stating your role.",
+            "Confirming that someone else is a family member or child of the house."
+          ],
+          "sentenceGoals": [
+            "State 'I am a guest' when introducing yourself to a host.",
+            "Say 'You are a guest' to welcome a visitor.",
+            "Identify a younger person by stating 'He or she is a child'.",
+            "Ask respectfully 'Are you a guest?' to a visitor."
+          ],
+          "focusSummary": "Combining pronouns, identity markers, and core vocabulary like 'guest' and 'child' to navigate social roles in a household."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Identifying Yourself and Others",
+              "description": "Learn the foundational pronouns to state who you are and talk about a third person without worrying about gender.",
+              "objectives": [
+                "Understand how to use the pronoun for 'I'.",
+                "Learn the universal, gender-neutral pronoun for 'He/She/It'.",
+                "State your own identity and point out another person."
+              ],
+              "conversationGoal": "Confidently identify yourself and point out what another person is doing using a gender-neutral pronoun.",
+              "situations": [
+                "Meeting a new neighbor and stating who you are.",
+                "Pointing out a friend across the street to someone.",
+                "Telling a host that a third person is coming inside."
+              ],
+              "sentenceGoals": [
+                "State 'It is me' when someone asks who is there.",
+                "Say that he or she is going somewhere.",
+                "Say that I am leaving now.",
+                "Say that he or she is eating."
+              ],
+              "focusSummary": "Introducing the basic independent pronoun for 'I' and the gender-neutral third-person pronoun for 'He/She/It'."
+            },
+            {
+              "title": "Navigating Respect with You",
+              "description": "Master the crucial social rule of Yoruba: choosing between the casual 'You' for peers and the respectful 'You' for elders and strangers.",
+              "objectives": [
+                "Recognize when to use casual speech versus respectful speech.",
+                "Learn the casual word for 'you' when speaking to peers.",
+                "Learn the respectful word for 'you' when speaking to elders or groups."
+              ],
+              "conversationGoal": "Address a peer casually and an elder respectfully using the correct form of 'you' without causing offense.",
+              "situations": [
+                "Greeting an older shop owner and asking if they are there.",
+                "Calling out to a younger sibling or friend in the house.",
+                "Addressing an elderly neighbor with the proper respectful pronoun."
+              ],
+              "sentenceGoals": [
+                "Say 'It is you' to a peer or friend.",
+                "Respectfully say 'It is you' to an elder.",
+                "Ask a friend if they are going.",
+                "Respectfully ask an elder if they are going."
+              ],
+              "focusSummary": "Learning the casual 'you' for peers and the respectful or plural 'you' for elders, a core pillar of Yoruba social interactions."
+            },
+            {
+              "title": "Using Identity Markers",
+              "description": "Discover how to establish identity using the unique Yoruba sentence structure where the identifying word comes after the noun.",
+              "objectives": [
+                "Understand how to state what something is.",
+                "Learn the primary identity marker used at the end of simple statements.",
+                "Identify basic everyday objects or roles in a room."
+              ],
+              "conversationGoal": "Point to objects or people in a room and correctly state what they are using the primary identity marker.",
+              "situations": [
+                "Clarifying what an object is when asked by a family member.",
+                "Pointing out a chair in a room.",
+                "Explaining to someone who a person is in a simple way."
+              ],
+              "sentenceGoals": [
+                "State that an object is a chair.",
+                "State that it is water.",
+                "Ask 'What is it?' when you do not recognize an object.",
+                "Clarify that something is money."
+              ],
+              "focusSummary": "Using the identity marker to form simple statements that point out what everyday objects and people are."
+            },
+            {
+              "title": "Claiming Your Social Role",
+              "description": "Combine your new pronouns and identity markers to confidently claim your social role in a home, distinguishing between guests and family members.",
+              "objectives": [
+                "Learn the words for 'guest' and 'child' or 'family member'.",
+                "Combine pronouns with the identity marker to state your role.",
+                "Understand the social dynamic of guests and hosts in a Yoruba home."
+              ],
+              "conversationGoal": "Arrive at a house and identify yourself as a guest, or identify someone else as a child of the house.",
+              "situations": [
+                "Arriving at a friend's home and playfully announcing yourself as the guest.",
+                "Being asked who is at the door and stating your role.",
+                "Confirming that someone else is a family member or child of the house."
+              ],
+              "sentenceGoals": [
+                "State 'I am a guest' when introducing yourself to a host.",
+                "Say 'You are a guest' to welcome a visitor.",
+                "Identify a younger person by stating 'He or she is a child'.",
+                "Ask respectfully 'Are you a guest?' to a visitor."
+              ],
+              "focusSummary": "Combining pronouns, identity markers, and core vocabulary like 'guest' and 'child' to navigate social roles in a household."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-03-24T13:45:40.904Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69be5c1a50bfea3a075214ad",
+      "unitTitle": "Me, You, and the Elders",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Establishing Me and the Universal Third Person",
+          "description": "Learn the foundational pronouns to talk about yourself and others. This lesson introduces the Yoruba word for 'I' and the universal, gender-neutral word for 'He/She/It', setting the stage for basic identification.",
+          "objectives": [
+            "State who you are using the basic first-person pronoun.",
+            "Point out someone else and describe their basic action using the gender-neutral third-person pronoun."
+          ],
+          "conversationGoal": "Confidently identify yourself and refer to a third person in a room without needing to know their gender.",
+          "situations": [
+            "Introducing yourself briefly when arriving at a gathering.",
+            "Pointing out a friend or sibling who is doing something nearby without using their name."
+          ],
+          "sentenceGoals": [
+            "It is me.",
+            "He is going.",
+            "She is going.",
+            "It is going."
+          ],
+          "focusSummary": "Introducing the independent pronoun for 'I' (Èmi) and the gender-neutral third-person pronoun for 'He/She/It' (Ó)."
+        },
+        {
+          "title": "The Crucial Choice Between Peers and Elders",
+          "description": "Master one of the most important social rules in Yoruba by learning when to use the casual 'You' for peers and the respectful 'You' for elders or strangers.",
+          "objectives": [
+            "Address a friend or someone younger using the casual pronoun.",
+            "Show respect to an elder, an authority figure, or a group using the honorific pronoun."
+          ],
+          "conversationGoal": "Choose the correct version of 'you' based on age and status when speaking to someone directly to avoid causing offense.",
+          "situations": [
+            "Meeting a new person on the street who looks significantly older than you and showing them respect.",
+            "Asking a younger sibling or close friend at school a direct, casual question."
+          ],
+          "sentenceGoals": [
+            "You are going. (to a peer)",
+            "You are going. (to an elder)",
+            "Are you here? (to a peer)",
+            "Are you here? (to an elder)"
+          ],
+          "focusSummary": "Navigating the critical difference between the casual 'You' (Ìwọ) for peers and the respectful or plural 'You' (Ẹ) for elders."
+        },
+        {
+          "title": "Stating What Things Are With Identity Markers",
+          "description": "Discover the unique way Yoruba sentences are built when identifying objects or people. You will learn the primary identity marker to state 'It is a...' simply and effectively.",
+          "objectives": [
+            "Use the identity marker to state what an everyday object is.",
+            "Understand that the identifying word usually follows the noun in Yoruba."
+          ],
+          "conversationGoal": "Point to everyday items or roles in a room and accurately state what they are using the Yoruba identity structure.",
+          "situations": [
+            "Pointing out a chair when a guest enters the room and needs a place to sit.",
+            "Clarifying what an object or person is when someone asks for basic information."
+          ],
+          "sentenceGoals": [
+            "It is a chair.",
+            "It is water.",
+            "It is a house.",
+            "Who is it?"
+          ],
+          "focusSummary": "Using the primary identity markers (ni and jẹ́) to state what people and everyday objects are."
+        },
+        {
+          "title": "Claiming Your Place in the Household",
+          "description": "Combine your new pronouns and identity markers to establish social roles. You will learn to correctly introduce yourself as a guest or refer to someone as a family member.",
+          "objectives": [
+            "Identify yourself appropriately as a visitor when arriving at a home.",
+            "Refer to another person as a child or recognized member of the house."
+          ],
+          "conversationGoal": "Arrive at a home and correctly identify yourself as the guest, or acknowledge someone else as a child of the house.",
+          "situations": [
+            "Knocking on a door and announcing yourself as the visitor when the host asks who you are.",
+            "Clarifying that a younger person in the room is a child of the family."
+          ],
+          "sentenceGoals": [
+            "I am a guest.",
+            "He is a child.",
+            "She is a child.",
+            "Are you the guest?"
+          ],
+          "focusSummary": "Combining pronouns and identity markers with core social vocabulary like 'guest' (àlejò) and 'child' (ọmọ) to clarify household roles."
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Establishing Me and the Universal Third Person",
+              "description": "Learn the foundational pronouns to talk about yourself and others. This lesson introduces the Yoruba word for 'I' and the universal, gender-neutral word for 'He/She/It', setting the stage for basic identification.",
+              "objectives": [
+                "State who you are using the basic first-person pronoun.",
+                "Point out someone else and describe their basic action using the gender-neutral third-person pronoun."
+              ],
+              "conversationGoal": "Confidently identify yourself and refer to a third person in a room without needing to know their gender.",
+              "situations": [
+                "Introducing yourself briefly when arriving at a gathering.",
+                "Pointing out a friend or sibling who is doing something nearby without using their name."
+              ],
+              "sentenceGoals": [
+                "It is me.",
+                "He is going.",
+                "She is going.",
+                "It is going."
+              ],
+              "focusSummary": "Introducing the independent pronoun for 'I' (Èmi) and the gender-neutral third-person pronoun for 'He/She/It' (Ó)."
+            },
+            {
+              "title": "The Crucial Choice Between Peers and Elders",
+              "description": "Master one of the most important social rules in Yoruba by learning when to use the casual 'You' for peers and the respectful 'You' for elders or strangers.",
+              "objectives": [
+                "Address a friend or someone younger using the casual pronoun.",
+                "Show respect to an elder, an authority figure, or a group using the honorific pronoun."
+              ],
+              "conversationGoal": "Choose the correct version of 'you' based on age and status when speaking to someone directly to avoid causing offense.",
+              "situations": [
+                "Meeting a new person on the street who looks significantly older than you and showing them respect.",
+                "Asking a younger sibling or close friend at school a direct, casual question."
+              ],
+              "sentenceGoals": [
+                "You are going. (to a peer)",
+                "You are going. (to an elder)",
+                "Are you here? (to a peer)",
+                "Are you here? (to an elder)"
+              ],
+              "focusSummary": "Navigating the critical difference between the casual 'You' (Ìwọ) for peers and the respectful or plural 'You' (Ẹ) for elders."
+            },
+            {
+              "title": "Stating What Things Are With Identity Markers",
+              "description": "Discover the unique way Yoruba sentences are built when identifying objects or people. You will learn the primary identity marker to state 'It is a...' simply and effectively.",
+              "objectives": [
+                "Use the identity marker to state what an everyday object is.",
+                "Understand that the identifying word usually follows the noun in Yoruba."
+              ],
+              "conversationGoal": "Point to everyday items or roles in a room and accurately state what they are using the Yoruba identity structure.",
+              "situations": [
+                "Pointing out a chair when a guest enters the room and needs a place to sit.",
+                "Clarifying what an object or person is when someone asks for basic information."
+              ],
+              "sentenceGoals": [
+                "It is a chair.",
+                "It is water.",
+                "It is a house.",
+                "Who is it?"
+              ],
+              "focusSummary": "Using the primary identity markers (ni and jẹ́) to state what people and everyday objects are."
+            },
+            {
+              "title": "Claiming Your Place in the Household",
+              "description": "Combine your new pronouns and identity markers to establish social roles. You will learn to correctly introduce yourself as a guest or refer to someone as a family member.",
+              "objectives": [
+                "Identify yourself appropriately as a visitor when arriving at a home.",
+                "Refer to another person as a child or recognized member of the house."
+              ],
+              "conversationGoal": "Arrive at a home and correctly identify yourself as the guest, or acknowledge someone else as a child of the house.",
+              "situations": [
+                "Knocking on a door and announcing yourself as the visitor when the host asks who you are.",
+                "Clarifying that a younger person in the room is a child of the family."
+              ],
+              "sentenceGoals": [
+                "I am a guest.",
+                "He is a child.",
+                "She is a child.",
+                "Are you the guest?"
+              ],
+              "focusSummary": "Combining pronouns and identity markers with core social vocabulary like 'guest' (àlejò) and 'child' (ọmọ) to clarify household roles."
             }
           ]
         }

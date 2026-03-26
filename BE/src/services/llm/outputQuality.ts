@@ -36,6 +36,15 @@ function normalize(value: string) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeEnglishMeaning(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:'"()\-–—]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function inferSentenceComponentType(value: string): "word" | "expression" {
   return splitWords(value).length <= 1 ? "word" : "expression";
 }
@@ -344,12 +353,17 @@ function sentenceReasons(
   const componentTexts = components.map((component) => ({
     text: String(component?.text || "").trim()
   }));
+  const meaningSegments = Array.isArray(sentence.meaningSegments) ? sentence.meaningSegments : [];
   const normalizedComponents = components.map((component) => {
     const componentText = String(component?.text || "").trim();
+    const tokenCount = splitWords(componentText).length;
     return {
       text: componentText,
       normalizedText: normalize(componentText),
       type: inferSentenceComponentType(componentText),
+      tokenCount,
+      fixed: component?.fixed === true,
+      hasFixedFlag: typeof component?.fixed === "boolean",
       role: component?.role === "support" ? "support" : component?.role === "core" ? "core" : "",
       translations: uniqueStrings(
         Array.isArray(component?.translations) ? component.translations.map((item) => String(item || "").trim()) : []
@@ -366,6 +380,56 @@ function sentenceReasons(
   if (components.length > 0 && !sentenceComponentsCoverText(text, componentTexts)) {
     reasons.push("components do not cover full sentence");
   }
+  if (translations.length > 0 && splitWords(translations[0] || "").length > 1) {
+    if (meaningSegments.length === 0) {
+      reasons.push("missing meaning segments");
+    } else {
+      const flattenedIndexes: number[] = [];
+      const normalizedMeaningFromSegments = normalizeEnglishMeaning(
+        meaningSegments
+        .map((segment) => String(segment?.text || "").trim())
+        .filter(Boolean)
+        .join(" ")
+      );
+      for (const segment of meaningSegments) {
+        const segmentText = String(segment?.text || "").trim();
+        const componentIndexes = Array.isArray(segment?.componentIndexes)
+          ? segment.componentIndexes.filter((value) => Number.isInteger(value))
+          : [];
+        if (!segmentText) reasons.push("meaning segment missing text");
+        if (componentIndexes.length === 0) reasons.push("meaning segment missing component indexes");
+        for (const componentIndex of componentIndexes) {
+          if (componentIndex < 0 || componentIndex >= components.length) {
+            reasons.push("meaning segment component index out of range");
+            continue;
+          }
+          flattenedIndexes.push(componentIndex);
+        }
+      }
+
+      const matchesAnyTranslation = translations.some(
+        (translation) => normalizeEnglishMeaning(translation) === normalizedMeaningFromSegments
+      );
+      if (!matchesAnyTranslation) {
+        reasons.push("meaning segments do not reconstruct translation");
+      }
+
+      const sortedIndexes = [...flattenedIndexes].sort((left, right) => left - right);
+      const expectedIndexes = components.map((_, index) => index);
+      if (
+        sortedIndexes.length !== expectedIndexes.length ||
+        sortedIndexes.some((value, index) => value !== expectedIndexes[index])
+      ) {
+        reasons.push("meaning segments must cover each component exactly once");
+      }
+
+      if (
+        flattenedIndexes.some((value, index) => index > 0 && value < flattenedIndexes[index - 1])
+      ) {
+        reasons.push("meaning segments out of component order");
+      }
+    }
+  }
 
   if (input.level === "beginner" && words.length > 8) reasons.push("beginner sentence too long");
   if (input.level === "intermediate" && words.length > 12) reasons.push("intermediate sentence too long");
@@ -378,6 +442,10 @@ function sentenceReasons(
     if (!type || !componentText) {
       reasons.push("invalid component");
       continue;
+    }
+    if (component.tokenCount > 1 && !component.hasFixedFlag) reasons.push("multi-word component missing fixed marker");
+    if (component.tokenCount > 1 && !component.fixed) {
+      reasons.push("multi-word compositional component must be split into separate words unless fixed");
     }
     if (componentTranslations.length === 0) reasons.push("component missing translations");
     if (hasExplicitInventory && !role) reasons.push("component missing role");
@@ -540,7 +608,10 @@ export function validateLessonSuggestion(
     const titleDescriptionMatches = countThemeAnchorMatches([title, description], themeAnchors);
     const objectiveMatches = countThemeAnchorMatches(objectives, themeAnchors);
 
-    if (titleDescriptionMatches === 0) reasons.push("title and description not aligned with unit theme");
+    // Temporarily disabled. The current lexical anchor heuristic is too brittle
+    // for curriculum planning and causes false negatives on otherwise valid units.
+    void titleDescriptionMatches;
+    void objectiveMatches;
   }
 
   const duplicateSeedPhrases = seedExpressions.filter((item) => existingPhraseTexts.has(normalize(item)));

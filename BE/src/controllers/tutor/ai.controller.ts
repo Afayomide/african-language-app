@@ -843,6 +843,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
 
   const { unitId } = req.params;
   const {
+    mode,
     lessonCount,
     sentencesPerLesson,
     reviewContentPerLesson,
@@ -854,6 +855,9 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   } = req.body ?? {};
   if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
+  }
+  if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
+    return res.status(400).json({ error: "mode must be generate or regenerate" });
   }
   if (topics !== undefined && !Array.isArray(topics)) {
     return res.status(400).json({ error: "topics must be an array" });
@@ -932,6 +936,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
 
   const { unitId } = req.params;
   const {
+    mode,
     lessonCount,
     sentencesPerLesson,
     reviewContentPerLesson,
@@ -943,6 +948,9 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
   } = req.body ?? {};
   if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
+  }
+  if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
+    return res.status(400).json({ error: "mode must be generate or regenerate" });
   }
   if (topics !== undefined && !Array.isArray(topics)) {
     return res.status(400).json({ error: "topics must be an array" });
@@ -996,7 +1004,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
   }
 
   try {
-    const result = await unitAiContentUseCases.previewGeneratePlan({
+    const generateInput = {
       unitId: unit.id,
       language: unit.language,
       level: unit.level,
@@ -1007,7 +1015,11 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined
-    });
+    };
+    const result =
+      mode === "regenerate"
+        ? await unitAiContentUseCases.previewRegeneratePlan(generateInput)
+        : await unitAiContentUseCases.previewGeneratePlan(generateInput);
 
     return res.status(200).json(result);
   } catch (error) {
@@ -1021,6 +1033,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
 
   const { unitId } = req.params;
   const {
+    mode,
     lessonCount,
     sentencesPerLesson,
     reviewContentPerLesson,
@@ -1033,6 +1046,9 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
   } = req.body ?? {};
   if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
+  }
+  if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
+    return res.status(400).json({ error: "mode must be generate or regenerate" });
   }
   if (!Array.isArray(planLessons)) {
     return res.status(400).json({ error: "planLessons must be an array" });
@@ -1089,7 +1105,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
   }
 
   try {
-    const result = await unitAiContentUseCases.generateFromApprovedPlan({
+    const generateInput = {
       unitId: unit.id,
       language: unit.language,
       level: unit.level,
@@ -1101,9 +1117,13 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
       extraInstructions: typeof extraInstructions === "string" ? extraInstructions.trim() : undefined,
       planLessons
-    });
+    };
+    const result =
+      mode === "regenerate"
+        ? await unitAiContentUseCases.regenerateFromApprovedPlan(generateInput)
+        : await unitAiContentUseCases.generateFromApprovedPlan(generateInput);
 
-    return res.status(201).json(result);
+    return res.status(mode === "regenerate" ? 200 : 201).json(result);
   } catch (error) {
     if (error instanceof AiPlanValidationError) {
       return res.status(400).json({ error: error.message, details: error.details });

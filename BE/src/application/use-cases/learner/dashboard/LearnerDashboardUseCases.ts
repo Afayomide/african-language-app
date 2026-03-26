@@ -1,8 +1,11 @@
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
+import type { LearnerLanguageStateEntity } from "../../../../domain/entities/LearnerLanguageState.js";
+import type { LearnerLanguageStateRepository } from "../../../../domain/repositories/LearnerLanguageStateRepository.js";
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
 import type { LessonProgressRepository } from "../../../../domain/repositories/LessonProgressRepository.js";
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
-import type { Language, LessonEntity } from "../../../../domain/entities/Lesson.js";
+import type { ChapterRepository } from "../../../../domain/repositories/ChapterRepository.js";
+import { LANGUAGE_VALUES, type Language, type LessonEntity } from "../../../../domain/entities/Lesson.js";
 
 function isoDay(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -27,6 +30,69 @@ function weekDays() {
   });
 }
 
+type WeeklyActivityRow = { date: Date; minutes: number };
+
+type StreakSnapshot = {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate?: Date;
+  weeklyActivity: WeeklyActivityRow[];
+};
+
+function buildActivityStateUpdate(snapshot: StreakSnapshot, minutes: number) {
+  const safeMinutes = Math.max(0, minutes);
+  const now = new Date();
+  const today = isoDay(now);
+  const lastActive = snapshot.lastActiveDate ? isoDay(new Date(snapshot.lastActiveDate)) : null;
+
+  let currentStreak = snapshot.currentStreak;
+  if (!lastActive) {
+    currentStreak = 1;
+  } else {
+    const diff = dayDiff(today, lastActive);
+    if (diff === 0) currentStreak = Math.max(snapshot.currentStreak, 1);
+    if (diff === 1) currentStreak = Math.max(snapshot.currentStreak, 0) + 1;
+    if (diff > 1) currentStreak = 1;
+  }
+
+  const longestStreak = Math.max(snapshot.longestStreak, currentStreak);
+  const todayKey = toDayKey(today);
+  const weekly = [...(snapshot.weeklyActivity || [])];
+  const idx = weekly.findIndex((entry) => toDayKey(isoDay(new Date(entry.date))) === todayKey);
+  if (idx >= 0) {
+    weekly[idx] = { ...weekly[idx], minutes: weekly[idx].minutes + safeMinutes };
+  } else {
+    weekly.push({ date: now, minutes: safeMinutes });
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+
+  return {
+    currentStreak,
+    longestStreak,
+    lastActiveDate: now,
+    weeklyActivity: weekly.filter((entry) => new Date(entry.date) >= cutoff)
+  };
+}
+
+function getTodayMinutes(weeklyActivity: WeeklyActivityRow[]) {
+  const todayKey = toDayKey(isoDay(new Date()));
+  const todayEntry = weeklyActivity.find((item) => toDayKey(isoDay(new Date(item.date))) === todayKey);
+  return todayEntry?.minutes || 0;
+}
+
+function sortLearnerLanguages(languageStates: LearnerLanguageStateEntity[], activeLanguage: Language) {
+  const order = new Map(LANGUAGE_VALUES.map((code, index) => [code, index]));
+  return languageStates
+    .slice()
+    .sort((left, right) => {
+      if (left.languageCode === activeLanguage && right.languageCode !== activeLanguage) return -1;
+      if (right.languageCode === activeLanguage && left.languageCode !== activeLanguage) return 1;
+      return (order.get(left.languageCode) ?? 999) - (order.get(right.languageCode) ?? 999);
+    });
+}
+
 function buildOrderedPublishedLessons(
   units: Array<{ id: string; orderIndex: number }>,
   lessons: LessonEntity[]
@@ -48,21 +114,56 @@ export class LearnerDashboardUseCases {
   constructor(
     private readonly lessons: LessonRepository,
     private readonly units: UnitRepository,
+    private readonly chapters: ChapterRepository,
     private readonly learnerProfiles: LearnerProfileRepository,
+    private readonly learnerLanguageStates: LearnerLanguageStateRepository,
     private readonly progress: LessonProgressRepository
   ) {}
 
-  async getOverview(userId: string) {
+  private async ensureLearnerLanguageState(input: {
+    userId: string;
+    language: Language;
+    profile: Awaited<ReturnType<LearnerProfileRepository["findByUserId"]>>;
+  }) {
+    if (!input.profile) return null;
+    const existing = await this.learnerLanguageStates.findByUserAndLanguage(input.userId, input.language);
+    if (existing) return existing;
+    return this.learnerLanguageStates.create({
+      userId: input.userId,
+      languageCode: input.language,
+      dailyGoalMinutes: input.profile.dailyGoalMinutes,
+      isEnrolled: true,
+      achievements: [],
+      weeklyActivity: []
+    });
+  }
+
+  async getOverview(userId: string, languageOverride?: Language) {
     const profile = await this.learnerProfiles.findByUserId(userId);
     if (!profile) return null;
+    const language = languageOverride || profile.currentLanguage;
+    const languageState = await this.ensureLearnerLanguageState({ userId, language, profile });
+    if (!languageState) return null;
+    const scopedLanguageId = languageState.languageId || (profile.currentLanguage === language ? profile.activeLanguageId || null : null);
+    const learnerLanguages = sortLearnerLanguages(
+      await this.learnerLanguageStates.listByUser(userId),
+      language
+    );
 
     const publishedLessons = await this.lessons.list({
       status: "published",
-      language: profile.currentLanguage
+      language,
+      languageId: scopedLanguageId
+    });
+    const publishedChapters = await this.chapters.list({
+      status: "published",
+      language,
+      languageId: scopedLanguageId
     });
     const publishedUnits = await this.units.list({
       status: "published",
-      language: profile.currentLanguage
+      language,
+      languageId: scopedLanguageId
     });
 
     const progresses = await this.progress.listByUserAndLessonIds(
@@ -100,7 +201,7 @@ export class LearnerDashboardUseCases {
 
     const thisWeek = weekDays();
     const weekMap = new Map<string, number>();
-    for (const item of profile.weeklyActivity || []) {
+    for (const item of languageState.weeklyActivity || []) {
       weekMap.set(toDayKey(isoDay(new Date(item.date))), item.minutes);
     }
 
@@ -110,13 +211,19 @@ export class LearnerDashboardUseCases {
     });
 
     const todayMinutes = weeklyOverview[weeklyOverview.length - 1]?.minutes || 0;
+    const globalTodayMinutes = getTodayMinutes(profile.weeklyActivity || []);
+    const filteredTotalXp = progresses.reduce((sum, item) => sum + (item.xpEarned || 0), 0);
+    const filteredCompletedLessonsCount = completed.size;
+    const totalXp = Math.max(languageState.totalXp, filteredTotalXp);
+    const completedLessonsCount = Math.max(languageState.completedLessonsCount, filteredCompletedLessonsCount);
+    const dailyGoalMinutes = languageState.dailyGoalMinutes;
 
-    const achievements = profile.achievements.length
-      ? profile.achievements
+    const achievements = languageState.achievements.length
+      ? languageState.achievements
       : [
-          profile.completedLessonsCount > 0 ? "First Step" : "",
-          profile.currentStreak >= 3 ? "On Fire" : "",
-          profile.totalXp >= 100 ? "Perfect Score" : ""
+          completedLessonsCount > 0 ? "First Step" : "",
+          languageState.currentStreak >= 3 ? "On Fire" : "",
+          totalXp >= 100 ? "Perfect Score" : ""
         ].filter(Boolean);
 
     const units = publishedUnits.map((unit) => {
@@ -144,6 +251,7 @@ export class LearnerDashboardUseCases {
 
       return {
         id: unit.id,
+        chapterId: unit.chapterId ?? null,
         title: unit.title,
         description: unit.description,
         level: unit.level,
@@ -155,15 +263,105 @@ export class LearnerDashboardUseCases {
       };
     });
 
+    const currentUnitId = nextLesson?.unitId || units.find((unit) => unit.progressPercent < 100)?.id || null;
+    const currentChapterId =
+      units.find((unit) => unit.id === currentUnitId)?.chapterId ||
+      publishedChapters.find((chapter) => units.some((unit) => unit.chapterId === chapter.id && unit.progressPercent < 100))?.id ||
+      null;
+    const unitsByChapterId = new Map<string | null, typeof units>();
+
+    for (const unit of units) {
+      const key = unit.chapterId ?? null;
+      const bucket = unitsByChapterId.get(key) || [];
+      bucket.push(unit);
+      unitsByChapterId.set(key, bucket);
+    }
+
+    const orderedChapters = publishedChapters
+      .slice()
+      .sort((a, b) => {
+        const orderDiff = a.orderIndex - b.orderIndex;
+        if (orderDiff !== 0) return orderDiff;
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      })
+      .map((chapter) => {
+        const chapterUnits = (unitsByChapterId.get(chapter.id) || []).slice().sort((a, b) => a.orderIndex - b.orderIndex);
+        const completedUnits = chapterUnits.filter((unit) => unit.progressPercent >= 100).length;
+        const totalUnits = chapterUnits.length;
+        const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
+
+        return {
+          id: chapter.id,
+          title: chapter.title,
+          description: chapter.description,
+          level: chapter.level,
+          orderIndex: chapter.orderIndex,
+          progressPercent,
+          completedUnits,
+          totalUnits,
+          status:
+            chapter.id === currentChapterId
+              ? "current"
+              : progressPercent >= 100
+                ? "completed"
+                : currentChapterId && chapter.orderIndex > (publishedChapters.find((item) => item.id === currentChapterId)?.orderIndex ?? -1)
+                  ? "locked"
+                  : "available",
+          units: chapterUnits
+        };
+      });
+
+    const orphanUnits = (unitsByChapterId.get(null) || []).slice().sort((a, b) => a.orderIndex - b.orderIndex);
+    if (orphanUnits.length) {
+      const completedUnits = orphanUnits.filter((unit) => unit.progressPercent >= 100).length;
+      const totalUnits = orphanUnits.length;
+      const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
+      orderedChapters.unshift({
+        id: "unassigned",
+        title: "Foundations",
+        description: "Build the basics before moving deeper into the language.",
+        level: orphanUnits[0]?.level || "beginner",
+        orderIndex: -1,
+        progressPercent,
+        completedUnits,
+        totalUnits,
+        status:
+          currentChapterId === null
+            ? "current"
+            : progressPercent >= 100
+              ? "completed"
+              : "available",
+        units: orphanUnits
+      });
+    }
+
     return {
       stats: {
-        currentLanguage: profile.currentLanguage,
+        currentLanguage: language,
         streakDays: profile.currentStreak,
-        totalXp: profile.totalXp,
-        dailyGoalMinutes: profile.dailyGoalMinutes,
+        languageStreakDays: languageState.currentStreak,
+        longestStreak: profile.longestStreak,
+        languageLongestStreak: languageState.longestStreak,
+        totalXp,
+        globalTotalXp: profile.totalXp,
+        dailyGoalMinutes,
         todayMinutes,
-        completedLessonsCount: profile.completedLessonsCount
+        globalTodayMinutes,
+        completedLessonsCount,
+        globalCompletedLessonsCount: profile.completedLessonsCount
       },
+      learnerLanguages: learnerLanguages.map((state) => ({
+        languageId: state.languageId || null,
+        languageCode: state.languageCode,
+        isEnrolled: state.isEnrolled,
+        isActive: state.languageCode === language,
+        totalXp: state.totalXp,
+        streakDays: state.currentStreak,
+        longestStreak: state.longestStreak,
+        dailyGoalMinutes: state.dailyGoalMinutes,
+        todayMinutes: getTodayMinutes(state.weeklyActivity),
+        completedLessonsCount: state.completedLessonsCount
+      })),
       nextLesson: nextLesson
         ? {
             id: nextLesson.id,
@@ -177,6 +375,7 @@ export class LearnerDashboardUseCases {
             progressPercent: progressByLessonId.get(nextLesson.id)?.progressPercent || 0
           }
         : null,
+      chapters: orderedChapters,
       units,
       completedLessons,
       weeklyOverview,
@@ -185,56 +384,75 @@ export class LearnerDashboardUseCases {
   }
 
   async updateDailyGoal(userId: string, minutes: number) {
+    const profile = await this.learnerProfiles.findByUserId(userId);
+    if (!profile) return null;
+
+    const state = await this.ensureLearnerLanguageState({
+      userId,
+      language: profile.currentLanguage,
+      profile
+    });
+    if (!state) return null;
+
+    await this.learnerLanguageStates.updateByUserAndLanguage(userId, profile.currentLanguage, {
+      dailyGoalMinutes: minutes
+    });
+
     return this.learnerProfiles.updateByUserId(userId, { dailyGoalMinutes: minutes });
   }
 
   async updateCurrentLanguage(userId: string, language: Language) {
-    return this.learnerProfiles.updateByUserId(userId, { currentLanguage: language });
+    const profile = await this.learnerProfiles.findByUserId(userId);
+    if (!profile) return null;
+
+    const state = await this.ensureLearnerLanguageState({ userId, language, profile });
+    if (!state) return null;
+
+    await this.learnerLanguageStates.updateByUserAndLanguage(userId, language, { isEnrolled: true });
+
+    return this.learnerProfiles.updateByUserId(userId, {
+      currentLanguage: language,
+      dailyGoalMinutes: state.dailyGoalMinutes
+    });
   }
 
   async markLearningSession(userId: string, minutes: number) {
     const profile = await this.learnerProfiles.findByUserId(userId);
     if (!profile) return null;
+    const language = profile.currentLanguage;
+    const state = await this.ensureLearnerLanguageState({ userId, language, profile });
+    if (!state) return null;
 
-    const now = new Date();
-    const today = isoDay(now);
-    const lastActive = profile.lastActiveDate ? isoDay(new Date(profile.lastActiveDate)) : null;
+    const nextGlobalActivity = buildActivityStateUpdate(
+      {
+        currentStreak: profile.currentStreak,
+        longestStreak: profile.longestStreak,
+        lastActiveDate: profile.lastActiveDate,
+        weeklyActivity: profile.weeklyActivity || []
+      },
+      minutes
+    );
+    const nextLanguageActivity = buildActivityStateUpdate(
+      {
+        currentStreak: state.currentStreak,
+        longestStreak: state.longestStreak,
+        lastActiveDate: state.lastActiveDate,
+        weeklyActivity: state.weeklyActivity || []
+      },
+      minutes
+    );
 
-    let currentStreak = profile.currentStreak;
-    if (!lastActive) {
-      currentStreak = 1;
-    } else {
-      const diff = dayDiff(today, lastActive);
-      if (diff === 1) currentStreak += 1;
-      if (diff > 1) currentStreak = 1;
-    }
+    const [updatedProfile, updatedState] = await Promise.all([
+      this.learnerProfiles.updateByUserId(userId, nextGlobalActivity),
+      this.learnerLanguageStates.updateByUserAndLanguage(userId, language, nextLanguageActivity)
+    ]);
 
-    const longestStreak = Math.max(profile.longestStreak, currentStreak);
-
-    const key = toDayKey(today);
-    const weekly = [...profile.weeklyActivity];
-    const idx = weekly.findIndex((entry) => toDayKey(isoDay(new Date(entry.date))) === key);
-    if (idx >= 0) {
-      weekly[idx] = { ...weekly[idx], minutes: weekly[idx].minutes + minutes };
-    } else {
-      weekly.push({ date: now, minutes });
-    }
-
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 14);
-    const retained = weekly.filter((entry) => new Date(entry.date) >= cutoff);
-
-    const updated = await this.learnerProfiles.updateByUserId(userId, {
-      currentStreak,
-      longestStreak,
-      lastActiveDate: now,
-      weeklyActivity: retained
-    });
-
-    if (!updated) return null;
+    if (!updatedProfile || !updatedState) return null;
     return {
-      streakDays: updated.currentStreak,
-      longestStreak: updated.longestStreak
+      streakDays: updatedProfile.currentStreak,
+      longestStreak: updatedProfile.longestStreak,
+      languageStreakDays: updatedState.currentStreak,
+      languageLongestStreak: updatedState.longestStreak
     };
   }
 }

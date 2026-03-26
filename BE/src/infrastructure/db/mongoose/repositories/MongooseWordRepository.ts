@@ -8,12 +8,14 @@ import type {
   WordUpdateInput
 } from "../../../../domain/repositories/WordRepository.js";
 import { mapContentAudio } from "./mapContentAudio.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function toEntity(doc: any): WordEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     kind: "word",
+    languageId: doc.languageId ? String(doc.languageId) : null,
     language: doc.language,
     text: String(doc.text || ""),
     textNormalized: String(doc.textNormalized || ""),
@@ -44,13 +46,16 @@ function toEntity(doc: any): WordEntity {
 
 export class MongooseWordRepository implements WordRepository {
   async create(input: WordCreateInput): Promise<WordEntity> {
-    const created = await WordModel.create(input);
+    const languageId = await findLanguageIdByCode(input.language);
+    const created = await WordModel.create({ ...input, languageId: languageId || null });
     return toEntity(created);
   }
 
   async list(filter: WordListFilter): Promise<WordEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.status) query.status = filter.status;
     const words = await WordModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
     return words.map(toEntity);
@@ -67,13 +72,22 @@ export class MongooseWordRepository implements WordRepository {
     return words.map(toEntity);
   }
 
-  async findByText(language: Language, text: string): Promise<WordEntity | null> {
-    const word = await WordModel.findOne({ language, textNormalized: text.trim().toLowerCase(), isDeleted: { $ne: true } });
+  async findByText(language: Language, text: string, languageId?: string | null): Promise<WordEntity | null> {
+    const word = await WordModel.findOne({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      textNormalized: text.trim().toLowerCase(),
+      isDeleted: { $ne: true }
+    });
     return word ? toEntity(word) : null;
   }
 
   async updateById(id: string, update: WordUpdateInput): Promise<WordEntity | null> {
-    const word = await WordModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const word = await WordModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return word ? toEntity(word) : null;
   }
 

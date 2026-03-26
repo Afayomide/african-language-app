@@ -7,9 +7,11 @@ import type {
   ChapterRepository,
   ChapterUpdateInput
 } from "../../../../domain/repositories/ChapterRepository.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
+  languageId?: { toString(): string } | string | null;
   title: string;
   description?: string | null;
   language: ChapterEntity["language"];
@@ -25,6 +27,7 @@ function toEntity(doc: {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
+    languageId: doc.languageId ? String(doc.languageId) : null,
     title: doc.title,
     description: String(doc.description || ""),
     language: doc.language,
@@ -40,26 +43,35 @@ function toEntity(doc: {
 }
 
 export class MongooseChapterRepository implements ChapterRepository {
-  async findLastOrderIndex(language: Language): Promise<number | null> {
-    const last = await ChapterModel.findOne({ language, isDeleted: { $ne: true } }).sort({ orderIndex: -1, createdAt: -1 });
+  async findLastOrderIndex(language: Language, languageId?: string | null): Promise<number | null> {
+    const last = await ChapterModel.findOne({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      isDeleted: { $ne: true }
+    }).sort({ orderIndex: -1, createdAt: -1 });
     return last?.orderIndex ?? null;
   }
 
   async create(input: ChapterCreateInput): Promise<ChapterEntity> {
-    const created = await ChapterModel.create(input);
+    const languageId = await findLanguageIdByCode(input.language);
+    const created = await ChapterModel.create({ ...input, languageId: languageId || null });
     return toEntity(created);
   }
 
   async list(filter: ChapterListFilter): Promise<ChapterEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.status) query.status = filter.status;
     const chapters = await ChapterModel.find(query).sort({ language: 1, orderIndex: 1, createdAt: 1 }).lean();
     return chapters.map(toEntity);
   }
 
-  async listByLanguage(language: Language): Promise<ChapterEntity[]> {
-    const chapters = await ChapterModel.find({ language, isDeleted: { $ne: true } }).sort({ orderIndex: 1, createdAt: 1 }).lean();
+  async listByLanguage(language: Language, languageId?: string | null): Promise<ChapterEntity[]> {
+    const chapters = await ChapterModel.find({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      isDeleted: { $ne: true }
+    }).sort({ orderIndex: 1, createdAt: 1 }).lean();
     return chapters.map(toEntity);
   }
 
@@ -69,7 +81,12 @@ export class MongooseChapterRepository implements ChapterRepository {
   }
 
   async updateById(id: string, update: ChapterUpdateInput): Promise<ChapterEntity | null> {
-    const chapter = await ChapterModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const chapter = await ChapterModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return chapter ? toEntity(chapter) : null;
   }
 

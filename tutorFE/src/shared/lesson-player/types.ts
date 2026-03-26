@@ -138,6 +138,11 @@ export interface ExerciseQuestion {
     words: string[];
     correctOrder: number[];
     meaning: string;
+    meaningSegments?: Array<{
+      text: string;
+      sourceWordIndexes: number[];
+      sourceComponentIndexes?: number[];
+    }>;
   };
   interactionData?: {
     sentence?: string;

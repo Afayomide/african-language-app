@@ -6,11 +6,13 @@ import type {
   LessonRepository,
   LessonUpdateInput
 } from "../../../../domain/repositories/LessonRepository.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 type LessonPersistenceDoc = {
   _id: { toString(): string };
   title: string;
   unitId?: { toString(): string } | string | null;
+  languageId?: { toString(): string } | string | null;
   language: LessonEntity["language"];
   level: LessonEntity["level"];
   orderIndex: number;
@@ -97,6 +99,7 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
+    languageId: doc.languageId ? String(doc.languageId) : null,
     title: doc.title,
     unitId: doc.unitId ? String(doc.unitId) : "",
     language: doc.language,
@@ -126,13 +129,16 @@ export class MongooseLessonRepository implements LessonRepository {
   }
 
   async create(input: LessonCreateInput): Promise<LessonEntity> {
-    const created = await LessonModel.create(input);
+    const languageId = await findLanguageIdByCode(input.language);
+    const created = await LessonModel.create({ ...input, languageId: languageId || null });
     return toEntity(created);
   }
 
   async list(filter: LessonListFilter): Promise<LessonEntity[]> {
     const query: Record<string, string | object> = { isDeleted: { $ne: true } };
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.unitId) query.unitId = filter.unitId;
     if (filter.status) query.status = filter.status;
 
@@ -147,24 +153,35 @@ export class MongooseLessonRepository implements LessonRepository {
     return lesson ? toEntity(lesson) : null;
   }
 
-  async findByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null> {
-    const lesson = await LessonModel.findOne({ _id: id, language, isDeleted: { $ne: true } });
+  async findByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null> {
+    const lesson = await LessonModel.findOne({
+      _id: id,
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      isDeleted: { $ne: true }
+    });
     return lesson ? toEntity(lesson) : null;
   }
 
   async updateById(id: string, update: LessonUpdateInput): Promise<LessonEntity | null> {
-    const lesson = await LessonModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const lesson = await LessonModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return lesson ? toEntity(lesson) : null;
   }
 
   async updateByIdAndLanguage(
     id: string,
     language: Language,
-    update: LessonUpdateInput
+    update: LessonUpdateInput,
+    scopedLanguageId?: string | null
   ): Promise<LessonEntity | null> {
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
     const lesson = await LessonModel.findOneAndUpdate(
-      { _id: id, language, isDeleted: { $ne: true } },
-      update,
+      { _id: id, ...(await buildScopedLanguageQuery({ language, languageId: scopedLanguageId })), isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
       { new: true }
     );
     return lesson ? toEntity(lesson) : null;
@@ -179,9 +196,9 @@ export class MongooseLessonRepository implements LessonRepository {
     return lesson ? toEntity(lesson) : null;
   }
 
-  async softDeleteByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null> {
+  async softDeleteByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null> {
     const lesson = await LessonModel.findOneAndUpdate(
-      { _id: id, language, isDeleted: { $ne: true } },
+      { _id: id, ...(await buildScopedLanguageQuery({ language, languageId })), isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: new Date() },
       { new: true }
     );
@@ -206,19 +223,19 @@ export class MongooseLessonRepository implements LessonRepository {
     return lesson ? toEntity(lesson) : null;
   }
 
-  async finishByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null> {
+  async finishByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null> {
     const lesson = await LessonModel.findOneAndUpdate(
-      { _id: id, language, isDeleted: { $ne: true } },
+      { _id: id, ...(await buildScopedLanguageQuery({ language, languageId })), isDeleted: { $ne: true } },
       { status: "finished" },
       { new: true }
     );
     return lesson ? toEntity(lesson) : null;
   }
 
-  async findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>> {
+  async findByIdsAndLanguage(ids: string[], language: Language, languageId?: string | null): Promise<Array<{ id: string }>> {
     const lessons = await LessonModel.find({
       _id: { $in: ids },
-      language,
+      ...(await buildScopedLanguageQuery({ language, languageId })),
       isDeleted: { $ne: true }
     }).select("_id");
 
@@ -236,8 +253,8 @@ export class MongooseLessonRepository implements LessonRepository {
     );
   }
 
-  async listByLanguage(language: Language): Promise<LessonEntity[]> {
-    const lessons = await LessonModel.find({ language, isDeleted: { $ne: true } })
+  async listByLanguage(language: Language, languageId?: string | null): Promise<LessonEntity[]> {
+    const lessons = await LessonModel.find({ ...(await buildScopedLanguageQuery({ language, languageId })), isDeleted: { $ne: true } })
       .sort({
         orderIndex: 1,
         createdAt: 1
@@ -246,8 +263,8 @@ export class MongooseLessonRepository implements LessonRepository {
     return lessons.map(toEntity);
   }
 
-  async compactOrderIndexes(language: Language): Promise<void> {
-    const lessons = await LessonModel.find({ language, isDeleted: { $ne: true } })
+  async compactOrderIndexes(language: Language, languageId?: string | null): Promise<void> {
+    const lessons = await LessonModel.find({ ...(await buildScopedLanguageQuery({ language, languageId })), isDeleted: { $ne: true } })
       .sort({ orderIndex: 1, createdAt: 1 })
       .select("_id");
 

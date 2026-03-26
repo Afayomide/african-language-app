@@ -4,6 +4,7 @@ const LessonSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     unitId: { type: Schema.Types.ObjectId, ref: "Unit", required: true, index: true },
+    languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true },
     level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true },
     orderIndex: { type: Number, default: 0, index: true },
@@ -47,6 +48,7 @@ const LessonSchema = new Schema(
 
 LessonSchema.index({ unitId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 LessonSchema.index({ language: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
+LessonSchema.index({ languageId: 1, isDeleted: 1, orderIndex: 1, createdAt: 1 });
 
 export type LessonDocument = InferSchemaType<typeof LessonSchema> & {
   _id: mongoose.Types.ObjectId;

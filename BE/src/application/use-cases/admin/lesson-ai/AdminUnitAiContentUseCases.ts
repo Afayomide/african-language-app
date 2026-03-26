@@ -1,6 +1,7 @@
 import type { LessonBlock, LessonEntity, LessonStage } from "../../../../domain/entities/Lesson.js";
-import type { ContentType } from "../../../../domain/entities/Content.js";
+import type { ContentComponentRef, ContentType } from "../../../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../../../domain/entities/Expression.js";
+import type { ProverbEntity } from "../../../../domain/entities/Proverb.js";
 import type { SentenceEntity } from "../../../../domain/entities/Sentence.js";
 import type { WordEntity } from "../../../../domain/entities/Word.js";
 import type { QuestionEntity, QuestionSubtype, QuestionType } from "../../../../domain/entities/Question.js";
@@ -16,6 +17,7 @@ import type { UnitRepository } from "../../../../domain/repositories/UnitReposit
 import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 import type { ChapterRepository } from "../../../../domain/repositories/ChapterRepository.js";
 import type {
+  LlmGeneratedSentenceMeaningSegment,
   LlmClient,
   LlmGeneratedSentence,
   LlmLessonRefactorOperation,
@@ -39,7 +41,13 @@ import { extractThemeAnchors } from "../../../../services/llm/unitTheme.js";
 import { sanitizeGeneratedSentence } from "../../../services/AiSentenceOrchestrator.js";
 import { buildLetterOrderReviewData } from "../../../../controllers/shared/spellingQuestion.js";
 import { ContentCurriculumService } from "../../../services/ContentCurriculumService.js";
-import { selectLessonQuestionCandidates } from "../../../services/lessonQuestionSelection.js";
+import { CurriculumMemoryService, type CurriculumMemoryResult } from "../../../services/CurriculumMemoryService.js";
+import {
+  createLessonQuestionSelectionState,
+  recordLessonQuestionSelection,
+  selectLessonQuestionPlan,
+  type LessonQuestionSelectionState
+} from "../../../services/lessonQuestionSelection.js";
 import {
   buildAiContextScenarioQuestionDraft,
   contentSupportsContextScenario
@@ -82,10 +90,19 @@ type PendingLessonQuestionCreate = {
   };
 };
 
+type ReviewMeaningSegment = {
+  text: string;
+  sourceWordIndexes: number[];
+  sourceComponentIndexes: number[];
+};
+
 type TeachingContent = Pick<
   ExpressionEntity | SentenceEntity | WordEntity,
   "id" | "text" | "translations" | "explanation" | "difficulty" | "audio"
->;
+> & {
+  components?: SentenceEntity["components"];
+  meaningSegments?: ReviewMeaningSegment[];
+};
 
 export type GenerateUnitAiContentInput = {
   unitId: string;
@@ -139,6 +156,17 @@ type ReviewGenerationContext = {
   introducedExpressionIds: Set<string>;
   wordExposureCounts: Map<string, number>;
   expressionExposureCounts: Map<string, number>;
+};
+
+type UnitPlanContext = {
+  unit: UnitEntity;
+  reviewContext: ReviewGenerationContext | null;
+  chapterContextInstruction: string;
+  reviewInstruction: string;
+  existingLessonsInUnit: LessonEntity[];
+  existingUnitExpressions: ExpressionEntity[];
+  existingUnitProverbs: ProverbEntity[];
+  curriculumMemory: CurriculumMemoryResult;
 };
 
 type UnitPlanValidationResult = {
@@ -247,8 +275,63 @@ function buildPhraseOrderReviewData(phrase: TeachingContent): NonNullable<Questi
     sentence,
     words,
     correctOrder: words.map((_, index) => index),
-    meaning: pickTranslation(phrase)
+    meaning: pickTranslation(phrase),
+    meaningSegments: Array.isArray(phrase.meaningSegments) ? phrase.meaningSegments : undefined
   };
+}
+
+function buildQuestionMeaningSegmentsFromSentence(input: {
+  sentenceComponents?: SentenceEntity["components"];
+  meaningSegments?: LlmGeneratedSentenceMeaningSegment[];
+}) {
+  const components = Array.isArray(input.sentenceComponents)
+    ? [...input.sentenceComponents].sort((left, right) => left.orderIndex - right.orderIndex)
+    : [];
+  const meaningSegments = Array.isArray(input.meaningSegments) ? input.meaningSegments : [];
+  if (components.length === 0 || meaningSegments.length === 0) return undefined;
+
+  const componentWordSpans = components.map((component) => {
+    const tokenCount = Math.max(1, splitWords(component.textSnapshot || "").length);
+    return tokenCount;
+  });
+
+  const wordIndexesByComponent = new Map<number, number[]>();
+  let wordCursor = 0;
+  componentWordSpans.forEach((tokenCount, componentIndex) => {
+    const indexes = Array.from({ length: tokenCount }, (_, offset) => wordCursor + offset);
+    wordIndexesByComponent.set(componentIndex, indexes);
+    wordCursor += tokenCount;
+  });
+
+  const normalizedSegments = meaningSegments
+    .map((segment) => {
+      const sourceComponentIndexes = Array.isArray(segment.componentIndexes)
+        ? Array.from(
+            new Set(
+              segment.componentIndexes
+                .map((value) => Number(value))
+                .filter((value) => Number.isInteger(value) && value >= 0 && value < components.length)
+            )
+          )
+        : [];
+      const sourceWordIndexes = sourceComponentIndexes.flatMap(
+        (componentIndex) => wordIndexesByComponent.get(componentIndex) || []
+      );
+      const text = String(segment.text || "").trim();
+      if (!text || sourceWordIndexes.length === 0) return null;
+      return {
+        text,
+        sourceWordIndexes,
+        sourceComponentIndexes
+      };
+    })
+    .filter(
+      (
+        segment
+      ): segment is ReviewMeaningSegment => Boolean(segment)
+    );
+
+  return normalizedSegments.length > 0 ? normalizedSegments : undefined;
 }
 
 function buildPhraseGapFillReviewData(phrase: TeachingContent): NonNullable<QuestionEntity["reviewData"]> | null {
@@ -748,6 +831,13 @@ function normalize(value: string) {
   return String(value || "").trim().toLowerCase();
 }
 
+function splitExpressionIntoWordTokens(value: string) {
+  return String(value || "")
+    .split(/\s+/)
+    .map((item) => item.trim().replace(/^[.,!?;:\"'()\[\]{}]+|[.,!?;:\"'()\[\]{}]+$/g, ""))
+    .filter(Boolean);
+}
+
 function normalizePlanItems(values: unknown) {
   return Array.isArray(values) ? values.map((item) => String(item || "").trim()).filter(Boolean) : [];
 }
@@ -1214,6 +1304,7 @@ export class AdminUnitAiContentUseCases {
   private readonly lessonAi: AdminLessonAiUseCases;
   private readonly llm: LlmClient;
   private readonly contentCurriculum: ContentCurriculumService;
+  private readonly curriculumMemory: CurriculumMemoryService;
   private readonly lessonRefactors: LessonRefactorService;
 
   constructor(
@@ -1246,6 +1337,16 @@ export class AdminUnitAiContentUseCases {
       this.units,
       this.lessonContentItems,
       this.unitContentItems
+    );
+    this.curriculumMemory = new CurriculumMemoryService(
+      this.chapters,
+      this.units,
+      this.lessons,
+      this.lessonContentItems,
+      this.words,
+      this.expressions,
+      this.sentences,
+      this.proverbs
     );
     this.lessonRefactors = new LessonRefactorService(
       this.lessons,
@@ -1433,14 +1534,14 @@ export class AdminUnitAiContentUseCases {
     if (Array.isArray(unit.reviewSourceUnitIds) && unit.reviewSourceUnitIds.length > 0) {
       const unitsInScope = unit.chapterId
         ? await this.units.listByChapterId(unit.chapterId)
-        : await this.units.listByLanguage(unit.language);
+        : await this.units.listByLanguage(unit.language, unit.languageId || null);
       const requestedIds = new Set(unit.reviewSourceUnitIds);
       return unitsInScope.filter((candidate) => requestedIds.has(candidate.id) && candidate.id !== unit.id);
     }
 
     const unitsInScope = unit.chapterId
       ? await this.units.listByChapterId(unit.chapterId)
-      : await this.units.listByLanguage(unit.language);
+      : await this.units.listByLanguage(unit.language, unit.languageId || null);
     return unitsInScope
       .filter((candidate) => candidate.id !== unit.id && candidate.kind === "core" && candidate.orderIndex < unit.orderIndex)
       .sort((left, right) => left.orderIndex - right.orderIndex || left.createdAt.getTime() - right.createdAt.getTime());
@@ -1914,7 +2015,7 @@ export class AdminUnitAiContentUseCases {
     text: string;
     translations: string[];
   }) {
-    const existing = await this.words.findByText(input.lesson.language, input.text);
+    const existing = await this.words.findByText(input.lesson.language, input.text, input.lesson.languageId || null);
     if (existing) {
       const mergedTranslations = Array.from(new Set([...existing.translations, ...input.translations].filter(Boolean)));
       return (await this.words.updateById(existing.id, {
@@ -1955,13 +2056,18 @@ export class AdminUnitAiContentUseCases {
     lesson: LessonEntity;
     text: string;
     translations: string[];
+    components?: ContentComponentRef[];
   }) {
-    const existing = await this.expressions.findByText(input.lesson.language, input.text);
+    const existing = await this.expressions.findByText(input.lesson.language, input.text, input.lesson.languageId || null);
     if (existing) {
       const mergedTranslations = Array.from(new Set([...existing.translations, ...input.translations].filter(Boolean)));
-      return (await this.expressions.updateById(existing.id, {
+      const update: Partial<ExpressionEntity> = {
         translations: mergedTranslations
-      })) || existing;
+      };
+      if ((existing.components || []).length === 0 && (input.components || []).length > 0) {
+        update.components = input.components;
+      }
+      return (await this.expressions.updateById(existing.id, update)) || existing;
     }
 
     return this.expressions.create({
@@ -1988,9 +2094,69 @@ export class AdminUnitAiContentUseCases {
         s3Key: ""
       },
       register: "neutral",
-      components: [],
+      components: input.components || [],
       status: "draft"
     });
+  }
+
+  private async resolveStandaloneWordsForExpressionComponents(input: {
+    lesson: LessonEntity;
+    sentenceDrafts: LlmGeneratedSentence[];
+  }) {
+    const tokenTextsByExpression = new Map<string, string[]>();
+    const requestedWordTexts: string[] = [];
+
+    for (const draft of input.sentenceDrafts) {
+      for (const component of draft.components) {
+        if (component.type !== "expression") continue;
+        if (component.fixed === true) continue;
+        const expressionKey = normalize(component.text);
+        if (!expressionKey) continue;
+        const tokenTexts = splitExpressionIntoWordTokens(component.text);
+        if (tokenTexts.length < 2) continue;
+        tokenTextsByExpression.set(expressionKey, tokenTexts);
+        requestedWordTexts.push(...tokenTexts);
+      }
+    }
+
+    const uniqueWordTexts = Array.from(new Set(requestedWordTexts.map((item) => item.trim()).filter(Boolean)));
+    const wordsByText = new Map<string, WordEntity>();
+    if (uniqueWordTexts.length === 0) {
+      return { tokenTextsByExpression, wordsByText };
+    }
+
+    const generated = await this.wordOrchestrator.generateForLesson({
+      lesson: input.lesson,
+      seedWords: uniqueWordTexts,
+      maxWords: uniqueWordTexts.length,
+      extraInstructions: [
+        "Generate entries only for the exact provided seed words.",
+        "Do not merge seed words into multi-word expressions.",
+        "Return a standalone gloss for each reusable seed word if it functions as its own word in the language.",
+        "For short possessives, particles, or function words, use the most natural standalone English gloss."
+      ].join(" ")
+    });
+
+    for (const word of generated) {
+      const key = normalize(word.text);
+      if (!key || wordsByText.has(key)) continue;
+      wordsByText.set(key, word);
+    }
+
+    const unresolvedTexts = uniqueWordTexts.filter((item) => !wordsByText.has(normalize(item)));
+    if (unresolvedTexts.length > 0) {
+      const existing = await Promise.all(
+        unresolvedTexts.map((item) => this.words.findByText(input.lesson.language, item, input.lesson.languageId || null))
+      );
+      for (const word of existing) {
+        if (!word) continue;
+        const key = normalize(word.text);
+        if (!key || wordsByText.has(key)) continue;
+        wordsByText.set(key, word);
+      }
+    }
+
+    return { tokenTextsByExpression, wordsByText };
   }
 
   private async deriveContentFromSentenceDrafts(input: {
@@ -2001,6 +2167,11 @@ export class AdminUnitAiContentUseCases {
     const coreExpressions = new Map<string, ExpressionEntity>();
     const supportWords = new Map<string, WordEntity>();
     const supportExpressions = new Map<string, ExpressionEntity>();
+    const { tokenTextsByExpression, wordsByText: derivedWordsByText } =
+      await this.resolveStandaloneWordsForExpressionComponents({
+        lesson: input.lesson,
+        sentenceDrafts: input.sentenceDrafts
+      });
 
     for (const draft of input.sentenceDrafts) {
       for (const component of draft.components) {
@@ -2016,12 +2187,22 @@ export class AdminUnitAiContentUseCases {
           continue;
         }
 
-        const expression = await this.upsertExpressionFromSentenceComponent({
-          lesson: input.lesson,
-          text: component.text,
-          translations: component.translations
-        });
-        (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
+        if (component.fixed === true) {
+          const expression = await this.upsertExpressionFromSentenceComponent({
+            lesson: input.lesson,
+            text: component.text,
+            translations: component.translations
+          });
+          (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
+          continue;
+        }
+
+        const tokenTexts = tokenTextsByExpression.get(normalizedText) || [];
+        for (const tokenText of tokenTexts) {
+          const tokenWord = derivedWordsByText.get(normalize(tokenText));
+          if (!tokenWord) continue;
+          (component.role === "support" ? supportWords : coreWords).set(normalize(tokenWord.text), tokenWord);
+        }
       }
     }
 
@@ -2042,31 +2223,78 @@ export class AdminUnitAiContentUseCases {
       expressions: Map<string, ExpressionEntity>;
     };
   }) {
-    const existingLanguageSentences = await this.sentences.list({ language: input.lesson.language });
+    const existingLanguageSentences = await this.sentences.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const byText = new Map(
       [...existingLanguageSentences, ...input.currentLessonSentences].map((sentence) => [normalize(sentence.text), sentence] as const)
     );
-    const createdOrReused: SentenceEntity[] = [];
+    const createdOrReused: TeachingContent[] = [];
 
     for (const draft of input.sentenceDrafts) {
-      const componentRefs = draft.components
-        .map((component, index) => {
-          const key = normalize(component.text);
-          const content =
-            component.type === "word"
-              ? input.componentIndex.words.get(key)
-              : input.componentIndex.expressions.get(key);
-          if (!content) return null;
-          return {
-            type: component.type,
-            refId: content.id,
-            orderIndex: index,
-            textSnapshot: content.text
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+      const componentRefs: ContentComponentRef[] = [];
+      let isValid = true;
+      let orderIndex = 0;
 
-      if (componentRefs.length !== draft.components.length) continue;
+      for (const component of draft.components) {
+        const key = normalize(component.text);
+        if (component.type === "word") {
+          const content = input.componentIndex.words.get(key);
+          if (!content) {
+            isValid = false;
+            break;
+          }
+          componentRefs.push({
+            type: "word",
+            refId: content.id,
+            orderIndex,
+            textSnapshot: content.text
+          });
+          orderIndex += 1;
+          continue;
+        }
+
+        if (component.fixed === true) {
+          const content = input.componentIndex.expressions.get(key);
+          if (!content) {
+            isValid = false;
+            break;
+          }
+          componentRefs.push({
+            type: "expression",
+            refId: content.id,
+            orderIndex,
+            textSnapshot: content.text
+          });
+          orderIndex += 1;
+          continue;
+        }
+
+        const tokenTexts = splitExpressionIntoWordTokens(component.text);
+        for (const tokenText of tokenTexts) {
+          const tokenWord = input.componentIndex.words.get(normalize(tokenText));
+          if (!tokenWord) {
+            isValid = false;
+            break;
+          }
+          componentRefs.push({
+            type: "word",
+            refId: tokenWord.id,
+            orderIndex,
+            textSnapshot: tokenWord.text
+          });
+          orderIndex += 1;
+        }
+        if (!isValid) break;
+      }
+
+      if (!isValid || componentRefs.length === 0) continue;
+
+      const reviewMeaningSegments = buildQuestionMeaningSegmentsFromSentence({
+        sentenceComponents: componentRefs,
+        meaningSegments: draft.meaningSegments
+      });
 
       const existing = byText.get(normalize(draft.text));
       if (existing) {
@@ -2078,7 +2306,12 @@ export class AdminUnitAiContentUseCases {
           explanation: existing.explanation || draft.explanation || "",
           components: existing.components.length > 0 ? existing.components : componentRefs
         });
-        createdOrReused.push(updated || existing);
+        const reused = updated || existing;
+        createdOrReused.push({
+          ...reused,
+          components: reused.components.length > 0 ? reused.components : componentRefs,
+          meaningSegments: reviewMeaningSegments
+        });
         continue;
       }
 
@@ -2110,7 +2343,11 @@ export class AdminUnitAiContentUseCases {
         components: componentRefs,
         status: "draft"
       });
-      createdOrReused.push(created);
+      createdOrReused.push({
+        ...created,
+        components: componentRefs,
+        meaningSegments: reviewMeaningSegments
+      });
       byText.set(normalize(created.text), created);
     }
 
@@ -2125,7 +2362,7 @@ export class AdminUnitAiContentUseCases {
     const results: WordEntity[] = [];
 
     for (const expression of singleWordExpressions) {
-      const existing = await this.words.findByText(lesson.language, expression.text);
+      const existing = await this.words.findByText(lesson.language, expression.text, lesson.languageId || null);
       if (existing) {
         const mergedTranslations = Array.from(new Set([...existing.translations, ...expression.translations].filter(Boolean)));
         const updated = await this.words.updateById(existing.id, {
@@ -2221,7 +2458,7 @@ export class AdminUnitAiContentUseCases {
     });
   }
 
-  private async loadUnitPlanContext(input: { unitId: string }) {
+  private async loadUnitPlanContext(input: { unitId: string }): Promise<UnitPlanContext> {
     const unit = await this.units.findById(input.unitId);
     if (!unit) {
       throw new Error("Unit not found.");
@@ -2261,6 +2498,10 @@ export class AdminUnitAiContentUseCases {
     const existingUnitProverbs = existingLessonIdsInUnit.length
       ? (await Promise.all(existingLessonIdsInUnit.map((lessonId) => this.proverbs.findByLessonId(lessonId)))).flat()
       : [];
+    const curriculumMemory = await this.curriculumMemory.buildUnitPlanningMemory({
+      unit,
+      chapter
+    });
 
     return {
       unit,
@@ -2269,8 +2510,72 @@ export class AdminUnitAiContentUseCases {
       reviewInstruction,
       existingLessonsInUnit,
       existingUnitExpressions,
-      existingUnitProverbs
+      existingUnitProverbs,
+      curriculumMemory
     };
+  }
+
+  private buildRegeneratePlanningInstruction(input: {
+    existingLessonsSummary: string;
+    lessonGenerationInstruction?: string;
+  }) {
+    return [
+      "Regenerate the unit from scratch while staying within the same unit theme and level.",
+      "Do not repeat weak lesson breakdowns or weak titles from the previous draft unless they are clearly the best fit.",
+      input.existingLessonsSummary
+        ? `Previous unit draft summary to avoid shallow repetition:\n${input.existingLessonsSummary}`
+        : "",
+      input.lessonGenerationInstruction
+    ]
+      .filter(Boolean)
+      .join("\n\n") || undefined;
+  }
+
+  private buildPlanMemoryInputs(planContext: UnitPlanContext) {
+    const existingLessonsSummary = [
+      planContext.curriculumMemory.summary,
+      buildExistingLessonSummary(planContext.existingLessonsInUnit)
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return {
+      existingLessonTitles: Array.from(
+        new Set([
+          ...planContext.curriculumMemory.lessonTitles,
+          ...planContext.existingLessonsInUnit.map((item) => item.title).filter(Boolean)
+        ])
+      ),
+      existingPhraseTexts: Array.from(
+        new Set([
+          ...planContext.curriculumMemory.phraseTexts,
+          ...planContext.existingUnitExpressions.map((item) => item.text).filter(Boolean)
+        ])
+      ),
+      existingProverbTexts: Array.from(
+        new Set([
+          ...planContext.curriculumMemory.proverbTexts,
+          ...planContext.existingUnitProverbs.map((item) => item.text).filter(Boolean)
+        ])
+      ),
+      existingLessonsSummary
+    };
+  }
+
+  private async clearUnitLessonsForRegeneration(input: {
+    unitId: string;
+    lessonsInUnit: LessonEntity[];
+  }) {
+    for (const lesson of input.lessonsInUnit) {
+      await this.lessons.softDeleteById(lesson.id);
+      const now = new Date();
+      await this.lessonContentItems.deleteByLessonId(lesson.id);
+      await this.proverbs.softDeleteByLessonId(lesson.id, now);
+      await this.questions.softDeleteByLessonId(lesson.id, now);
+    }
+    await this.unitContentItems.deleteByUnitId(input.unitId);
+    await this.lessons.compactOrderIndexesByUnit(input.unitId);
+    return input.lessonsInUnit.length;
   }
 
   private validateApprovedUnitPlan(input: {
@@ -2710,6 +3015,7 @@ export class AdminUnitAiContentUseCases {
   private async populateGeneratedLessonFromPlan(input: {
     lesson: LessonEntity;
     plan: LlmUnitPlanLesson;
+    lessonMode?: "core" | "review";
     unitKind?: UnitEntity["kind"];
     sentencesPerLesson: number;
     reviewContentPerLesson?: number;
@@ -2721,6 +3027,7 @@ export class AdminUnitAiContentUseCases {
     wordLanguagePool: WordEntity[];
     wordRepetitionPool: WordEntity[];
     reviewContext?: ReviewGenerationContext | null;
+    questionSelectionState?: LessonQuestionSelectionState | null;
   }): Promise<LessonGenerationSummary> {
     const isSentenceOnlyReviewUnit = input.unitKind === "review";
     const planReviewSourceLessonIds = Array.isArray((input.plan as { reviewSourceLessonIds?: unknown }).reviewSourceLessonIds)
@@ -3105,8 +3412,6 @@ export class AdminUnitAiContentUseCases {
     const stage3ContentSet = new Set(focusedLessonContent.map((item) => getContentKey(item)));
 
     const stage1Questions: QuestionEntity[] = [];
-    const stage2Questions: QuestionEntity[] = [];
-    const stage3Questions: QuestionEntity[] = [];
     const pendingQuestionCreates: PendingLessonQuestionCreate[] = [];
     const createdQuestions: QuestionEntity[] = [];
     const contentWasIntroducedBeforeMap = new Map<string, boolean>();
@@ -3173,7 +3478,6 @@ export class AdminUnitAiContentUseCases {
       input.lesson.id,
       stage2MatchingContent
     );
-    let stage2MatchingQuestion: QuestionEntity | null = null;
     if (!isSentenceOnlyReviewUnit && stage2MatchingDraft) {
       pendingQuestionCreates.push({
         stage: 2,
@@ -3199,8 +3503,6 @@ export class AdminUnitAiContentUseCases {
         ? generatedSentences
         : [...generatedSentences, ...focusedLessonContent];
     const stage1SentenceQuestions: QuestionEntity[] = [];
-    const stage2SentenceQuestions: QuestionEntity[] = [];
-    const stage3SentenceQuestions: QuestionEntity[] = [];
     const reviewStage2ScenarioQuestions: QuestionEntity[] = [];
     const reviewStage3ScenarioQuestions: QuestionEntity[] = [];
 
@@ -3231,7 +3533,7 @@ export class AdminUnitAiContentUseCases {
       }
     }
 
-    const selectedQuestionCreates = selectLessonQuestionCandidates(
+    const selectedQuestionPlan = selectLessonQuestionPlan(
       pendingQuestionCreates.map((pending) => ({
         stage: pending.stage,
         sourceGroup: pending.sourceGroup,
@@ -3239,23 +3541,27 @@ export class AdminUnitAiContentUseCases {
         questionType: pending.questionType,
         questionSubtype: pending.questionSubtype,
         payload: pending
-      }))
+      })),
+      {
+        lessonKey: input.lesson.id,
+        lessonMode: input.lessonMode || (input.lesson.kind === "review" ? "review" : "core"),
+        selectionState: input.questionSelectionState,
+        commitSelection: false
+      }
     );
+    const selectedQuestionCreates = selectedQuestionPlan.selectedCandidates.map((candidate) => candidate.payload);
+    const stage2OrderedQuestions: QuestionEntity[] = [];
+    const stage3OrderedQuestions: QuestionEntity[] = [];
     for (const pending of selectedQuestionCreates) {
       const created = await this.questions.create(pending.createInput);
       createdQuestions.push(created);
-      if (pending.createInput.subtype === "mt-match-translation") {
-        stage2MatchingQuestion = created;
-      }
       if (pending.createInput.sourceType === "sentence") {
         if (pending.stage === 1) stage1SentenceQuestions.push(created);
-        if (pending.stage === 2) stage2SentenceQuestions.push(created);
-        if (pending.stage === 3) stage3SentenceQuestions.push(created);
       } else {
         if (pending.stage === 1) stage1Questions.push(created);
-        if (pending.stage === 2) stage2Questions.push(created);
-        if (pending.stage === 3) stage3Questions.push(created);
       }
+      if (pending.stage === 2) stage2OrderedQuestions.push(created);
+      if (pending.stage === 3) stage3OrderedQuestions.push(created);
     }
 
     if (input.lesson.kind === "review" && planReviewSourceLessonIds.length > 0) {
@@ -3346,19 +3652,8 @@ export class AdminUnitAiContentUseCases {
     }
 
     const stage2Blocks: LessonBlock[] = [];
-    for (const content of focusedLessonContent.filter((item) => stage2ContentSet.has(getContentKey(item)))) {
-      for (const question of stage2Questions.filter((q) => q.sourceType === content.kind && q.sourceId === content.id)) {
-        stage2Blocks.push({ type: "question", refId: question.id });
-      }
-    }
-    if (
-      stage2MatchingQuestion &&
-      !stage2Blocks.some((block) => block.type === "question" && block.refId === stage2MatchingQuestion.id)
-    ) {
-      stage2Blocks.push({ type: "question", refId: stage2MatchingQuestion.id });
-    }
-    for (const sentence of generatedSentences) {
-      for (const question of stage2SentenceQuestions.filter((q) => q.sourceId === sentence.id)) {
+    for (const question of stage2OrderedQuestions) {
+      if (!stage2Blocks.some((block) => block.type === "question" && block.refId === question.id)) {
         stage2Blocks.push({ type: "question", refId: question.id });
       }
     }
@@ -3367,13 +3662,8 @@ export class AdminUnitAiContentUseCases {
     }
 
     const stage3Blocks: LessonBlock[] = [];
-    for (const content of focusedLessonContent.filter((item) => stage3ContentSet.has(getContentKey(item)))) {
-      for (const question of stage3Questions.filter((q) => q.sourceType === content.kind && q.sourceId === content.id)) {
-        stage3Blocks.push({ type: "question", refId: question.id });
-      }
-    }
-    for (const sentence of generatedSentences) {
-      for (const question of stage3SentenceQuestions.filter((q) => q.sourceId === sentence.id)) {
+    for (const question of stage3OrderedQuestions) {
+      if (!stage3Blocks.some((block) => block.type === "question" && block.refId === question.id)) {
         stage3Blocks.push({ type: "question", refId: question.id });
       }
     }
@@ -3410,6 +3700,14 @@ export class AdminUnitAiContentUseCases {
         ...generatedSentences.map((item) => ({ contentType: "sentence" as const, contentId: item.id }))
       ]
     });
+    if (input.questionSelectionState) {
+      recordLessonQuestionSelection(
+        input.questionSelectionState,
+        input.lesson.id,
+        selectedQuestionPlan.profileName,
+        selectedQuestionPlan.selectedCandidates
+      );
+    }
 
     return {
       lessonId: input.lesson.id,
@@ -3443,6 +3741,7 @@ export class AdminUnitAiContentUseCases {
 
   async generate(input: GenerateUnitAiContentInput) {
     const planContext = await this.loadUnitPlanContext({ unitId: input.unitId });
+    const planMemory = this.buildPlanMemoryInputs(planContext);
     const planLessons = await this.getValidatedUnitPlan({
       flow: input.planLoggingFlow || "generate",
       unitId: input.unitId,
@@ -3454,11 +3753,13 @@ export class AdminUnitAiContentUseCases {
       topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
       curriculumInstruction: input.lessonGenerationInstruction,
       extraInstructions: [input.extraInstructions, planContext.chapterContextInstruction, planContext.reviewInstruction].filter(Boolean).join("\n"),
-      existingUnitTitles: (await this.units.listByLanguage(input.language)).map((item) => item.title).filter(Boolean),
-      existingLessonTitles: planContext.existingLessonsInUnit.map((item) => item.title).filter(Boolean),
-      existingPhraseTexts: planContext.existingUnitExpressions.map((item) => item.text).filter(Boolean),
-      existingProverbTexts: planContext.existingUnitProverbs.map((item) => item.text).filter(Boolean),
-      existingLessonsSummary: buildExistingLessonSummary(planContext.existingLessonsInUnit)
+      existingUnitTitles: (await this.units.listByLanguage(input.language, planContext.unit.languageId || undefined))
+        .map((item) => item.title)
+        .filter(Boolean),
+      existingLessonTitles: planMemory.existingLessonTitles,
+      existingPhraseTexts: planMemory.existingPhraseTexts,
+      existingProverbTexts: planMemory.existingProverbTexts,
+      existingLessonsSummary: planMemory.existingLessonsSummary
     });
     return this.executeGenerateFromPlan({
       generateInput: {
@@ -3480,7 +3781,19 @@ export class AdminUnitAiContentUseCases {
     reviewContext: ReviewGenerationContext | null;
     existingLessonsInUnit: LessonEntity[];
     existingUnitExpressions: ExpressionEntity[];
+    runMode?: UnitAiRunSummary["mode"];
+    updatedLessons?: number;
+    clearedLessons?: number;
   }) {
+    const runStartedAt = Date.now();
+    console.info("[UNIT_AI_GENERATE] start", {
+      unitId: input.generateInput.unitId,
+      runMode: input.runMode || "generate",
+      requestedLessons: input.generateInput.lessonCount,
+      planLessons: input.planLessons.length,
+      unitKind: input.unitKind
+    });
+
     const lessonResult = await this.createPlannedLessons({
       unitId: input.generateInput.unitId,
       language: input.generateInput.language,
@@ -3503,8 +3816,21 @@ export class AdminUnitAiContentUseCases {
     const lessonSummaries: LessonGenerationSummary[] = [];
     const errors: Array<{ lessonId?: string; title?: string; error: string }> = [];
     const createdLessonById = new Map(lessonResult.created.map((item) => [item.lesson.id, item.lesson] as const));
+    const questionSelectionState = createLessonQuestionSelectionState({
+      lessons: lessonResult.created.map((item) => ({
+        lessonKey: item.lesson.id,
+        lessonMode: item.plan.lessonMode || (item.lesson.kind === "review" ? "review" : "core")
+      }))
+    });
 
     for (const item of lessonResult.created) {
+      const lessonStartedAt = Date.now();
+      console.info("[UNIT_AI_GENERATE] lesson:start", {
+        unitId: input.generateInput.unitId,
+        lessonId: item.lesson.id,
+        title: item.lesson.title,
+        lessonMode: item.plan.lessonMode || item.lesson.kind
+      });
       try {
         const planReviewSourceLessonIds = Array.isArray((item.plan as { reviewSourceLessonIds?: unknown }).reviewSourceLessonIds)
           ? ((item.plan as { reviewSourceLessonIds?: unknown }).reviewSourceLessonIds as unknown[])
@@ -3522,6 +3848,7 @@ export class AdminUnitAiContentUseCases {
         const summary = await this.populateGeneratedLessonFromPlan({
           lesson: item.lesson,
           plan: item.plan,
+          lessonMode: item.plan.lessonMode,
           unitKind: input.unitKind,
           sentencesPerLesson: input.generateInput.sentencesPerLesson,
           reviewContentPerLesson: input.generateInput.reviewContentPerLesson,
@@ -3532,12 +3859,31 @@ export class AdminUnitAiContentUseCases {
           repetitionPool,
           wordLanguagePool,
           wordRepetitionPool,
-          reviewContext: perLessonReviewContext
+          reviewContext: perLessonReviewContext,
+          questionSelectionState
         });
         lessonSummaries.push(summary);
+        console.info("[UNIT_AI_GENERATE] lesson:success", {
+          unitId: input.generateInput.unitId,
+          lessonId: item.lesson.id,
+          title: item.lesson.title,
+          durationMs: Date.now() - lessonStartedAt,
+          contentGenerated: summary.contentGenerated,
+          sentencesGenerated: summary.sentencesGenerated,
+          proverbsGenerated: summary.proverbsGenerated,
+          questionsGenerated: summary.questionsGenerated,
+          blocksGenerated: summary.blocksGenerated
+        });
         languagePool = await this.expressions.list({ language: input.generateInput.language });
         wordLanguagePool = await this.words.list({ language: input.generateInput.language });
       } catch (error) {
+        console.error("[UNIT_AI_GENERATE] lesson:error", {
+          unitId: input.generateInput.unitId,
+          lessonId: item.lesson.id,
+          title: item.lesson.title,
+          durationMs: Date.now() - lessonStartedAt,
+          error: error instanceof Error ? error.message : "Failed to generate lesson content."
+        });
         errors.push({
           lessonId: item.lesson.id,
           title: item.lesson.title,
@@ -3557,21 +3903,32 @@ export class AdminUnitAiContentUseCases {
       lessons: lessonSummaries
     };
     await this.saveLatestAiRun(input.generateInput.unitId, {
-      mode: "generate",
+      mode: input.runMode || "generate",
       createdBy: input.generateInput.createdBy,
       createdAt: new Date(),
       requestedLessons: result.requestedLessons,
       createdLessons: result.createdLessons,
+      updatedLessons: input.updatedLessons,
+      clearedLessons: input.clearedLessons,
       skippedLessons: result.skippedLessons,
       lessonGenerationErrors: result.lessonGenerationErrors,
       contentErrors: result.contentErrors,
       lessons: result.lessons
+    });
+    console.info("[UNIT_AI_GENERATE] complete", {
+      unitId: input.generateInput.unitId,
+      runMode: input.runMode || "generate",
+      durationMs: Date.now() - runStartedAt,
+      createdLessons: result.createdLessons,
+      lessonGenerationErrors: result.lessonGenerationErrors.length,
+      contentErrors: result.contentErrors.length
     });
     return result;
   }
 
   async previewGeneratePlan(input: GenerateUnitAiContentInput): Promise<PreviewGenerateUnitPlanResult> {
     const planContext = await this.loadUnitPlanContext({ unitId: input.unitId });
+    const planMemory = this.buildPlanMemoryInputs(planContext);
     const coreLessons = await this.getValidatedUnitPlan({
       flow: input.planLoggingFlow || "generate",
       unitId: input.unitId,
@@ -3583,11 +3940,53 @@ export class AdminUnitAiContentUseCases {
       topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
       curriculumInstruction: input.lessonGenerationInstruction,
       extraInstructions: [input.extraInstructions, planContext.chapterContextInstruction, planContext.reviewInstruction].filter(Boolean).join("\n"),
-      existingUnitTitles: (await this.units.listByLanguage(input.language)).map((item) => item.title).filter(Boolean),
-      existingLessonTitles: planContext.existingLessonsInUnit.map((item) => item.title).filter(Boolean),
-      existingPhraseTexts: planContext.existingUnitExpressions.map((item) => item.text).filter(Boolean),
-      existingProverbTexts: planContext.existingUnitProverbs.map((item) => item.text).filter(Boolean),
-      existingLessonsSummary: buildExistingLessonSummary(planContext.existingLessonsInUnit)
+      existingUnitTitles: (await this.units.listByLanguage(input.language, planContext.unit.languageId || undefined))
+        .map((item) => item.title)
+        .filter(Boolean),
+      existingLessonTitles: planMemory.existingLessonTitles,
+      existingPhraseTexts: planMemory.existingPhraseTexts,
+      existingProverbTexts: planMemory.existingProverbTexts,
+      existingLessonsSummary: planMemory.existingLessonsSummary
+    });
+    const lessonSequence = buildAutoInsertedReviewLessonSequence(coreLessons, {
+      autoInsertReviewLessons: planContext.unit.kind !== "review"
+    });
+
+    return {
+      unitId: input.unitId,
+      requestedLessons: input.lessonCount,
+      actualLessonCount: lessonSequence.length,
+      coreLessons,
+      lessonSequence
+    };
+  }
+
+  async previewRegeneratePlan(input: GenerateUnitAiContentInput): Promise<PreviewGenerateUnitPlanResult> {
+    const planContext = await this.loadUnitPlanContext({ unitId: input.unitId });
+    const planMemory = this.buildPlanMemoryInputs(planContext);
+    const coreLessons = await this.getValidatedUnitPlan({
+      flow: "regenerate",
+      unitId: input.unitId,
+      language: input.language,
+      level: input.level,
+      lessonCount: input.lessonCount,
+      unitTitle: planContext.unit.title,
+      unitDescription: planContext.unit.description,
+      topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
+      curriculumInstruction: this.buildRegeneratePlanningInstruction({
+        existingLessonsSummary: planMemory.existingLessonsSummary,
+        lessonGenerationInstruction: input.lessonGenerationInstruction
+      }),
+      extraInstructions: [input.extraInstructions, planContext.chapterContextInstruction, planContext.reviewInstruction]
+        .filter(Boolean)
+        .join("\n"),
+      existingUnitTitles: (await this.units.listByLanguage(input.language, planContext.unit.languageId || undefined))
+        .map((item) => item.title)
+        .filter(Boolean),
+      existingLessonTitles: planMemory.existingLessonTitles,
+      existingPhraseTexts: planMemory.existingPhraseTexts,
+      existingProverbTexts: planMemory.existingProverbTexts,
+      existingLessonsSummary: planMemory.existingLessonsSummary
     });
     const lessonSequence = buildAutoInsertedReviewLessonSequence(coreLessons, {
       autoInsertReviewLessons: planContext.unit.kind !== "review"
@@ -3626,6 +4025,52 @@ export class AdminUnitAiContentUseCases {
       existingLessonsInUnit: planContext.existingLessonsInUnit,
       existingUnitExpressions: planContext.existingUnitExpressions
     });
+  }
+
+  async regenerateFromApprovedPlan(input: GenerateUnitAiContentInput & { planLessons: LlmUnitPlanLesson[] }) {
+    const planContext = await this.loadUnitPlanContext({ unitId: input.unitId });
+    const planMemory = this.buildPlanMemoryInputs(planContext);
+    const normalizedPlanLessons = this.validateApprovedUnitPlan({
+      language: input.language,
+      level: input.level,
+      lessonCount: input.lessonCount,
+      unitTitle: planContext.unit.title,
+      unitDescription: planContext.unit.description,
+      topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
+      curriculumInstruction: this.buildRegeneratePlanningInstruction({
+        existingLessonsSummary: planMemory.existingLessonsSummary,
+        lessonGenerationInstruction: input.lessonGenerationInstruction
+      }),
+      planLessons: input.planLessons
+    });
+
+    const clearedLessons = await this.clearUnitLessonsForRegeneration({
+      unitId: input.unitId,
+      lessonsInUnit: planContext.existingLessonsInUnit
+    });
+
+    const result = await this.executeGenerateFromPlan({
+      generateInput: {
+        ...input,
+        planLoggingFlow: "regenerate",
+        extraInstructions: [input.extraInstructions, planContext.chapterContextInstruction].filter(Boolean).join("\n") || undefined
+      },
+      unitKind: planContext.unit.kind,
+      planLessons: normalizedPlanLessons,
+      reviewContext: planContext.reviewContext,
+      existingLessonsInUnit: [],
+      existingUnitExpressions: [],
+      runMode: "regenerate",
+      updatedLessons: 0,
+      clearedLessons
+    });
+
+    return {
+      ...result,
+      revisionMode: "regenerate" as const,
+      updatedLessons: 0,
+      clearedLessons
+    };
   }
 
   async refactorLesson(input: {
@@ -3669,8 +4114,14 @@ export class AdminUnitAiContentUseCases {
     const patch = (Array.isArray(refactorPlan.lessonPatches) ? refactorPlan.lessonPatches : []).find(
       (item) => item.lessonId === lesson.id
     );
-    const expressionLanguagePool = await this.expressions.list({ language: lesson.language });
-    const wordLanguagePool = await this.words.list({ language: lesson.language });
+    const expressionLanguagePool = await this.expressions.list({
+      language: lesson.language,
+      languageId: lesson.languageId || null
+    });
+    const wordLanguagePool = await this.words.list({
+      language: lesson.language,
+      languageId: lesson.languageId || null
+    });
     const summary = patch && Array.isArray(patch.operations) && patch.operations.length > 0
       ? await this.lessonRefactors.applyPatchPlan({
           lesson,
@@ -3878,6 +4329,12 @@ export class AdminUnitAiContentUseCases {
             errors: []
           };
     const createdLessonById = new Map(createdResult.created.map((item) => [item.lesson.id, item.lesson] as const));
+    const questionSelectionState = createLessonQuestionSelectionState({
+      lessons: createdResult.created.map((item) => ({
+        lessonKey: item.lesson.id,
+        lessonMode: item.plan.lessonMode || (item.lesson.kind === "review" ? "review" : "core")
+      }))
+    });
 
     for (const item of createdResult.created) {
       try {
@@ -3897,6 +4354,7 @@ export class AdminUnitAiContentUseCases {
         const summary = await this.populateGeneratedLessonFromPlan({
           lesson: item.lesson,
           plan: item.plan,
+          lessonMode: item.plan.lessonMode,
           unitKind: unit.kind,
           sentencesPerLesson: input.sentencesPerLesson,
           reviewContentPerLesson: input.reviewContentPerLesson,
@@ -3914,7 +4372,8 @@ export class AdminUnitAiContentUseCases {
           repetitionPool,
           wordLanguagePool,
           wordRepetitionPool,
-          reviewContext: perLessonReviewContext
+          reviewContext: perLessonReviewContext,
+          questionSelectionState
         });
         lessonSummaries.push(summary);
         expressionLanguagePool = await this.expressions.list({ language: input.language });

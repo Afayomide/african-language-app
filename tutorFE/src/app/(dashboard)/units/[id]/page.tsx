@@ -329,7 +329,12 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
 
   function handleGenerateContentDialogChange(open: boolean) {
     setIsGenerateContentDialogOpen(open);
-    if (!open) {
+    resetContentPlanEditor();
+  }
+
+  function handleReviseDialogChange(open: boolean) {
+    setIsReviseDialogOpen(open);
+    if (!open || revisionMode === "regenerate") {
       resetContentPlanEditor();
     }
   }
@@ -374,7 +379,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     return true;
   }
 
-  async function handlePreviewUnitContentPlan() {
+  async function handlePreviewUnitContentPlan(mode: "generate" | "regenerate" = "generate") {
     if (!validateUnitContentSettings()) {
       return;
     }
@@ -382,6 +387,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     try {
       setIsPreviewingContentPlan(true);
       const result = await aiService.previewUnitContentPlan(id, {
+        mode,
         lessonCount: contentLessonCount,
         newTargetsPerLesson: contentNewTargetsPerLesson,
         reviewContentPerLesson: contentReviewContentPerLesson,
@@ -397,19 +403,23 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         coreLessons: normalizedLessons,
         lessonSequence: buildAutoReviewPlanSequence(normalizedLessons, { autoInsertReviewLessons })
       });
-      toast.success(`AI plan ready. Review ${normalizedLessons.length} core lessons before generating.`);
+      toast.success(
+        mode === "regenerate"
+          ? `AI regeneration plan ready. Review ${normalizedLessons.length} core lessons before regenerating.`
+          : `AI plan ready. Review ${normalizedLessons.length} core lessons before generating.`
+      );
     } catch (error) {
       const message =
         (error as ApiError)?.response?.data?.error ||
         (error as ApiError)?.response?.data?.message ||
-        "Failed to preview the AI lesson plan.";
+        (mode === "regenerate" ? "Failed to preview the AI regeneration plan." : "Failed to preview the AI lesson plan.");
       toast.error(message);
     } finally {
       setIsPreviewingContentPlan(false);
     }
   }
 
-  async function handleGenerateUnitContent() {
+  async function handleApplyPlannedUnitContent(mode: "generate" | "regenerate" = "generate") {
     if (!validateUnitContentSettings()) {
       return;
     }
@@ -422,8 +432,13 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     }
 
     try {
-      setIsGeneratingContent(true);
+      if (mode === "generate") {
+        setIsGeneratingContent(true);
+      } else {
+        setIsRevisingContent(true);
+      }
       const result = await aiService.applyUnitContentPlan(id, {
+        mode,
         lessonCount: contentLessonCount,
         newTargetsPerLesson: contentNewTargetsPerLesson,
         reviewContentPerLesson: contentReviewContentPerLesson,
@@ -432,21 +447,42 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         extraInstructions: contentExtraInstructions.trim() || undefined,
         planLessons: editablePlanLessons.map((lesson) => normalizeEditablePlanLesson(lesson))
       });
-      toast.success(
-        `Generated content for ${result.createdLessons} lessons (${result.contentErrors.length} content errors).`
-      );
-      setLastAiRun({
-        mode: "generate",
-        createdBy: tutor?.id || "",
-        createdAt: new Date().toISOString(),
-        requestedLessons: result.requestedLessons,
-        createdLessons: result.createdLessons,
-        skippedLessons: result.skippedLessons,
-        lessonGenerationErrors: result.lessonGenerationErrors,
-        contentErrors: result.contentErrors,
-        lessons: result.lessons
-      });
-      handleGenerateContentDialogChange(false);
+      if (mode === "generate") {
+        toast.success(
+          `Generated content for ${result.createdLessons} lessons (${result.contentErrors.length} content errors).`
+        );
+        setLastAiRun({
+          mode: "generate",
+          createdBy: tutor?.id || "",
+          createdAt: new Date().toISOString(),
+          requestedLessons: result.requestedLessons,
+          createdLessons: result.createdLessons,
+          skippedLessons: result.skippedLessons,
+          lessonGenerationErrors: result.lessonGenerationErrors,
+          contentErrors: result.contentErrors,
+          lessons: result.lessons
+        });
+        handleGenerateContentDialogChange(false);
+      } else {
+        const revisedResult = "revisionMode" in result ? result : null;
+        toast.success(
+          `Regenerated unit content for ${result.createdLessons} lessons after clearing ${revisedResult?.clearedLessons || 0} existing lessons.`
+        );
+        setLastAiRun({
+          mode: "regenerate",
+          createdBy: tutor?.id || "",
+          createdAt: new Date().toISOString(),
+          requestedLessons: result.requestedLessons,
+          createdLessons: result.createdLessons,
+          updatedLessons: revisedResult?.updatedLessons || 0,
+          clearedLessons: revisedResult?.clearedLessons || 0,
+          skippedLessons: result.skippedLessons,
+          lessonGenerationErrors: result.lessonGenerationErrors,
+          contentErrors: result.contentErrors,
+          lessons: result.lessons
+        });
+        handleReviseDialogChange(false);
+      }
       const refreshed = await lessonService.listLessonsPage({
         unitId: id,
         page: 1,
@@ -460,15 +496,23 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       const message =
         (error as ApiError)?.response?.data?.error ||
         (error as ApiError)?.response?.data?.message ||
-        "Failed to generate full unit content.";
+        (mode === "regenerate" ? "Failed to regenerate unit content from the approved plan." : "Failed to generate full unit content.");
       toast.error(message);
     } finally {
-      setIsGeneratingContent(false);
+      if (mode === "generate") {
+        setIsGeneratingContent(false);
+      } else {
+        setIsRevisingContent(false);
+      }
     }
   }
 
   async function handleReviseUnitContent() {
     if (!validateUnitContentSettings()) {
+      return;
+    }
+    if (revisionMode === "regenerate") {
+      await handleApplyPlannedUnitContent("regenerate");
       return;
     }
 
@@ -501,7 +545,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         contentErrors: result.contentErrors,
         lessons: result.lessons
       });
-      setIsReviseDialogOpen(false);
+      handleReviseDialogChange(false);
       const refreshed = await lessonService.listLessonsPage({
         unitId: id,
         page: 1,
@@ -582,7 +626,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             <Sparkles className="mr-2 h-5 w-5 text-purple-600" />
             Bulk Generate Lessons
           </Button>
-          <Button type="button" variant="outline" onClick={() => setIsGenerateContentDialogOpen(true)} className="h-11 rounded-xl border-2 font-bold hover:bg-emerald-50 hover:text-emerald-600 transition-all">
+          <Button type="button" variant="outline" onClick={() => handleGenerateContentDialogChange(true)} className="h-11 rounded-xl border-2 font-bold hover:bg-emerald-50 hover:text-emerald-600 transition-all">
             <Sparkles className="mr-2 h-5 w-5 text-emerald-600" />
             Generate Full Unit
           </Button>
@@ -590,8 +634,9 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             type="button"
             variant="outline"
             onClick={() => {
+              resetContentPlanEditor();
               setRevisionMode("refactor");
-              setIsReviseDialogOpen(true);
+              handleReviseDialogChange(true);
             }}
             className="h-11 rounded-xl border-2 font-bold hover:bg-sky-50 hover:text-sky-600 transition-all"
           >
@@ -602,8 +647,9 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             type="button"
             variant="outline"
             onClick={() => {
+              resetContentPlanEditor();
               setRevisionMode("regenerate");
-              setIsReviseDialogOpen(true);
+              handleReviseDialogChange(true);
             }}
             className="h-11 rounded-xl border-2 font-bold hover:bg-rose-50 hover:text-rose-600 transition-all"
           >
@@ -1167,18 +1213,18 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             <Button type="button" variant="outline" onClick={() => handleGenerateContentDialogChange(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="outline" onClick={handlePreviewUnitContentPlan} disabled={isPreviewingContentPlan || isGeneratingContent}>
+            <Button type="button" variant="outline" onClick={() => handlePreviewUnitContentPlan("generate")} disabled={isPreviewingContentPlan || isGeneratingContent}>
               {isPreviewingContentPlan ? "Previewing..." : contentPlanPreview ? "Regenerate AI Plan" : "Preview AI Plan"}
             </Button>
-            <Button type="button" onClick={handleGenerateUnitContent} disabled={isGeneratingContent || isPreviewingContentPlan || !contentPlanPreview}>
+            <Button type="button" onClick={() => handleApplyPlannedUnitContent("generate")} disabled={isGeneratingContent || isPreviewingContentPlan || !contentPlanPreview}>
               {isGeneratingContent ? "Generating..." : "Generate From Edited Plan"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isReviseDialogOpen} onOpenChange={setIsReviseDialogOpen}>
-        <DialogContent>
+      <Dialog open={isReviseDialogOpen} onOpenChange={handleReviseDialogChange}>
+        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>{revisionMode === "refactor" ? "Targeted Refactor with AI" : "Regenerate Unit with AI"}</DialogTitle>
             <DialogDescription>
@@ -1187,23 +1233,35 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                 : "AI will clear the current unit lessons and generate a fresh version of this unit from scratch."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto py-2 pr-2">
             <div className="grid grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="revise-lesson-count">Lesson count</Label>
-                <Input id="revise-lesson-count" type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => setContentLessonCount(Number(event.target.value || 0))} />
+                <Input id="revise-lesson-count" type="number" min={1} max={20} value={contentLessonCount} onChange={(event) => {
+                  setContentLessonCount(Number(event.target.value || 0));
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="revise-target-content-per-lesson">New Targets / Lesson</Label>
-                <Input id="revise-sentences-per-lesson" type="number" min={1} max={2} value={contentNewTargetsPerLesson} onChange={(event) => setContentNewTargetsPerLesson(Number(event.target.value || 0))} />
+                <Input id="revise-sentences-per-lesson" type="number" min={1} max={2} value={contentNewTargetsPerLesson} onChange={(event) => {
+                  setContentNewTargetsPerLesson(Number(event.target.value || 0));
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="revise-review-content-per-lesson">Review Items / Lesson</Label>
-                <Input id="revise-review-content-per-lesson" type="number" min={0} max={4} value={contentReviewContentPerLesson} onChange={(event) => setContentReviewContentPerLesson(Number(event.target.value || 0))} />
+                <Input id="revise-review-content-per-lesson" type="number" min={0} max={4} value={contentReviewContentPerLesson} onChange={(event) => {
+                  setContentReviewContentPerLesson(Number(event.target.value || 0));
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="revise-proverbs-per-lesson">Proverbs / lesson</Label>
-                <Input id="revise-proverbs-per-lesson" type="number" min={0} max={10} value={contentProverbsPerLesson} onChange={(event) => setContentProverbsPerLesson(Number(event.target.value || 0))} />
+                <Input id="revise-proverbs-per-lesson" type="number" min={0} max={10} value={contentProverbsPerLesson} onChange={(event) => {
+                  setContentProverbsPerLesson(Number(event.target.value || 0));
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }} />
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -1211,7 +1269,10 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             </p>
             <div className="space-y-2">
               <Label htmlFor="revise-topic">Topic focus</Label>
-              <Input id="revise-topic" value={contentTopic} onChange={(event) => setContentTopic(event.target.value)} placeholder="Optional focus for this revision" />
+              <Input id="revise-topic" value={contentTopic} onChange={(event) => {
+                setContentTopic(event.target.value);
+                if (revisionMode === "regenerate") resetContentPlanEditor();
+              }} placeholder="Optional focus for this revision" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="revise-extra-instructions">Extra instructions</Label>
@@ -1219,18 +1280,145 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                 id="revise-extra-instructions"
                 rows={5}
                 value={contentExtraInstructions}
-                onChange={(event) => setContentExtraInstructions(event.target.value)}
+                onChange={(event) => {
+                  setContentExtraInstructions(event.target.value);
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }}
                 placeholder={revisionMode === "refactor" ? "Examples: replace Ku osan with E kaasan, move the listening block to Stage 3, add a short helper text after Stage 1." : "Tell AI what to change in the regenerated unit."}
               />
             </div>
+            {revisionMode === "regenerate" ? (
+              contentPlanPreview ? (
+                <div className="grid gap-4 border rounded-xl p-4 bg-muted/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Editable regeneration plan</p>
+                      <p className="text-sm text-muted-foreground">
+                        {autoInsertReviewLessons
+                          ? `${contentPlanPreview.requestedLessons} core lessons planned, ${displayedPlanSequence.length} actual lessons after automatic review insertion.`
+                          : `${contentPlanPreview.requestedLessons} review-unit lessons planned with no extra auto-inserted review lessons.`}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{displayedPlanSequence.length} lesson slots</Badge>
+                  </div>
+                  <div className="grid gap-3">
+                    {editablePlanLessons.map((lesson, index) => (
+                      <div key={`revise-plan-lesson-${index}`} className="grid gap-3 rounded-lg border bg-background p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="font-semibold text-foreground">Core Lesson {index + 1}</h3>
+                          <Badge variant="outline">Editable</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Title</Label>
+                          <Input
+                            value={lesson.title}
+                            onChange={(event) => updateEditablePlanLesson(index, { title: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            rows={2}
+                            value={lesson.description || ""}
+                            onChange={(event) => updateEditablePlanLesson(index, { description: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Focus Summary</Label>
+                          <Textarea
+                            rows={2}
+                            value={lesson.focusSummary || ""}
+                            onChange={(event) => updateEditablePlanLesson(index, { focusSummary: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Objectives</Label>
+                          <Textarea
+                            rows={3}
+                            value={joinPlanLines(lesson.objectives)}
+                            onChange={(event) => updateEditablePlanLesson(index, { objectives: normalizePlanLines(event.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Conversation Goal</Label>
+                          <Textarea
+                            rows={2}
+                            value={lesson.conversationGoal}
+                            onChange={(event) => updateEditablePlanLesson(index, { conversationGoal: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Situations</Label>
+                          <Textarea
+                            rows={3}
+                            value={joinPlanLines(lesson.situations)}
+                            onChange={(event) => updateEditablePlanLesson(index, { situations: normalizePlanLines(event.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sentence Goals</Label>
+                          <Textarea
+                            rows={3}
+                            value={joinPlanLines(lesson.sentenceGoals)}
+                            onChange={(event) => updateEditablePlanLesson(index, { sentenceGoals: normalizePlanLines(event.target.value) })}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Actual lesson sequence</p>
+                      <p className="text-sm text-muted-foreground">
+                        {autoInsertReviewLessons
+                          ? "Review lessons are backend-generated and read-only here."
+                          : "Review units do not auto-insert extra review lessons inside the unit."}
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      {displayedPlanSequence.map((lesson, index) => (
+                        <div key={`revise-lesson-sequence-${index}`} className="flex items-start justify-between gap-3 rounded-lg border bg-background px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground">
+                              {index + 1}. {lesson.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {lesson.description || "No description"}
+                            </p>
+                          </div>
+                          <Badge variant={lesson.lessonMode === "review" ? "secondary" : "outline"}>
+                            {lesson.lessonMode}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                  Preview the AI lesson plan first. Regeneration will only clear the unit after you approve the edited plan.
+                </div>
+              )
+            ) : null}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsReviseDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleReviseDialogChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleReviseUnitContent} disabled={isRevisingContent}>
-              {isRevisingContent ? "Running..." : revisionMode === "refactor" ? "Refactor Unit" : "Regenerate Unit"}
-            </Button>
+            {revisionMode === "regenerate" ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => handlePreviewUnitContentPlan("regenerate")} disabled={isPreviewingContentPlan || isRevisingContent}>
+                  {isPreviewingContentPlan ? "Previewing..." : contentPlanPreview ? "Regenerate AI Plan" : "Preview AI Plan"}
+                </Button>
+                <Button onClick={handleReviseUnitContent} disabled={isRevisingContent || isPreviewingContentPlan || !contentPlanPreview}>
+                  {isRevisingContent ? "Running..." : "Regenerate From Edited Plan"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleReviseUnitContent} disabled={isRevisingContent}>
+                {isRevisingContent ? "Running..." : "Refactor Unit"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

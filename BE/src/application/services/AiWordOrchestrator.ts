@@ -55,7 +55,10 @@ export class AiWordOrchestrator {
     }
 
     const existingLessonWords = input.existingLessonWords || [];
-    const allLanguageWords = await this.words.list({ language: input.lesson.language });
+    const allLanguageWords = await this.words.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const existingLessonKeys = new Set(existingLessonWords.map((item) => normalizeText(item.text)));
     const wordByText = new Map<string, WordEntity>();
     for (const word of allLanguageWords) {

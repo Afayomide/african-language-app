@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-on-surface": "#9f9d97",
+              "on-background": "#39382f",
+              "error-container": "#fa7150",
+              "outline-variant": "#bcb9ad",
+              "primary-fixed-dim": "#ff9a65",
+              "surface-container-highest": "#ece8db",
+              "error-dim": "#821a01",
+              "on-secondary": "#ffffff",
+              "primary-fixed": "#ffae86",
+              "tertiary-fixed": "#b9eeab",
+              "secondary-dim": "#765100",
+              "surface-tint": "#a94600",
+              "on-tertiary": "#ffffff",
+              "on-primary-container": "#692900",
+              "secondary-fixed-dim": "#ffcc79",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#f7f3ea",
+              "on-tertiary-container": "#2d5a27",
+              "on-tertiary-fixed-variant": "#376430",
+              "secondary-fixed": "#ffdeac",
+              "on-tertiary-fixed": "#1a4716",
+              "on-error": "#ffffff",
+              "inverse-surface": "#0f0e0b",
+              "tertiary-fixed-dim": "#abdf9e",
+              "background": "#fffbff",
+              "surface-dim": "#e6e3d3",
+              "outline": "#838175",
+              "tertiary-container": "#b9eeab",
+              "surface-container-low": "#fdf9f1",
+              "on-secondary-fixed": "#563a00",
+              "on-error-container": "#671200",
+              "inverse-primary": "#fd8542",
+              "on-primary-fixed-variant": "#772f00",
+              "on-secondary-fixed-variant": "#7a5400",
+              "on-surface-variant": "#66655a",
+              "on-secondary-container": "#6e4b00",
+              "on-primary": "#ffffff",
+              "secondary-container": "#ffdeac",
+              "surface-bright": "#fffbff",
+              "surface-container-high": "#f1eee2",
+              "on-surface": "#39382f",
+              "surface-variant": "#ece8db",
+              "tertiary-dim": "#35632e",
+              "tertiary": "#416f39",
+              "secondary": "#865d00",
+              "primary": "#a94600",
+              "error": "#b23d21",
+              "surface": "#fffbff",
+              "primary-container": "#ffae86",
+              "primary-dim": "#953d00",
+              "on-primary-fixed": "#481a00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-stone-50/80 dark:bg-stone-950/80 backdrop-blur-xl">
+<div class="flex items-center justify-between px-6 py-4 w-full">
+<div class="active:translate-y-0.5 transition-transform duration-150 hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-stone-500 dark:text-stone-400">close</span>
+</div>
+<div class="flex flex-col items-center flex-1 mx-4">
+<div class="bg-stone-200 dark:bg-stone-800 h-1.5 w-full overflow-hidden rounded-full mb-1">
+<div class="bg-orange-700 dark:bg-orange-500 h-full w-[65%] rounded-full"></div>
+</div>
+</div>
+<div class="active:translate-y-0.5 transition-transform duration-150 hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-orange-700 dark:text-orange-500">history_edu</span>
+</div>
+</div>
+<div class="px-6 pb-2">
+<h1 class="font-headline font-extrabold tracking-tight text-lg text-orange-800 dark:text-orange-200 uppercase">Match the Pairs</h1>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 mt-32 mb-24 px-6 overflow-hidden flex flex-col">
+<!-- Word Focus Context -->
+<div class="mb-6 flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-secondary-container flex items-center justify-center overflow-hidden">
+<img alt="Yoruba pattern" class="w-full h-full object-cover" data-alt="Abstract close-up of traditional West African hand-woven textile with earthy terracotta and gold geometric patterns" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEK1UXoeRQTiPBkNFYLo-hUdbGOoWBg6BsjQE1nz7TEc-vDbtyD2tKmjeTZ-x4BkaITZfV_8Cqorz5iDKHZYYMJtQPB_34t4jG1Sm6BFcpueGrL0PA7CBwMhVONz5tka2boBpKSzUZeSMNhz7saqPIeUld6g0eLEepJYHk3iNLtKNLo9sJcu0q_-BgWnNFrP_VlJpKGvpRKUojXYcS8KBsHIKR-49Zfbz3ABC5vTKXBHVpD5toeRCElcQIeflF28hEZQzXPyayVEEW"/>
+</div>
+<div>
+<span class="font-label text-[10px] font-bold tracking-widest text-primary uppercase">Lesson 04</span>
+<p class="font-headline font-bold text-on-surface leading-tight">Morning Greetings</p>
+</div>
+</div>
+<!-- Matching Grid -->
+<div class="flex-1 grid grid-cols-2 gap-x-4 gap-y-3 pb-4 h-full">
+<!-- Column 1: Yoruba -->
+<div class="flex flex-col gap-3">
+<div class="flex-1 flex items-center justify-center p-4 bg-surface-container-low rounded-xl border-2 border-transparent active:scale-95 transition-all duration-200 group hover:bg-surface-container-high">
+<p class="font-headline font-bold text-center text-on-surface">Káàárọ̀</p>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-orange-100 dark:bg-orange-900/30 rounded-xl border-2 border-orange-200 dark:border-orange-800/50 scale-105 shadow-[0_4px_12px_rgba(169,70,0,0.08)]">
+<p class="font-headline font-bold text-center text-orange-800 dark:text-orange-100">Ẹ káàárọ̀</p>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-surface-container-low rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-headline font-bold text-center text-on-surface">O tójọ́mẹ́ta</p>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-tertiary-container/30 rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-headline font-bold text-center text-tertiary-dim">Báwo ni?</p>
+<span class="material-symbols-outlined absolute top-2 right-2 text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Column 2: English -->
+<div class="flex flex-col gap-3">
+<div class="flex-1 flex items-center justify-center p-4 bg-tertiary-container/30 rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-body font-semibold text-center text-tertiary-dim">How are you?</p>
+<span class="material-symbols-outlined absolute top-2 right-2 text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-surface-container-low rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-body font-semibold text-center text-on-surface">Long time no see</p>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-surface-container-low rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-body font-semibold text-center text-on-surface">Good morning (respectful)</p>
+</div>
+<div class="flex-1 flex items-center justify-center p-4 bg-surface-container-low rounded-xl active:scale-95 transition-all duration-200">
+<p class="font-body font-semibold text-center text-on-surface">Good morning (casual)</p>
+</div>
+</div>
+</div>
+<!-- Action Area -->
+<div class="fixed bottom-24 left-0 w-full px-6 py-4 bg-gradient-to-t from-surface via-surface/90 to-transparent">
+<button class="w-full py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-bold rounded-xl shadow-lg active:translate-y-0.5 transition-all duration-150">
+                Check Answer
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-stone-50/90 dark:bg-stone-950/90 backdrop-blur-lg shadow-[0_-4px_20px_rgba(175,75,6,0.06)] rounded-t-2xl">
+<div class="flex flex-col items-center justify-center bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-100 rounded-xl px-5 py-2 scale-105 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">school</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Lessons</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:text-orange-600 dark:hover:text-orange-300 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined">mic</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Speak</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:text-orange-600 dark:hover:text-orange-300 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Match</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:text-orange-600 dark:hover:text-orange-300 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined">person</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Profile</span>
+</div>
+</nav>
+</body></html>

@@ -9,6 +9,7 @@ export type ProverbAiMeta = {
 export type ProverbEntity = {
   id: string;
   _id?: string;
+  languageId?: string | null;
   lessonIds: string[];
   language: Language;
   text: string;

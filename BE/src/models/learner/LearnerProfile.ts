@@ -11,6 +11,7 @@ const WeeklyActivitySchema = new Schema(
 const LearnerProfileSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    activeLanguageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     displayName: { type: String, default: "" },
     proficientLanguage: { type: String, default: "" },
     countryOfOrigin: { type: String, default: "" },

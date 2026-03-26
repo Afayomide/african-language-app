@@ -4,6 +4,7 @@ const ProverbSchema = new Schema(
   {
     lessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", required: true, index: true }],
     deletedLessonIds: [{ type: Schema.Types.ObjectId, ref: "Lesson", default: [] }],
+    languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     language: {
       type: String,
       enum: ["yoruba", "igbo", "hausa"],
@@ -47,6 +48,7 @@ ProverbSchema.index({ lessonIds: 1, status: 1, isDeleted: 1, createdAt: -1 });
 ProverbSchema.index({ deletedLessonIds: 1, isDeleted: 1, createdAt: -1 });
 ProverbSchema.index({ language: 1, status: 1, isDeleted: 1, createdAt: -1 });
 ProverbSchema.index({ language: 1, normalizedText: 1, isDeleted: 1 });
+ProverbSchema.index({ languageId: 1, status: 1, isDeleted: 1, createdAt: -1 });
 
 export type ProverbDocument = InferSchemaType<typeof ProverbSchema> & {
   _id: mongoose.Types.ObjectId;

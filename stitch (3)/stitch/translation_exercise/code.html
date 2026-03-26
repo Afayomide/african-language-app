@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant": "#376430",
+              "on-primary-fixed-variant": "#772f00",
+              "secondary-fixed-dim": "#ffcc79",
+              "outline": "#838175",
+              "secondary-dim": "#765100",
+              "on-error": "#ffffff",
+              "on-error-container": "#671200",
+              "inverse-surface": "#0f0e0b",
+              "on-primary-container": "#692900",
+              "surface-variant": "#ece8db",
+              "on-primary": "#ffffff",
+              "surface-dim": "#e6e3d3",
+              "outline-variant": "#bcb9ad",
+              "secondary-container": "#ffdeac",
+              "on-surface": "#39382f",
+              "inverse-primary": "#fd8542",
+              "error": "#b23d21",
+              "on-tertiary-container": "#2d5a27",
+              "surface-container-highest": "#ece8db",
+              "primary-fixed": "#ffae86",
+              "on-secondary": "#ffffff",
+              "on-primary-fixed": "#481a00",
+              "background": "#fffbff",
+              "primary-fixed-dim": "#ff9a65",
+              "tertiary-fixed": "#b9eeab",
+              "tertiary-fixed-dim": "#abdf9e",
+              "surface-container-low": "#fdf9f1",
+              "surface-bright": "#fffbff",
+              "surface": "#fffbff",
+              "tertiary": "#416f39",
+              "tertiary-container": "#b9eeab",
+              "on-secondary-fixed": "#563a00",
+              "secondary": "#865d00",
+              "primary": "#a94600",
+              "on-secondary-fixed-variant": "#7a5400",
+              "primary-dim": "#953d00",
+              "error-dim": "#821a01",
+              "surface-container": "#f7f3ea",
+              "surface-container-high": "#f1eee2",
+              "inverse-on-surface": "#9f9d97",
+              "surface-tint": "#a94600",
+              "on-secondary-container": "#6e4b00",
+              "on-background": "#39382f",
+              "surface-container-lowest": "#ffffff",
+              "secondary-fixed": "#ffdeac",
+              "primary-container": "#ffae86",
+              "error-container": "#fa7150",
+              "on-tertiary": "#ffffff",
+              "on-tertiary-fixed": "#1a4716",
+              "tertiary-dim": "#35632e",
+              "on-surface-variant": "#66655a"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        line-height: 1;
+      }
+      .glass-effect {
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+      .lesson-grid {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        height: 100vh;
+        max-height: 100vh;
+        overflow: hidden;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface lesson-grid">
+<!-- Top Navigation Shell (Fixed Implementation from JSON) -->
+<nav class="bg-orange-50/80 dark:bg-stone-900/80 backdrop-blur-xl flex items-center justify-between px-6 py-4 w-full h-16 fixed top-0 z-50 no-border bg-opacity-90 shadow-none">
+<div class="flex items-center gap-4">
+<button class="text-orange-800 dark:text-orange-200 hover:bg-orange-100/50 dark:hover:bg-stone-800/50 transition-colors p-2 rounded-full active:scale-95 duration-200 ease-in-out">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<!-- Progress Bar Integrated into Header for Scroll-free UX -->
+<div class="w-48 md:w-64 h-3 bg-surface-container-highest rounded-full overflow-hidden relative">
+<div class="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary-container w-[65%] rounded-full shadow-sm"></div>
+</div>
+</div>
+<div class="text-orange-900 dark:text-orange-100 font-extrabold tracking-tighter font-headline text-lg">
+            Yoruba
+        </div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-headline font-bold text-on-surface">12</span>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-32 px-6 flex flex-col max-w-2xl mx-auto w-full">
+<!-- Question Section -->
+<header class="mb-10 animate-fade-in">
+<div class="flex items-center gap-4 mb-2">
+<span class="font-label text-xs font-bold uppercase tracking-widest text-primary">Translation Task</span>
+<div class="h-[1px] flex-grow bg-outline-variant/20"></div>
+</div>
+<div class="flex items-start gap-4">
+<button class="bg-primary-container text-on-primary-container p-4 rounded-2xl shadow-sm hover:scale-105 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-3xl" data-icon="volume_up">volume_up</span>
+</button>
+<div class="flex flex-col">
+<h1 class="font-headline text-2xl md:text-3xl font-bold text-on-surface leading-tight">
+                        What is <span class="text-primary border-b-2 border-dashed border-primary-container">Káàárọ</span> in English?
+                    </h1>
+</div>
+</div>
+</header>
+<!-- Options Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+<!-- Option 1 -->
+<button class="group relative flex items-center p-5 bg-surface-container-low rounded-3xl transition-all duration-300 hover:bg-surface-container-high hover:-translate-y-1 active:scale-95 text-left overflow-hidden">
+<div class="flex flex-col gap-1 z-10">
+<span class="font-label text-[10px] font-black text-outline uppercase tracking-tighter mb-1">Option 1</span>
+<p class="font-headline text-lg font-bold text-on-surface leading-snug">Good morning</p>
+<p class="font-body text-sm text-on-surface-variant italic">(respectful, ma)</p>
+</div>
+<div class="absolute right-[-10%] bottom-[-20%] opacity-5 text-on-surface group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" data-icon="account_circle">account_circle</span>
+</div>
+</button>
+<!-- Option 2 (Selected State Mockup) -->
+<button class="group relative flex items-center p-5 bg-secondary-container ring-2 ring-primary rounded-3xl transition-all duration-300 shadow-[0_8px_24px_rgba(169,70,0,0.1)] -translate-y-1 text-left overflow-hidden">
+<div class="flex flex-col gap-1 z-10">
+<span class="font-label text-[10px] font-black text-primary uppercase tracking-tighter mb-1">Option 2</span>
+<p class="font-headline text-lg font-bold text-on-primary-container leading-snug">Good morning</p>
+<p class="font-body text-sm text-on-primary-container/70 italic">(casual, sir)</p>
+</div>
+<div class="absolute right-4 top-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</button>
+<!-- Option 3 -->
+<button class="group relative flex items-center p-5 bg-surface-container-low rounded-3xl transition-all duration-300 hover:bg-surface-container-high hover:-translate-y-1 active:scale-95 text-left overflow-hidden">
+<div class="flex flex-col gap-1 z-10">
+<span class="font-label text-[10px] font-black text-outline uppercase tracking-tighter mb-1">Option 3</span>
+<p class="font-headline text-lg font-bold text-on-surface leading-snug">Good afternoon</p>
+<p class="font-body text-sm text-on-surface-variant italic">(formal)</p>
+</div>
+</button>
+<!-- Option 4 -->
+<button class="group relative flex items-center p-5 bg-surface-container-low rounded-3xl transition-all duration-300 hover:bg-surface-container-high hover:-translate-y-1 active:scale-95 text-left overflow-hidden">
+<div class="flex flex-col gap-1 z-10">
+<span class="font-label text-[10px] font-black text-outline uppercase tracking-tighter mb-1">Option 4</span>
+<p class="font-headline text-lg font-bold text-on-surface leading-snug">Hello, how are you?</p>
+</div>
+</button>
+</section>
+</main>
+<!-- Bottom Action Shell (Fixed Implementation from JSON/Design System) -->
+<div class="fixed bottom-0 left-0 w-full bg-orange-50/90 dark:bg-stone-950/90 backdrop-blur-2xl px-6 pb-10 pt-6 z-50 shadow-[0_-8px_24px_rgba(175,75,6,0.06)] rounded-t-3xl">
+<div class="max-w-2xl mx-auto flex flex-col gap-4">
+<!-- Hint Section (Optional system feel) -->
+<div class="flex items-center gap-3 px-4 py-2 bg-surface-container rounded-xl">
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="lightbulb">lightbulb</span>
+<p class="text-xs font-medium text-on-surface-variant leading-tight">Hint: Yoruba greetings often change based on the time of day and seniority.</p>
+</div>
+<button class="w-full h-16 bg-gradient-to-br from-primary to-primary-dim text-on-primary rounded-2xl font-headline font-extrabold text-lg tracking-wide shadow-lg hover:shadow-primary/20 active:translate-y-0.5 transition-all duration-300 uppercase">
+                Check Answer
+            </button>
+</div>
+</div>
+<!-- Background Decoration for Premium Artifact Feel -->
+<div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+<div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]"></div>
+<div class="absolute -bottom-[5%] -right-[5%] w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px]"></div>
+<!-- Tonal Pattern Grid (Subtle) -->
+<div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#a94600 1px, transparent 1px); background-size: 40px 40px;"></div>
+</div>
+</body></html>

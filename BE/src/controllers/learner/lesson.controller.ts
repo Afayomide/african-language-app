@@ -4,6 +4,7 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { LearnerLessonUseCases } from "../../application/use-cases/learner/lesson/LearnerLessonUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
+import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerLanguageStateRepository.js";
 import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
 import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
 import { MongooseLearnerContentPerformanceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerContentPerformanceRepository.js";
@@ -25,6 +26,7 @@ const useCases = new LearnerLessonUseCases(
   new MongooseQuestionRepository(),
   new MongooseLessonProgressRepository(),
   new MongooseLearnerProfileRepository(),
+  new MongooseLearnerLanguageStateRepository(),
   new MongooseLearnerContentPerformanceRepository(),
   new MongooseLearnerQuestionMissRepository()
 );

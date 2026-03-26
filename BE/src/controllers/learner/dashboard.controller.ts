@@ -3,6 +3,8 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { LearnerDashboardUseCases } from "../../application/use-cases/learner/dashboard/LearnerDashboardUseCases.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
+import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerLanguageStateRepository.js";
 import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
 import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
@@ -11,7 +13,9 @@ import type { Language } from "../../domain/entities/Lesson.js";
 const useCases = new LearnerDashboardUseCases(
   new MongooseLessonRepository(),
   new MongooseUnitRepository(),
+  new MongooseChapterRepository(),
   new MongooseLearnerProfileRepository(),
+  new MongooseLearnerLanguageStateRepository(),
   new MongooseLessonProgressRepository()
 );
 
@@ -20,7 +24,15 @@ export async function getDashboardOverview(req: AuthRequest, res: Response) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const data = await useCases.getOverview(req.user.id);
+  const language = req.query.language;
+  if (language !== undefined && (!language || !isValidLessonLanguage(String(language)))) {
+    return res.status(400).json({ error: "invalid language" });
+  }
+
+  const data = await useCases.getOverview(
+    req.user.id,
+    language ? (String(language) as Language) : undefined
+  );
   if (!data) {
     return res.status(404).json({ error: "learner profile not found" });
   }

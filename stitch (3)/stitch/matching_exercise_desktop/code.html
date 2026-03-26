@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="yo"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,700;0,800;1,800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #fffbff;
+        }
+        .headline-font {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(255, 251, 255, 0.7);
+            backdrop-filter: blur(12px);
+        }
+        .cta-gradient {
+            background: linear-gradient(45deg, #a94600, #ffae86);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "inverse-on-surface": "#9f9d97",
+                "on-background": "#39382f",
+                "error-container": "#fa7150",
+                "outline-variant": "#bcb9ad",
+                "primary-fixed-dim": "#ff9a65",
+                "surface-container-highest": "#ece8db",
+                "error-dim": "#821a01",
+                "on-secondary": "#ffffff",
+                "primary-fixed": "#ffae86",
+                "tertiary-fixed": "#b9eeab",
+                "secondary-dim": "#765100",
+                "surface-tint": "#a94600",
+                "on-tertiary": "#ffffff",
+                "on-primary-container": "#692900",
+                "secondary-fixed-dim": "#ffcc79",
+                "surface-container-lowest": "#ffffff",
+                "surface-container": "#f7f3ea",
+                "on-tertiary-container": "#2d5a27",
+                "on-tertiary-fixed-variant": "#376430",
+                "secondary-fixed": "#ffdeac",
+                "on-tertiary-fixed": "#1a4716",
+                "on-error": "#ffffff",
+                "inverse-surface": "#0f0e0b",
+                "tertiary-fixed-dim": "#abdf9e",
+                "background": "#fffbff",
+                "surface-dim": "#e6e3d3",
+                "outline": "#838175",
+                "tertiary-container": "#b9eeab",
+                "surface-container-low": "#fdf9f1",
+                "on-secondary-fixed": "#563a00",
+                "on-error-container": "#671200",
+                "inverse-primary": "#fd8542",
+                "on-primary-fixed-variant": "#772f00",
+                "on-secondary-fixed-variant": "#7a5400",
+                "on-surface-variant": "#66655a",
+                "on-secondary-container": "#6e4b00",
+                "on-primary": "#ffffff",
+                "secondary-container": "#ffdeac",
+                "surface-bright": "#fffbff",
+                "surface-container-high": "#f1eee2",
+                "on-surface": "#39382f",
+                "surface-variant": "#ece8db",
+                "tertiary-dim": "#35632e",
+                "tertiary": "#416f39",
+                "secondary": "#865d00",
+                "primary": "#a94600",
+                "error": "#b23d21",
+                "surface": "#fffbff",
+                "primary-container": "#ffae86",
+                "primary-dim": "#953d00",
+                "on-primary-fixed": "#481a00"
+              },
+              fontFamily: {
+                "headline": ["Plus Jakarta Sans"],
+                "body": ["Manrope"],
+                "label": ["Manrope"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- SideNavBar -->
+<aside class="h-screen w-72 fixed left-0 top-0 flex flex-col bg-stone-50 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 z-50">
+<div class="flex flex-col h-full py-8">
+<div class="px-8 mb-10">
+<div class="flex items-center gap-3 mb-2">
+<img alt="Brand Logo" class="w-8 h-8" data-alt="A small stylized icon of a traditional West African terracotta pot with intricate geometric patterns" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvbSrUB3eVaSRRrz-3McFBesUSJ3AaKw8oUxJQWg_0ypWFBi27lqHY7RlM_cvq8fDoEE-CT9aJzuv2Qscp7-y0GNxka0kRmroogLToHK8bm3F5gVYzaZJSK1nk_NYRGBTTaKo7mw0TJqPCy_PHmo7kzA6m1ki10MBkr4mn9Pl7qDRGjOylAJJ_pchwH-To46BUBt2PLYP_2xvAX6viRQ8Ek5k_gT8WqqO5NxkUVWBOioTSxjk82Kct2a0SgkbS1xtdhzN4RyV8GSzy"/>
+<h1 class="text-lg font-bold text-stone-900 dark:text-stone-100 headline-font">The Modern Griot</h1>
+</div>
+<p class="font-['Manrope'] text-[10px] font-medium tracking-widest uppercase text-stone-500">Language Mastery</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 transition-transform duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Dashboard</span>
+</a>
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 transition-transform duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Lessons</span>
+</a>
+<a class="text-stone-500 dark:text-stone-400 px-6 py-4 flex items-center gap-4 hover:bg-stone-100 dark:hover:bg-stone-800 transition-transform duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined">mic</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Speaking</span>
+</a>
+<a class="bg-orange-100/50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300 border-r-4 border-orange-700 font-bold px-6 py-4 flex items-center gap-4" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">extension</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Matching</span>
+</a>
+</nav>
+<div class="px-6 mt-auto">
+<button class="w-full cta-gradient text-on-primary font-bold py-4 rounded-xl shadow-lg hover:translate-y-[-2px] active:scale-95 transition-all text-sm uppercase tracking-widest">
+                    Upgrade to Premium
+                </button>
+<div class="mt-8 pt-8 border-t border-stone-200 dark:border-stone-800">
+<a class="text-stone-500 px-2 py-3 flex items-center gap-4 hover:text-orange-700 transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Help</span>
+</a>
+<a class="text-stone-500 px-2 py-3 flex items-center gap-4 hover:text-orange-700 transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-['Manrope'] text-sm font-medium tracking-wide uppercase">Logout</span>
+</a>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<main class="ml-72 flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 bg-orange-50/80 dark:bg-stone-950/80 backdrop-blur-xl shadow-sm dark:shadow-none h-20 px-8 flex justify-between items-center">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-extrabold text-orange-900 dark:text-orange-100 italic headline-font">Yorùbá Learner</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">search</span>
+<input class="pl-10 pr-4 py-2 bg-stone-100 dark:bg-stone-800 border-none rounded-full text-sm focus:ring-2 focus:ring-orange-500 w-64 transition-all" placeholder="Search lessons..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-orange-800 dark:text-orange-500 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-orange-800 dark:text-orange-500 transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-10 w-10 rounded-full overflow-hidden border-2 border-orange-200 ml-2 cursor-pointer hover:border-orange-500 transition-colors">
+<img alt="User profile avatar" data-alt="Close-up portrait of a young person smiling softly, warm skin tones, professional photography style, soft bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB37VviFWD2-Or9sEzLUN8sJ8ClNPOySoohV-4ddUc7zYRoAt-bXRqpmFY5Iczy04HpY7AFVDVvx5Y_ULKjjDNKgEnmztw3fkdq_2wdnjRxWpHLVe2_U_O3q5gpqIcRCZ5GgXO4A7jg62BRNGEVQ5aeS2CGGT50Q3s33ziM5IroYYXIS6w0kwvdbor3fLTcSX5sVEz_RqsRB5BCMBxwK7-u-xJnxOcFVYOb06y6K2sNrSVVXlrTIrptrx-w1ZT2M7NeBVY9T14MQ6MU"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Exercise Canvas -->
+<div class="flex-1 p-12 bg-surface flex flex-col items-center justify-center max-w-6xl mx-auto w-full">
+<!-- Progress Header -->
+<div class="w-full mb-12 flex items-center justify-between">
+<div class="flex flex-col gap-1">
+<h2 class="text-3xl font-extrabold headline-font text-on-surface tracking-tight">Match the Pairs</h2>
+<p class="text-on-surface-variant font-medium">Daily Challenge: Greetings &amp; Phrases</p>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex flex-col items-end">
+<span class="text-xs font-bold text-tertiary uppercase tracking-tighter">Current Score</span>
+<span class="text-2xl font-black headline-font text-on-surface">1,240</span>
+</div>
+<div class="w-48 h-3 bg-surface-container-highest rounded-full overflow-hidden relative shadow-inner">
+<div class="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-700" style="width: 65%;"></div>
+</div>
+</div>
+</div>
+<!-- Matching Grid -->
+<div class="grid grid-cols-2 gap-12 w-full">
+<!-- Column 1: Yoruba Words -->
+<div class="flex flex-col gap-4">
+<div class="text-[10px] font-bold text-outline-variant uppercase tracking-[0.2em] mb-2 px-2">Yorùbá</div>
+<!-- Selected State Card -->
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all group scale-[1.02] border-2 border-primary shadow-lg shadow-primary/10">
+<span class="text-xl font-bold text-on-surface headline-font">Ẹ káàárọ̀</span>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+<!-- Default State Card -->
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-bold text-on-surface headline-font">O dábọ̀</span>
+<span class="material-symbols-outlined text-surface-container-highest">drag_indicator</span>
+</button>
+<!-- Error State Card (Faded) -->
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high opacity-100">
+<span class="text-xl font-bold text-on-surface headline-font">Ẹ ṣé</span>
+<span class="material-symbols-outlined text-surface-container-highest">drag_indicator</span>
+</button>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-bold text-on-surface headline-font">Báwo ni?</span>
+<span class="material-symbols-outlined text-surface-container-highest">drag_indicator</span>
+</button>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-bold text-on-surface headline-font">Pẹ̀lẹ́ o</span>
+<span class="material-symbols-outlined text-surface-container-highest">drag_indicator</span>
+</button>
+</div>
+<!-- Column 2: English Translations -->
+<div class="flex flex-col gap-4">
+<div class="text-[10px] font-bold text-outline-variant uppercase tracking-[0.2em] mb-2 px-2">English</div>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-medium text-on-surface-variant">Thank you</span>
+<span class="material-symbols-outlined text-surface-container-highest">translate</span>
+</button>
+<!-- Target Selection State -->
+<button class="bg-secondary-container p-6 rounded-2xl flex items-center justify-between transition-all scale-[1.05] shadow-xl text-on-secondary-container">
+<span class="text-xl font-bold">Good morning</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">stars</span>
+</button>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-medium text-on-surface-variant">Goodbye</span>
+<span class="material-symbols-outlined text-surface-container-highest">translate</span>
+</button>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-medium text-on-surface-variant">Sorry / Careful</span>
+<span class="material-symbols-outlined text-surface-container-highest">translate</span>
+</button>
+<button class="bg-surface-container-low p-6 rounded-2xl flex items-center justify-between transition-all hover:bg-surface-container-high hover:translate-y-[-2px]">
+<span class="text-xl font-medium text-on-surface-variant">How are you?</span>
+<span class="material-symbols-outlined text-surface-container-highest">translate</span>
+</button>
+</div>
+</div>
+<!-- Floating Action Footer (Inside Content Area) -->
+<div class="mt-16 w-full flex items-center justify-between px-2">
+<div class="flex items-center gap-4">
+<div class="flex -space-x-3">
+<div class="w-10 h-10 rounded-full border-2 border-surface bg-orange-100 flex items-center justify-center text-[10px] font-bold">JD</div>
+<div class="w-10 h-10 rounded-full border-2 border-surface bg-stone-200 flex items-center justify-center text-[10px] font-bold">AM</div>
+<div class="w-10 h-10 rounded-full border-2 border-surface bg-tertiary-container text-on-tertiary-container flex items-center justify-center text-[10px] font-bold">+4</div>
+</div>
+<p class="text-sm font-medium text-on-surface-variant">You and 5 others are practicing now</p>
+</div>
+<div class="flex gap-4">
+<button class="px-8 py-4 rounded-xl font-bold bg-surface-container-highest text-primary hover:bg-surface-container-high active:translate-y-[2px] transition-all uppercase tracking-widest text-sm">
+                        Skip Word
+                    </button>
+<button class="px-12 py-4 rounded-xl font-bold cta-gradient text-on-primary shadow-xl hover:translate-y-[-2px] active:translate-y-[2px] transition-all uppercase tracking-widest text-sm">
+                        Continue
+                    </button>
+</div>
+</div>
+</div>
+<!-- Semantic Separator -->
+<div class="bg-stone-200/50 dark:bg-stone-800/50 h-px w-full mt-auto"></div>
+<!-- Footer Info -->
+<footer class="p-6 bg-surface-container-low flex justify-between items-center">
+<div class="flex gap-8">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">timer</span>
+<span class="text-xs font-bold uppercase tracking-widest">Time: 04:22</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">history_edu</span>
+<span class="text-xs font-bold uppercase tracking-widest">Streak: 12 Days</span>
+</div>
+</div>
+<div class="flex items-center gap-4 text-xs font-medium text-outline">
+<span>© 2024 Yorùbá Learner</span>
+<span>•</span>
+<a class="hover:text-primary transition-colors" href="#">Privacy Policy</a>
+</div>
+</footer>
+</main>
+</body></html>

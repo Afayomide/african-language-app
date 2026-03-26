@@ -6,10 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
-  type ReactNode,
 } from 'react'
-import { ArrowRight, Check, Info, Mic, Quote, Turtle, Volume2, X } from 'lucide-react'
 import type {
   ExerciseQuestion,
   Language,
@@ -21,6 +18,27 @@ import type {
   StageQuestionResult,
   StageCompletionResult,
 } from './types'
+import { ExerciseBlock } from './components/studyComponents/ExerciseBlock'
+import { StageTransitionOverlay } from './components/studyComponents/StageTransitionOverlay'
+import { ContentStudyBlock, ProverbStudyBlock, TeacherNoteBlock } from './components/studyComponents/StaticStudyBlocks'
+import { StudyFooter } from './components/studyComponents/StudyFooter'
+import { StudyHeader } from './components/studyComponents/StudyHeader'
+import { cx } from './components/studyComponents/StudyUi'
+import { blobToBase64, playAudioUrl } from './components/studyComponents/studyMedia'
+import {
+  SOUNDS,
+  XP_PER_BLOCK,
+  buildMatchingFallbackItems,
+  buildStageTransitionCopy,
+  buildWordOrderDisplayOrder,
+  getChoiceSupportText,
+  getListeningHeading,
+  getListeningPromptDetail,
+  getListeningSupportText,
+  normalizeWordSequence,
+  replacePromptToken,
+  type StageTransitionCopy,
+} from './components/studyComponents/studyHelpers'
 
 type StageSlice = {
   index: number
@@ -54,11 +72,6 @@ type SpeakingTarget = {
   audioUrl?: string
 }
 
-type StageTransitionCopy = {
-  title: string
-  subtitle: string
-}
-
 type LessonPlayerProps = {
   lessonId: string
   loadFlow: (lessonId: string) => Promise<LessonFlowData>
@@ -85,411 +98,6 @@ type LessonPlayerProps = {
       }
     },
   ) => Promise<PronunciationComparisonResponse>
-}
-
-const SOUNDS = {
-  correct: '/sounds/correct.wav',
-  incorrect: '/sounds/incorrect.wav',
-  click: '/sounds/click.wav',
-  stageStart: '/sounds/stage-start.wav',
-  stageComplete: '/sounds/stage-complete.wav',
-  continue: '/sounds/continue.wav',
-} as const
-
-const XP_PER_BLOCK = 10
-
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ')
-}
-
-function Button({
-  className,
-  variant = 'default',
-  size = 'default',
-  type = 'button',
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'default' | 'ghost' | 'outline' | 'secondary'
-  size?: 'default' | 'lg' | 'icon'
-}) {
-  return (
-    <button
-      type={type}
-      className={cx(
-        'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold transition-all active:translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:pointer-events-none disabled:opacity-50',
-        variant === 'default' && 'bg-primary text-primary-foreground shadow-[0_4px_0_0_rgba(0,0,0,0.2)] hover:bg-primary/90 active:shadow-none',
-        variant === 'ghost' && 'bg-transparent text-inherit hover:bg-muted/70',
-        variant === 'outline' && 'border-2 border-border bg-background shadow-[0_4px_0_0_rgba(0,0,0,0.05)] hover:bg-muted/60 active:shadow-none',
-        variant === 'secondary' && 'bg-secondary text-secondary-foreground shadow-[0_4px_0_0_rgba(0,0,0,0.1)] hover:bg-secondary/80 active:shadow-none',
-        size === 'default' && 'h-10 rounded-xl px-4 py-2 text-sm',
-        size === 'lg' && 'h-12 rounded-2xl px-6 py-3 text-base',
-        size === 'icon' && 'h-10 w-10 rounded-full',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
-
-function getListeningHeading(subtype?: ExerciseQuestion['subtype']) {
-  switch (subtype) {
-    case 'ls-mc-select-missing-word':
-      return 'Listen and choose the missing word'
-    case 'ls-mc-select-translation':
-      return 'Listen and choose the correct meaning'
-    case 'ls-fg-gap-fill':
-      return 'Listen and fill in the blank'
-    case 'ls-fg-word-order':
-      return 'Listen and arrange the words'
-    case 'ls-dictation':
-      return 'Listen and type what you hear'
-    case 'ls-tone-recognition':
-      return 'Listen and identify the correct tone pattern'
-    default:
-      return 'Listen carefully and answer'
-  }
-}
-
-function getListeningSupportText(subtype?: ExerciseQuestion['subtype']) {
-  switch (subtype) {
-    case 'ls-mc-select-missing-word':
-      return 'Play the audio and choose the word missing from the sentence.'
-    case 'ls-mc-select-translation':
-      return 'Play the audio and pick the correct English meaning.'
-    case 'ls-fg-gap-fill':
-      return 'Play the audio and choose the best word to complete the blank.'
-    case 'ls-fg-word-order':
-      return 'Play the audio and arrange the words in the correct order.'
-    default:
-      return 'Tap play and answer based on what you hear.'
-  }
-}
-
-function getChoiceSupportText(subtype?: ExerciseQuestion['subtype']) {
-  switch (subtype) {
-    case 'mc-select-context-response':
-      return 'Choose the response that best fits the situation. Focus on respect, timing, and social context, not just literal meaning.'
-    default:
-      return ''
-  }
-}
-
-function getListeningPromptDetail(
-  subtype: ExerciseQuestion['subtype'] | undefined,
-  sentenceText: string,
-  meaningText: string,
-  renderedPrompt: string,
-) {
-  switch (subtype) {
-    case 'ls-mc-select-missing-word':
-    case 'ls-fg-gap-fill':
-      return sentenceText
-    case 'ls-fg-word-order':
-      return meaningText ? `Meaning: ${meaningText}` : renderedPrompt
-    default:
-      return ''
-  }
-}
-
-type SentenceRenderPart =
-  | { type: 'text'; text: string }
-  | { type: 'component'; text: string; component: LearningContentComponent }
-
-function buildSentenceRenderParts(text: string, components: LearningContentComponent[]): SentenceRenderPart[] {
-  const sentenceText = String(text || '')
-  if (!sentenceText.trim() || components.length === 0) {
-    return [{ type: 'text', text: sentenceText }]
-  }
-
-  const lowerSentence = sentenceText.toLocaleLowerCase()
-  const parts: SentenceRenderPart[] = []
-  let cursor = 0
-
-  for (const component of components) {
-    const componentText = String(component.text || '')
-    if (!componentText) continue
-
-    const matchIndex = lowerSentence.indexOf(componentText.toLocaleLowerCase(), cursor)
-    if (matchIndex < 0) {
-      return components.flatMap((item, index) => {
-        const rows: SentenceRenderPart[] = []
-        if (index > 0) rows.push({ type: 'text', text: ' ' })
-        rows.push({ type: 'component', text: item.text, component: item })
-        return rows
-      })
-    }
-
-    if (matchIndex > cursor) {
-      parts.push({ type: 'text', text: sentenceText.slice(cursor, matchIndex) })
-    }
-
-    parts.push({
-      type: 'component',
-      text: sentenceText.slice(matchIndex, matchIndex + componentText.length),
-      component,
-    })
-    cursor = matchIndex + componentText.length
-  }
-
-  if (cursor < sentenceText.length) {
-    parts.push({ type: 'text', text: sentenceText.slice(cursor) })
-  }
-
-  return parts.filter((part) => part.type === 'component' || part.text.length > 0)
-}
-
-function buildMatchingFallbackItems(question: ExerciseQuestion | null) {
-  const matchingPairs = Array.isArray(question?.interactionData?.matchingPairs)
-    ? question!.interactionData!.matchingPairs!
-    : []
-  if (matchingPairs.length < 2) {
-    return { leftItems: [] as QuestionMatchingDisplayItem[], rightItems: [] as QuestionMatchingDisplayItem[] }
-  }
-
-  const leftItems: QuestionMatchingDisplayItem[] = matchingPairs.map((pair) => ({
-    id: pair.pairId,
-    label: pair.contentText || pair.translation,
-    translationIndex: pair.translationIndex,
-  }))
-
-  const rightItems: QuestionMatchingDisplayItem[] =
-    question?.subtype === 'mt-match-image'
-      ? matchingPairs
-          .filter((pair) => pair.image?.url)
-          .map((pair) => ({
-            id: pair.pairId,
-            label: pair.image?.altText || pair.translation,
-            image: pair.image || null,
-          }))
-      : matchingPairs.map((pair) => ({
-          id: pair.pairId,
-          label: pair.translation,
-        }))
-
-  return { leftItems, rightItems: shuffleItems(rightItems) }
-}
-
-function SentenceGlossPanel({ component }: { component: LearningContentComponent }) {
-  const translations = component.translations.filter(Boolean)
-
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-foreground/45">{component.kind}</p>
-        <p className="mt-1 text-lg font-black text-foreground">{component.text}</p>
-        {component.pronunciation ? (
-          <p className="mt-1 text-sm font-semibold italic text-foreground/55">{component.pronunciation}</p>
-        ) : null}
-      </div>
-
-      {translations.length > 0 ? (
-        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/40 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-foreground/45">Translations</p>
-          <div className="flex flex-wrap gap-2">
-            {translations.map((translation, index) => (
-              <span
-                key={`${component.id}-${translation}-${index}`}
-                className={cx(
-                  'rounded-full px-2.5 py-1 text-sm font-bold',
-                  index === component.selectedTranslationIndex
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-white text-foreground/75',
-                )}
-              >
-                {translation}
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {component.explanation ? (
-        <p className="text-sm font-medium leading-relaxed text-foreground/70">{component.explanation}</p>
-      ) : null}
-    </div>
-  )
-}
-
-function shuffleItems<T>(items: T[]) {
-  return items
-    .map((item) => ({ item, sortKey: Math.random() }))
-    .sort((left, right) => left.sortKey - right.sortKey)
-    .map((entry) => entry.item)
-}
-
-function replacePromptToken(prompt: string, token: string, value: string) {
-  return prompt.split(token).join(value)
-}
-
-function buildStageTransitionCopy(input: {
-  mistakesCount: number
-  stageNumber: number
-  totalStages: number
-  isLastStage: boolean
-  preview?: boolean
-}): StageTransitionCopy {
-  const title = input.isLastStage
-    ? input.mistakesCount === 0
-      ? 'Lesson locked in'
-      : input.mistakesCount <= 2
-        ? 'Strong finish'
-        : 'Lesson complete'
-    : input.mistakesCount === 0
-      ? 'Clean round'
-      : input.mistakesCount <= 2
-        ? 'Nice work'
-        : 'Good recovery'
-
-  const subtitle = input.isLastStage
-    ? input.preview
-      ? 'Wrapping up preview...'
-      : `Stage ${input.stageNumber} of ${input.totalStages} complete. Finishing lesson...`
-    : `Stage ${input.stageNumber} of ${input.totalStages} complete. Next stage starts now.`
-
-  return { title, subtitle }
-}
-
-function InlineAudioButton({
-  audioUrl,
-  label,
-  className,
-}: {
-  audioUrl?: string
-  label: string
-  className?: string
-}) {
-  if (!audioUrl) return null
-
-  return (
-    <button
-      type="button"
-      className={cx(
-        'inline-flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-white/90 text-primary transition-all hover:bg-primary/10 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
-        className,
-      )}
-      onClick={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        playAudioUrl(audioUrl)
-      }}
-      aria-label={`Play audio for ${label}`}
-    >
-      <Volume2 className="h-3.5 w-3.5" />
-    </button>
-  )
-}
-
-function SentenceGlossToken({
-  component,
-  children,
-}: {
-  component: LearningContentComponent
-  children: ReactNode
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <span className="relative inline-flex items-center gap-1 align-baseline" onMouseLeave={() => setIsOpen(false)}>
-      <button
-        type="button"
-        className="inline rounded-xl border-b-2 border-primary/35 bg-primary/10 px-2 py-1 font-black text-primary transition-colors hover:border-primary hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        {children}
-      </button>
-      {isOpen ? (
-        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-border/60 bg-background p-4 shadow-xl">
-          <SentenceGlossPanel component={component} />
-        </div>
-      ) : null}
-    </span>
-  )
-}
-
-function InlineGlossToken({
-  label,
-  component,
-}: {
-  label: string
-  component: LearningContentComponent
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <span className="relative inline-flex items-center gap-2 align-baseline" onMouseLeave={() => setIsOpen(false)}>
-      <InlineAudioButton audioUrl={component.audio?.url} label={component.text} className="bg-primary/5 border-none shadow-none" />
-      <button
-        type="button"
-        className="inline rounded-xl border-b-2 border-primary/35 bg-primary/10 px-2.5 py-1.5 font-black text-primary transition-colors hover:border-primary hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        {label}
-      </button>
-      {isOpen ? (
-        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-border/60 bg-background p-4 shadow-xl">
-          <SentenceGlossPanel component={component} />
-        </div>
-      ) : null}
-    </span>
-  )
-}
-
-function SentenceContentDisplay({
-  text,
-  components,
-  audioUrl,
-}: {
-  text: string
-  components: LearningContentComponent[]
-  audioUrl?: string
-}) {
-  const parts = useMemo(() => buildSentenceRenderParts(text, components), [text, components])
-
-  return (
-    <div className="space-y-6 text-center">
-      <div className="flex items-start justify-center gap-3">
-        <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-2 shrink-0 self-start" />
-        <div className="text-4xl font-black tracking-tight text-primary leading-[1.6] sm:text-5xl">
-          {parts.map((part, index) =>
-            part.type === 'text' ? (
-              <span key={`text-${index}`} className="whitespace-pre-wrap text-primary">
-                {part.text}
-              </span>
-            ) : (
-              <SentenceGlossToken key={`component-${part.component.id}-${index}`} component={part.component}>
-                {part.text}
-              </SentenceGlossToken>
-            ),
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function playAudioUrl(url?: string, speed = 1, onEnd?: () => void) {
-  if (!url) {
-    onEnd?.()
-    return
-  }
-  const audio = new Audio(url)
-  audio.playbackRate = speed
-  if (onEnd) {
-    audio.onended = onEnd
-    audio.onerror = onEnd
-  }
-  audio.play().catch(() => onEnd?.())
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('audio_read_failed'))
-    reader.readAsDataURL(blob)
-  })
 }
 
 export function LessonPlayer({
@@ -750,6 +358,7 @@ export function LessonPlayer({
   const isVeryShortViewport = viewportHeight !== null && viewportHeight <= 740
   const isUltraShortViewport = viewportHeight !== null && viewportHeight <= 680
   const isNarrowViewport = viewportWidth !== null && viewportWidth <= 640
+  const isDesktopViewport = viewportWidth !== null && viewportWidth >= 1024
   const isExtraNarrowViewport = viewportWidth !== null && viewportWidth <= 420
   const meaningText =
     exerciseData?.reviewData?.meaning ||
@@ -766,12 +375,22 @@ export function LessonPlayer({
   const interactionWords: string[] = exerciseData?.interactionData?.words || exerciseData?.reviewData?.words || []
   const correctOrder: number[] =
     exerciseData?.interactionData?.correctOrder || exerciseData?.reviewData?.correctOrder || []
+  const wordOrderDisplayOrder = useMemo(
+    () => buildWordOrderDisplayOrder(interactionWords, `${exerciseData?._id || currentStageIndex}:${promptText}:${interactionWords.join("||")}`),
+    [exerciseData?._id, currentStageIndex, interactionWords, promptText],
+  )
   const listeningAudioUrl = isListeningQuestion ? questionSource?.audio?.url : undefined
   const questionSentenceText =
     questionSource?.kind === 'sentence' ? questionSource.text || sentenceText : sentenceText || ''
   const questionSentenceComponents =
     questionSource?.kind === 'sentence' && Array.isArray(questionSource.components) ? questionSource.components : []
   const questionSentenceAudioUrl = questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined
+  const shouldShowMeaningSentenceCard =
+    exerciseData?.subtype === 'fg-word-order' &&
+    questionSource?.kind === 'sentence' &&
+    Boolean(meaningText.trim()) &&
+    questionSentenceComponents.length > 0 &&
+    /arrange the words to mean/i.test(promptText)
   const inlineSourceComponent =
     questionSource && questionSource.kind && questionSource.kind !== 'sentence'
       ? {
@@ -879,6 +498,21 @@ export function LessonPlayer({
     }
     return selectedOption !== null || selectedWords.length > 0
   }, [isAnswered, isExerciseBlock, isMatchingQuestion, isSpeakingQuestion, matchingLeftItems, selectedMatches, selectedOption, selectedWords.length])
+
+  const canCheckSpeaking = useMemo(() => {
+    if (!isExerciseBlock || !isSpeakingQuestion || isAnswered) return false
+    return Boolean(
+      canPracticeSpeaking && recordedSpeechUrl && !isRecordingSpeech && !isComparingSpeech,
+    )
+  }, [
+    canPracticeSpeaking,
+    isAnswered,
+    isComparingSpeech,
+    isExerciseBlock,
+    isRecordingSpeech,
+    isSpeakingQuestion,
+    recordedSpeechUrl,
+  ])
 
   const playFeedbackSound = useCallback(
     (type: 'correct' | 'incorrect') => {
@@ -1074,7 +708,16 @@ export function LessonPlayer({
         matchingLeftItems.every((item) => selectedMatches[item.id] === item.id) &&
         Object.keys(selectedMatches).length === matchingLeftItems.length
     } else if (isWordOrderQuestion) {
-      correct = selectedWords.join(',') === correctOrder.join(',')
+      const selectedSequence = selectedWords.map((index) => interactionWords[index] || '')
+      if (exerciseData?.subtype === 'fg-letter-order') {
+        correct = selectedSequence.join('') === questionSentenceText
+      } else {
+        const expectedWordOrderText = /build the english meaning of this sentence/i.test(promptText)
+          ? meaningText
+          : questionSentenceText
+        correct =
+          normalizeWordSequence(selectedSequence.join(' ')) === normalizeWordSequence(expectedWordOrderText)
+      }
     } else {
       correct = selectedOption === exerciseData.correctIndex
     }
@@ -1227,80 +870,33 @@ export function LessonPlayer({
   }
 
   return (
-    <main className="relative flex h-[100svh] select-none flex-col overflow-hidden bg-background">
+    <main className="relative flex min-h-[100svh] select-none flex-col overflow-x-hidden bg-[#fffbff]">
       <div
         className={cx(
-          'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(248,196,113,0.14),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(239,162,129,0.1),transparent_50%)]',
+          'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,213,171,0.2),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0),rgba(253,249,241,0.78))]',
           isStageComplete && 'opacity-0',
         )}
       />
 
-      <header
-        className={cx(
-          'sticky top-0 z-50 shrink-0 border-b border-border/40 bg-background/95 px-4 backdrop-blur',
-          isStageComplete && 'pointer-events-none opacity-0',
-          isShortViewport && 'px-3',
-        )}
-      >
-          <div
-            className={cx(
-              'mx-auto flex w-full max-w-5xl items-center gap-6',
-              isUltraShortViewport ? 'h-14 gap-2' : isShortViewport ? 'h-16 gap-3' : 'h-24',
-            )}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onExit}
-              className={cx(
-
-                'rounded-full text-foreground/40 hover:bg-muted/80 hover:text-foreground transition-all text-primary',
-                isUltraShortViewport ? 'h-8 w-8' : isShortViewport && 'h-9 w-9',
-              )}
-              aria-label={preview ? 'Exit preview' : 'Exit lesson'}
-            >
-              <X className={cx(isUltraShortViewport ? 'h-5 w-5' : isShortViewport ? 'h-6 w-6' : 'h-8 w-8')} />
-            </Button>
-
-            <div className="flex-1 space-y-2">
-              {/* <div
-                className={cx(
-                  'flex items-center justify-between font-black uppercase tracking-widest text-foreground/40',
-                  isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs',
-                )}
-              >
-                <span>
-                  {lesson?.title || 'Lesson'} • Stage {currentStageIndex + 1} of {Math.max(stageMeta.length, 1)}
-                </span>
-                {!isVeryShortViewport ? <span>{isStageComplete ? 'Stage complete' : stageBlockPositionLabel}</span> : null}
-              </div> */}
-              <div className={cx('relative overflow-hidden rounded-full bg-muted', isUltraShortViewport ? 'h-2.5' : isShortViewport ? 'h-3' : 'h-4')}>
-                <div className="h-full rounded-full bg-primary transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/20 via-transparent to-white/10" />
-              </div>
-            </div>
-
-          {!isUltraShortViewport ? (
-            <div
-              className={cx(
-                'rounded-full border border-primary/30 bg-primary/10 font-black text-primary',
-                isShortViewport ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1 text-xs',
-              )}
-            >
-              {xpEarned} XP
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <StudyHeader
+        onExit={onExit}
+        preview={preview}
+        progress={progress}
+        xpEarned={xpEarned}
+        isStageComplete={isStageComplete}
+        isShortViewport={isShortViewport}
+        isUltraShortViewport={isUltraShortViewport}
+        immersiveExerciseChrome={Boolean(isExerciseBlock && exerciseData && !isStageIntro)}
+      />
 
       <div
         className={cx(
-          'relative z-10 flex-1 overflow-y-auto px-4 sm:px-6',
+          'relative z-10 flex-1 overflow-y-visible px-4 sm:px-6',
           isStageComplete && 'pointer-events-none opacity-0',
-          isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-26 pt-3' : 'pb-32 pt-6',
+          isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-28 pt-3' : 'pb-32 pt-6',
         )}
       >
-        <div className={cx('mx-auto flex h-full w-full flex-col', isMatchingQuestion ? 'max-w-4xl' : 'max-w-2xl')}>
+        <div className={cx('mx-auto flex w-full flex-col', isMatchingQuestion ? 'max-w-[70rem]' : isSpeakingQuestion ? 'max-w-5xl' : 'max-w-4xl')}>
           {isStageIntro ? (
             <section className="hidden">
               <div className="w-full rounded-[2rem] border border-primary/15 bg-white/95 p-8 text-center shadow-sm sm:p-10">
@@ -1332,576 +928,128 @@ export function LessonPlayer({
           ) : (
             <>
               {currentBlock.type === 'text' ? (
-                <section className={cx('animate-in fade-in zoom-in-95 duration-500', isUltraShortViewport ? 'space-y-3 py-2' : isShortViewport ? 'space-y-4 py-3' : 'space-y-6 py-4')}>
-                  <div className={cx('rounded-3xl border border-blue-100 bg-orange-50/50 shadow-sm', isUltraShortViewport ? 'p-3.5' : isShortViewport ? 'p-4' : 'p-6')}>
-                    <div className={cx('flex items-center gap-3', isUltraShortViewport ? 'mb-3' : 'mb-5')}>
-                      <div className={cx('flex items-center justify-center rounded-2xl bg-blue-500 text-primary', isUltraShortViewport ? 'h-10 w-10' : 'h-12 w-12')}>
-                        <Info className={cx(isUltraShortViewport ? 'h-5 w-5' : 'h-6 w-6')} />
-                      </div>
-                      <div>
-                        <h2 className={cx('font-black text-foreground', isUltraShortViewport ? 'text-lg' : isShortViewport ? 'text-xl' : 'text-2xl')}>Teacher&apos;s Note</h2>
-                        {!isUltraShortViewport ? <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/45">Context</p> : null}
-                      </div>
-                    </div>
-                    <p
-                      className={cx(
-                        'rounded-2xl bg-blue-50 font-medium leading-relaxed text-foreground/85',
-                        isUltraShortViewport ? 'p-3 text-sm' : isShortViewport ? 'p-4 text-base' : 'p-6 text-lg',
-                      )}
-                    >
-                      {currentBlock.content}
-                    </p>
-                  </div>
-                </section>
+                <TeacherNoteBlock
+                  content={currentBlock.content}
+                  isShortViewport={isShortViewport}
+                  isUltraShortViewport={isUltraShortViewport}
+                />
               ) : null}
 
               {currentBlock.type === 'content' ? (
-                <section
-                  className={cx(
-                    'animate-in fade-in slide-in-from-bottom-6 duration-500',
-                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
-                  )}
-                >
-                  <div className="text-center">
-                    <p className={cx('font-black uppercase tracking-[0.3em] text-foreground/45', isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs')}>
-                      {currentContentEyebrow}
-                    </p>
-                  </div>
-
-                  <div
-                    className={cx(
-                      'rounded-[2rem] border-2 border-primary/20 bg-orange-50/50 shadow-[0_8px_0_0_rgba(0,0,0,0.05)] py-5',
-                      isUltraShortViewport ? 'space-y-4 p-3.5 sm:p-4' : isShortViewport ? 'space-y-5 p-4 sm:p-5' : 'space-y-8 p-6 sm:p-10',
-                    )}
-                  >
-                    <div className="flex justify-center gap-3">
-                      <Button
-                        size="lg"
-                        className={cx(
-                          'rounded-2xl p-0 shadow-md shadow-primary/30 transition-transform hover:scale-105',
-                          isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16',
-                        )}
-                        onClick={() => {
-                          playClick()
-                          playAudioUrl(currentBlock.data?.audio?.url)
-                        }}
-                      >
-                        <Volume2 className="h-7 w-7" />
-                      </Button>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        className={cx(
-                          'rounded-2xl border-2 border-border bg-background p-0 text-foreground/60',
-                          isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16',
-                        )}
-                        onClick={() => {
-                          playClick()
-                          playAudioUrl(currentBlock.data?.audio?.url, 0.6)
-                        }}
-                      >
-                        <Turtle className="h-7 w-7" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3 text-center">
-                      {currentBlock.data.kind === 'sentence' && Array.isArray(currentBlock.data.components) && currentBlock.data.components.length > 0 ? (
-                        <SentenceContentDisplay
-                          text={currentBlock.data.text}
-                          components={currentBlock.data.components}
-                          audioUrl={currentBlock.data.audio?.url}
-                        />
-                      ) : (
-                        <div className="flex items-start justify-center gap-2">
-                          <InlineAudioButton
-                            audioUrl={currentBlock.data.audio?.url}
-                            label={currentBlock.data.text}
-                            className="mt-2 shrink-0 self-start"
-                          />
-                          <h3 className={cx('font-black tracking-tight text-primary', isUltraShortViewport ? 'text-[1.7rem] leading-tight sm:text-3xl' : isShortViewport ? 'text-3xl leading-tight sm:text-4xl' : 'text-4xl sm:text-5xl')}>
-                            {currentBlock.data.text}
-                          </h3>
-                        </div>
-                      )}
-                      {currentBlock.data.pronunciation ? (
-                        <p className={cx('font-semibold italic text-foreground/45', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
-                          {currentBlock.data.pronunciation}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="h-px w-full bg-border" />
-
-                    <p className={cx('text-center font-black text-foreground/80', isUltraShortViewport ? 'text-lg' : isShortViewport ? 'text-xl' : 'text-2xl')}>
-                      {currentBlock.data.selectedTranslation || currentBlock.data.translations?.[0] || ''}
-                    </p>
-                  </div>
-
-                </section>
+                <ContentStudyBlock
+                  contentEyebrow={currentContentEyebrow}
+                  content={currentBlock.data}
+                  language={lesson?.language}
+                  isShortViewport={isShortViewport}
+                  isUltraShortViewport={isUltraShortViewport}
+                  isDesktopViewport={isDesktopViewport}
+                  onPlayAudio={playAudioUrl}
+                  onPlayClick={playClick}
+                />
               ) : null}
 
               {currentBlock.type === 'proverb' ? (
-                <section
-                  className={cx(
-                    'animate-in fade-in slide-in-from-bottom-6 duration-500',
-                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
-                  )}
-                >
-                  <div className="text-center">
-                    <p className={cx('font-black uppercase tracking-[0.3em] text-amber-700/60', isUltraShortViewport ? 'text-[9px]' : isShortViewport ? 'text-[10px]' : 'text-xs')}>
-                      Cultural Wisdom
-                    </p>
-                  </div>
-
-                  <div
-                    className={cx(
-                      'relative overflow-hidden rounded-[2rem] border border-amber-200 bg-amber-50/80 shadow-sm',
-                      isUltraShortViewport ? 'p-3.5 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-6 sm:p-10',
-                    )}
-                  >
-                    <Quote className="absolute -left-1 -top-1 h-14 w-14 -rotate-12 text-amber-200/70" />
-                    <div className="relative space-y-5">
-                      <h3 className={cx('font-black leading-snug text-amber-900', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
-                        {currentBlock.data.text}
-                      </h3>
-                      <div className="h-px w-20 bg-amber-300" />
-                      <p className={cx('font-semibold italic text-amber-900/75', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
-                        {currentBlock.data.translation || ''}
-                      </p>
-                    </div>
-                  </div>
-
-                  {currentBlock.data.contextNote ? (
-                    <div className="flex gap-3 rounded-2xl border border-secondary/30 bg-secondary/20 p-5">
-                      <Info className="mt-0.5 h-5 w-5 shrink-0 text-secondary-foreground/70" />
-                      <p className="text-sm font-medium leading-relaxed text-foreground/70">{currentBlock.data.contextNote}</p>
-                    </div>
-                  ) : null}
-                </section>
+                <ProverbStudyBlock
+                  proverb={currentBlock.data}
+                  isShortViewport={isShortViewport}
+                  isUltraShortViewport={isUltraShortViewport}
+                />
               ) : null}
 
-              {isExerciseBlock ? (
-                <section
-                  className={cx(
-                    'animate-in fade-in duration-500',
-                    isUltraShortViewport ? 'space-y-4 py-2' : isShortViewport ? 'space-y-5 py-3' : 'space-y-8 py-4',
-                  )}
-                >
-                  <div
-                    className={cx(
-                      'rounded-3xl border-2 border-border/50 bg-white/95 shadow-sm',
-                      isUltraShortViewport ? 'space-y-4 p-4 sm:p-5' : isShortViewport ? 'space-y-5 p-6 sm:p-8' : 'space-y-8 p-10 sm:p-14',
-                    )}
-                  >
-                    <h2 className={cx('font-black leading-snug text-foreground', isUltraShortViewport ? 'text-[1.05rem] sm:text-[1.2rem]' : isShortViewport ? 'text-[1.35rem] sm:text-[1.55rem]' : 'text-2xl sm:text-4xl')}>
-                      {isListeningQuestion ? (
-                        listeningHeading
-                      ) : inlineSourceComponent && sourceText && renderedPromptParts.length > 1 ? (
-                        renderedPromptParts.map((part, index) => (
-                          <span key={`prompt-part-${index}`}>
-                            {part}
-                            {index < renderedPromptParts.length - 1 ? (
-                              <InlineGlossToken label={sourceText} component={inlineSourceComponent} />
-                            ) : null}
-                          </span>
-                        ))
-                      ) : (
-                        renderedPrompt
-                      )}
-                    </h2>
-
-                    {isContextResponseQuestion && choiceSupportText ? (
-                      <div className={cx('rounded-2xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-2.5' : isShortViewport ? 'p-3' : 'p-4')}>
-                        {!isUltraShortViewport ? <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Context Choice</p> : null}
-                        <p className={cx('font-semibold text-foreground/70', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'mt-1 text-xs' : 'mt-1 text-sm')}>
-                          {choiceSupportText}
-                        </p>
-                      </div>
-                    ) : null}
-
-                    {!isListeningQuestion && !isSpeakingQuestion && questionSentenceText ? (
-                      <div className={cx('rounded-3xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
-                        {questionSentenceComponents.length > 0 ? (
-                          <SentenceContentDisplay
-                            text={questionSentenceText}
-                            components={questionSentenceComponents}
-                            audioUrl={questionSentenceAudioUrl}
-                          />
-                        ) : (
-                          <div className="flex items-start justify-center gap-2">
-                            <InlineAudioButton
-                              audioUrl={questionSentenceAudioUrl}
-                              label={questionSentenceText}
-                              className="mt-2 shrink-0 self-start"
-                            />
-                            <p className={cx('text-center font-black leading-relaxed text-primary', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
-                              {questionSentenceText}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {isListeningQuestion ? (
-                      <div
-                        className={cx(
-                          'mt-2 rounded-3xl border border-primary/20 bg-purple-50/50 border-purple-200',
-                          isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6',
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Listening Challenge</p>
-                            {!isShortViewport ? <p className="mt-1 text-sm font-semibold text-foreground/65">{listeningSupportText}</p> : null}
-                          </div>
-                          <div className="flex gap-3">
-                            <Button
-                              size="lg"
-                              className={cx('rounded-2xl p-0 shadow-md shadow-primary/25', isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16')}
-                              onClick={() => {
-                                if (!listeningAudioUrl) return
-                                playClick()
-                                setIsPlayingPrompt(true)
-                                playAudioUrl(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
-                              }}
-                              disabled={!listeningAudioUrl}
-                              aria-label="Play listening prompt audio"
-                            >
-                              <Volume2 className={cx('h-7 w-7', isPlayingPrompt && 'animate-pulse')} />
-                            </Button>
-                            <Button
-                              size="lg"
-                              variant="outline"
-                              className={cx('rounded-2xl border-2 border-border p-0 text-foreground/55', isUltraShortViewport ? 'h-11 w-11' : isShortViewport ? 'h-14 w-14' : 'h-16 w-16')}
-                              onClick={() => {
-                                playClick()
-                                playAudioUrl(listeningAudioUrl, 0.6)
-                              }}
-                              disabled={!listeningAudioUrl}
-                              aria-label="Play listening prompt audio slowly"
-                            >
-                              <Turtle className="h-7 w-7" />
-                            </Button>
-                          </div>
-                        </div>
-                        {!listeningAudioUrl ? (
-                          <p className="mt-3 text-sm font-semibold text-red-600">No audio available for this item yet.</p>
-                        ) : null}
-                        {listeningPromptDetail ? (
-                          <div className={cx('mt-4 rounded-2xl border border-border/50 bg-white/85 shadow-sm', isShortViewport ? 'px-3 py-2.5' : 'px-4 py-3')}>
-                            <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">Your prompt</p>
-                            <p className={cx('mt-2 font-bold leading-relaxed text-foreground', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
-                              {listeningPromptDetail}
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {isSpeakingQuestion && speakingTarget ? (
-                      <div className={cx('rounded-3xl border border-secondary/20 bg-sky-50/50 border-sky-200', isUltraShortViewport ? 'p-3' : isShortViewport ? 'p-4' : 'p-5')}>
-                        <div className="space-y-5">
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                              <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Speaking Practice</p>
-                              <p className={cx('mt-1 font-semibold text-foreground/65', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
-                                Listen first, then record your own take for comparison.
-                              </p>
-                            </div>
-                            <div className="flex gap-3">
-                              <Button
-                                size="lg"
-                                className={cx('rounded-2xl p-0 shadow-md shadow-primary/25', isUltraShortViewport ? 'h-10 w-10' : isShortViewport ? 'h-12 w-12' : 'h-14 w-14')}
-                                onClick={() => {
-                                  if (!speakingTarget.audioUrl) return
-                                  playClick()
-                                  playAudioUrl(speakingTarget.audioUrl)
-                                }}
-                                disabled={!speakingTarget.audioUrl}
-                                aria-label="Play speaking reference audio"
-                              >
-                                <Volume2 className="h-6 w-6" />
-                              </Button>
-                              <Button
-                                size="lg"
-                                variant="outline"
-                                className={cx('rounded-2xl border-2 border-border p-0 text-foreground/55', isUltraShortViewport ? 'h-10 w-10' : isShortViewport ? 'h-12 w-12' : 'h-14 w-14')}
-                                onClick={() => {
-                                  if (!speakingTarget.audioUrl) return
-                                  playClick()
-                                  playAudioUrl(speakingTarget.audioUrl, 0.6)
-                                }}
-                                disabled={!speakingTarget.audioUrl}
-                                aria-label="Play speaking reference audio slowly"
-                              >
-                                <Turtle className="h-6 w-6" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className={cx('rounded-3xl border-2 border-primary/20 bg-orange-50/50 shadow-[0_8px_0_0_rgba(0,0,0,0.05)]', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
-                            {questionSource?.kind === 'sentence' && questionSentenceComponents.length > 0 ? (
-                              <SentenceContentDisplay
-                                text={questionSentenceText}
-                                components={questionSentenceComponents}
-                                audioUrl={questionSentenceAudioUrl}
-                              />
-                            ) : (
-                              <div className="flex items-start justify-center gap-2">
-                                <InlineAudioButton
-                                  audioUrl={speakingTarget.audioUrl}
-                                  label={speakingTarget.text}
-                                  className="mt-2 shrink-0 self-start"
-                                />
-                                <p className={cx('text-center font-black leading-relaxed text-primary', isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>
-                                  {speakingTarget.text}
-                                </p>
-                              </div>
-                            )}
-                            {meaningText ? (
-                              <p className={cx('mt-4 text-center font-semibold text-foreground/55', isUltraShortViewport ? 'text-xs' : isShortViewport ? 'text-sm' : 'text-base')}>
-                                {meaningText}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <div className="flex flex-wrap gap-3">
-                            <Button
-                              variant={isRecordingSpeech ? 'default' : 'outline'}
-                              className={cx(
-                                'rounded-2xl border-2 font-bold',
-                                isUltraShortViewport ? 'h-10 px-3 text-xs' : 'h-11 px-4 text-sm',
-                                isRecordingSpeech ? 'bg-red-600 text-white hover:bg-red-700' : 'border-border bg-white/80 text-foreground/70',
-                              )}
-                              onClick={() => {
-                                playClick()
-                                if (isRecordingSpeech) {
-                                  stopSpeakingRecording()
-                                } else {
-                                  void startSpeakingRecording()
-                                }
-                              }}
-                              disabled={!canPracticeSpeaking || isComparingSpeech || isAnswered}
-                            >
-                              <Mic className={cx('h-5 w-5', isRecordingSpeech && 'fill-current')} />
-                              {isRecordingSpeech ? 'Stop' : 'Record'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className={cx('rounded-2xl border-2 border-border bg-white/80 font-bold text-foreground/70', isUltraShortViewport ? 'h-10 px-3 text-xs' : 'h-11 px-4 text-sm')}
-                              onClick={() => {
-                                playClick()
-                                if (recordedSpeechUrl) playAudioUrl(recordedSpeechUrl)
-                              }}
-                              disabled={!recordedSpeechUrl || isRecordingSpeech}
-                            >
-                              <Volume2 className="h-5 w-5" />
-                              Replay
-                            </Button>
-                            <Button
-                              className={cx('rounded-2xl font-bold', isUltraShortViewport ? 'h-10 px-3 text-xs' : 'h-11 px-4 text-sm')}
-                              onClick={() => {
-                                playClick()
-                                void submitSpeakingAttempt()
-                              }}
-                              disabled={!canPracticeSpeaking || !recordedSpeechBlob || isRecordingSpeech || isComparingSpeech || isAnswered}
-                            >
-                              {isComparingSpeech ? 'Checking...' : 'Check'}
-                            </Button>
-                          </div>
-
-                          {!hasSpeakingReference ? (
-                            <p className="text-sm font-semibold text-red-600">Reference audio is not available for this speaking question yet.</p>
-                          ) : null}
-
-                          {!canPracticeSpeaking && hasSpeakingReference ? (
-                            <p className="text-sm font-semibold text-foreground/60">
-                              Speaking check is available in the learner study flow.
-                            </p>
-                          ) : null}
-
-                          {speakingError ? (
-                            <p className="text-sm font-semibold text-red-600">{speakingError}</p>
-                          ) : null}
-
-                          {speakingFeedback ? (
-                            <div className={cx('rounded-2xl border border-border/60 bg-white/90', isUltraShortViewport ? 'p-3' : 'p-4')}>
-                              <p
-                                className={cx(
-                                  'font-black',
-                                  isUltraShortViewport ? 'text-base' : 'text-lg',
-                                  speakingFeedback.level === 'poor' ? 'text-red-700' : 'text-emerald-700',
-                                )}
-                              >
-                                {speakingFeedback.level === 'poor' ? 'Not quite. Try again.' : 'Passed.'}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {isChoiceQuestion ? (
-                    <div className="grid w-full max-w-xl gap-4">
-                      {isContextResponseQuestion ? (
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Possible responses</p>
-                      ) : null}
-                      {exerciseData?.options.map((option: string, idx: number) => (
-                        <Button
-                          key={idx}
-                          variant="outline"
-                          className={cx(
-                            'h-auto w-full items-center justify-start whitespace-normal rounded-[1.5rem] border-2 bg-white/95 text-left font-bold transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none',
-                            isUltraShortViewport ? 'p-3 text-[14px] sm:text-sm' : isShortViewport ? 'p-4 text-sm sm:text-base' : 'px-6 py-5 text-base sm:text-xl',
-                            selectedOption === idx && !isAnswered && 'border-primary bg-primary/5 text-primary shadow-primary/20',
-                            isAnswered && idx === exerciseData.correctIndex && 'border-green-500 bg-green-50 text-green-700 shadow-green-200',
-                            isAnswered && selectedOption === idx && idx !== exerciseData.correctIndex && 'border-red-500 bg-red-50 text-red-700 shadow-red-200',
-                          )}
-                          onClick={() => {
-                            if (isAnswered) return
-                            setSelectedAnswer(idx)
-                            playClick()
-                          }}
-                          disabled={isAnswered}
-                        >
-                          <><span className={cx('mr-4 flex shrink-0 items-center justify-center rounded-lg bg-orange-200 font-black text-orange-800', isUltraShortViewport ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-lg')}>{idx + 1}</span><span className="block w-full text-left leading-relaxed">{option}</span></>
-                        </Button>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {isMatchingQuestion ? (
-                    <div className={cx('grid grid-cols-2 items-start lg:grid-cols-[1fr_auto_1fr]', isUltraShortViewport ? 'gap-4 lg:gap-6' : isShortViewport ? 'gap-6 lg:gap-8' : 'gap-10 lg:gap-14')}>
-                      <div className="min-w-0 space-y-4">
-                        {matchingLeftItems.map((item) => {
-                          const matchedRight = selectedMatches[item.id] ? getMatchingRightItem(selectedMatches[item.id]) : null
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              className={cx(
-                                'w-full rounded-2xl border-2 bg-white/95 text-left transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.05)] active:translate-y-0.5 active:shadow-none',
-                                isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-6 sm:p-8',
-                                selectedMatchingLeftId === item.id && 'border-primary bg-primary/5 shadow-primary/20 translate-y-0.5 shadow-none',
-                                !selectedMatchingLeftId && matchedRight && 'border-emerald-300 bg-emerald-50/50 opacity-60 pointer-events-none shadow-none',
-                                isAnswered && selectedMatches[item.id] === item.id && 'border-green-500 bg-green-50 shadow-none',
-                                isAnswered && selectedMatches[item.id] !== item.id && 'border-red-500 bg-red-50 shadow-none',
-                              )}
-                              onClick={() => handleSelectMatchingLeft(item.id)}
-                              disabled={isAnswered}
-                            >
-                              <p className={cx('break-words font-black text-foreground text-center', isUltraShortViewport ? 'text-[14px] sm:text-base' : isShortViewport ? 'text-base sm:text-lg' : 'text-lg sm:text-xl')}>
-                                {item.label}
-                              </p>
-                              {matchedRight ? (
-                                <p className={cx('mt-2 font-bold text-center text-emerald-600 uppercase tracking-wider', isUltraShortViewport ? 'text-[10px]' : 'text-[11px]')}>
-                                  Matched
-                                </p>
-                              ) : null}
-                            </button>
-                          )
-                        })}
-                      </div>
-
-                      <div className="hidden h-full items-center justify-center lg:flex">
-                        <div className="h-full w-px bg-border/40" />
-                      </div>
-
-                      <div className="min-w-0 space-y-4">
-                        {matchingRightItems.map((item) => {
-                          const isUsed = Object.values(selectedMatches).includes(item.id)
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              className={cx(
-                                'w-full rounded-2xl border-2 bg-white/95 text-left transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.05)] active:translate-y-0.5 active:shadow-none',
-                                isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-6 sm:p-8',
-                                selectedMatchingLeftId && 'hover:border-primary/60 hover:bg-primary/5',
-                                isUsed && !selectedMatchingLeftId && 'border-emerald-300 bg-emerald-50/50 opacity-60 pointer-events-none shadow-none',
-                                isAnswered && isUsed && 'border-green-500 bg-green-50 shadow-none',
-                              )}
-                              onClick={() => handleSelectMatchingRight(item.id)}
-                              disabled={isAnswered}
-                            >
-                              {item.image?.url ? (
-                                <div className="space-y-3">
-                                  <div className="overflow-hidden rounded-2xl border-2 border-border/30 bg-muted/20">
-                                    <img src={item.image.url} alt={item.image.altText} className={cx('w-full object-cover', isUltraShortViewport ? 'h-24 sm:h-32' : isShortViewport ? 'h-32 sm:h-40' : 'h-40 sm:h-56')} />
-                                  </div>
-                                  <p className={cx('font-bold text-center text-foreground/50', isUltraShortViewport ? 'text-[11px]' : 'text-xs')}>
-                                    {item.image.altText}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p className={cx('break-words font-black text-foreground text-center', isUltraShortViewport ? 'text-[14px] sm:text-base' : isShortViewport ? 'text-base sm:text-lg' : 'text-lg sm:text-xl')}>
-                                  {item.label}
-                                </p>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {isWordOrderQuestion ? (
-                    <div className={cx(isUltraShortViewport ? 'space-y-4' : isShortViewport ? 'space-y-5' : 'space-y-8')}>
-                      <div
-                        className={cx(
-                          'flex flex-wrap content-center items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-border bg-white/80',
-                          isUltraShortViewport ? 'min-h-[88px] p-3' : isShortViewport ? 'min-h-[112px] p-4' : 'min-h-[140px] p-5',
-                        )}
-                      >
-                        {selectedWords.length === 0 && !isAnswered ? (
-                          <span className={cx('font-semibold uppercase tracking-wider text-foreground/35', isUltraShortViewport ? 'text-xs' : isShortViewport ? 'text-sm' : 'text-base')}>
-                            {orderPromptPlaceholder}
-                          </span>
-                        ) : null}
-                        {selectedWords.map((wordIdx, idx) => (
-                          <Button
-                            key={`${wordIdx}-${idx}`}
-                            variant="secondary"
-                            className={cx('rounded-xl font-black', isUltraShortViewport ? 'h-9 px-3 text-xs' : isShortViewport ? 'h-10 px-4 text-sm' : 'h-12 px-5 text-base')}
-                            onClick={() => {
-                              if (isAnswered) return
-                              setSelectedWords((prevWords) => prevWords.filter((_, selectedIndex) => selectedIndex !== idx))
-                            }}
-                            disabled={isAnswered}
-                          >
-                            {interactionWords[wordIdx]}
-                          </Button>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-wrap justify-center gap-3">
-                        {interactionWords.map((word: string, idx: number) => {
-                          const isUsed = selectedWords.includes(idx)
-                          return (
-                            <Button
-                              key={idx}
-                              variant="outline"
-                              className={cx(
-                                'rounded-xl border-2 font-black transition-all',
-                                isUltraShortViewport ? 'h-9 px-3 text-xs' : isShortViewport ? 'h-10 px-4 text-sm' : 'h-12 px-5 text-base',
-                                isUsed ? 'pointer-events-none opacity-25' : 'bg-white hover:border-primary/60 hover:bg-white/90 shadow-[0_4px_0_0_rgba(15,23,42,0.04)]',
-                              )}
-                              onClick={() => {
-                                if (isAnswered) return
-                                setSelectedWords((prevWords) => [...prevWords, idx])
-                                playClick()
-                              }}
-                              disabled={isAnswered}
-                            >
-                              {word}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </section>
+              {isExerciseBlock && exerciseData ? (
+                <ExerciseBlock
+                  exerciseData={exerciseData}
+                  isUltraShortViewport={isUltraShortViewport}
+                  isShortViewport={isShortViewport}
+                  isDesktopViewport={isDesktopViewport}
+                  lessonTitle={lesson?.title}
+                  isListeningQuestion={isListeningQuestion}
+                  isSpeakingQuestion={isSpeakingQuestion}
+                  isContextResponseQuestion={isContextResponseQuestion}
+                  isChoiceQuestion={isChoiceQuestion}
+                  isMatchingQuestion={isMatchingQuestion}
+                  isWordOrderQuestion={isWordOrderQuestion}
+                  inlineSourceComponent={inlineSourceComponent}
+                  sourceText={sourceText}
+                  renderedPrompt={renderedPrompt}
+                  renderedPromptParts={renderedPromptParts}
+                  listeningHeading={listeningHeading}
+                  choiceSupportText={choiceSupportText}
+                  questionSentenceText={questionSentenceText}
+                  shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
+                  meaningText={meaningText}
+                  questionSentenceAudioUrl={questionSentenceAudioUrl}
+                  questionSentenceComponents={questionSentenceComponents}
+                  interactionWords={interactionWords}
+                  listeningSupportText={listeningSupportText}
+                  listeningAudioUrl={listeningAudioUrl}
+                  listeningPromptDetail={listeningPromptDetail}
+                  isPlayingPrompt={isPlayingPrompt}
+                  speakingTarget={speakingTarget}
+                  hasSpeakingReference={hasSpeakingReference}
+                  canPracticeSpeaking={canPracticeSpeaking}
+                  isRecordingSpeech={isRecordingSpeech}
+                  isComparingSpeech={isComparingSpeech}
+                  recordedSpeechUrl={recordedSpeechUrl}
+                  speakingError={speakingError}
+                  speakingFeedback={speakingFeedback}
+                  selectedOption={selectedOption}
+                  selectedWords={selectedWords}
+                  selectedMatches={selectedMatches}
+                  selectedMatchingLeftId={selectedMatchingLeftId}
+                  matchingLeftItems={matchingLeftItems}
+                  matchingRightItems={matchingRightItems}
+                  orderPromptPlaceholder={orderPromptPlaceholder}
+                  wordOrderDisplayOrder={wordOrderDisplayOrder}
+                  isAnswered={isAnswered}
+                  onPlayAudio={playAudioUrl}
+                  onPlayClick={playClick}
+                  onToggleListeningPrompt={() => {
+                    if (!listeningAudioUrl) return
+                    playClick()
+                    setIsPlayingPrompt(true)
+                    playAudioUrl(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
+                  }}
+                  onPlayListeningSlow={() => {
+                    playClick()
+                    playAudioUrl(listeningAudioUrl, 0.6)
+                  }}
+                  onToggleRecording={() => {
+                    playClick()
+                    if (isRecordingSpeech) {
+                      stopSpeakingRecording()
+                    } else {
+                      void startSpeakingRecording()
+                    }
+                  }}
+                  onReplayRecording={() => {
+                    playClick()
+                    if (recordedSpeechUrl) playAudioUrl(recordedSpeechUrl)
+                  }}
+                  onSubmitSpeakingAttempt={() => {
+                    playClick()
+                    void submitSpeakingAttempt()
+                  }}
+                  onSelectOption={(idx) => {
+                    if (isAnswered) return
+                    setSelectedAnswer(idx)
+                    playClick()
+                  }}
+                  onSelectMatchingLeft={handleSelectMatchingLeft}
+                  onSelectMatchingRight={handleSelectMatchingRight}
+                  getMatchingRightItem={getMatchingRightItem}
+                  onRemoveSelectedWord={(selectedIndex) => {
+                    if (isAnswered) return
+                    setSelectedWords((prevWords) =>
+                      prevWords.filter((_, currentSelectedIndex) => currentSelectedIndex !== selectedIndex),
+                    )
+                  }}
+                  onAddSelectedWord={(wordIndex) => {
+                    if (isAnswered) return
+                    setSelectedWords((prevWords) => [...prevWords, wordIndex])
+                    playClick()
+                  }}
+                />
               ) : null}
             </>
           )}
@@ -1909,163 +1057,42 @@ export function LessonPlayer({
       </div>
 
       {isStageComplete && stageTransitionCopy ? (
-        <div
-          className="fixed inset-0 z-[120] isolate pointer-events-auto"
-          style={{ backgroundColor: 'hsl(var(--background))', opacity: 1 }}
-        >
-          <div className="relative flex min-h-full items-center justify-center px-4">
-          <div
-            className={cx(
-              'relative w-full max-w-md overflow-hidden rounded-[2.2rem] border border-primary/15 bg-[linear-gradient(155deg,rgba(255,255,255,1),rgba(255,247,237,0.98))] text-center shadow-[0_24px_80px_rgba(15,23,42,0.22)]',
-              isUltraShortViewport ? 'p-4 sm:p-5' : isShortViewport ? 'p-5 sm:p-6' : 'p-6 sm:p-8',
-            )}
-          >
-            <div className="absolute -left-10 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full bg-primary/15 blur-3xl animate-pulse" />
-            <div className="absolute -right-6 top-8 h-24 w-24 rounded-full bg-secondary/20 blur-3xl animate-pulse" />
-            <div className="absolute inset-x-10 top-6 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 rounded-[2.2rem] border border-white/60" />
-            <div className={cx('relative mx-auto mb-5 flex items-center justify-center', isUltraShortViewport ? 'h-14 w-14' : isShortViewport ? 'h-16 w-16' : 'h-20 w-20')}>
-              <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
-              <div className="absolute inset-2 rounded-full bg-primary/15 animate-pulse" />
-              <div className={cx('relative rounded-full bg-primary font-black text-primary-foreground shadow-lg shadow-primary/25', isUltraShortViewport ? 'px-2.5 py-1.5 text-base' : isShortViewport ? 'px-3 py-2 text-lg' : 'px-4 py-3 text-xl')}>
-                +{stageXpEarned}
-              </div>
-            </div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-primary/60">Stage Complete</p>
-            <h2 className={cx('mt-4 font-black text-foreground', isUltraShortViewport ? 'text-xl sm:text-2xl' : isShortViewport ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl')}>
-              {stageTransitionCopy.title}
-            </h2>
-            <p className={cx('mt-3 font-semibold uppercase tracking-[0.16em] text-foreground/50', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
-              {stageTransitionCopy.subtitle}
-            </p>
-            <div className={cx('mt-6 grid gap-3', isVeryShortViewport && 'mt-4')}>
-              <div className="rounded-3xl border border-green-200 bg-green-50 p-4 text-left">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700/70">Stage XP</p>
-                <p className="mt-2 text-2xl font-black text-green-700">+{stageXpEarned}</p>
-              </div>
-              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-left">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700/70">Mistakes</p>
-                <p className="mt-2 text-2xl font-black text-amber-700">{stageMistakesCount}</p>
-              </div>
-            </div>
-            <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-primary/10">
-              <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-[linear-gradient(90deg,#fb923c_0%,#f59e0b_40%,#34d399_100%)] animate-[pulse_1.1s_ease-in-out_infinite]" />
-            </div>
-            <p className={cx('mt-5 font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
-              {isSavingStage ? 'Saving progress...' : isLastStage ? 'Wrapping up...' : 'Loading next stage...'}
-            </p>
-          </div>
-          </div>
-        </div>
+        <StageTransitionOverlay
+          title={stageTransitionCopy.title}
+          subtitle={stageTransitionCopy.subtitle}
+          stageXpEarned={stageXpEarned}
+          stageMistakesCount={stageMistakesCount}
+          isSavingStage={isSavingStage}
+          isLastStage={isLastStage}
+          isShortViewport={isShortViewport}
+          isUltraShortViewport={isUltraShortViewport}
+          isVeryShortViewport={isVeryShortViewport}
+        />
       ) : null}
 
       {!isStageComplete ? (
-        <footer
-          className={cx(
-            'fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur transition-colors duration-300',
-            !isAnswered && 'border-border/70 bg-background/95',
-            isAnswered && isCorrect && 'border-green-200 bg-green-50/95',
-            isAnswered && !isCorrect && 'border-red-200 bg-red-50/95',
-          )}
-        >
-          <div
-            className={cx(
-              'mx-auto flex max-w-4xl flex-col sm:flex-row sm:items-center sm:justify-between sm:px-10',
-              isUltraShortViewport ? 'gap-2.5 px-3 py-2.5' : isShortViewport ? 'gap-3 px-3 py-4' : 'gap-6 px-4 py-10',
-            )}
-          >
-            <div className="hidden flex-1 items-center gap-3 sm:flex">
-              {isAnswered ? (
-                <>
-                  <div
-                    className={cx(
-                      'flex h-11 w-11 items-center justify-center rounded-xl border',
-                      isCorrect ? 'border-green-300 bg-white text-green-700' : 'border-red-300 bg-white text-red-700',
-                    )}
-                  >
-                    {isCorrect ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <p className={cx(isUltraShortViewport ? 'text-xs font-black' : isShortViewport ? 'text-sm font-black' : 'text-base font-black', isCorrect ? 'text-green-800' : 'text-red-800')}>
-                      {answerStatusLabel}
-                    </p>
-                    {!isCorrect && exerciseData?.explanation && !isVeryShortViewport ? (
-                      <p className="text-sm font-medium text-red-800/70">{exerciseData.explanation}</p>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <p className={cx('font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
-                  {isSpeakingQuestion
-                    ? preview
-                      ? 'Preview the speaking prompt and reference audio.'
-                      : 'Record yourself, then check your tone above.'
-                    : preview
-                      ? 'Work through the lesson as a learner would.'
-                      : 'Choose your answer, then check.'}
-                </p>
-              )}
-            </div>
-
-            <div className="sm:w-auto py-2">
-              {isExerciseBlock ? (
-                isSpeakingQuestion ? (
-                  <Button
-                    size="lg"
-                    className={cx(
-                      'w-full font-black sm:w-auto',
-                      isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-14 px-8 text-lg',
-                      isAnswered ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-muted text-foreground/55 hover:bg-muted',
-                    )}
-                    onClick={handleNext}
-                    disabled={!isAnswered || isSavingStage}
-                  >
-                    {isAnswered ? (
-                      <>
-                        Continue
-                        <ArrowRight className="h-5 w-5" />
-                      </>
-                    ) : (
-                      'Check Above'
-                    )}
-                  </Button>
-                ) : !isAnswered ? (
-                  <Button
-                    size="lg"
-                    className={cx('w-full font-black sm:w-auto', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-14 px-8 text-lg')}
-                    onClick={handleCheck}
-                    disabled={!canCheck}
-                  >
-                    Check Answer
-                  </Button>
-                ) : (
-                  <Button
-                    size="lg"
-                    className={cx(
-                      'w-full font-black text-white sm:w-auto',
-                      isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-14 px-8 text-lg',
-                      isCorrect ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700',
-                    )}
-                    onClick={handleNext}
-                    disabled={isSavingStage}
-                  >
-                    Continue
-                    <ArrowRight className="h-5 w-5" />
-                  </Button>
-                )
-              ) : (
-                <Button
-                  size="lg"
-                  className={cx('w-full font-black sm:w-auto', isUltraShortViewport ? 'h-10 px-4 text-xs' : isShortViewport ? 'h-11 px-5 text-sm' : 'h-14 px-8 text-lg')}
-                  onClick={handleNext}
-                >
-                  Continue
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </footer>
+        <StudyFooter
+          isAnswered={isAnswered}
+          isCorrect={isCorrect}
+          isExerciseBlock={isExerciseBlock}
+          isSpeakingQuestion={isSpeakingQuestion}
+          preview={preview}
+          answerStatusLabel={answerStatusLabel}
+          explanation={exerciseData?.explanation}
+          canCheck={canCheck}
+          canCheckSpeaking={canCheckSpeaking}
+          isSpeakingBusy={Boolean(isRecordingSpeech || isComparingSpeech)}
+          isSavingStage={isSavingStage}
+          isShortViewport={isShortViewport}
+          isUltraShortViewport={isUltraShortViewport}
+          isVeryShortViewport={isVeryShortViewport}
+          onCheck={handleCheck}
+          onCheckSpeaking={() => {
+            playClick()
+            void submitSpeakingAttempt()
+          }}
+          onNext={handleNext}
+        />
       ) : null}
     </main>
   )

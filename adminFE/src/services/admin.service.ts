@@ -804,6 +804,11 @@ export const questionService = {
       words: string[];
       correctOrder: number[];
       meaning: string;
+      meaningSegments?: Array<{
+        text: string;
+        sourceWordIndexes: number[];
+        sourceComponentIndexes?: number[];
+      }>;
     };
     interactionData?: {
       matchingPairs?: Array<{

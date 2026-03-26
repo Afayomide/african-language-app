@@ -3,6 +3,7 @@ import type { SentenceEntity } from "../entities/Sentence.js";
 
 export type SentenceListFilter = {
   language?: Language;
+  languageId?: string | null;
   status?: Status;
 };
 
@@ -14,7 +15,7 @@ export interface SentenceRepository {
   list(filter: SentenceListFilter): Promise<SentenceEntity[]>;
   findById(id: string): Promise<SentenceEntity | null>;
   findByIds(ids: string[]): Promise<SentenceEntity[]>;
-  findByText(language: Language, text: string): Promise<SentenceEntity | null>;
+  findByText(language: Language, text: string, languageId?: string | null): Promise<SentenceEntity | null>;
   updateById(id: string, update: SentenceUpdateInput): Promise<SentenceEntity | null>;
   softDeleteById(id: string): Promise<SentenceEntity | null>;
 }

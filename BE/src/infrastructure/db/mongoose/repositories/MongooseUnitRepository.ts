@@ -8,6 +8,7 @@ import type {
   UnitRepository,
   UnitUpdateInput
 } from "../../../../domain/repositories/UnitRepository.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
   if (!value || typeof value !== "object") return null;
@@ -72,6 +73,7 @@ function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
 
 function toEntity(doc: {
   _id: { toString(): string };
+  languageId?: { toString(): string } | string | null;
   chapterId?: { toString(): string } | string | null;
   title: string;
   description: string;
@@ -91,6 +93,7 @@ function toEntity(doc: {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
+    languageId: doc.languageId ? String(doc.languageId) : null,
     chapterId: doc.chapterId ? String(doc.chapterId) : null,
     title: doc.title,
     description: doc.description,
@@ -110,8 +113,8 @@ function toEntity(doc: {
 }
 
 export class MongooseUnitRepository implements UnitRepository {
-  async findLastOrderIndex(language: Language, chapterId?: string | null): Promise<number | null> {
-    const query: Record<string, unknown> = { language, isDeleted: { $ne: true } };
+  async findLastOrderIndex(language: Language, chapterId?: string | null, languageId?: string | null): Promise<number | null> {
+    const query: Record<string, unknown> = { ...(await buildScopedLanguageQuery({ language, languageId })), isDeleted: { $ne: true } };
     if (chapterId === null) query.chapterId = null;
     else if (chapterId) query.chapterId = chapterId;
     const last = await UnitModel.findOne(query).sort({ orderIndex: -1, createdAt: -1 });
@@ -119,8 +122,10 @@ export class MongooseUnitRepository implements UnitRepository {
   }
 
   async create(input: UnitCreateInput): Promise<UnitEntity> {
+    const languageId = await findLanguageIdByCode(input.language);
     const created = await UnitModel.create({
       chapterId: input.chapterId ?? null,
+      languageId: languageId || null,
       kind: input.kind ?? "core",
       reviewStyle: input.reviewStyle ?? "none",
       reviewSourceUnitIds: input.reviewSourceUnitIds ?? [],
@@ -132,7 +137,9 @@ export class MongooseUnitRepository implements UnitRepository {
   async list(filter: UnitListFilter): Promise<UnitEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
     if (filter.chapterId) query.chapterId = filter.chapterId;
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.status) query.status = filter.status;
     if (filter.kind) query.kind = filter.kind;
 
@@ -146,7 +153,12 @@ export class MongooseUnitRepository implements UnitRepository {
   }
 
   async updateById(id: string, update: UnitUpdateInput): Promise<UnitEntity | null> {
-    const unit = await UnitModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const unit = await UnitModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return unit ? toEntity(unit) : null;
   }
 
@@ -177,8 +189,12 @@ export class MongooseUnitRepository implements UnitRepository {
     return unit ? toEntity(unit) : null;
   }
 
-  async findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>> {
-    const units = await UnitModel.find({ _id: { $in: ids }, language, isDeleted: { $ne: true } }).select("_id");
+  async findByIdsAndLanguage(ids: string[], language: Language, languageId?: string | null): Promise<Array<{ id: string }>> {
+    const units = await UnitModel.find({
+      _id: { $in: ids },
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      isDeleted: { $ne: true }
+    }).select("_id");
     return units.map((unit) => ({ id: unit._id.toString() }));
   }
 
@@ -193,8 +209,11 @@ export class MongooseUnitRepository implements UnitRepository {
     );
   }
 
-  async listByLanguage(language: Language): Promise<UnitEntity[]> {
-    const units = await UnitModel.find({ language, isDeleted: { $ne: true } }).sort({ orderIndex: 1, createdAt: 1 }).lean();
+  async listByLanguage(language: Language, languageId?: string | null): Promise<UnitEntity[]> {
+    const units = await UnitModel.find({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      isDeleted: { $ne: true }
+    }).sort({ orderIndex: 1, createdAt: 1 }).lean();
     return units.map(toEntity);
   }
 

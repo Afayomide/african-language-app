@@ -105,6 +105,7 @@ export const ContentComponentSchema = new Schema(
 
 export function buildBaseContentFields() {
   return {
+    languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     language: { type: String, enum: CONTENT_LANGUAGE_VALUES, required: true, index: true },
     text: { type: String, required: true, trim: true },
     textNormalized: { type: String, required: true, trim: true, index: true },

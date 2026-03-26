@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Word Focus: Káàárọ̀ - The Modern Griot</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#e6e3d3",
+              "on-secondary-fixed": "#563a00",
+              "on-surface": "#39382f",
+              "primary-fixed-dim": "#ff9a65",
+              "on-tertiary-fixed": "#1a4716",
+              "inverse-primary": "#fd8542",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#ffcc79",
+              "secondary-dim": "#765100",
+              "tertiary": "#416f39",
+              "surface": "#fffbff",
+              "secondary": "#865d00",
+              "on-tertiary-container": "#2d5a27",
+              "surface-bright": "#fffbff",
+              "error-container": "#fa7150",
+              "primary-container": "#ffae86",
+              "on-secondary-container": "#6e4b00",
+              "surface-container-highest": "#ece8db",
+              "tertiary-fixed": "#b9eeab",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-tint": "#a94600",
+              "primary-dim": "#953d00",
+              "background": "#fffbff",
+              "surface-container-lowest": "#ffffff",
+              "outline-variant": "#bcb9ad",
+              "surface-container-low": "#fdf9f1",
+              "on-primary-container": "#692900",
+              "surface-container": "#f7f3ea",
+              "primary-fixed": "#ffae86",
+              "inverse-surface": "#0f0e0b",
+              "tertiary-fixed-dim": "#abdf9e",
+              "outline": "#838175",
+              "error": "#b23d21",
+              "on-primary-fixed-variant": "#772f00",
+              "on-surface-variant": "#66655a",
+              "error-dim": "#821a01",
+              "on-tertiary-fixed-variant": "#376430",
+              "secondary-container": "#ffdeac",
+              "surface-container-highest": "#ece8db",
+              "tertiary-container": "#b9eeab",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#9f9d97",
+              "tertiary-dim": "#35632e",
+              "on-primary": "#ffffff",
+              "on-background": "#39382f",
+              "primary": "#a94600",
+              "surface-container-high": "#f1eee2",
+              "on-error-container": "#671200",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#ffdeac",
+              "on-primary-fixed": "#481a00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .custom-glass {
+        background: rgba(255, 251, 255, 0.7);
+        backdrop-filter: blur(20px);
+      }
+      .cta-gradient {
+        background: linear-gradient(45deg, #a94600, #ffae86);
+      }
+      .inner-shadow-track {
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+      }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- Sidebar Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-6 bg-orange-50 dark:bg-stone-950 h-screen w-64 border-r-0 z-50">
+<div class="mb-12">
+<h1 class="text-2xl font-extrabold text-orange-900 dark:text-orange-100 italic font-headline">The Modern Griot</h1>
+<p class="text-xs font-bold tracking-wider uppercase text-stone-500 mt-1">Yoruba Scholar</p>
+</div>
+<nav class="flex flex-col gap-2 flex-1">
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 transition-all duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label font-bold text-xs tracking-wider uppercase">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-orange-100 dark:bg-orange-900/40 text-orange-900 dark:text-orange-50 rounded-xl transition-all duration-300 scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-label font-bold text-xs tracking-wider uppercase">Lessons</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 transition-all duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="translate">translate</span>
+<span class="font-label font-bold text-xs tracking-wider uppercase">Vocabulary</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-stone-800/50 transition-all duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-label font-bold text-xs tracking-wider uppercase">Progress</span>
+</a>
+</nav>
+<div class="mt-auto p-4 bg-surface-container-highest rounded-xl">
+<div class="flex items-center gap-3 mb-3">
+<img alt="User Profile Avatar" class="w-10 h-10 rounded-full border-2 border-primary" data-alt="Portrait of a young Yoruba man with a modern fade haircut wearing traditional patterned clothing in a bright studio setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCv9vCzvOSYJt7YVbz5T_aaIj7HlO-C391rVCCucLPevTCGG7gVOvc3lNtL9WokW4NOp0Move2XKQNqMm87q2zwpmbdVKyhDNCVAO5mRjAbyYsGKUzX3uXVUoO80FOf1GSMaQb5p3YdJrQL5kdtMYOD-E-vQIry_5aaB7sBHeoTqyEGy1SoPr0DQ2oJFz5htVg10TtmeMrFlgD_rxJ_jFBT2jKpjTqd2nHkSVBf16iywZz8-rTx5FZuEizJ5YhJldrchCBqD-59TY0j"/>
+<div>
+<p class="text-sm font-bold font-headline">Scholar</p>
+<p class="text-[10px] uppercase tracking-tighter text-on-surface-variant">Level 12 • 450 XP</p>
+</div>
+</div>
+<button class="w-full py-2 bg-primary text-on-primary text-xs font-bold rounded-lg uppercase tracking-widest hover:opacity-90 transition-opacity">Daily Challenge</button>
+</div>
+</aside>
+<!-- Top AppBar Shell -->
+<header class="flex items-center justify-between px-12 ml-64 w-[calc(100%-16rem)] w-full h-20 sticky top-0 bg-white/80 dark:bg-stone-950/80 backdrop-blur-xl z-40">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-stone-900 dark:text-stone-50 font-headline">Yoruba Learning</span>
+<div class="h-2 w-48 bg-surface-container-highest rounded-full overflow-hidden inner-shadow-track">
+<div class="h-full w-2/3 cta-gradient rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-primary" data-icon="local_fire_department" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-bold text-sm">14 Day Streak</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-stone-500 hover:text-orange-700 transition-colors" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-stone-500 hover:text-orange-700 transition-colors" data-icon="settings">settings</button>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-64 p-12 h-[calc(100vh-5rem)] flex flex-col items-center justify-center relative bg-surface">
+<!-- Word Focus Canvas -->
+<div class="w-full max-w-4xl grid grid-cols-12 gap-8 items-center">
+<!-- Left: Word Detail (Asymmetric Layering) -->
+<div class="col-span-12 lg:col-span-7 flex flex-col gap-8">
+<div class="space-y-2">
+<span class="label-md uppercase tracking-[0.2em] text-primary font-bold text-xs">Word Focus</span>
+<h2 class="text-7xl font-extrabold font-headline tracking-tight text-on-surface">Káàárọ̀</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-16 h-16 rounded-full cta-gradient text-on-primary flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="volume_up" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</button>
+<button class="w-14 h-14 rounded-full bg-surface-container-highest text-primary flex items-center justify-center hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="slow_motion_video">slow_motion_video</span>
+</button>
+</div>
+<div class="p-8 bg-surface-container-low rounded-3xl border-l-4 border-primary">
+<p class="text-sm font-label uppercase tracking-widest text-on-surface-variant mb-2">Translation</p>
+<p class="text-3xl font-bold font-headline text-on-surface">Good morning <span class="text-primary/60 font-medium">(casual)</span></p>
+</div>
+</div>
+<!-- Right: Visual Context / Supporting Card -->
+<div class="col-span-12 lg:col-span-5 relative">
+<div class="aspect-[4/5] bg-surface-container rounded-[2rem] overflow-hidden rotate-2 hover:rotate-0 transition-transform duration-500 shadow-xl border-8 border-white">
+<img alt="Sunrise over Lagos" class="w-full h-full object-cover" data-alt="Stunning warm sunrise over the Atlantic ocean coastline of Lagos with silhouetted palm trees and soft morning mist in golden light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqF08U8tBReYC-NbmzpMUdz5Z9vS9fKFr1nVBSGqyWALHyUybj5bLqOqLSjfAI2vWfzkDav83PycWP_DHtHa77U97Wx0G7-xHTmO6ybebxGNW2-mvGTZ-Go5Djoe9gft6kNOePsNxLElQ_Nl6R8dR9gKy6Al3Q7cXtg96021DwaGiz7YKl8BXzoG8D2XLtst5KVl4mfdFNkC4rtj5I5OWjrxaNKCplpExyZICzkxVQrEkCV9IhDgTjcaH77MfGis0-W5dWm3Mb9deK"/>
+<div class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
+<p class="text-white font-bold text-lg">Morning in Yorubaland</p>
+<p class="text-white/80 text-sm italic">Used when greeting family or friends after sunrise.</p>
+</div>
+</div>
+<!-- Floating Decorative Chip -->
+<div class="absolute -top-4 -right-4 bg-secondary-container text-on-secondary-container px-6 py-3 rounded-full font-bold shadow-md -rotate-6">
+                    Grammar Tip: Tones Matter! ↗ ↘
+                </div>
+</div>
+</div>
+<!-- Word Focus Chips (Horizontal Row) -->
+<div class="w-full max-w-4xl mt-16">
+<div class="flex flex-wrap gap-4 justify-center">
+<div class="px-6 py-4 bg-surface-container-highest text-on-surface rounded-2xl hover:bg-primary-container hover:text-on-primary-container transition-all cursor-pointer font-bold text-lg">
+                    Greetings
+                </div>
+<div class="px-6 py-4 bg-surface-container-highest text-on-surface rounded-2xl hover:bg-primary-container hover:text-on-primary-container transition-all cursor-pointer font-bold text-lg">
+                    Casual
+                </div>
+<div class="px-6 py-4 bg-surface-container-highest text-on-surface rounded-2xl hover:bg-primary-container hover:text-on-primary-container transition-all cursor-pointer font-bold text-lg">
+                    Sunrise
+                </div>
+<div class="px-6 py-4 bg-secondary-container text-on-secondary-container rounded-2xl scale-105 shadow-md font-bold text-lg flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+                    Core Vocab
+                </div>
+</div>
+</div>
+<!-- Footer / Action Area -->
+<footer class="absolute bottom-0 left-0 right-0 p-8 px-16 flex items-center justify-between bg-surface-container-lowest border-t border-outline-variant/10">
+<div class="flex items-center gap-4">
+<button class="p-4 rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="flag">flag</span>
+<span class="font-bold text-sm uppercase">Report Issue</span>
+</button>
+</div>
+<div class="flex gap-4">
+<button class="px-10 py-5 rounded-2xl bg-surface-container-highest text-primary font-bold uppercase tracking-widest hover:bg-surface-container-high transition-all active:translate-y-0.5">
+                    Skip
+                </button>
+<button class="px-16 py-5 rounded-2xl cta-gradient text-on-primary font-bold uppercase tracking-[0.15em] shadow-lg shadow-primary/20 hover:scale-[1.02] active:translate-y-0.5 transition-all text-lg">
+                    Continue
+                </button>
+</div>
+</footer>
+</main>
+</body></html>

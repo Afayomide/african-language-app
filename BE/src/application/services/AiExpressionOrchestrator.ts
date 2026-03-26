@@ -73,7 +73,10 @@ export class AiExpressionOrchestrator {
     }
 
     const existingLessonExpressions = input.existingLessonExpressions || [];
-    const allLanguageExpressions = await this.expressions.list({ language: input.lesson.language });
+    const allLanguageExpressions = await this.expressions.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
     const existingLessonKeys = new Set(existingLessonExpressions.map((item) => normalizeText(item.text)));
     const expressionByText = new Map<string, ExpressionEntity>();
     for (const expression of allLanguageExpressions) {

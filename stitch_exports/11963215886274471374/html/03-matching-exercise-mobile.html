@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Yoruba Language - Matching Exercise</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed": "#ffdeac",
+              "on-secondary": "#ffffff",
+              "inverse-on-surface": "#9f9d97",
+              "tertiary-fixed": "#b9eeab",
+              "tertiary-dim": "#35632e",
+              "inverse-surface": "#0f0e0b",
+              "on-error-container": "#671200",
+              "tertiary-fixed-dim": "#abdf9e",
+              "on-tertiary-fixed-variant": "#376430",
+              "on-surface-variant": "#66655a",
+              "outline": "#838175",
+              "on-primary": "#ffffff",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-container-high": "#f1eee2",
+              "surface-tint": "#a94600",
+              "on-primary-fixed": "#481a00",
+              "primary-dim": "#953d00",
+              "primary-container": "#ffae86",
+              "inverse-primary": "#fd8542",
+              "surface-container": "#f7f3ea",
+              "on-primary-fixed-variant": "#772f00",
+              "surface-container-highest": "#ece8db",
+              "secondary-dim": "#765100",
+              "outline-variant": "#bcb9ad",
+              "error": "#b23d21",
+              "primary-fixed-dim": "#ff9a65",
+              "primary": "#a94600",
+              "secondary-container": "#ffdeac",
+              "on-secondary-fixed": "#563a00",
+              "on-background": "#39382f",
+              "error-dim": "#821a01",
+              "surface-container-lowest": "#ffffff",
+              "tertiary": "#416f39",
+              "on-surface": "#39382f",
+              "error-container": "#fa7150",
+              "background": "#fffbff",
+              "secondary-fixed-dim": "#ffcc79",
+              "surface-container-low": "#fdf9f1",
+              "on-error": "#ffffff",
+              "surface-bright": "#fffbff",
+              "surface-dim": "#e6e3d3",
+              "on-tertiary": "#ffffff",
+              "surface-variant": "#ece8db",
+              "on-primary-container": "#692900",
+              "secondary": "#865d00",
+              "on-tertiary-fixed": "#1a4716",
+              "surface": "#fffbff",
+              "primary-fixed": "#ffae86",
+              "on-tertiary-container": "#2d5a27",
+              "tertiary-container": "#b9eeab",
+              "on-secondary-container": "#6e4b00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-nav {
+        background: rgba(255, 251, 255, 0.8);
+        backdrop-filter: blur(12px);
+      }
+      .primary-gradient-btn {
+        background: linear-gradient(45deg, #a94600, #ffae86);
+      }
+      .inset-track {
+        box-shadow: inset 0px 2px 4px rgba(0,0,0,0.05);
+      }
+      .active-chip {
+        transform: scale(1.05);
+        box-shadow: 0px 8px 24px rgba(57, 56, 47, 0.06);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface min-h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-4 glass-nav">
+<div class="flex items-center gap-4 w-full max-w-4xl mx-auto">
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-colors active:translate-y-[2px] transition-transform duration-150">
+<span class="material-symbols-outlined text-primary">close</span>
+</button>
+<div class="flex-grow h-3 bg-surface-container-highest rounded-full overflow-hidden inset-track mx-2">
+<div class="h-full bg-primary rounded-full transition-all duration-700 ease-out" style="width: 80%"></div>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-low px-3 py-1 rounded-full border border-outline-variant/15">
+<span class="material-symbols-outlined text-[#FFD700]" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="font-headline text-primary text-sm">480</span>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center justify-center p-6 mt-16 max-w-4xl mx-auto w-full">
+<!-- Editorial Header -->
+<div class="text-center mb-10">
+<span class="font-label text-xs tracking-[0.05em] uppercase text-on-surface-variant font-bold mb-2 block">Word Focus</span>
+<h1 class="font-headline text-3xl text-on-surface font-extrabold tracking-tight">Match the expressions</h1>
+<p class="text-on-surface-variant text-sm mt-2">Connect the Yoruba terms with their English meanings</p>
+</div>
+<!-- Matching Grid: Bento Style -->
+<div class="grid grid-cols-2 gap-4 w-full">
+<!-- Left Column: Yoruba -->
+<div class="space-y-3">
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Term</p>
+<h3 class="font-headline text-xl text-primary font-bold">Ẹ kú àárọ̀</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-lowest rounded-xl border border-primary/30 active-chip transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-primary mb-1 font-bold">Selected</p>
+<h3 class="font-headline text-xl text-primary font-bold">O dábọ̀</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Term</p>
+<h3 class="font-headline text-xl text-primary font-bold">Ẹ ṣé</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150 opacity-40 grayscale">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Matched</p>
+<h3 class="font-headline text-xl text-primary font-bold line-through">Báwo ni?</h3>
+</button>
+</div>
+<!-- Right Column: English -->
+<div class="space-y-3">
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Translation</p>
+<h3 class="font-headline text-xl text-on-surface font-bold">Good morning</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Translation</p>
+<h3 class="font-headline text-xl text-on-surface font-bold">Thank you</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Translation</p>
+<h3 class="font-headline text-xl text-on-surface font-bold">Goodbye</h3>
+</button>
+<button class="w-full text-left p-6 bg-surface-container-low rounded-xl border border-outline-variant/15 hover:bg-surface-container-high transition-all active:translate-y-[2px] duration-150 opacity-40 grayscale">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1 font-bold">Matched</p>
+<h3 class="font-headline text-xl text-on-surface font-bold line-through">How are you?</h3>
+</button>
+</div>
+</div>
+<!-- Decorative Element -->
+<div class="mt-12 flex justify-center opacity-30">
+<div class="h-24 w-24 rounded-full border-[8px] border-tertiary-container relative">
+<div class="absolute inset-0 border-[8px] border-primary-container rounded-full rotate-45 border-t-transparent border-r-transparent"></div>
+</div>
+</div>
+</main>
+<!-- Task Action Footer -->
+<footer class="p-6 bg-surface">
+<div class="max-w-4xl mx-auto flex gap-4">
+<button class="flex-grow py-5 rounded-xl primary-gradient-btn text-on-primary font-headline text-lg font-bold shadow-lg shadow-primary/20 active:translate-y-[2px] transition-all">
+                Check Answer
+            </button>
+<button class="px-6 py-5 rounded-xl bg-surface-container-highest text-primary font-headline font-bold active:translate-y-[2px] transition-all">
+<span class="material-symbols-outlined">lightbulb</span>
+</button>
+</div>
+</footer>
+<!-- Background Texture -->
+<div class="fixed -bottom-24 -right-24 w-96 h-96 bg-primary-container/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+<div class="fixed -top-24 -left-24 w-96 h-96 bg-tertiary-container/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+</body></html>

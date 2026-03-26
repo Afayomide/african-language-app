@@ -47,6 +47,8 @@ type UnitRevisionResult = UnitContentResult & {
   revisionMode: "refactor" | "regenerate";
 };
 
+type AppliedUnitContentResult = UnitContentResult | UnitRevisionResult;
+
 export type UnitContentPlanPreviewResult = {
   unitId: string;
   requestedLessons: number;
@@ -173,6 +175,7 @@ export const aiService = {
   async previewUnitContentPlan(
     unitId: string,
     payload?: {
+      mode?: "generate" | "regenerate";
       lessonCount?: number;
       newTargetsPerLesson?: number;
       sentencesPerLesson?: number;
@@ -210,6 +213,7 @@ export const aiService = {
   async applyUnitContentPlan(
     unitId: string,
     payload: {
+      mode?: "generate" | "regenerate";
       lessonCount?: number;
       newTargetsPerLesson?: number;
       sentencesPerLesson?: number;
@@ -234,7 +238,7 @@ export const aiService = {
         newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
-    const response = await api.post<UnitContentResult>(
+    const response = await api.post<AppliedUnitContentResult>(
       feTutorAiRoutes.applyUnitContentPlan(unitId),
       requestPayload
     );

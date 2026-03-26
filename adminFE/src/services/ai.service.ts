@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import { feAdminRoutes, feAiRoutes } from "@/lib/apiRoutes";
-import { Lesson, Expression, Proverb, Language, Level, Sentence, Word } from "@/types";
+import { CurriculumBuildArtifact, CurriculumBuildJob, Lesson, Expression, Proverb, Language, Level, Sentence, Word } from "@/types";
 
 type UnitContentLessonSummary = {
   lessonId: string;
@@ -47,6 +47,8 @@ type UnitRevisionResult = UnitContentResult & {
   revisionMode: "refactor" | "regenerate";
 };
 
+type AppliedUnitContentResult = UnitContentResult | UnitRevisionResult;
+
 export type UnitContentPlanPreviewResult = {
   unitId: string;
   requestedLessons: number;
@@ -69,6 +71,44 @@ type LessonRefactorResult = {
 };
 
 export const aiService = {
+  async startCurriculumBuildJob(payload: {
+    language: Language;
+    level: Level;
+    requestedChapterCount: number;
+    topic?: string;
+    extraInstructions?: string;
+  }) {
+    const response = await api.post<{ job: CurriculumBuildJob }>(feAdminRoutes.curriculumJobs(), payload);
+    return response.data.job;
+  },
+
+  async listCurriculumBuildJobs(params?: {
+    language?: Language;
+    level?: Level;
+    status?: CurriculumBuildJob["status"];
+    limit?: number;
+  }) {
+    const response = await api.get<{ jobs: CurriculumBuildJob[]; total: number }>(feAdminRoutes.curriculumJobs(), {
+      params
+    });
+    return response.data.jobs;
+  },
+
+  async getCurriculumBuildJob(id: string) {
+    const response = await api.get<{ job: CurriculumBuildJob }>(feAdminRoutes.curriculumJob(id));
+    return response.data.job;
+  },
+
+  async listCurriculumBuildArtifacts(id: string) {
+    const response = await api.get<{ artifacts: CurriculumBuildArtifact[]; total: number }>(feAdminRoutes.curriculumJobArtifacts(id));
+    return response.data.artifacts;
+  },
+
+  async resumeCurriculumBuildJob(id: string) {
+    const response = await api.post<{ job: CurriculumBuildJob }>(feAdminRoutes.resumeCurriculumJob(id));
+    return response.data.job;
+  },
+
   async generateExpressions(
     lessonId: string | undefined,
     language: Language,
@@ -172,6 +212,7 @@ export const aiService = {
   async previewUnitContentPlan(
     unitId: string,
     payload?: {
+      mode?: "generate" | "regenerate";
       lessonCount?: number;
       newTargetsPerLesson?: number;
       sentencesPerLesson?: number;
@@ -209,6 +250,7 @@ export const aiService = {
   async applyUnitContentPlan(
     unitId: string,
     payload: {
+      mode?: "generate" | "regenerate";
       lessonCount?: number;
       newTargetsPerLesson?: number;
       sentencesPerLesson?: number;
@@ -233,7 +275,7 @@ export const aiService = {
         newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
-    const response = await api.post<UnitContentResult>(
+    const response = await api.post<AppliedUnitContentResult>(
       feAdminRoutes.applyUnitContentPlan(unitId),
       requestPayload
     );

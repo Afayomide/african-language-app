@@ -53,6 +53,7 @@ type LessonPlayerProps = {
   emptyMessage?: string
   preview?: boolean
   allowStagePicker?: boolean
+  continuousMode?: boolean
   enableUiSounds?: boolean
   culturalSoundResolver?: (language: Language, cue: CueType) => string
 }
@@ -239,6 +240,66 @@ function buildMatchingFallbackItems(question: ExerciseQuestion | null) {
   return { leftItems, rightItems: shuffleItems(rightItems) }
 }
 
+function hashString(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0 || 1
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let value = Math.imul(state ^ (state >>> 15), 1 | state)
+    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value)
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function buildWordOrderDisplayOrder(words: string[], seedKey: string) {
+  const indices = words.map((_, index) => index)
+  if (indices.length <= 1) return indices
+  if (indices.length === 2) return [1, 0]
+
+  const original = indices.join(",")
+  let best = [...indices]
+  let bestFixedPositions = indices.length
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const random = createSeededRandom(hashString(`${seedKey}:${attempt}`))
+    const candidate = [...indices]
+
+    for (let index = candidate.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(random() * (index + 1))
+      const current = candidate[index]
+      candidate[index] = candidate[swapIndex]
+      candidate[swapIndex] = current
+    }
+
+    const fixedPositions = candidate.reduce((count, value, index) => count + (value === index ? 1 : 0), 0)
+    if (candidate.join(",") !== original && fixedPositions < bestFixedPositions) {
+      best = candidate
+      bestFixedPositions = fixedPositions
+      if (fixedPositions === 0) break
+    }
+  }
+
+  if (best.join(",") === original) {
+    return [...indices].reverse()
+  }
+
+  return best
+}
+
+function normalizeWordSequence(value: string) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function SentenceGlossPanel({ component }: { component: LearningContentComponent }) {
   const translations = component.translations.filter(Boolean)
 
@@ -259,12 +320,7 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
             {translations.map((translation, index) => (
               <span
                 key={`${component.id}-${translation}-${index}`}
-                className={cx(
-                  'rounded-full px-2.5 py-1 text-sm font-bold',
-                  index === component.selectedTranslationIndex
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-white text-foreground/75',
-                )}
+                className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-foreground/75"
               >
                 {translation}
               </span>
@@ -275,6 +331,41 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
 
       {component.explanation ? (
         <p className="text-sm font-medium leading-relaxed text-foreground/70">{component.explanation}</p>
+      ) : null}
+    </div>
+  )
+}
+
+type MeaningSegmentDisplay = {
+  text: string
+  sourceWords: string[]
+  components: LearningContentComponent[]
+}
+
+function MeaningSegmentGlossPanel({ segment }: { segment: MeaningSegmentDisplay }) {
+  const joinedSourceWords = segment.sourceWords.join(' ').trim()
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-foreground/45">Source</p>
+        <p className="mt-1 text-lg font-black text-foreground">{joinedSourceWords || segment.text}</p>
+      </div>
+
+      {segment.components.length > 1 ? (
+        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/40 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-foreground/45">Parts</p>
+          <div className="flex flex-wrap gap-2">
+            {segment.components.map((component, index) => (
+              <span
+                key={`${component.id}-${index}`}
+                className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-foreground/75"
+              >
+                {component.text}
+              </span>
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   )
@@ -362,7 +453,7 @@ function SentenceGlossToken({
     <span className="relative inline-block" onMouseLeave={() => setIsOpen(false)}>
       <button
         type="button"
-        className="inline rounded-xl border-b-2 border-primary/35 bg-primary/10 px-1.5 py-0.5 font-black text-primary transition-colors hover:border-primary hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="inline rounded-none border-b border-primary/35 bg-transparent px-0.5 py-0 font-black text-primary transition-colors hover:border-primary/60 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         onMouseEnter={() => setIsOpen(true)}
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -371,6 +462,38 @@ function SentenceGlossToken({
       {isOpen ? (
         <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-border/60 bg-background p-4 shadow-xl">
           <SentenceGlossPanel component={component} />
+        </div>
+      ) : null}
+    </span>
+  )
+}
+
+function MeaningGlossToken({
+  label,
+  segment,
+}: {
+  label: string
+  segment: MeaningSegmentDisplay
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <span className="relative inline-block align-baseline" onMouseLeave={() => setIsOpen(false)}>
+      <button
+        type="button"
+        className="inline rounded-none border-b border-primary/35 bg-transparent px-0.5 py-0 font-black text-primary transition-colors hover:border-primary/60 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        onMouseEnter={() => setIsOpen(true)}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        {label}
+      </button>
+      {isOpen ? (
+        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-border/60 bg-background p-4 shadow-xl">
+          {segment.components.length === 1 ? (
+            <SentenceGlossPanel component={segment.components[0]!} />
+          ) : (
+            <MeaningSegmentGlossPanel segment={segment} />
+          )}
         </div>
       ) : null}
     </span>
@@ -390,7 +513,7 @@ function InlineGlossToken({
     <span className="relative inline-block align-baseline" onMouseLeave={() => setIsOpen(false)}>
       <button
         type="button"
-        className="inline rounded-xl border-b-2 border-primary/35 bg-primary/10 px-1.5 py-0.5 font-black text-primary transition-colors hover:border-primary hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="inline rounded-none border-b border-primary/35 bg-transparent px-0.5 py-0 font-black text-primary transition-colors hover:border-primary/60 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         onMouseEnter={() => setIsOpen(true)}
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -441,6 +564,78 @@ function SentenceContentDisplay({
   )
 }
 
+function SentenceMeaningDisplay({
+  text,
+  audioUrl,
+  meaningSegments,
+  interactionWords,
+  sourceComponents,
+}: {
+  text: string
+  audioUrl?: string
+  meaningSegments?: Array<{
+    text: string
+    sourceWordIndexes: number[]
+    sourceComponentIndexes?: number[]
+  }>
+  interactionWords?: string[]
+  sourceComponents?: LearningContentComponent[]
+}) {
+  const segmentDisplays = useMemo(() => {
+    if (!Array.isArray(meaningSegments) || meaningSegments.length === 0) return []
+
+    return meaningSegments
+      .map((segment) => {
+        const sourceWords = Array.isArray(interactionWords)
+          ? segment.sourceWordIndexes
+              .map((index) => interactionWords[index] || '')
+              .filter(Boolean)
+          : []
+        const components = Array.isArray(sourceComponents)
+          ? (segment.sourceComponentIndexes || [])
+              .map((index) => sourceComponents[index])
+              .filter((component): component is LearningContentComponent => Boolean(component))
+          : []
+        if (!segment.text.trim()) return null
+        return {
+          text: segment.text,
+          sourceWords,
+          components,
+        }
+      })
+      .filter((segment): segment is MeaningSegmentDisplay => Boolean(segment))
+  }, [interactionWords, meaningSegments, sourceComponents])
+
+  return (
+    <div className="space-y-4 text-center">
+      <div className="flex items-start justify-center gap-2">
+        <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-1 shrink-0 self-start" />
+        <div className="text-4xl font-black tracking-tight text-primary leading-[1.28] sm:text-5xl">
+          {segmentDisplays.length > 0 ? (
+            segmentDisplays.map((segment, index) => (
+              <span key={`${segment.text}-${index}`}>
+                {index > 0 ? <span className="whitespace-pre-wrap text-primary"> </span> : null}
+                {(segment.sourceWords.length > 0 || segment.components.length > 0) ? (
+                  <MeaningGlossToken label={segment.text} segment={segment} />
+                ) : (
+                  <span className="whitespace-pre-wrap text-primary">{segment.text}</span>
+                )}
+              </span>
+            ))
+          ) : (
+            <span className="whitespace-pre-wrap text-primary">{text}</span>
+          )}
+        </div>
+      </div>
+      {segmentDisplays.length > 0 ? (
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">
+          Hover or tap the highlighted English parts to see the source wording
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function playAudioUrl(url?: string, speed = 1, onEnd?: () => void) {
   if (!url) {
     onEnd?.()
@@ -466,6 +661,7 @@ export function LessonPlayer({
   emptyMessage = 'No content available.',
   preview = false,
   allowStagePicker = false,
+  continuousMode = false,
   enableUiSounds = false,
   culturalSoundResolver,
 }: LessonPlayerProps) {
@@ -523,15 +719,19 @@ export function LessonPlayer({
       .then((data) => {
         setLesson({
           ...data.lesson,
-          currentStageIndex: data.progress?.currentStageIndex ?? data.lesson?.currentStageIndex ?? 0,
+          currentStageIndex: continuousMode
+            ? 0
+            : data.progress?.currentStageIndex ?? data.lesson?.currentStageIndex ?? 0,
           stageProgress: data.progress?.stageProgress ?? data.lesson?.stageProgress ?? [],
           progressPercent: data.progress?.progressPercent ?? data.lesson?.progressPercent ?? 0,
         })
         setBlocks(data.blocks || [])
         setCurrentStageIndex(
-          data.progress?.status === 'completed'
+          continuousMode
             ? 0
-            : (data.progress?.currentStageIndex ?? data.lesson?.currentStageIndex ?? 0),
+            : data.progress?.status === 'completed'
+              ? 0
+              : (data.progress?.currentStageIndex ?? data.lesson?.currentStageIndex ?? 0),
         )
         setCurrentStageBlockIndex(0)
         setIsRetryMode(false)
@@ -559,7 +759,7 @@ export function LessonPlayer({
         onLoadError?.(error)
       })
       .finally(() => setIsLoading(false))
-  }, [clearStageAdvanceTimeout, lessonId, loadFlow, onLoadError])
+  }, [clearStageAdvanceTimeout, continuousMode, lessonId, loadFlow, onLoadError])
 
   useEffect(() => {
     return () => {
@@ -597,6 +797,42 @@ export function LessonPlayer({
   }, [culturalSoundResolver, lesson?.language])
 
   const stageMeta = useMemo<StageSlice[]>(() => {
+    if (continuousMode) {
+      return [
+        {
+          index: 0,
+          title: lesson?.title || 'Lesson',
+          description: lesson?.description || '',
+          blockCount: blocks.length,
+          start: 0,
+          end: blocks.length > 0 ? blocks.length - 1 : -1,
+          blocks,
+        },
+      ]
+    }
+
+    const stages = Array.isArray(lesson?.stages) ? lesson.stages : []
+    let cursor = 0
+
+    return stages.map((stage, index) => {
+      const blockCount = Array.isArray(stage.blocks) ? stage.blocks.length : 0
+      const start = cursor
+      const end = blockCount > 0 ? cursor + blockCount - 1 : cursor - 1
+      const slice = blockCount > 0 ? blocks.slice(start, start + blockCount) : []
+      cursor += blockCount
+      return {
+        index,
+        title: stage.title || `Stage ${index + 1}`,
+        description: stage.description || '',
+        blockCount,
+        start,
+        end,
+        blocks: slice,
+      }
+    })
+  }, [blocks, continuousMode, lesson?.description, lesson?.stages, lesson?.title])
+
+  const navigationStages = useMemo<StageSlice[]>(() => {
     const stages = Array.isArray(lesson?.stages) ? lesson.stages : []
     let cursor = 0
 
@@ -622,6 +858,12 @@ export function LessonPlayer({
   const currentStageBlocks = currentStage?.blocks || []
   const activeStageBlockIndex = isRetryMode ? retryQueue[retryPosition] ?? 0 : currentStageBlockIndex
   const currentBlock = currentStageBlocks[activeStageBlockIndex]
+  const activeNavigationStageIndex = continuousMode
+    ? Math.max(
+        0,
+        navigationStages.findIndex((stage) => activeStageBlockIndex >= stage.start && activeStageBlockIndex <= stage.end),
+      )
+    : currentStageIndex
   const completedStageBlockCount = currentStage
     ? Math.min(currentStage.blockCount, isStageComplete ? currentStage.blockCount : activeStageBlockIndex)
     : 0
@@ -681,11 +923,21 @@ export function LessonPlayer({
   const interactionWords: string[] = exerciseData?.interactionData?.words || exerciseData?.reviewData?.words || []
   const correctOrder: number[] =
     exerciseData?.interactionData?.correctOrder || exerciseData?.reviewData?.correctOrder || []
+  const wordOrderDisplayOrder = useMemo(
+    () => buildWordOrderDisplayOrder(interactionWords, `${exerciseData?._id || currentStageIndex}:${promptText}:${interactionWords.join("||")}`),
+    [exerciseData?._id, currentStageIndex, interactionWords, promptText],
+  )
   const listeningAudioUrl = isListeningQuestion ? questionSource?.audio?.url : undefined
   const questionSentenceText =
     questionSource?.kind === 'sentence' ? questionSource.text || sentenceText : sentenceText || ''
   const questionSentenceComponents =
     questionSource?.kind === 'sentence' && Array.isArray(questionSource.components) ? questionSource.components : []
+  const shouldShowMeaningSentenceCard =
+    exerciseData?.subtype === 'fg-word-order' &&
+    questionSource?.kind === 'sentence' &&
+    Boolean(meaningText.trim()) &&
+    questionSentenceComponents.length > 0 &&
+    /arrange the words to mean/i.test(promptText)
   const inlineSourceComponent =
     questionSource && questionSource.kind && questionSource.kind !== 'sentence'
       ? {
@@ -788,14 +1040,32 @@ export function LessonPlayer({
 
   const handleJumpToStage = useCallback(
     (stageIndex: number) => {
-      if (stageIndex < 0 || stageIndex >= stageMeta.length) return
+      const targetStage = continuousMode ? navigationStages[stageIndex] : stageMeta[stageIndex]
+      if (!targetStage) return
       playClick()
+      if (continuousMode) {
+        clearStageAdvanceTimeout()
+        setCurrentStageIndex(0)
+        setCurrentStageBlockIndex(Math.max(0, targetStage.start))
+        setIsRetryMode(false)
+        setRetryRound(0)
+        setRetryQueue([])
+        setNextRetryQueue([])
+        setRetryPosition(0)
+        setStageMistakesCount(0)
+        setIsStageComplete(false)
+        setStageTransitionCopy(null)
+        setStageStartedAt(Date.now())
+        resetAnswerState()
+        return
+      }
+
       setCurrentStageIndex(stageIndex)
       resetStageState()
       setIsStageIntro(false)
       setStageStartedAt(Date.now())
     },
-    [playClick, resetStageState, stageMeta.length],
+    [clearStageAdvanceTimeout, continuousMode, navigationStages, playClick, resetAnswerState, resetStageState, stageMeta],
   )
 
   const playUiSound = useCallback(
@@ -854,20 +1124,27 @@ export function LessonPlayer({
     if (!lessonId || !currentStage) return
     const elapsedMs = stageStartedAt ? Date.now() - stageStartedAt : 0
     const minutesSpent = Math.max(1, Math.round(elapsedMs / 60000))
-    playUiSound('stageComplete')
-    setIsStageComplete(true)
-    setStageTransitionCopy(
-      buildStageTransitionCopy({
-        mistakesCount: stageMistakesCount,
-        stageNumber: currentStageIndex + 1,
-        totalStages: Math.max(stageMeta.length, 1),
-        isLastStage,
-        preview,
-      }),
-    )
     resetAnswerState()
 
+    if (!continuousMode) {
+      playUiSound('stageComplete')
+      setIsStageComplete(true)
+      setStageTransitionCopy(
+        buildStageTransitionCopy({
+          mistakesCount: stageMistakesCount,
+          stageNumber: currentStageIndex + 1,
+          totalStages: Math.max(stageMeta.length, 1),
+          isLastStage,
+          preview,
+        }),
+      )
+    }
+
     if (!onCompleteStage) {
+      if (continuousMode) {
+        handleAdvanceStage()
+        return
+      }
       clearStageAdvanceTimeout()
       stageAdvanceTimeoutRef.current = setTimeout(() => {
         handleAdvanceStage()
@@ -898,6 +1175,10 @@ export function LessonPlayer({
       console.error('Failed to save stage progress', error)
     } finally {
       setIsSavingStage(false)
+      if (continuousMode) {
+        handleAdvanceStage()
+        return
+      }
       clearStageAdvanceTimeout()
       stageAdvanceTimeoutRef.current = setTimeout(() => {
         handleAdvanceStage()
@@ -905,6 +1186,7 @@ export function LessonPlayer({
     }
   }, [
     clearStageAdvanceTimeout,
+    continuousMode,
     currentStage,
     currentStageIndex,
     handleAdvanceStage,
@@ -930,7 +1212,16 @@ export function LessonPlayer({
         matchingLeftItems.every((item) => selectedMatches[item.id] === item.id) &&
         Object.keys(selectedMatches).length === matchingLeftItems.length
     } else if (isWordOrderQuestion) {
-      correct = selectedWords.join(',') === correctOrder.join(',')
+      const selectedSequence = selectedWords.map((index) => interactionWords[index] || '')
+      if (exerciseData?.subtype === 'fg-letter-order') {
+        correct = selectedSequence.join('') === questionSentenceText
+      } else {
+        const expectedWordOrderText = /build the english meaning of this sentence/i.test(promptText)
+          ? meaningText
+          : questionSentenceText
+        correct =
+          normalizeWordSequence(selectedSequence.join(' ')) === normalizeWordSequence(expectedWordOrderText)
+      }
     } else {
       correct = selectedOption === exerciseData.correctIndex
     }
@@ -1055,7 +1346,9 @@ export function LessonPlayer({
               )}
             >
               <span>
-                {lesson?.title || 'Lesson'} • Stage {currentStageIndex + 1} of {Math.max(stageMeta.length, 1)}
+                {continuousMode
+                  ? `${lesson?.title || 'Lesson'} • Stage ${activeNavigationStageIndex + 1} of ${Math.max(navigationStages.length, 1)}`
+                  : `${lesson?.title || 'Lesson'} • Stage ${currentStageIndex + 1} of ${Math.max(stageMeta.length, 1)}`}
               </span>
               {!isVeryShortViewport ? <span>{isStageComplete ? 'Stage complete' : stageBlockPositionLabel}</span> : null}
             </div>
@@ -1086,16 +1379,16 @@ export function LessonPlayer({
         )}
       >
         <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
-          {preview && allowStagePicker && stageMeta.length > 1 ? (
+          {preview && allowStagePicker && (continuousMode ? navigationStages.length > 1 : stageMeta.length > 1) ? (
             <div className={cx('flex flex-wrap gap-2', isShortViewport ? 'mb-4' : 'mb-6')}>
-              {stageMeta.map((stage) => (
+              {(continuousMode ? navigationStages : stageMeta).map((stage) => (
                 <button
                   key={`stage-jump-${stage.index}`}
                   type="button"
                   className={cx(
                     'rounded-full border font-black transition-colors',
                     isUltraShortViewport ? 'px-2.5 py-1 text-[11px]' : isShortViewport ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm',
-                    currentStageIndex === stage.index
+                    (continuousMode ? activeNavigationStageIndex === stage.index : currentStageIndex === stage.index)
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-white text-foreground/70 hover:border-primary/40 hover:bg-primary/5',
                   )}
@@ -1340,7 +1633,15 @@ export function LessonPlayer({
 
                     {!isListeningQuestion && !isSpeakingQuestion && questionSentenceText ? (
                       <div className={cx('rounded-3xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
-                        {questionSentenceComponents.length > 0 ? (
+                        {shouldShowMeaningSentenceCard ? (
+                          <SentenceMeaningDisplay
+                            text={meaningText}
+                            audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
+                            meaningSegments={exerciseData?.reviewData?.meaningSegments}
+                            interactionWords={interactionWords}
+                            sourceComponents={questionSentenceComponents}
+                          />
+                        ) : questionSentenceComponents.length > 0 ? (
                           <SentenceContentDisplay
                             text={questionSentenceText}
                             components={questionSentenceComponents}
@@ -1650,11 +1951,12 @@ export function LessonPlayer({
                       </div>
 
                       <div className="flex flex-wrap justify-center gap-3">
-                        {interactionWords.map((word: string, idx: number) => {
-                          const isUsed = selectedWords.includes(idx)
+                        {wordOrderDisplayOrder.map((wordIndex: number) => {
+                          const word = interactionWords[wordIndex]
+                          const isUsed = selectedWords.includes(wordIndex)
                           return (
                             <Button
-                              key={idx}
+                              key={wordIndex}
                               variant="outline"
                               className={cx(
                                 'rounded-xl border-2 font-black transition-all',
@@ -1663,7 +1965,7 @@ export function LessonPlayer({
                               )}
                               onClick={() => {
                                 if (isAnswered) return
-                                setSelectedWords((prevWords) => [...prevWords, idx])
+                                setSelectedWords((prevWords) => [...prevWords, wordIndex])
                                 playClick()
                               }}
                               disabled={isAnswered}
@@ -1682,7 +1984,7 @@ export function LessonPlayer({
         </div>
       </div>
 
-      {isStageComplete && stageTransitionCopy ? (
+      {!continuousMode && isStageComplete && stageTransitionCopy ? (
         <div
           className="fixed inset-0 z-[120] isolate pointer-events-auto"
           style={{ backgroundColor: 'hsl(var(--background))', opacity: 1 }}
@@ -1800,7 +2102,7 @@ export function LessonPlayer({
                     onClick={handleAdvanceStage}
                     disabled={isSavingStage}
                   >
-                    {isLastStage ? 'Finish Preview' : 'Skip Stage'}
+                    {continuousMode ? 'Finish Preview' : isLastStage ? 'Finish Preview' : 'Skip Stage'}
                   </Button>
                 ) : null}
                 {isExerciseBlock ? (

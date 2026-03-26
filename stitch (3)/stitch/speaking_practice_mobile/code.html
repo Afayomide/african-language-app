@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Learning Yoruba - Speak Practice</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "inverse-on-surface": "#9f9d97",
+                "on-background": "#39382f",
+                "error-container": "#fa7150",
+                "outline-variant": "#bcb9ad",
+                "primary-fixed-dim": "#ff9a65",
+                "surface-container-highest": "#ece8db",
+                "error-dim": "#821a01",
+                "on-secondary": "#ffffff",
+                "primary-fixed": "#ffae86",
+                "tertiary-fixed": "#b9eeab",
+                "secondary-dim": "#765100",
+                "surface-tint": "#a94600",
+                "on-tertiary": "#ffffff",
+                "on-primary-container": "#692900",
+                "secondary-fixed-dim": "#ffcc79",
+                "surface-container-lowest": "#ffffff",
+                "surface-container": "#f7f3ea",
+                "on-tertiary-container": "#2d5a27",
+                "on-tertiary-fixed-variant": "#376430",
+                "secondary-fixed": "#ffdeac",
+                "on-tertiary-fixed": "#1a4716",
+                "on-error": "#ffffff",
+                "inverse-surface": "#0f0e0b",
+                "tertiary-fixed-dim": "#abdf9e",
+                "background": "#fffbff",
+                "surface-dim": "#e6e3d3",
+                "outline": "#838175",
+                "tertiary-container": "#b9eeab",
+                "surface-container-low": "#fdf9f1",
+                "on-secondary-fixed": "#563a00",
+                "on-error-container": "#671200",
+                "inverse-primary": "#fd8542",
+                "on-primary-fixed-variant": "#772f00",
+                "on-secondary-fixed-variant": "#7a5400",
+                "on-surface-variant": "#66655a",
+                "on-secondary-container": "#6e4b00",
+                "on-primary": "#ffffff",
+                "secondary-container": "#ffdeac",
+                "surface-bright": "#fffbff",
+                "surface-container-high": "#f1eee2",
+                "on-surface": "#39382f",
+                "surface-variant": "#ece8db",
+                "tertiary-dim": "#35632e",
+                "tertiary": "#416f39",
+                "secondary": "#865d00",
+                "primary": "#a94600",
+                "error": "#b23d21",
+                "surface": "#fffbff",
+                "primary-container": "#ffae86",
+                "primary-dim": "#953d00",
+                "on-primary-fixed": "#481a00"
+              },
+              fontFamily: {
+                "headline": ["Plus Jakarta Sans"],
+                "body": ["Manrope"],
+                "label": ["Manrope"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        body {
+            overscroll-behavior-y: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar Section -->
+<header class="bg-stone-50/80 dark:bg-stone-950/80 backdrop-blur-xl fixed top-0 w-full z-50">
+<div class="flex items-center justify-between px-6 py-4 w-full">
+<button class="active:translate-y-0.5 transition-transform duration-150 hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-orange-700 dark:text-orange-500" data-icon="close">close</span>
+</button>
+<div class="flex-1 px-8">
+<div class="bg-surface-container-highest h-2.5 w-full rounded-full overflow-hidden shadow-inner relative">
+<div class="bg-primary h-full rounded-full w-[65%] transition-all duration-700 ease-out shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"></div>
+</div>
+</div>
+<button class="active:translate-y-0.5 transition-transform duration-150 hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-orange-700 dark:text-orange-500" data-icon="history_edu">history_edu</span>
+</button>
+</div>
+<!-- Progress Indicator Divider Shadow -->
+<div class="bg-stone-200 dark:bg-stone-800 h-1.5 w-full overflow-hidden opacity-30"></div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 mt-20 mb-28 flex flex-col items-center justify-center px-6 relative">
+<!-- Instruction Label -->
+<div class="mb-8 text-center">
+<span class="font-label text-[11px] font-bold uppercase tracking-[0.15em] text-secondary opacity-80">SPEAK THIS PHRASE</span>
+</div>
+<!-- Asymmetric Word Card -->
+<div class="w-full max-w-sm relative">
+<div class="absolute -top-4 -right-2 w-16 h-16 bg-tertiary/10 rounded-full blur-2xl"></div>
+<div class="absolute -bottom-6 -left-4 w-24 h-24 bg-primary/10 rounded-full blur-3xl"></div>
+<div class="bg-surface-container-low rounded-[2rem] p-10 flex flex-col items-center justify-center relative z-10 shadow-none border-0">
+<h1 class="font-headline text-5xl md:text-6xl font-extrabold text-on-surface tracking-tight mb-2">Káàárọ̀</h1>
+<p class="font-body text-on-surface-variant text-lg opacity-70">Good morning</p>
+<button class="mt-8 w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center text-primary active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined text-3xl filled-icon" data-icon="volume_up" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</button>
+</div>
+</div>
+<!-- Recording Interface -->
+<div class="mt-16 flex flex-col items-center">
+<div class="relative group">
+<!-- Outer Pulse Rings -->
+<div class="absolute inset-0 bg-primary/20 rounded-full animate-ping scale-150 opacity-20 group-active:animate-none"></div>
+<!-- Main Mic Button -->
+<button class="relative w-28 h-28 rounded-full bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center text-on-primary shadow-[0_8px_32px_rgba(169,70,0,0.3)] active:translate-y-1 transition-all duration-150">
+<span class="material-symbols-outlined text-5xl filled-icon" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+<p class="mt-8 font-label text-sm font-semibold text-on-surface-variant tracking-wide">Tap to Record</p>
+</div>
+<!-- Decorative Element (Visual Artifact) -->
+<div class="absolute right-0 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none translate-x-12">
+<span class="material-symbols-outlined text-[200px]" data-icon="graphic_eq">graphic_eq</span>
+</div>
+</main>
+<!-- Persistent Action Bar (Successive Interaction) -->
+<div class="fixed bottom-0 left-0 w-full px-6 pb-10 pt-4 bg-surface/80 backdrop-blur-md z-40">
+<button class="w-full py-5 bg-gradient-to-r from-primary to-primary-container rounded-2xl shadow-[0_8px_24px_rgba(169,70,0,0.25)] flex items-center justify-center gap-3 active:translate-y-0.5 transition-all duration-150">
+<span class="font-headline text-lg font-bold text-on-primary uppercase tracking-wider">Check Answer</span>
+<span class="material-symbols-outlined text-on-primary" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- BottomNavBar (Suppressed as per "Task-Focused" rule in JSON hierarchy) -->
+<!-- However, the JSON provides a BottomNavBar. For this specific 'Speaking Exercise' screen (Task-Focused), I am suppressing the global navigation to prioritize focus as per instructions. -->
+</body></html>

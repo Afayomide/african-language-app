@@ -4,6 +4,7 @@ import type { UnitAiRunSummary, UnitEntity } from "../entities/Unit.js";
 export type UnitListFilter = {
   chapterId?: string;
   language?: Language;
+  languageId?: string | null;
   status?: Status;
   kind?: UnitEntity["kind"];
 };
@@ -31,7 +32,7 @@ export type UnitAiRunUpdateInput = {
 };
 
 export interface UnitRepository {
-  findLastOrderIndex(language: Language, chapterId?: string | null): Promise<number | null>;
+  findLastOrderIndex(language: Language, chapterId?: string | null, languageId?: string | null): Promise<number | null>;
   create(input: UnitCreateInput): Promise<UnitEntity>;
   list(filter: UnitListFilter): Promise<UnitEntity[]>;
   findById(id: string): Promise<UnitEntity | null>;
@@ -39,8 +40,8 @@ export interface UnitRepository {
   updateLastAiRun(id: string, update: UnitAiRunUpdateInput): Promise<UnitEntity | null>;
   softDeleteById(id: string): Promise<UnitEntity | null>;
   publishById(id: string, now: Date): Promise<UnitEntity | null>;
-  findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>>;
+  findByIdsAndLanguage(ids: string[], language: Language, languageId?: string | null): Promise<Array<{ id: string }>>;
   reorderByIds(ids: string[]): Promise<void>;
-  listByLanguage(language: Language): Promise<UnitEntity[]>;
+  listByLanguage(language: Language, languageId?: string | null): Promise<UnitEntity[]>;
   listByChapterId(chapterId: string): Promise<UnitEntity[]>;
 }

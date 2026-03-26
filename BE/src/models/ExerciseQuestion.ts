@@ -50,7 +50,17 @@ const ExerciseQuestionSchema = new Schema(
       sentence: { type: String, default: "" },
       words: { type: [String], default: [] },
       correctOrder: { type: [Number], default: [] },
-      meaning: { type: String, default: "" }
+      meaning: { type: String, default: "" },
+      meaningSegments: {
+        type: [
+          {
+            text: { type: String, required: true, trim: true },
+            sourceWordIndexes: { type: [Number], default: [] },
+            sourceComponentIndexes: { type: [Number], default: [] }
+          }
+        ],
+        default: []
+      }
     },
     interactionData: {
       matchingPairs: {

@@ -9,6 +9,7 @@ import type {
   SentenceUpdateInput
 } from "../../../../domain/repositories/SentenceRepository.js";
 import { mapContentAudio } from "./mapContentAudio.js";
+import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 function mapComponents(rows: Array<{ type?: string; refId?: { toString(): string } | string; orderIndex?: number; textSnapshot?: string }> | null | undefined): ContentComponentRef[] {
   return Array.isArray(rows)
@@ -26,6 +27,7 @@ function toEntity(doc: any): SentenceEntity {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     kind: "sentence",
+    languageId: doc.languageId ? String(doc.languageId) : null,
     language: doc.language,
     text: String(doc.text || ""),
     textNormalized: String(doc.textNormalized || ""),
@@ -57,13 +59,16 @@ function toEntity(doc: any): SentenceEntity {
 
 export class MongooseSentenceRepository implements SentenceRepository {
   async create(input: SentenceCreateInput): Promise<SentenceEntity> {
-    const created = await SentenceModel.create(input);
+    const languageId = await findLanguageIdByCode(input.language);
+    const created = await SentenceModel.create({ ...input, languageId: languageId || null });
     return toEntity(created);
   }
 
   async list(filter: SentenceListFilter): Promise<SentenceEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-    if (filter.language) query.language = filter.language;
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
     if (filter.status) query.status = filter.status;
     const sentences = await SentenceModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
     return sentences.map(toEntity);
@@ -80,13 +85,22 @@ export class MongooseSentenceRepository implements SentenceRepository {
     return sentences.map(toEntity);
   }
 
-  async findByText(language: Language, text: string): Promise<SentenceEntity | null> {
-    const sentence = await SentenceModel.findOne({ language, textNormalized: text.trim().toLowerCase(), isDeleted: { $ne: true } });
+  async findByText(language: Language, text: string, languageId?: string | null): Promise<SentenceEntity | null> {
+    const sentence = await SentenceModel.findOne({
+      ...(await buildScopedLanguageQuery({ language, languageId })),
+      textNormalized: text.trim().toLowerCase(),
+      isDeleted: { $ne: true }
+    });
     return sentence ? toEntity(sentence) : null;
   }
 
   async updateById(id: string, update: SentenceUpdateInput): Promise<SentenceEntity | null> {
-    const sentence = await SentenceModel.findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, update, { new: true });
+    const languageId = update.language ? await findLanguageIdByCode(update.language) : undefined;
+    const sentence = await SentenceModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      languageId === undefined ? update : { ...update, languageId: languageId || null },
+      { new: true }
+    );
     return sentence ? toEntity(sentence) : null;
   }
 

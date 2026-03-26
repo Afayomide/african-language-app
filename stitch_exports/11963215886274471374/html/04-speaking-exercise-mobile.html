@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html class="light" lang="yo"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed": "#ffdeac",
+              "on-secondary": "#ffffff",
+              "inverse-on-surface": "#9f9d97",
+              "tertiary-fixed": "#b9eeab",
+              "tertiary-dim": "#35632e",
+              "inverse-surface": "#0f0e0b",
+              "on-error-container": "#671200",
+              "tertiary-fixed-dim": "#abdf9e",
+              "on-tertiary-fixed-variant": "#376430",
+              "on-surface-variant": "#66655a",
+              "outline": "#838175",
+              "on-primary": "#ffffff",
+              "on-secondary-fixed-variant": "#7a5400",
+              "surface-container-high": "#f1eee2",
+              "surface-tint": "#a94600",
+              "on-primary-fixed": "#481a00",
+              "primary-dim": "#953d00",
+              "primary-container": "#ffae86",
+              "inverse-primary": "#fd8542",
+              "surface-container": "#f7f3ea",
+              "on-primary-fixed-variant": "#772f00",
+              "surface-container-highest": "#ece8db",
+              "secondary-dim": "#765100",
+              "outline-variant": "#bcb9ad",
+              "error": "#b23d21",
+              "primary-fixed-dim": "#ff9a65",
+              "primary": "#a94600",
+              "secondary-container": "#ffdeac",
+              "on-secondary-fixed": "#563a00",
+              "on-background": "#39382f",
+              "error-dim": "#821a01",
+              "surface-container-lowest": "#ffffff",
+              "tertiary": "#416f39",
+              "on-surface": "#39382f",
+              "error-container": "#fa7150",
+              "background": "#fffbff",
+              "secondary-fixed-dim": "#ffcc79",
+              "surface-container-low": "#fdf9f1",
+              "on-error": "#ffffff",
+              "surface-bright": "#fffbff",
+              "surface-dim": "#e6e3d3",
+              "on-tertiary": "#ffffff",
+              "surface-variant": "#ece8db",
+              "on-primary-container": "#692900",
+              "secondary": "#865d00",
+              "on-tertiary-fixed": "#1a4716",
+              "surface": "#fffbff",
+              "primary-fixed": "#ffae86",
+              "on-tertiary-container": "#2d5a27",
+              "tertiary-container": "#b9eeab",
+              "on-secondary-container": "#6e4b00"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .mic-shadow {
+            box-shadow: 0px 8px 24px rgba(57, 56, 47, 0.08);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background font-body text-on-surface min-h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-4 bg-[#fffcfb] dark:bg-[#1a1108]">
+<div class="flex items-center gap-4 w-full">
+<button class="hover:bg-[#f0e6dd] transition-colors p-2 rounded-full flex items-center justify-center text-[#af4b06]">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<!-- Progress Bar Integration -->
+<div class="flex-grow h-3 bg-surface-container-highest rounded-full overflow-hidden relative">
+<div class="absolute inset-y-0 left-0 bg-primary rounded-full" style="width: 65%;"></div>
+<div class="absolute inset-0 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] rounded-full"></div>
+</div>
+<div class="flex items-center gap-1 text-primary font-bold px-3 py-1 bg-surface-container-high rounded-full">
+<span class="material-symbols-outlined text-sm" data-icon="local_fire_department" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="text-xs font-label uppercase tracking-widest">12</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-6 pt-24 pb-12 max-w-2xl mx-auto w-full">
+<!-- Instructional Header -->
+<div class="text-center mb-10">
+<span class="text-on-surface-variant font-label text-xs font-bold tracking-[0.15em] uppercase mb-2 block">Speaking Exercise</span>
+<h1 class="font-headline text-3xl font-extrabold text-on-surface tracking-tight leading-tight">
+                Repeat the phrase
+            </h1>
+</div>
+<!-- The Word Card (Editorial Layout) -->
+<div class="w-full relative mb-12">
+<!-- Background Layering -->
+<div class="absolute -inset-2 bg-surface-container-low rounded-[2rem] -rotate-1"></div>
+<div class="relative bg-surface-container-lowest p-10 rounded-[2rem] mic-shadow flex flex-col items-center text-center border-b-4 border-surface-container-high">
+<div class="mb-4 inline-flex items-center justify-center p-3 bg-secondary-container text-on-secondary-container rounded-xl cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-3xl" data-icon="volume_up">volume_up</span>
+</div>
+<h2 class="font-headline text-5xl font-extrabold text-primary mb-2 tracking-tight">Káàárọ̀</h2>
+<p class="text-on-surface-variant italic font-body text-lg">"Good morning"</p>
+<!-- Visual Pronunciation Guide -->
+<div class="mt-8 flex gap-2">
+<span class="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-sm font-label">Ká-àá-rọ̀</span>
+</div>
+</div>
+</div>
+<!-- Visual Audio Feedback (Glassmorphism Concept) -->
+<div class="w-full max-w-xs h-16 flex items-center justify-center gap-1 mb-12">
+<!-- Static wave representation -->
+<div class="w-1.5 h-4 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-8 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-12 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-10 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-14 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-6 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-10 bg-outline-variant rounded-full opacity-30"></div>
+<div class="w-1.5 h-4 bg-outline-variant rounded-full opacity-30"></div>
+</div>
+<!-- Microphone Interaction Area -->
+<div class="mt-auto flex flex-col items-center gap-6">
+<button class="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-on-primary mic-shadow active:translate-y-[4px] transition-all duration-150 group">
+<span class="material-symbols-outlined text-4xl group-active:scale-110 transition-transform" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+<p class="font-label text-sm font-bold text-on-surface-variant uppercase tracking-widest">Tap to speak</p>
+</div>
+</main>
+<!-- Contextual Context Image (Subtle Editorial Detail) -->
+<div class="fixed bottom-0 right-0 w-32 h-32 opacity-20 pointer-events-none grayscale contrast-125 overflow-hidden rounded-tl-[3rem]">
+<img alt="African textile texture" class="object-cover w-full h-full" data-alt="close-up of traditional woven Yoruba Aso-Oke fabric with intricate orange and brown geometric patterns and rich texture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDU3gkulIslClC7b4E2Y31v9rGBP6UtibBgNw-z2gB6ENWuxfYwZ5o1DeJOkaQqT74JW8bBO8_gXFfBcvjiUwlFqH8gDVlDPUCe2V8t8V6RrlFBjLqf-5vOO5Tcc_NHjS1wT41aC8XJYXQZFfmsRHj5nZjOYaioAHOZth-nXRNiWWzYctkibB6d_cMOzPHGPfS-fKKuDStFIyQmi63kWJDtebXorPLWVnFaL5nEHdkAxYLEGvU9rhdAgoq0mzRNMX36jsJRAvsHgYIh"/>
+</div>
+<!-- Footer Action (Hidden or for focused flow) -->
+<footer class="p-6 bg-surface flex justify-center">
+<button class="w-full max-w-md py-4 rounded-xl font-headline font-bold text-primary bg-surface-container-highest hover:bg-surface-container-high transition-colors active:translate-y-[2px]">
+            Can't talk right now
+        </button>
+</footer>
+</body></html>

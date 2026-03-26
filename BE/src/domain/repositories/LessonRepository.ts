@@ -2,6 +2,7 @@ import type { Language, LessonEntity, LessonStage, Status } from "../entities/Le
 
 export type LessonListFilter = {
   language?: Language;
+  languageId?: string | null;
   unitId?: string;
   status?: Status;
 };
@@ -30,20 +31,20 @@ export interface LessonRepository {
   create(input: LessonCreateInput): Promise<LessonEntity>;
   list(filter: LessonListFilter): Promise<LessonEntity[]>;
   findById(id: string): Promise<LessonEntity | null>;
-  findByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
+  findByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null>;
   updateById(id: string, update: LessonUpdateInput): Promise<LessonEntity | null>;
-  updateByIdAndLanguage(id: string, language: Language, update: LessonUpdateInput): Promise<LessonEntity | null>;
+  updateByIdAndLanguage(id: string, language: Language, update: LessonUpdateInput, languageId?: string | null): Promise<LessonEntity | null>;
   softDeleteById(id: string): Promise<LessonEntity | null>;
-  softDeleteByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
+  softDeleteByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null>;
   restoreById(id: string, orderIndex: number): Promise<LessonEntity | null>;
   publishById(id: string, now: Date): Promise<LessonEntity | null>;
-  finishByIdAndLanguage(id: string, language: Language): Promise<LessonEntity | null>;
-  findByIdsAndLanguage(ids: string[], language: Language): Promise<Array<{ id: string }>>;
+  finishByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null>;
+  findByIdsAndLanguage(ids: string[], language: Language, languageId?: string | null): Promise<Array<{ id: string }>>;
   findByIdsAndUnit(ids: string[], unitId: string): Promise<Array<{ id: string }>>;
   reorderByIds(ids: string[]): Promise<void>;
-  listByLanguage(language: Language): Promise<LessonEntity[]>;
+  listByLanguage(language: Language, languageId?: string | null): Promise<LessonEntity[]>;
   listByUnitId(unitId: string): Promise<LessonEntity[]>;
   listDeletedByUnitId(unitId: string): Promise<LessonEntity[]>;
-  compactOrderIndexes(language: Language): Promise<void>;
+  compactOrderIndexes(language: Language, languageId?: string | null): Promise<void>;
   compactOrderIndexesByUnit(unitId: string): Promise<void>;
 }

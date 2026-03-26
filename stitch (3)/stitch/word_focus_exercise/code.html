@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+
+<html class="light" lang="yo"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant": "#376430",
+              "on-primary-fixed-variant": "#772f00",
+              "secondary-fixed-dim": "#ffcc79",
+              "outline": "#838175",
+              "secondary-dim": "#765100",
+              "on-error": "#ffffff",
+              "on-error-container": "#671200",
+              "inverse-surface": "#0f0e0b",
+              "on-primary-container": "#692900",
+              "surface-variant": "#ece8db",
+              "on-primary": "#ffffff",
+              "surface-dim": "#e6e3d3",
+              "outline-variant": "#bcb9ad",
+              "secondary-container": "#ffdeac",
+              "on-surface": "#39382f",
+              "inverse-primary": "#fd8542",
+              "error": "#b23d21",
+              "on-tertiary-container": "#2d5a27",
+              "surface-container-highest": "#ece8db",
+              "primary-fixed": "#ffae86",
+              "on-secondary": "#ffffff",
+              "on-primary-fixed": "#481a00",
+              "background": "#fffbff",
+              "primary-fixed-dim": "#ff9a65",
+              "tertiary-fixed": "#b9eeab",
+              "tertiary-fixed-dim": "#abdf9e",
+              "surface-container-low": "#fdf9f1",
+              "surface-bright": "#fffbff",
+              "surface": "#fffbff",
+              "tertiary": "#416f39",
+              "tertiary-container": "#b9eeab",
+              "on-secondary-fixed": "#563a00",
+              "secondary": "#865d00",
+              "primary": "#a94600",
+              "on-secondary-fixed-variant": "#7a5400",
+              "primary-dim": "#953d00",
+              "error-dim": "#821a01",
+              "surface-container": "#f7f3ea",
+              "surface-container-high": "#f1eee2",
+              "inverse-on-surface": "#9f9d97",
+              "surface-tint": "#a94600",
+              "on-secondary-container": "#6e4b00",
+              "on-background": "#39382f",
+              "surface-container-lowest": "#ffffff",
+              "secondary-fixed": "#ffdeac",
+              "primary-container": "#ffae86",
+              "error-container": "#fa7150",
+              "on-tertiary": "#ffffff",
+              "on-tertiary-fixed": "#1a4716",
+              "tertiary-dim": "#35632e",
+              "on-surface-variant": "#66655a"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .custom-glass {
+        background: rgba(255, 251, 255, 0.7);
+        backdrop-filter: blur(20px);
+      }
+      .recessed-track {
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- Header Section -->
+<header class="fixed top-0 w-full z-50 bg-orange-50/80 dark:bg-stone-900/80 backdrop-blur-xl flex items-center justify-between px-6 py-4 h-16">
+<div class="flex items-center gap-4 w-full max-w-2xl mx-auto">
+<button class="text-orange-800 dark:text-orange-200 hover:bg-orange-100/50 transition-colors rounded-full p-2 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<div class="flex-1 h-3 bg-surface-container-highest rounded-full recessed-track overflow-hidden">
+<div class="h-full w-[45%] bg-primary rounded-full transition-all duration-500"></div>
+</div>
+<span class="text-on-surface-variant font-label text-xs font-bold">45%</span>
+</div>
+</header>
+<!-- Main Content Area (Scroll-free focus) -->
+<main class="h-screen flex flex-col pt-20 pb-28 px-6 max-w-2xl mx-auto justify-center">
+<!-- Category Anchor -->
+<div class="text-center mb-8">
+<span class="font-label text-xs font-extrabold tracking-[0.2em] text-on-surface-variant opacity-80 uppercase">
+                Word Focus
+            </span>
+</div>
+<!-- Hero Card (Staged Scene) -->
+<div class="relative group">
+<!-- Decorative Backplane -->
+<div class="absolute inset-0 bg-primary/5 rounded-[2.5rem] -rotate-2 scale-105 transition-transform group-hover:rotate-0"></div>
+<div class="relative bg-surface-container-lowest rounded-[2rem] p-10 flex flex-col items-center text-center shadow-[0_8px_40px_-12px_rgba(169,70,0,0.08)]">
+<!-- Audio Controls Cluster -->
+<div class="flex gap-4 mb-10">
+<button class="w-16 h-16 flex items-center justify-center bg-primary rounded-2xl text-on-primary shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined !text-3xl" data-icon="volume_up" style="font-variation-settings: 'FILL' 1;">volume_up</span>
+</button>
+<button class="w-16 h-16 flex items-center justify-center bg-surface-container-high rounded-2xl text-primary hover:bg-surface-container-highest transition-colors active:scale-95">
+<span class="material-symbols-outlined !text-3xl" data-icon="turtle">egg</span>
+</button>
+</div>
+<!-- Word Display -->
+<div class="mb-4">
+<h1 class="font-headline text-5xl md:text-6xl font-bold text-on-surface tracking-tight mb-4">
+                        Káàárọ
+                    </h1>
+<div class="flex justify-center gap-2 mb-8">
+<span class="w-2 h-2 rounded-full bg-primary/20"></span>
+<span class="w-2 h-2 rounded-full bg-primary/20"></span>
+<span class="w-2 h-2 rounded-full bg-primary/20"></span>
+</div>
+</div>
+<!-- Translation Container -->
+<div class="bg-surface-container-low px-8 py-4 rounded-2xl">
+<p class="text-xl md:text-2xl font-body text-on-surface-variant leading-relaxed">
+                        Good morning <span class="text-primary font-medium opacity-80">(casual)</span>
+</p>
+</div>
+<!-- Cultural Context Chip (Subtle Detail) -->
+<div class="mt-8 flex items-center gap-2 text-tertiary font-label text-[10px] font-bold uppercase tracking-widest bg-tertiary-container/30 px-3 py-1.5 rounded-full">
+<span class="material-symbols-outlined !text-xs" data-icon="auto_awesome">auto_awesome</span>
+                    Dialect: Central Yoruba
+                </div>
+</div>
+</div>
+<!-- Instructional Microcopy -->
+<p class="mt-10 text-center text-on-surface-variant/60 font-body text-sm px-12">
+            Repeat this phrase aloud to perfect your tone and rhythm.
+        </p>
+</main>
+<!-- Fixed Action Bar -->
+<div class="fixed bottom-0 w-full p-6 pb-10 bg-gradient-to-t from-surface via-surface/90 to-transparent">
+<div class="max-w-2xl mx-auto">
+<button class="w-full py-5 rounded-3xl bg-gradient-to-br from-primary to-primary-dim text-on-primary font-headline font-bold text-lg shadow-[0_8px_24px_rgba(169,70,0,0.25)] hover:shadow-primary/30 active:translate-y-0.5 transition-all duration-200">
+                Continue
+            </button>
+</div>
+</div>
+<!-- Hidden Navigation Shell (Suppressed for focused task) -->
+<!-- As per instructions: "suppress the navigation shell if the page intent is focused journey" -->
+</body></html>

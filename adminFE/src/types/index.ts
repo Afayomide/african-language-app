@@ -4,6 +4,9 @@ export type Status = "draft" | "finished" | "published";
 export type ContentType = "word" | "expression" | "sentence";
 export type UnitKind = "core" | "review";
 export type UnitReviewStyle = "none" | "star" | "gym";
+export type CurriculumBuildJobStatus = "queued" | "running" | "planned" | "completed" | "failed" | "cancelled";
+export type CurriculumBuildStepKey = "architect" | "generator" | "critic" | "refiner";
+export type CurriculumBuildStepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
 export type LessonBlock = 
   | { type: "text"; content: string }
@@ -93,6 +96,125 @@ export interface Unit {
     }>;
   } | null;
   publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CurriculumBuildJobStep {
+  key: CurriculumBuildStepKey;
+  status: CurriculumBuildStepStatus;
+  attempts: number;
+  message?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface CurriculumBuildJobChapterPlan {
+  title: string;
+  description: string;
+  orderIndex: number;
+  status: "planned" | "created";
+  chapterId?: string | null;
+}
+
+export interface CurriculumBuildJobUnitPlan {
+  chapterId: string;
+  chapterTitle: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  status: "planned" | "created";
+  unitId?: string | null;
+}
+
+export interface CurriculumBuildJobLessonPlan {
+  chapterId: string;
+  chapterTitle: string;
+  unitId: string;
+  unitTitle: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  status: "planned" | "created";
+  lessonId?: string | null;
+}
+
+export interface CurriculumBuildArtifact {
+  _id: string;
+  id?: string;
+  jobId: string;
+  stepKey: "architect" | "generator" | "critic" | "refiner";
+  phaseKey:
+    | "architect_plan"
+    | "architect_checkpoint"
+    | "chapter_shells"
+    | "unit_plan"
+    | "unit_checkpoint"
+    | "unit_shells"
+    | "lesson_plan"
+    | "lesson_checkpoint"
+    | "lesson_shells"
+    | "content_plan"
+    | "content_generation"
+    | "content_checkpoint"
+    | "final_review";
+  scopeType: "job" | "chapter" | "unit" | "lesson";
+  scopeId?: string | null;
+  scopeTitle?: string | null;
+  attempt: number;
+  status: "draft" | "accepted" | "rejected" | "applied" | "failed";
+  summary: string;
+  input?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
+  critic?: {
+    ok: boolean;
+    summary: string;
+    issues: string[];
+    issueDetails?: Record<string, unknown>[];
+  } | null;
+  refiner?: {
+    fixed: boolean;
+    summary: string;
+    fixesApplied: string[];
+    unresolvedIssues: string[];
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CurriculumBuildJob {
+  _id: string;
+  id?: string;
+  language: Language;
+  level: Level;
+  requestedChapterCount: number;
+  topic: string;
+  extraInstructions: string;
+  cefrTarget: string;
+  status: CurriculumBuildJobStatus;
+  currentStepKey: CurriculumBuildStepKey;
+  steps: CurriculumBuildJobStep[];
+  artifacts: {
+    memorySummary: string;
+    priorChapterTitles: string[];
+    priorUnitTitles: string[];
+    chapterPlan: CurriculumBuildJobChapterPlan[];
+    unitPlan: CurriculumBuildJobUnitPlan[];
+    lessonPlan: CurriculumBuildJobLessonPlan[];
+    architectNotes: string[];
+    criticSummary: string;
+    criticIssues: string[];
+    refinerSummary: string;
+  };
+  errors: Array<{
+    stepKey?: CurriculumBuildStepKey | null;
+    message: string;
+    details?: Record<string, unknown> | null;
+    createdAt: string;
+  }>;
+  createdBy: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -315,6 +437,11 @@ export interface ExerciseQuestion {
     words: string[];
     correctOrder: number[];
     meaning: string;
+    meaningSegments?: Array<{
+      text: string;
+      sourceWordIndexes: number[];
+      sourceComponentIndexes?: number[];
+    }>;
   };
   interactionData?: {
     matchingPairs?: QuestionMatchingPair[];

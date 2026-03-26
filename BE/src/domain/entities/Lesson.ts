@@ -27,6 +27,7 @@ export type LessonStage = {
 export type LessonEntity = {
   id: string;
   _id?: string;
+  languageId?: string | null;
   title: string;
   unitId: string;
   language: Language;

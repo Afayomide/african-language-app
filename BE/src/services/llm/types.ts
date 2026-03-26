@@ -27,7 +27,13 @@ export type LlmGeneratedSentenceComponent = {
   type: "word" | "expression";
   text: string;
   translations: string[];
+  fixed?: boolean;
   role?: "core" | "support";
+};
+
+export type LlmGeneratedSentenceMeaningSegment = {
+  text: string;
+  componentIndexes: number[];
 };
 
 export type LlmGeneratedSentence = {
@@ -37,6 +43,7 @@ export type LlmGeneratedSentence = {
   usageNotes?: string;
   explanation?: string;
   components: LlmGeneratedSentenceComponent[];
+  meaningSegments?: LlmGeneratedSentenceMeaningSegment[];
 };
 
 export type LlmGeneratedContextScenarioQuestion = {
