@@ -226,11 +226,15 @@ function buildMatchingFallbackItems(question: ExerciseQuestion | null) {
   const rightItems: QuestionMatchingDisplayItem[] =
     question?.subtype === 'mt-match-image'
       ? matchingPairs
-          .filter((pair) => pair.image?.url)
           .map((pair) => ({
             id: pair.pairId,
             label: pair.image?.altText || pair.translation,
-            image: pair.image || null,
+            image: pair.image || {
+              imageAssetId: '',
+              url: '',
+              thumbnailUrl: '',
+              altText: pair.translation,
+            },
           }))
       : matchingPairs.map((pair) => ({
           id: pair.pairId,
@@ -1896,14 +1900,20 @@ export function LessonPlayer({
                               onClick={() => handleSelectMatchingRight(item.id)}
                               disabled={isAnswered}
                             >
-                              {item.image?.url ? (
+                              {item.image ? (
                                 <div className="space-y-3">
                                   <div className="overflow-hidden rounded-2xl border border-border/50 bg-muted/40">
-                                    <img
-                                      src={item.image.url}
-                                      alt={item.image.altText}
-                                      className={cx('w-full object-cover', isUltraShortViewport ? 'h-20 sm:h-24' : isShortViewport ? 'h-24 sm:h-32' : 'h-28 sm:h-40')}
-                                    />
+                                    {item.image.url ? (
+                                      <img
+                                        src={item.image.url}
+                                        alt={item.image.altText}
+                                        className={cx('w-full object-cover', isUltraShortViewport ? 'h-20 sm:h-24' : isShortViewport ? 'h-24 sm:h-32' : 'h-28 sm:h-40')}
+                                      />
+                                    ) : (
+                                      <div className={cx('flex items-center justify-center bg-muted/70 text-foreground/45', isUltraShortViewport ? 'h-20 sm:h-24' : isShortViewport ? 'h-24 sm:h-32' : 'h-28 sm:h-40')}>
+                                        <span className="text-[11px] font-black uppercase tracking-[0.18em]">Image Coming Soon</span>
+                                      </div>
+                                    )}
                                   </div>
                                   <p className={cx('font-semibold text-foreground/55', isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : 'text-sm')}>
                                     {item.image.altText}

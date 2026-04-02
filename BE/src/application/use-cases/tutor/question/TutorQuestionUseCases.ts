@@ -3,6 +3,7 @@ import type { ExpressionRepository } from "../../../../domain/repositories/Expre
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { QuestionRepository, QuestionUpdateInput } from "../../../../domain/repositories/QuestionRepository.js";
 import type { QuestionEntity } from "../../../../domain/entities/Question.js";
+import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 
 function lessonHasExpression(lesson: Awaited<ReturnType<LessonRepository["findById"]>>, expressionId: string) {
   if (!lesson) return false;
@@ -15,13 +16,14 @@ export class TutorQuestionUseCases {
   constructor(
     private readonly questions: QuestionRepository,
     private readonly lessons: LessonRepository,
-    private readonly expressions: ExpressionRepository
+    private readonly expressions: ExpressionRepository,
+    private readonly words: WordRepository
   ) {}
 
   async create(
     input: {
       lessonId: string;
-      sourceType: "expression";
+      sourceType: "word" | "expression";
       sourceId: string;
       relatedSourceRefs?: QuestionEntity["relatedSourceRefs"];
       translationIndex?: number;
@@ -39,11 +41,16 @@ export class TutorQuestionUseCases {
     const lesson = await this.lessons.findById(input.lessonId);
     if (!lesson || lesson.language !== tutorLanguage) return "lesson_not_found" as const;
 
-    const expression = await this.expressions.findById(input.sourceId);
-    if (!expression) return "source_not_found" as const;
-    if (!lessonHasExpression(lesson, expression.id)) return "source_not_in_lesson" as const;
     const translationIndex = Number(input.translationIndex ?? 0);
-    if (translationIndex < 0 || translationIndex >= expression.translations.length) {
+    const source =
+      input.sourceType === "word"
+        ? await this.words.findById(input.sourceId)
+        : await this.expressions.findById(input.sourceId);
+    if (!source) return "source_not_found" as const;
+    if (input.sourceType === "expression" && !lessonHasExpression(lesson, source.id)) {
+      return "source_not_in_lesson" as const;
+    }
+    if (translationIndex < 0 || translationIndex >= source.translations.length) {
       return "invalid_translation_index" as const;
     }
 
@@ -85,12 +92,17 @@ export class TutorQuestionUseCases {
     const question = await this.getByIdInScope(id, tutorLanguage);
     if (!question) return "question_not_found" as const;
 
-    if (update.sourceType === "expression" && update.sourceId) {
+    if ((update.sourceType === "expression" || update.sourceType === "word") && update.sourceId) {
       const lesson = await this.lessons.findById(question.lessonId);
       if (!lesson) return "question_not_found" as const;
-      const expression = await this.expressions.findById(update.sourceId);
-      if (!expression) return "source_not_found" as const;
-      if (!lessonHasExpression(lesson, expression.id)) return "source_not_in_lesson" as const;
+      const source =
+        update.sourceType === "word"
+          ? await this.words.findById(update.sourceId)
+          : await this.expressions.findById(update.sourceId);
+      if (!source) return "source_not_found" as const;
+      if (update.sourceType === "expression" && !lessonHasExpression(lesson, source.id)) {
+        return "source_not_in_lesson" as const;
+      }
     }
 
     return this.questions.updateById(id, update);

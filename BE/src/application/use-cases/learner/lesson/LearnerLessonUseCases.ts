@@ -9,6 +9,7 @@ import type { QuestionRepository } from "../../../../domain/repositories/Questio
 import type { SentenceRepository } from "../../../../domain/repositories/SentenceRepository.js";
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
+import type { ChapterRepository } from "../../../../domain/repositories/ChapterRepository.js";
 import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 import type { LearnerContentPerformanceEntity } from "../../../../domain/entities/LearnerContentPerformance.js";
 import type {
@@ -27,6 +28,7 @@ import {
   scoreAdaptiveReviewTarget
 } from "../../../services/adaptiveReviewPriority.js";
 import { ContentLookupService, type ResolvedContentEntity } from "../../../services/ContentLookupService.js";
+import { derivePersistentAchievements } from "../../../services/learnerStats.js";
 
 export const LESSON_STEPS = [
   { key: "multiple-choice", title: "Multiple Choice", description: "Learn essential words", route: "/study" },
@@ -220,18 +222,20 @@ function buildMatchingInteractionData(question: QuestionEntity) {
   const rightItems: MatchingDisplayItem[] =
     question.subtype === "mt-match-image"
       ? matchingPairs
-          .filter((pair) => pair.image?.url)
           .map((pair) => ({
             id: pair.pairId,
             label: pair.image?.altText || pair.translation,
-            image: pair.image || null
+            image: pair.image || {
+              imageAssetId: "",
+              url: "",
+              thumbnailUrl: "",
+              altText: pair.translation
+            }
           }))
       : matchingPairs.map((pair) => ({
           id: pair.pairId,
           label: pair.translation
         }));
-
-  if (rightItems.length !== matchingPairs.length) return null;
 
   return {
     matchingPairs,
@@ -364,14 +368,52 @@ function syncStageProgress(lesson: LessonEntity, progress: LessonProgressEntity)
   return { stageProgress: merged, currentStageIndex };
 }
 
-function buildOrderedPublishedLessons(units: Array<{ id: string; orderIndex: number }>, lessons: LessonEntity[]) {
-  const unitOrderMap = new Map(units.map((unit) => [unit.id, unit.orderIndex]));
+function buildOrderedPublishedUnits<T extends { id: string; chapterId?: string | null; orderIndex: number; createdAt: Date }>(
+  chapters: Array<{ id: string; orderIndex: number; createdAt: Date }>,
+  units: T[]
+): T[] {
+  const chapterMetaById = new Map(
+    chapters.map((chapter) => [
+      chapter.id,
+      { orderIndex: chapter.orderIndex, createdAt: chapter.createdAt.getTime() }
+    ])
+  );
+
+  return units
+    .slice()
+    .sort((left, right) => {
+      const leftChapter = left.chapterId ? chapterMetaById.get(left.chapterId) : null;
+      const rightChapter = right.chapterId ? chapterMetaById.get(right.chapterId) : null;
+      const leftChapterOrder = leftChapter?.orderIndex ?? Number.MAX_SAFE_INTEGER;
+      const rightChapterOrder = rightChapter?.orderIndex ?? Number.MAX_SAFE_INTEGER;
+      const chapterOrderDiff = leftChapterOrder - rightChapterOrder;
+      if (chapterOrderDiff !== 0) return chapterOrderDiff;
+
+      if ((left.chapterId || null) !== (right.chapterId || null)) {
+        const leftChapterTime = leftChapter?.createdAt ?? Number.MAX_SAFE_INTEGER;
+        const rightChapterTime = rightChapter?.createdAt ?? Number.MAX_SAFE_INTEGER;
+        const chapterTimeDiff = leftChapterTime - rightChapterTime;
+        if (chapterTimeDiff !== 0) return chapterTimeDiff;
+        return String(left.chapterId || "").localeCompare(String(right.chapterId || ""));
+      }
+
+      const unitOrderDiff = (left.orderIndex ?? 0) - (right.orderIndex ?? 0);
+      if (unitOrderDiff !== 0) return unitOrderDiff;
+      return left.createdAt.getTime() - right.createdAt.getTime();
+    });
+}
+
+function buildOrderedPublishedLessons<T extends { id: string; orderIndex: number; createdAt: Date }>(
+  orderedUnits: T[],
+  lessons: LessonEntity[]
+) {
+  const unitPositionMap = new Map(orderedUnits.map((unit, index) => [unit.id, index]));
   return lessons
-    .filter((lesson) => unitOrderMap.has(lesson.unitId))
+    .filter((lesson) => unitPositionMap.has(lesson.unitId))
     .slice()
     .sort((a, b) => {
-      const unitOrderDiff = (unitOrderMap.get(a.unitId) ?? 0) - (unitOrderMap.get(b.unitId) ?? 0);
-      if (unitOrderDiff !== 0) return unitOrderDiff;
+      const unitPositionDiff = (unitPositionMap.get(a.unitId) ?? 0) - (unitPositionMap.get(b.unitId) ?? 0);
+      if (unitPositionDiff !== 0) return unitPositionDiff;
       const lessonOrderDiff = (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
       if (lessonOrderDiff !== 0) return lessonOrderDiff;
       return a.createdAt.getTime() - b.createdAt.getTime();
@@ -500,6 +542,7 @@ export class LearnerLessonUseCases {
   constructor(
     private readonly lessons: LessonRepository,
     private readonly units: UnitRepository,
+    private readonly chapters: ChapterRepository,
     private readonly words: WordRepository,
     private readonly expressions: ExpressionRepository,
     private readonly sentences: SentenceRepository,
@@ -549,6 +592,8 @@ export class LearnerLessonUseCases {
 
     const safeXp = Math.max(0, input.xpEarned);
     const safeMinutes = Math.max(0, input.minutesSpent);
+    const nextProfileTotalXp = profile.totalXp + safeXp;
+    const nextStateTotalXp = state.totalXp + safeXp;
     const nextGlobalActivity = buildActivityStateUpdate(
       {
         currentStreak: profile.currentStreak,
@@ -570,11 +615,21 @@ export class LearnerLessonUseCases {
 
     const [updatedProfile, updatedState] = await Promise.all([
       this.learnerProfiles.updateByUserId(input.userId, {
-        totalXp: profile.totalXp + safeXp,
+        totalXp: nextProfileTotalXp,
+        achievements: derivePersistentAchievements({
+          existingAchievements: profile.achievements,
+          completedLessonsCount: profile.completedLessonsCount,
+          totalXp: nextProfileTotalXp
+        }),
         ...nextGlobalActivity
       }),
       this.learnerLanguageStates.updateByUserAndLanguage(input.userId, input.language, {
-        totalXp: state.totalXp + safeXp,
+        totalXp: nextStateTotalXp,
+        achievements: derivePersistentAchievements({
+          existingAchievements: state.achievements,
+          completedLessonsCount: state.completedLessonsCount,
+          totalXp: nextStateTotalXp
+        }),
         ...nextLanguageActivity,
         isEnrolled: true
       })
@@ -1068,8 +1123,8 @@ export class LearnerLessonUseCases {
       }
     }
 
-    if (topContentTargets.length >= 2) {
-      const matchingPairs = topContentTargets.map((item, index) => ({
+    if (topContentTargets.length >= 4) {
+      const matchingPairs = topContentTargets.slice(0, 4).map((item, index) => ({
         pairId: `${item.kind}-${item.id}-${index + 1}`,
         contentType: item.kind,
         contentId: item.id,
@@ -1495,11 +1550,13 @@ export class LearnerLessonUseCases {
     const profile = await this.learnerProfiles.findByUserId(userId);
     if (!profile) return "profile_not_found" as const;
 
-    const [units, lessons] = await Promise.all([
+    const [chapters, units, lessons] = await Promise.all([
+      this.chapters.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
       this.units.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
       this.lessons.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null })
     ]);
-    const orderedLessons = buildOrderedPublishedLessons(units, lessons);
+    const orderedUnits = buildOrderedPublishedUnits(chapters, units);
+    const orderedLessons = buildOrderedPublishedLessons(orderedUnits, lessons);
 
     const progresses = await this.progress.listByUserAndLessonIds(
       userId,
@@ -1524,11 +1581,13 @@ export class LearnerLessonUseCases {
     const languageId =
       lesson.languageId ||
       (profile?.currentLanguage === lesson.language ? profile.activeLanguageId || null : null);
-    const [units, allLanguageLessons] = await Promise.all([
+    const [chapters, units, allLanguageLessons] = await Promise.all([
+      this.chapters.list({ status: "published", language, languageId }),
       this.units.list({ status: "published", language, languageId }),
       this.lessons.list({ status: "published", language, languageId })
     ]);
-    const orderedLessons = buildOrderedPublishedLessons(units, allLanguageLessons);
+    const orderedUnits = buildOrderedPublishedUnits(chapters, units);
+    const orderedLessons = buildOrderedPublishedLessons(orderedUnits, allLanguageLessons);
     const lessonIndex = orderedLessons.findIndex((item) => item.id === lesson.id);
     const futureLessons =
       lessonIndex >= 0
@@ -1666,31 +1725,12 @@ export class LearnerLessonUseCases {
       ? Math.max(1, Math.round(Number(input.minutesSpent)))
       : Math.max(1, stageBlockCount);
 
-    const learnerStats = wasStageAlreadyCompleted
-      ? await (async () => {
-          const profile = await this.learnerProfiles.findByUserId(input.userId);
-          if (!profile) return null;
-          const state = await this.ensureLearnerLanguageState({
-            userId: input.userId,
-            language: lesson.language,
-            profile
-          });
-          return state
-            ? {
-                totalXp: state.totalXp,
-                currentStreak: state.currentStreak,
-                longestStreak: state.longestStreak,
-                todayMinutes: getTodayMinutes(state.weeklyActivity),
-                dailyGoalMinutes: state.dailyGoalMinutes
-              }
-            : null;
-        })()
-      : await this.recordLearnerStageActivity({
-          userId: input.userId,
-          language: lesson.language,
-          xpEarned: stageXpEarned,
-          minutesSpent: stageMinutesSpent
-        });
+    const learnerStats = await this.recordLearnerStageActivity({
+      userId: input.userId,
+      language: lesson.language,
+      xpEarned: wasStageAlreadyCompleted ? 0 : stageXpEarned,
+      minutesSpent: stageMinutesSpent
+    });
 
     return {
       lessonId: lesson.id,
@@ -1754,24 +1794,27 @@ export class LearnerLessonUseCases {
         })
       : null;
     if (profile && state && !wasCompleted) {
-      const languageAchievements = [...state.achievements];
-      if (!languageAchievements.includes("First Step")) {
-        languageAchievements.push("First Step");
-      }
-
-      const profileAchievements = [...profile.achievements];
-      if (!profileAchievements.includes("First Step")) {
-        profileAchievements.push("First Step");
-      }
+      const nextLanguageCompletedLessonsCount = state.completedLessonsCount + 1;
+      const nextProfileCompletedLessonsCount = profile.completedLessonsCount + 1;
+      const languageAchievements = derivePersistentAchievements({
+        existingAchievements: state.achievements,
+        completedLessonsCount: nextLanguageCompletedLessonsCount,
+        totalXp: state.totalXp
+      });
+      const profileAchievements = derivePersistentAchievements({
+        existingAchievements: profile.achievements,
+        completedLessonsCount: nextProfileCompletedLessonsCount,
+        totalXp: profile.totalXp
+      });
 
       const [updatedState] = await Promise.all([
         this.learnerLanguageStates.updateByUserAndLanguage(input.userId, lesson.language, {
-          completedLessonsCount: state.completedLessonsCount + 1,
+          completedLessonsCount: nextLanguageCompletedLessonsCount,
           achievements: languageAchievements,
           isEnrolled: true
         }),
         this.learnerProfiles.updateByUserId(input.userId, {
-          completedLessonsCount: profile.completedLessonsCount + 1,
+          completedLessonsCount: nextProfileCompletedLessonsCount,
           achievements: profileAchievements
         })
       ]);

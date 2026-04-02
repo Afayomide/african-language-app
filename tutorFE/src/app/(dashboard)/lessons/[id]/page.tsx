@@ -272,7 +272,13 @@ export default function EditLessonPage({
     try {
       const data = await lessonService.auditLesson(id);
       setAudit(data);
-      toast.success(data.ok ? "Lesson audit passed" : "Lesson audit found issues");
+      toast.success(
+        data.ok
+          ? data.publishBlocked
+            ? "Lesson audit found publish-blocking warnings"
+            : "Lesson audit passed"
+          : "Lesson audit found issues"
+      );
       return data;
     } catch (error) {
       toast.error("Failed to audit lesson");

@@ -2,6 +2,7 @@ import type { ExpressionRepository } from "../../../../domain/repositories/Expre
 import type { QuestionRepository, QuestionUpdateInput } from "../../../../domain/repositories/QuestionRepository.js";
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { QuestionEntity } from "../../../../domain/entities/Question.js";
+import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 
 function lessonHasExpression(lesson: Awaited<ReturnType<LessonRepository["findById"]>>, expressionId: string) {
   if (!lesson) return false;
@@ -14,12 +15,13 @@ export class AdminQuestionUseCases {
   constructor(
     private readonly questions: QuestionRepository,
     private readonly lessons: LessonRepository,
-    private readonly expressions: ExpressionRepository
+    private readonly expressions: ExpressionRepository,
+    private readonly words: WordRepository
   ) {}
 
   async create(input: {
     lessonId: string;
-    sourceType: "expression";
+    sourceType: "word" | "expression";
     sourceId: string;
     relatedSourceRefs?: QuestionEntity["relatedSourceRefs"];
     translationIndex?: number;
@@ -35,11 +37,16 @@ export class AdminQuestionUseCases {
     const lesson = await this.lessons.findById(input.lessonId);
     if (!lesson) return "lesson_not_found" as const;
 
-    const expression = await this.expressions.findById(input.sourceId);
-    if (!expression) return "source_not_found" as const;
-    if (!lessonHasExpression(lesson, expression.id)) return "source_not_in_lesson" as const;
     const translationIndex = Number(input.translationIndex ?? 0);
-    if (translationIndex < 0 || translationIndex >= expression.translations.length) {
+    const source =
+      input.sourceType === "word"
+        ? await this.words.findById(input.sourceId)
+        : await this.expressions.findById(input.sourceId);
+    if (!source) return "source_not_found" as const;
+    if (input.sourceType === "expression" && !lessonHasExpression(lesson, source.id)) {
+      return "source_not_in_lesson" as const;
+    }
+    if (translationIndex < 0 || translationIndex >= source.translations.length) {
       return "invalid_translation_index" as const;
     }
 
@@ -80,15 +87,35 @@ export class AdminQuestionUseCases {
     if (!question) return "question_not_found" as const;
     if (question.status !== "finished") return "question_not_finished" as const;
 
-    if (question.sourceType === "expression" && question.sourceId) {
+    if ((question.sourceType === "expression" || question.sourceType === "word") && question.sourceId) {
       const ids = Array.from(
         new Set([
           question.sourceId,
           ...(Array.isArray(question.relatedSourceRefs) ? question.relatedSourceRefs.map((item) => item.id) : [])
         ])
       );
-      const expressions = await this.expressions.findByIds(ids);
-      if (expressions.length !== ids.length || expressions.some((item) => item.status !== "published")) {
+      const expressionIds = Array.from(
+        new Set(
+          [question.sourceType === "expression" ? question.sourceId : "", ...(question.relatedSourceRefs || []).filter((item) => item.type === "expression").map((item) => item.id)]
+            .filter(Boolean)
+        )
+      );
+      const wordIds = Array.from(
+        new Set(
+          [question.sourceType === "word" ? question.sourceId : "", ...(question.relatedSourceRefs || []).filter((item) => item.type === "word").map((item) => item.id)]
+            .filter(Boolean)
+        )
+      );
+      const [expressions, words] = await Promise.all([
+        expressionIds.length > 0 ? this.expressions.findByIds(expressionIds) : Promise.resolve([]),
+        wordIds.length > 0 ? this.words.findByIds(wordIds) : Promise.resolve([])
+      ]);
+      if (
+        expressions.length !== expressionIds.length ||
+        words.length !== wordIds.length ||
+        expressions.some((item) => item.status !== "published") ||
+        words.some((item) => item.status !== "published")
+      ) {
         return "linked_source_must_be_published" as const;
       }
     }

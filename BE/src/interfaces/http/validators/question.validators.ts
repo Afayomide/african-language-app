@@ -91,6 +91,7 @@ export function subtypeUsesMatching(subtype: string) {
 }
 
 export type ParsedMatchingPair = {
+  contentType: "word" | "expression";
   contentId: string;
   translationIndex: number;
   imageAssetId?: string;
@@ -109,10 +110,18 @@ export function parseQuestionMatchingPairs(interactionData: unknown, subtype: st
   for (const item of payload.matchingPairs) {
     if (!item || typeof item !== "object") return null;
     const pair = item as {
+      contentType?: unknown;
       contentId?: unknown;
       translationIndex?: unknown;
       imageAssetId?: unknown;
     };
+    const rawContentType = String(pair.contentType || "").trim();
+    const contentType =
+      rawContentType === "word" || rawContentType === "expression"
+        ? rawContentType
+        : subtype === "mt-match-image"
+          ? "word"
+          : "expression";
     const contentId = String(pair.contentId || "").trim();
     if (!contentId) return null;
 
@@ -121,15 +130,19 @@ export function parseQuestionMatchingPairs(interactionData: unknown, subtype: st
 
     const imageAssetId = String(pair.imageAssetId || "").trim();
     if (subtype === "mt-match-image" && !imageAssetId) {
-      parsedPairs.push({ contentId, translationIndex });
+      parsedPairs.push({ contentType, contentId, translationIndex });
       continue;
     }
 
-    parsedPairs.push(imageAssetId ? { contentId, translationIndex, imageAssetId } : { contentId, translationIndex });
+    parsedPairs.push(
+      imageAssetId
+        ? { contentType, contentId, translationIndex, imageAssetId }
+        : { contentType, contentId, translationIndex }
+    );
   }
 
-  const uniquePairKeys = new Set(parsedPairs.map((item) => `${item.contentId}:${item.translationIndex}`));
-  if (parsedPairs.length < 2 || uniquePairKeys.size < 2) return null;
+  const uniquePairKeys = new Set(parsedPairs.map((item) => `${item.contentType}:${item.contentId}:${item.translationIndex}`));
+  if (parsedPairs.length < 4 || uniquePairKeys.size < 4) return null;
 
   return parsedPairs;
 }

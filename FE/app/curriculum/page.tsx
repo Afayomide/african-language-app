@@ -54,7 +54,10 @@ type CurriculumData = {
     totalXp: number
     dailyGoalMinutes: number
     todayMinutes: number
+    dailyProgressPercent?: number
+    courseProgressPercent?: number
     completedLessonsCount?: number
+    totalLessonsCount?: number
   }
   learnerLanguages?: LearnerLanguageSummary[]
   nextLesson: {
@@ -66,6 +69,7 @@ type CurriculumData = {
     currentStageIndex?: number
     totalStages?: number
     progressPercent?: number
+    orderIndex?: number
   } | null
   chapters?: ChapterSummary[]
 }

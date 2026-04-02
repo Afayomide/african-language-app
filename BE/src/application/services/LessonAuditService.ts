@@ -29,6 +29,7 @@ type AuditFinding = {
 
 export type LessonAuditResult = {
   ok: boolean;
+  publishBlocked: boolean;
   errors: number;
   warnings: number;
   metrics: {
@@ -56,6 +57,17 @@ function normalizeSpace(value: string) {
 
 function addFinding(findings: AuditFinding[], severity: AuditSeverity, code: string, message: string) {
   findings.push({ severity, code, message });
+}
+
+function hasValidPublishedImageUrl(value: string | undefined | null) {
+  const candidate = String(value || "").trim();
+  if (!candidate) return false;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function validateReviewData(question: QuestionEntity) {
@@ -271,11 +283,19 @@ export class LessonAuditService {
             const matchingPairs = Array.isArray(question.interactionData?.matchingPairs)
               ? question.interactionData.matchingPairs
               : [];
-            if (matchingPairs.length < 2) {
-              addFinding(findings, "error", "invalid_matching_pairs", `Question ${question.id} requires at least two matching pairs.`);
+            if (matchingPairs.length < 4) {
+              addFinding(findings, "error", "invalid_matching_pairs", `Question ${question.id} requires at least four matching pairs.`);
             }
-            if (question.subtype === "mt-match-image" && matchingPairs.some((pair) => !String(pair.image?.url || "").trim())) {
-              addFinding(findings, "error", "missing_matching_images", `Image matching question ${question.id} is missing one or more linked images.`);
+            if (question.subtype === "mt-match-image") {
+              const invalidImagePairs = matchingPairs.filter((pair) => !hasValidPublishedImageUrl(pair.image?.url));
+              if (invalidImagePairs.length > 0) {
+                addFinding(
+                  findings,
+                  "warning",
+                  "matching_image_missing_urls",
+                  `Matching-image question ${question.id} has ${invalidImagePairs.length} pair(s) without valid image URLs. Lesson publish is blocked until those image URLs are added.`
+                );
+              }
             }
           }
 
@@ -426,9 +446,11 @@ export class LessonAuditService {
 
     const errors = findings.filter((item) => item.severity === "error").length;
     const warnings = findings.filter((item) => item.severity === "warning").length;
+    const publishBlocked = findings.some((item) => item.code === "matching_image_missing_urls");
 
     return {
       ok: errors === 0,
+      publishBlocked,
       errors,
       warnings,
       metrics: {

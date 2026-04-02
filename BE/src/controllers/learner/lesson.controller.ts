@@ -11,6 +11,7 @@ import { MongooseLearnerContentPerformanceRepository } from "../../infrastructur
 import { MongooseLearnerQuestionMissRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerQuestionMissRepository.js";
 import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
 import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
 import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
 import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
@@ -19,6 +20,7 @@ import type { QuestionSubtype, QuestionType } from "../../domain/entities/Questi
 const useCases = new LearnerLessonUseCases(
   new MongooseLessonRepository(),
   new MongooseUnitRepository(),
+  new MongooseChapterRepository(),
   new MongooseWordRepository(),
   new MongooseExpressionRepository(),
   new MongooseSentenceRepository(),

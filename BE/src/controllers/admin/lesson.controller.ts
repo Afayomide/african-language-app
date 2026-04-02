@@ -502,9 +502,9 @@ export async function publishLesson(req: Request, res: Response) {
   if (!audit) {
     return res.status(404).json({ error: "lesson not found" });
   }
-  if (!audit.ok) {
+  if (!audit.ok || audit.publishBlocked) {
     return res.status(409).json({
-      error: "lesson quality audit failed",
+      error: audit.publishBlocked ? "lesson publish blocked by audit warnings" : "lesson quality audit failed",
       audit
     });
   }

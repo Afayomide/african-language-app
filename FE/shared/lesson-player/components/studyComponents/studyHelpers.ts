@@ -101,11 +101,15 @@ export function buildMatchingFallbackItems(question: ExerciseQuestion | null) {
   const rightItems: QuestionMatchingDisplayItem[] =
     question?.subtype === 'mt-match-image'
       ? matchingPairs
-          .filter((pair) => pair.image?.url)
           .map((pair) => ({
             id: pair.pairId,
             label: pair.image?.altText || pair.translation,
-            image: pair.image || null,
+            image: pair.image || {
+              imageAssetId: '',
+              url: '',
+              thumbnailUrl: '',
+              altText: pair.translation,
+            },
           }))
       : matchingPairs.map((pair) => ({
           id: pair.pairId,

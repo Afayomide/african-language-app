@@ -24,17 +24,46 @@ export class TutorLessonUseCases {
     this.contentLookup = new ContentLookupService(words, expressions, sentences);
   }
 
-  private listContentRefs(lesson: LessonEntity) {
-    return Array.from(
-      new Map(
-        (lesson.stages || [])
-          .flatMap((stage) => stage.blocks || [])
-          .flatMap((block) => {
-            if (block.type !== "content" || !block.refId) return [];
-            return [[`${block.contentType}:${block.refId}`, { type: block.contentType as ContentType, id: block.refId as string }] as const];
-          })
-      ).values()
-    );
+  private async listAudioContentRefs(lesson: LessonEntity) {
+    const refMap = new Map<string, { type: ContentType; id: string }>();
+
+    for (const stage of lesson.stages || []) {
+      for (const block of stage.blocks || []) {
+        if (block.type !== "content" || !block.refId) continue;
+        refMap.set(`${block.contentType}:${block.refId}`, {
+          type: block.contentType as ContentType,
+          id: block.refId as string
+        });
+      }
+    }
+
+    const questions = await this.questions.list({ lessonId: lesson.id });
+    for (const question of questions) {
+      if (question.sourceType && question.sourceId) {
+        refMap.set(`${question.sourceType}:${question.sourceId}`, {
+          type: question.sourceType,
+          id: question.sourceId
+        });
+      }
+
+      for (const ref of question.relatedSourceRefs || []) {
+        if (!ref?.type || !ref.id) continue;
+        refMap.set(`${ref.type}:${ref.id}`, {
+          type: ref.type,
+          id: ref.id
+        });
+      }
+
+      for (const pair of question.interactionData?.matchingPairs || []) {
+        if (!pair?.contentType || !pair.contentId) continue;
+        refMap.set(`${pair.contentType}:${pair.contentId}`, {
+          type: pair.contentType,
+          id: pair.contentId
+        });
+      }
+    }
+
+    return Array.from(refMap.values());
   }
 
   private hasAcceptedHumanAudio(audio: { referenceType?: string; reviewStatus?: string; url?: string } | undefined) {
@@ -133,7 +162,7 @@ export class TutorLessonUseCases {
     const lesson = await this.getById(id, language);
     if (!lesson) return null;
 
-    const refs = this.listContentRefs(lesson);
+    const refs = await this.listAudioContentRefs(lesson);
     for (const ref of refs) {
       const content = await this.contentLookup.findByRef(ref.type, ref.id);
       if (!content || this.hasAcceptedHumanAudio(content.audio)) continue;

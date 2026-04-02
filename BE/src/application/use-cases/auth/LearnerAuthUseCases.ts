@@ -156,6 +156,13 @@ export class LearnerAuthUseCases {
       }
     );
 
+    console.log("LearnerAuthUseCases.me - user:", {
+      id: input.userId,
+      email: input.email,
+      role: input.role
+    });
+    console.log("LearnerAuthUseCases.me - profile:", profile);
+
     return {
       user: {
         id: input.userId,
@@ -212,7 +219,7 @@ export class LearnerAuthUseCases {
       throw new AuthError(500, "Failed to update learner profile.");
     }
 
-    await this.learnerLanguageStates.upsertByUserAndLanguage(
+ await this.learnerLanguageStates.upsertByUserAndLanguage(
       userId,
       updated.currentLanguage,
       {
@@ -226,6 +233,7 @@ export class LearnerAuthUseCases {
         dailyGoalMinutes: updated.dailyGoalMinutes
       }
     );
+
 
     return {
       profile: updated,

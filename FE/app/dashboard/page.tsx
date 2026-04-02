@@ -51,9 +51,12 @@ type DashboardData = {
     globalTotalXp?: number
     dailyGoalMinutes: number
     todayMinutes: number
+    dailyProgressPercent?: number
     globalTodayMinutes?: number
     completedLessonsCount?: number
     globalCompletedLessonsCount?: number
+    totalLessonsCount?: number
+    courseProgressPercent?: number
   }
   learnerLanguages?: LearnerLanguageSummary[]
   nextLesson: {
@@ -62,6 +65,7 @@ type DashboardData = {
     unitTitle?: string
     title: string
     description: string
+    orderIndex?: number
     currentStageIndex?: number
     totalStages?: number
     progressPercent?: number
@@ -91,6 +95,13 @@ type DashboardData = {
 }
 
 type UnitSummary = NonNullable<DashboardData['units']>[number]
+type MasteryLesson = {
+  id: string
+  title: string
+  description: string
+  level: string
+  completedAt?: string | null
+}
 type SupportedLanguage = 'yoruba' | 'igbo' | 'hausa'
 
 const LANGUAGE_UI_COPY: Record<
@@ -236,11 +247,16 @@ export default function DashboardScreen() {
   }, [data?.units, expandedUnitId])
 
   const nextLessonHref = data?.nextLesson ? `/lesson-overview?lessonId=${data.nextLesson.id}` : '/dashboard'
-  const dailyPercent = data
+  const dailyProgressPercent = data?.stats.dailyProgressPercent ?? (data
     ? Math.min(100, Math.round((data.stats.todayMinutes / Math.max(1, data.stats.dailyGoalMinutes)) * 100))
-    : 0
-  const completedLessonCount = data?.completedLessons?.length || 0
-  const masteryLessons = activeUnit?.lessons.slice(0, 4) || []
+    : 0)
+  const courseProgressPercent = data?.stats.courseProgressPercent ?? (data?.stats.totalLessonsCount
+    ? Math.min(
+        100,
+        Math.round(((data.stats.completedLessonsCount || 0) / Math.max(1, data.stats.totalLessonsCount || 0)) * 100),
+      )
+    : 0)
+  const masteryLessons: MasteryLesson[] = data?.completedLessons?.slice(0, 4) || []
   const weeklyOverview = data?.weeklyOverview?.length ? data.weeklyOverview : DEFAULT_WEEK
   const learnerName = session?.profile?.displayName || session?.user?.email?.split('@')[0] || 'Scholar'
   const languageKey = normalizeLanguage(data?.stats.currentLanguage)
@@ -266,9 +282,9 @@ export default function DashboardScreen() {
     <main className="min-h-screen bg-[#fffbff] text-[#39382f]">
       <DashboardDesktop
         activeUnit={activeUnit}
-        completedLessonCount={completedLessonCount}
-        dailyPercent={dailyPercent}
+        courseProgressPercent={courseProgressPercent}
         data={data}
+        dailyProgressPercent={dailyProgressPercent}
         isSwitchingLanguage={isSwitchingLanguage}
         languageKey={languageKey}
         languageLabel={languageLabel}
@@ -283,8 +299,9 @@ export default function DashboardScreen() {
       />
       <DashboardMobile
         activeUnit={activeUnit}
-        dailyPercent={dailyPercent}
+        courseProgressPercent={courseProgressPercent}
         data={data}
+        dailyProgressPercent={dailyProgressPercent}
         isSwitchingLanguage={isSwitchingLanguage}
         languageKey={languageKey}
         languageCopy={copy}
@@ -299,9 +316,9 @@ export default function DashboardScreen() {
 
 function DashboardDesktop({
   activeUnit,
-  completedLessonCount,
-  dailyPercent,
+  courseProgressPercent,
   data,
+  dailyProgressPercent,
   isSwitchingLanguage,
   languageKey,
   languageCopy,
@@ -315,15 +332,15 @@ function DashboardDesktop({
   weeklyOverview,
 }: {
   activeUnit: UnitSummary | null
-  completedLessonCount: number
-  dailyPercent: number
+  courseProgressPercent: number
   data: DashboardData | null
+  dailyProgressPercent: number
   isSwitchingLanguage: boolean
   languageKey: SupportedLanguage
   languageCopy: (typeof LANGUAGE_UI_COPY)[SupportedLanguage]
   languageLabel: string
   learnerName: string
-  masteryLessons: UnitLesson[]
+  masteryLessons: MasteryLesson[]
   nextLessonHref: string
   onLogout: () => void
   onSelectLanguage: (language: SupportedLanguage) => void
@@ -463,6 +480,17 @@ function DashboardDesktop({
                   {data?.nextLesson?.description ||
                     languageCopy.lessonFallbackDescription}
                 </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
+                    Course {courseProgressPercent}%
+                  </span>
+                  <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
+                    {data?.stats.completedLessonsCount || 0} Lessons Complete
+                  </span>
+                  <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
+                    {data?.stats.totalXp || 0} XP
+                  </span>
+                </div>
                 <div className="mt-8 flex gap-4">
                   {nextLessonHref && (
                     <Link
@@ -489,7 +517,7 @@ function DashboardDesktop({
             <div className="col-span-4 flex flex-col gap-6">
               <StatPanel
                 accent="secondary"
-                label="Daily streak"
+                label="Global streak"
                 value={`${data?.stats.streakDays || 0}`}
                 suffix="Days"
                 footer={`${data?.stats.languageStreakDays || 0} days in ${languageLabel}`}
@@ -497,12 +525,12 @@ function DashboardDesktop({
               />
               <StatPanel
                 accent="tertiary"
-                label="Total experience"
-                value={String(data?.stats.totalXp || 0)}
-                suffix="XP"
-                progress={dailyPercent}
-                footer="150 XP to Level 13"
-                icon={Star}
+                label="Daily goal"
+                value={String(data?.stats.todayMinutes || 0)}
+                suffix="Min"
+                progress={dailyProgressPercent}
+                footer={`${data?.stats.todayMinutes || 0}/${data?.stats.dailyGoalMinutes || 0} min`}
+                icon={Target}
               />
             </div>
           </section>
@@ -565,9 +593,10 @@ function DashboardDesktop({
               </Link>
             </div>
             <div className="grid grid-cols-4 gap-4">
-              {(masteryLessons.length > 0
+              {(
+                masteryLessons.length > 0
                 ? masteryLessons
-                : buildPlaceholderLessons(languageKey)
+                : buildPlaceholderMastery(languageKey)
               ).map((lesson) => (
                 <div
                   key={lesson.id}
@@ -585,16 +614,10 @@ function DashboardDesktop({
                     <span
                       className={cn(
                         "mt-1 flex h-4 w-4 items-center justify-center rounded-full",
-                        lesson.status === "completed"
-                          ? "bg-[#2d7c37] text-white"
-                          : "bg-[#ebe4db] text-[#8a7d70]",
+                        "bg-[#2d7c37] text-white",
                       )}
                     >
-                      {lesson.status === "completed" ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <div className="h-1.5 w-1.5 rounded-full bg-current" />
-                      )}
+                      <Check className="h-3 w-3" />
                     </span>
                   </div>
                 </div>
@@ -757,8 +780,9 @@ function DashboardDesktop({
 
 function DashboardMobile({
   activeUnit,
-  dailyPercent,
+  courseProgressPercent,
   data,
+  dailyProgressPercent,
   isSwitchingLanguage,
   languageKey,
   languageCopy,
@@ -768,8 +792,9 @@ function DashboardMobile({
   weeklyOverview,
 }: {
   activeUnit: UnitSummary | null
-  dailyPercent: number
+  courseProgressPercent: number
   data: DashboardData | null
+  dailyProgressPercent: number
   isSwitchingLanguage: boolean
   languageKey: SupportedLanguage
   languageCopy: (typeof LANGUAGE_UI_COPY)[SupportedLanguage]
@@ -821,25 +846,49 @@ function DashboardMobile({
                 <BookOpen className="h-5 w-5" />
               </div>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em] text-white/92">
-                <span>Course Progress</span>
-                <span>{dailyPercent}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-white/16 p-[2px]">
-                <div className="h-full rounded-full bg-white" style={{ width: `${dailyPercent}%` }} />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em] text-white/92">
+                  <span>Course Progress</span>
+                  <span>{courseProgressPercent}%</span>
+                </div>
+                <div className="h-3 rounded-full bg-white/16 p-[2px]">
+                  <div className="h-full rounded-full bg-white" style={{ width: `${courseProgressPercent}%` }} />
+                </div>
+                <p className="text-xs font-semibold text-white/80">
+                  {data?.stats.completedLessonsCount || 0} lessons complete · {data?.stats.totalXp || 0} XP
+                </p>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="grid grid-cols-2 gap-4">
-          <MobileStatCard icon={Flame} label="Streak" value={String(data?.stats.streakDays || 0)} footer="Days active" accent="primary" />
-          <MobileStatCard icon={Star} label="XP earned" value={String(data?.stats.totalXp || 0)} footer="Total XP" accent="secondary" />
-        </section>
+          <section className="grid grid-cols-2 gap-4">
+          <MobileStatCard icon={Flame} label="Global streak" value={String(data?.stats.streakDays || 0)} footer="All languages" accent="primary" />
+          <MobileStatCard icon={Languages} label={`${languageLabel} streak`} value={String(data?.stats.languageStreakDays || 0)} footer="Current track" accent="secondary" />
+          </section>
 
-        <section className="rounded-[28px] bg-[#f7f3ea] p-6">
-          <div className="mb-6 flex items-center gap-4">
+          <section className="rounded-[28px] bg-[#f7f3ea] p-6">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">Daily Goal</h3>
+                <p className="text-sm text-[#66655a]">
+                  {data?.stats.todayMinutes || 0} of {data?.stats.dailyGoalMinutes || 0} minutes
+                </p>
+              </div>
+              <Target className="h-5 w-5 text-[#a94600]" />
+            </div>
+            <div className="h-3 rounded-full bg-white p-[2px]">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(135deg,#a94600,#ffae86)]"
+                style={{ width: `${Math.max(dailyProgressPercent, 0)}%` }}
+              />
+            </div>
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">
+              {dailyProgressPercent}% of daily goal
+            </p>
+          </section>
+
+          <section className="rounded-[28px] bg-[#f7f3ea] p-6">
+            <div className="mb-6 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b9eeab]/55 text-[#2d5a27]">
               <Target className="h-5 w-5" />
             </div>
@@ -850,7 +899,9 @@ function DashboardMobile({
           </div>
           <Link href={nextLessonHref} className="flex items-center justify-between rounded-2xl bg-white px-4 py-4">
             <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-[#a94600]">01</span>
+              <span className="text-lg font-bold text-[#a94600]">
+                {String((nextLesson?.orderIndex ?? 0) + 1).padStart(2, '0')}
+              </span>
               <span className="text-sm font-bold text-[#191713]">{nextLesson?.title || 'Formal Greetings'}</span>
             </div>
             <ArrowRight className="h-4 w-4 text-[#a59d95]" />
@@ -872,7 +923,9 @@ function DashboardMobile({
           <div className="rounded-[28px] bg-[#f7f3ea] p-6">
             <WeeklyBars data={weeklyOverview} compact />
             <p className="mt-5 px-3 text-center text-sm leading-6 text-[#8a7d70]">
-              You're just starting. Complete today's lesson to begin your streak and build momentum.
+              {data?.stats.todayMinutes
+                ? `You logged ${data.stats.todayMinutes} minutes today. Keep the streak moving.`
+                : "Complete today's lesson to start building momentum."}
             </p>
           </div>
         </section>
@@ -1072,6 +1125,16 @@ function buildPlaceholderLessons(language: SupportedLanguage): UnitLesson[] {
     orderIndex,
     status: orderIndex < 3 ? 'completed' : 'not_started',
     progressPercent: orderIndex < 3 ? 100 : 0,
+  }))
+}
+
+function buildPlaceholderMastery(language: SupportedLanguage): MasteryLesson[] {
+  return LANGUAGE_UI_COPY[language].placeholderLessons.slice(0, 4).map((item, orderIndex) => ({
+    id: `mastery-placeholder-${language}-${orderIndex + 1}`,
+    title: item.title,
+    description: item.description,
+    level: 'Beginner',
+    completedAt: null,
   }))
 }
 

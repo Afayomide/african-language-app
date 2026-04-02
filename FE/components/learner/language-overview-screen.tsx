@@ -52,7 +52,10 @@ type DashboardData = {
     totalXp: number
     dailyGoalMinutes: number
     todayMinutes: number
+    dailyProgressPercent?: number
+    courseProgressPercent?: number
     completedLessonsCount?: number
+    totalLessonsCount?: number
   }
   learnerLanguages?: LearnerLanguageSummary[]
   nextLesson: {
@@ -64,6 +67,7 @@ type DashboardData = {
     currentStageIndex?: number
     totalStages?: number
     progressPercent?: number
+    orderIndex?: number
   } | null
   chapters?: ChapterSummary[]
 }
@@ -77,7 +81,8 @@ type Props = {
 }
 
 const UNIT_OFFSETS = ['translate-x-4', '-translate-x-6', 'translate-x-0', 'translate-x-8', '-translate-x-2', 'translate-x-6']
-const LESSON_OFFSETS = ['translate-x-0', '-translate-x-4', 'translate-x-5', '-translate-x-2', 'translate-x-3']
+const WEAVER_OFFSETS = [60, 60, 80, 70, 40, 52]
+const WEAVER_TOPS = [0, 92, 184, 296, 408, 520]
 
 function titleCaseLanguage(language?: string) {
   if (!language) return 'Your Language'
@@ -129,6 +134,14 @@ function deriveCurrentLesson(unit: UnitSummary | null, nextLesson: DashboardData
   return unit.lessons.find((lesson) => lesson.status !== 'completed') || unit.lessons[0]
 }
 
+function getWeaverLessonPosition(index: number) {
+  return {
+    side: index % 2 === 0 ? 'left' : 'right',
+    offset: WEAVER_OFFSETS[index] ?? WEAVER_OFFSETS[index % WEAVER_OFFSETS.length],
+    top: WEAVER_TOPS[index] ?? index * 112,
+  }
+}
+
 export function LanguageOverviewScreen({
   data,
   isLoading = false,
@@ -138,10 +151,17 @@ export function LanguageOverviewScreen({
 }: Props) {
   const chapters = data?.chapters || []
   const languageLabel = titleCaseLanguage(data?.stats.currentLanguage)
-  const overallProgress = computeChapterProgress(chapters)
+  const overallProgress = data?.stats.courseProgressPercent ?? computeChapterProgress(chapters)
   const currentChapter = deriveCurrentChapter(chapters, data?.nextLesson || null)
   const globalCurrentUnitId = data?.nextLesson?.unitId || deriveCurrentUnit(currentChapter, null)?.id || ''
   const globalCurrentLessonId = data?.nextLesson?.id || ''
+  const completedLessonsCount =
+    data?.stats.completedLessonsCount ??
+    chapters.reduce((sum, chapter) => sum + chapter.units.reduce((unitSum, unit) => unitSum + unit.completedLessons, 0), 0)
+  const totalLessonsCount =
+    data?.stats.totalLessonsCount ??
+    chapters.reduce((sum, chapter) => sum + chapter.units.reduce((unitSum, unit) => unitSum + unit.totalLessons, 0), 0)
+  const languageStreakDays = data?.stats.languageStreakDays ?? data?.stats.streakDays ?? 0
   const [expandedChapterId, setExpandedChapterId] = useState(currentChapter?.id || '')
   const [expandedUnitId, setExpandedUnitId] = useState(deriveCurrentUnit(currentChapter, data?.nextLesson || null)?.id || '')
 
@@ -168,7 +188,9 @@ export function LanguageOverviewScreen({
 
   const nextLessonHref = data?.nextLesson ? `/lesson-overview?lessonId=${data.nextLesson.id}` : '/dashboard'
   const activeUnit = activeChapter?.units.find((unit) => unit.id === expandedUnitId) || deriveCurrentUnit(activeChapter, data?.nextLesson || null)
-  const dailyProgress = data?.stats.dailyGoalMinutes ? Math.min(100, Math.round((data.stats.todayMinutes / data.stats.dailyGoalMinutes) * 100)) : 0
+  const dailyProgress =
+    data?.stats.dailyProgressPercent ??
+    (data?.stats.dailyGoalMinutes ? Math.min(100, Math.round((data.stats.todayMinutes / data.stats.dailyGoalMinutes) * 100)) : 0)
 
   if (isLoading) {
     return (
@@ -241,7 +263,10 @@ export function LanguageOverviewScreen({
                 <div className="mt-5 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-[#66655a]">
                   <span>{chapters.length} Chapters</span>
                   <span className="h-1 w-1 rounded-full bg-[#bcb9ad]" />
-                  <span>{data?.stats.completedLessonsCount || 0} Lessons Complete</span>
+                  <span>
+                    {completedLessonsCount}
+                    {totalLessonsCount ? ` of ${totalLessonsCount}` : ''} Lessons Complete
+                  </span>
                 </div>
                 <div className="mt-5 overflow-hidden rounded-full bg-[#ece8db] p-1">
                   <div
@@ -250,7 +275,7 @@ export function LanguageOverviewScreen({
                   />
                 </div>
                 <p className="mt-3 text-xs font-semibold text-[#66655a]">
-                  Daily rhythm {dailyProgress}% · Streak {data?.stats.languageStreakDays || data?.stats.streakDays || 0} days · XP {data?.stats.totalXp || 0}
+                  Daily goal {dailyProgress}% · Language streak {languageStreakDays} days · XP {data?.stats.totalXp || 0}
                 </p>
               </div>
             </section>
@@ -294,10 +319,15 @@ export function LanguageOverviewScreen({
                     </button>
 
                     {isExpanded ? (
-                      <div className="mt-6 flex flex-col items-center space-y-8 px-1 pb-4">
-                        <div className="absolute hidden" />
-                        <div className="relative flex w-full flex-col items-center space-y-8">
-                          <div className="absolute bottom-0 top-0 left-1/2 w-3 -translate-x-1/2 rounded-full bg-[#ece8db]" />
+                      <div className="relative mt-6 px-1 pb-8 pt-2">
+                        <div className="absolute bottom-10 left-1/2 top-0 w-4 -translate-x-1/2 overflow-hidden rounded-full bg-[#ece8db] shadow-inner">
+                          <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(169,70,0,0.08)_10px,rgba(169,70,0,0.08)_20px)]" />
+                          <div
+                            className="absolute left-0 top-0 w-full rounded-full bg-[#a94600] shadow-[0_0_12px_rgba(169,70,0,0.35)]"
+                            style={{ height: `${Math.max(chapter.progressPercent, 10)}%` }}
+                          />
+                        </div>
+                        <div className="relative flex w-full flex-col items-center gap-16">
                           {chapter.units.map((unit, unitIndex) => {
                             const chapterCurrentUnitOrder =
                               chapter.id === currentChapter?.id
@@ -311,114 +341,111 @@ export function LanguageOverviewScreen({
                               (!isCurrentUnit && !isUnitCompleted && chapter.id === currentChapter?.id && unit.orderIndex > chapterCurrentUnitOrder)
                             const unitLabel = isUnitCompleted ? 'COMPLETED' : isCurrentUnit ? 'CURRENT UNIT' : isUnitLocked ? 'LOCKED' : 'OPEN'
 
+                            const currentLessonIndex =
+                              isCurrentUnit && globalCurrentLessonId
+                                ? unit.lessons.findIndex((item) => item.id === globalCurrentLessonId)
+                                : -1
+                            const unitHeight = Math.max(420, (unit.lessons.length - 1) * 112 + 180)
+
                             return (
-                              <div
-                                key={unit.id}
-                                className={cn('relative flex w-full flex-col items-center', UNIT_OFFSETS[unitIndex % UNIT_OFFSETS.length])}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setExpandedChapterId(chapter.id)
-                                    if (!isUnitLocked) setExpandedUnitId(unit.id)
-                                  }}
-                                  className="group relative flex flex-col items-center"
-                                >
-                                  <div
+                              <div key={unit.id} className="relative w-full max-w-[24rem] space-y-12">
+                                <div className="flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExpandedChapterId(chapter.id)
+                                      if (!isUnitLocked) setExpandedUnitId(unit.id)
+                                    }}
                                     className={cn(
-                                      'relative flex h-20 w-20 items-center justify-center rounded-full transition-all',
-                                      isUnitCompleted && 'bg-[#416f39] text-white shadow-[0px_8px_0px_#2d5a27]',
-                                      isCurrentUnit && 'bg-[linear-gradient(45deg,#a94600,#ffae86)] text-white shadow-[0px_8px_0px_#953d00]',
-                                      !isCurrentUnit && !isUnitCompleted && isUnitLocked && 'bg-[#ece8db] text-[#66655a] shadow-[0px_8px_0px_#bcb9ad]',
-                                      !isCurrentUnit && !isUnitCompleted && !isUnitLocked && 'bg-[#ffdeac] text-[#6e4b00] shadow-[0px_8px_0px_#c89c44]',
+                                      'rounded-full px-6 py-2 text-xs font-bold tracking-tight shadow-md transition-transform active:scale-[0.98]',
+                                      isCurrentUnit || isSelectedUnit
+                                        ? 'bg-[#416f39] text-white'
+                                        : isUnitLocked
+                                          ? 'bg-[#ece8db] text-[#66655a]'
+                                          : 'bg-[#416f39] text-white/95',
                                     )}
                                   >
-                                    {isCurrentUnit ? <div className="absolute inset-0 scale-[1.24] rounded-full bg-[#a94600]/20 animate-pulse" /> : null}
-                                    {isUnitCompleted ? (
-                                      <MaterialIcon icon="check" filled className="relative z-10 text-[32px]" />
-                                    ) : isUnitLocked ? (
-                                      <MaterialIcon icon="lock" className="relative z-10 text-[32px]" />
-                                    ) : isCurrentUnit ? (
-                                      <MaterialIcon icon="school" filled className="relative z-10 text-[36px]" />
-                                    ) : (
-                                      <MaterialIcon icon="play_arrow" filled className="relative z-10 text-[34px]" />
-                                    )}
-                                  </div>
-                                  <div
-                                    className={cn(
-                                      'absolute -top-12 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] shadow-sm',
-                                      isCurrentUnit ? 'bg-[#a94600] text-white shadow-[0px_4px_12px_rgba(169,70,0,0.3)]' : 'bg-[#ece8db] text-[#66655a]',
-                                    )}
-                                  >
-                                    {unitLabel}
-                                  </div>
-                                  <span className="mt-4 max-w-[160px] text-center font-display text-base font-bold text-[#39382f]">{unit.title}</span>
-                                </button>
+                                    {unit.title}
+                                  </button>
+                                </div>
 
-                                {isSelectedUnit ? (
-                                  <div className="mt-5 w-full max-w-[20rem] rounded-[28px] bg-[#fdf9f1] p-4 shadow-sm">
-                                    <div className="mb-4 flex items-center justify-between gap-4 px-1">
-                                      <div>
-                                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#66655a]">Lessons</p>
-                                        <h4 className="mt-1 font-display text-lg font-extrabold text-[#1a1410]">{unit.title}</h4>
-                                      </div>
-                                      <span className="rounded-full bg-[#f4ebe1] px-3 py-1 text-xs font-bold text-[#af4b06]">
-                                        {unit.completedLessons}/{unit.totalLessons}
-                                      </span>
-                                    </div>
-                                    <div className="relative flex flex-col items-center gap-5 py-2">
-                                      <div className="absolute bottom-2 top-2 left-1/2 w-2 -translate-x-1/2 rounded-full bg-[#ece8db]" />
-                                      {unit.lessons.map((lesson, lessonIndex) => {
-                                        const currentLessonIndex =
-                                          isCurrentUnit && globalCurrentLessonId
-                                            ? unit.lessons.findIndex((item) => item.id === globalCurrentLessonId)
-                                            : -1
-                                        const lessonIsCompleted = lesson.status === 'completed'
-                                        const lessonIsCurrent = lesson.id === globalCurrentLessonId
-                                        const lessonIsLocked =
-                                          isUnitLocked ||
-                                          (currentLessonIndex >= 0 && lessonIndex > currentLessonIndex && !lessonIsCompleted)
-                                        const lessonHref = `/lesson-overview?lessonId=${lesson.id}`
+                                <div className="relative" style={{ minHeight: `${unitHeight}px` }}>
+                                  {unit.lessons.map((lesson, lessonIndex) => {
+                                    const lessonIsCompleted = lesson.status === 'completed'
+                                    const lessonIsCurrent = lesson.id === globalCurrentLessonId && isCurrentUnit
+                                    const lessonIsLocked =
+                                      isUnitLocked ||
+                                      (currentLessonIndex >= 0 && lessonIndex > currentLessonIndex && !lessonIsCompleted) ||
+                                      (!isCurrentUnit && !isUnitCompleted)
+                                    const lessonHref = `/lesson-overview?lessonId=${lesson.id}`
+                                    const position = getWeaverLessonPosition(lessonIndex)
 
-                                        return (
-                                          <div
-                                            key={lesson.id}
-                                            className={cn('relative flex w-full flex-col items-center', LESSON_OFFSETS[lessonIndex % LESSON_OFFSETS.length])}
-                                          >
-                                            <Link
-                                              href={lessonIsLocked ? '#' : lessonHref}
-                                              className={cn('group flex flex-col items-center', lessonIsLocked && 'pointer-events-none')}
-                                              aria-disabled={lessonIsLocked}
-                                            >
-                                              <div
-                                                className={cn(
-                                                  'relative flex h-14 w-14 items-center justify-center rounded-full transition-all',
-                                                  lessonIsCompleted && 'bg-[#416f39] text-white shadow-[0px_6px_0px_#2d5a27]',
-                                                  lessonIsCurrent && 'bg-[linear-gradient(45deg,#a94600,#ffae86)] text-white shadow-[0px_6px_0px_#953d00]',
-                                                  !lessonIsCurrent && !lessonIsCompleted && lessonIsLocked && 'bg-[#ece8db] text-[#66655a] shadow-[0px_6px_0px_#bcb9ad]',
-                                                  !lessonIsCurrent && !lessonIsCompleted && !lessonIsLocked && 'bg-[#ffdeac] text-[#6e4b00] shadow-[0px_6px_0px_#c89c44]',
-                                                )}
-                                              >
-                                                {lessonIsCompleted ? (
-                                                  <MaterialIcon icon="check" filled className="relative z-10 text-[24px]" />
-                                                ) : lessonIsLocked ? (
-                                                  <MaterialIcon icon="lock" className="relative z-10 text-[22px]" />
-                                                ) : lessonIsCurrent ? (
-                                                  <MaterialIcon icon="school" filled className="relative z-10 text-[24px]" />
-                                                ) : (
-                                                  <MaterialIcon icon="menu_book" filled className="relative z-10 text-[22px]" />
-                                                )}
+                                    return (
+                                      <div
+                                        key={lesson.id}
+                                        className="absolute left-1/2 flex flex-col items-center"
+                                        style={{
+                                          top: `${position.top}px`,
+                                          transform:
+                                            position.side === 'left'
+                                              ? `translateX(calc(-50% - ${position.offset}px))`
+                                              : `translateX(calc(-50% + ${position.offset}px))`,
+                                        }}
+                                      >
+                                        <Link
+                                          href={lessonIsLocked ? '#' : lessonHref}
+                                          className={cn('group relative flex flex-col items-center', lessonIsLocked && 'pointer-events-none opacity-50 grayscale')}
+                                          aria-disabled={lessonIsLocked}
+                                        >
+                                          {lessonIsCurrent ? (
+                                            <div className="absolute -right-2 -top-2 rounded-full bg-[#a94600] px-2 py-1 text-[8px] font-black uppercase tracking-[0.2em] text-white animate-bounce">
+                                              Next
+                                            </div>
+                                          ) : null}
+                                          {lessonIsCurrent ? (
+                                            <div className="h-20 w-20 rounded-full border-4 border-[#a94600] bg-white p-1 shadow-xl transition-transform group-hover:scale-105">
+                                              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#ffdeac]">
+                                                <MaterialIcon icon="bolt" filled className="relative z-10 text-[30px] text-[#a94600]" />
+                                                <div className="absolute inset-0 bg-[linear-gradient(90deg,#a94600_2px,transparent_2px),linear-gradient(#a94600_2px,transparent_2px)] bg-[length:24px_24px] opacity-[0.05]" />
                                               </div>
-                                              <span className="mt-3 max-w-[210px] text-center font-display text-sm font-bold text-[#39382f]">
-                                                {lesson.title}
-                                              </span>
-                                            </Link>
-                                          </div>
-                                        )
-                                      })}
-                                    </div>
-                                  </div>
-                                ) : null}
+                                            </div>
+                                          ) : (
+                                            <div
+                                              className={cn(
+                                                'flex h-16 w-16 items-center justify-center rounded-full transition-transform group-hover:scale-110',
+                                                lessonIsCompleted && 'bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30',
+                                                !lessonIsCompleted && lessonIsLocked && 'border-2 border-dashed border-[#bcb9ad] bg-[#ece8db] text-[#838175]',
+                                                !lessonIsCompleted && !lessonIsLocked && 'bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30',
+                                              )}
+                                            >
+                                              <MaterialIcon
+                                                icon={lessonIsCompleted ? 'check' : lessonIsLocked ? 'lock' : 'play_arrow'}
+                                                filled={lessonIsCompleted || !lessonIsLocked}
+                                                className={cn('text-[28px]', !lessonIsLocked && !lessonIsCompleted && 'translate-x-[1px]')}
+                                              />
+                                            </div>
+                                          )}
+                                          <span
+                                            className={cn(
+                                              'mt-3 max-w-[6rem] text-center text-[10px] font-bold uppercase leading-tight tracking-[0.14em]',
+                                              lessonIsCurrent ? 'text-[#a94600]' : 'text-[#66655a]',
+                                            )}
+                                          >
+                                            {lesson.title}
+                                          </span>
+                                        </Link>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+
+                                <div className="flex items-center justify-center gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#66655a]">
+                                  <span>{unitLabel}</span>
+                                  <span className="h-1 w-1 rounded-full bg-[#bcb9ad]" />
+                                  <span>
+                                    {unit.completedLessons}/{unit.totalLessons}
+                                  </span>
+                                </div>
                               </div>
                             )
                           })}

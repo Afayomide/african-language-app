@@ -37,6 +37,14 @@ function toEntity(doc: any): WordEntity {
     audio: mapContentAudio(doc.audio),
     lemma: String(doc.lemma || ""),
     partOfSpeech: String(doc.partOfSpeech || ""),
+    image: doc.image?.url
+      ? {
+          imageAssetId: doc.image.imageAssetId ? String(doc.image.imageAssetId) : undefined,
+          url: String(doc.image.url || ""),
+          thumbnailUrl: String(doc.image.thumbnailUrl || ""),
+          altText: String(doc.image.altText || "")
+        }
+      : null,
     status: doc.status,
     deletedAt: doc.deletedAt || null,
     createdAt: doc.createdAt,

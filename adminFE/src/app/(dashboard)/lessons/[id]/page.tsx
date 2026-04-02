@@ -168,7 +168,13 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
     try {
       const data = await lessonService.auditLesson(id)
       setAudit(data)
-      toast.success(data.ok ? "Lesson audit passed" : "Lesson audit found issues")
+      toast.success(
+        data.ok
+          ? data.publishBlocked
+            ? "Lesson audit found publish-blocking warnings"
+            : "Lesson audit passed"
+          : "Lesson audit found issues"
+      )
       return data
     } catch (error) {
       toast.error("Failed to audit lesson")
@@ -317,8 +323,12 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
   const handlePublish = async () => {
     try {
       const auditResult = await fetchLessonAudit()
-      if (!auditResult?.ok) {
-        toast.error("Fix the lesson audit errors before publishing")
+      if (!auditResult) {
+        toast.error("Failed to audit lesson")
+        return
+      }
+      if (!auditResult.ok || auditResult.publishBlocked) {
+        toast.error(auditResult.publishBlocked ? "Add valid image URLs for matching-image questions before publishing" : "Fix the lesson audit errors before publishing")
         return
       }
       await lessonService.publishLesson(id)
@@ -986,9 +996,10 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
               ) : (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge className={audit.ok ? "bg-green-500" : "bg-red-500"}>
-                      {audit.ok ? "Ready to Publish" : "Needs Fixes"}
+                    <Badge className={audit.ok && !audit.publishBlocked ? "bg-green-500" : "bg-red-500"}>
+                      {audit.ok && !audit.publishBlocked ? "Ready to Publish" : "Needs Fixes"}
                     </Badge>
+                    {audit.publishBlocked ? <Badge className="bg-amber-500">Publish Blocked</Badge> : null}
                     <Badge variant="secondary">Errors: {audit.errors}</Badge>
                     <Badge variant="secondary">Warnings: {audit.warnings}</Badge>
                   </div>

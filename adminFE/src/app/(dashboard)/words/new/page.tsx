@@ -3,8 +3,8 @@
 
 import { Suspense, use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { wordService, lessonService } from "@/services";
-import type { Lesson, Language, Word } from "@/types";
+import { wordService, lessonService, imageService } from "@/services";
+import type { Lesson, Language, Word, ImageAsset } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Volume2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, Volume2, CheckCircle, ImagePlus, Trash2 } from "lucide-react";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 
 function isLanguage(value: string | null): value is Language {
@@ -40,12 +40,20 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
   });
   const [translationsText, setTranslationsText] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [libraryImages, setLibraryImages] = useState<ImageAsset[]>([]);
+  const [selectedImageAssetId, setSelectedImageAssetId] = useState("");
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImageAltText, setNewImageAltText] = useState("");
+  const [newImageDescription, setNewImageDescription] = useState("");
+  const [newImageTagsText, setNewImageTagsText] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (mode === "edit") void loadLessons();
     if (mode === "edit" && id) void loadWord(id);
+    void loadLibraryImages();
   }, [mode, id]);
 
   async function loadLessons() {
@@ -70,6 +78,15 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
     }
   }
 
+  async function loadLibraryImages() {
+    try {
+      const data = await imageService.listImagesPage({ page: 1, limit: 50 });
+      setLibraryImages(data.items);
+    } catch {
+      toast.error("Failed to load image library");
+    }
+  }
+
   async function fileToBase64(file: File) {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -82,6 +99,74 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
       reader.onerror = () => reject(new Error("file_read_failed"));
       reader.readAsDataURL(file);
     });
+  }
+
+  function applyImageAsset(asset: ImageAsset) {
+    setWord((current) => ({
+      ...current,
+      image: {
+        imageAssetId: asset._id,
+        url: asset.url,
+        thumbnailUrl: asset.thumbnailUrl || "",
+        altText: asset.altText || ""
+      }
+    }));
+  }
+
+  async function handleAttachExistingImage() {
+    if (!selectedImageAssetId) {
+      toast.error("Select an existing image");
+      return;
+    }
+    const asset = libraryImages.find((image) => image._id === selectedImageAssetId);
+    if (!asset) {
+      toast.error("Selected image not found");
+      return;
+    }
+    applyImageAsset(asset);
+    setSelectedImageAssetId("");
+    toast.success("Image attached to word");
+  }
+
+  async function handleUploadNewImage() {
+    if (!newImageFile) {
+      toast.error("Choose an image to upload");
+      return;
+    }
+    if (!newImageAltText.trim()) {
+      toast.error("Alt text is required");
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const image = await imageService.createImage({
+        altText: newImageAltText.trim(),
+        description: newImageDescription.trim() || newImageAltText.trim(),
+        tags: newImageTagsText.split(",").map((item) => item.trim()).filter(Boolean),
+        status: "approved",
+        imageUpload: {
+          base64: await fileToBase64(newImageFile),
+          mimeType: newImageFile.type || undefined,
+          fileName: newImageFile.name
+        }
+      });
+      await loadLibraryImages();
+      applyImageAsset(image);
+      setNewImageFile(null);
+      setNewImageAltText("");
+      setNewImageDescription("");
+      setNewImageTagsText("");
+      toast.success("Image uploaded and attached");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }
+
+  function handleClearImage() {
+    setWord((current) => ({ ...current, image: null }));
+    toast.success("Word image cleared");
   }
 
   function toggleLesson(lessonId: string, checked: boolean) {
@@ -112,6 +197,15 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
         difficulty: Number(word.difficulty || 1),
         lemma: word.lemma || "",
         partOfSpeech: word.partOfSpeech || "",
+        image:
+          word.image?.url || word.image?.thumbnailUrl || word.image?.altText
+            ? {
+                imageAssetId: word.image?.imageAssetId,
+                url: word.image?.url || "",
+                thumbnailUrl: word.image?.thumbnailUrl || "",
+                altText: word.image?.altText || ""
+              }
+            : null,
         audioUpload: audioFile ? { base64: await fileToBase64(audioFile), mimeType: audioFile.type || undefined, fileName: audioFile.name } : undefined
       };
       const saved = mode === "edit" && id
@@ -247,6 +341,131 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
               <Label>Explanation</Label>
               <Textarea value={word.explanation || ""} onChange={(event) => setWord((current) => ({ ...current, explanation: event.target.value }))} rows={4} />
             </div>
+            <div className="space-y-4 rounded-xl border border-primary/10 bg-primary/5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label>Word Image</Label>
+                  <p className="text-sm text-muted-foreground">Select an existing library image or upload a new one.</p>
+                </div>
+                {word.image ? (
+                  <Button type="button" variant="outline" size="sm" onClick={handleClearImage}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+
+              {word.image ? (
+                <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                  <div className="overflow-hidden rounded-lg border bg-background">
+                    {word.image.url ? (
+                      <img src={word.image.url} alt={word.image.altText || word.text || "Word image"} className="h-48 w-full object-cover" />
+                    ) : (
+                      <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Image unavailable</div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">{word.image.altText || "Untitled image"}</p>
+                    <p className="text-xs text-muted-foreground break-all">{word.image.url}</p>
+                    {word.image.thumbnailUrl ? <p className="text-xs text-muted-foreground break-all">Thumbnail: {word.image.thumbnailUrl}</p> : null}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Select Existing Image</Label>
+                  <Select value={selectedImageAssetId} onValueChange={setSelectedImageAssetId}>
+                    <SelectTrigger><SelectValue placeholder="Choose an uploaded image" /></SelectTrigger>
+                    <SelectContent>
+                      {libraryImages.map((image) => (
+                        <SelectItem key={image._id} value={image._id}>{image.altText}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={handleAttachExistingImage} disabled={!selectedImageAssetId}>
+                    <ImagePlus className="mr-2 h-4 w-4" />
+                    Attach Existing
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Upload New Image</Label>
+                  <Input type="file" accept="image/*" onChange={(event) => setNewImageFile(event.target.files?.[0] || null)} />
+                  <Input value={newImageAltText} onChange={(event) => setNewImageAltText(event.target.value)} placeholder="Alt text" />
+                  <Textarea value={newImageDescription} onChange={(event) => setNewImageDescription(event.target.value)} rows={2} placeholder="Optional description" />
+                  <Input value={newImageTagsText} onChange={(event) => setNewImageTagsText(event.target.value)} placeholder="Tags, comma separated" />
+                  <Button type="button" variant="outline" onClick={handleUploadNewImage} disabled={isUploadingImage || !newImageFile}>
+                    <ImagePlus className="mr-2 h-4 w-4" />
+                    {isUploadingImage ? "Uploading..." : "Upload and Attach"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Image URL</Label>
+                <Input
+                  value={word.image?.url || ""}
+                  placeholder="https://..."
+                  onChange={(event) =>
+                    setWord((current) => ({
+                      ...current,
+                      image: {
+                        imageAssetId: current.image?.imageAssetId,
+                        url: event.target.value,
+                        thumbnailUrl: current.image?.thumbnailUrl || "",
+                        altText: current.image?.altText || ""
+                      }
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Image Alt Text</Label>
+                <Input
+                  value={word.image?.altText || ""}
+                  placeholder="Describe the image"
+                  onChange={(event) =>
+                    setWord((current) => ({
+                      ...current,
+                      image: {
+                        imageAssetId: current.image?.imageAssetId,
+                        url: current.image?.url || "",
+                        thumbnailUrl: current.image?.thumbnailUrl || "",
+                        altText: event.target.value
+                      }
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Thumbnail URL</Label>
+              <Input
+                value={word.image?.thumbnailUrl || ""}
+                placeholder="Optional thumbnail URL"
+                onChange={(event) =>
+                  setWord((current) => ({
+                    ...current,
+                    image: {
+                      imageAssetId: current.image?.imageAssetId,
+                      url: current.image?.url || "",
+                      thumbnailUrl: event.target.value,
+                      altText: current.image?.altText || ""
+                    }
+                  }))
+                }
+              />
+            </div>
+            {word.image?.url ? (
+              <div className="space-y-2">
+                <Label>Image Preview</Label>
+                <div className="overflow-hidden rounded-lg border bg-muted/30 p-2">
+                  <img src={word.image.url} alt={word.image.altText || word.text || "Word image"} className="max-h-48 rounded-md object-cover" />
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label>Audio Upload</Label>
               <Input type="file" accept="audio/*" onChange={(event) => setAudioFile(event.target.files?.[0] || null)} />

@@ -6,7 +6,9 @@ import { TutorQuestionUseCases } from "../../application/use-cases/tutor/questio
 import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
+import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
 import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
+import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 import type { QuestionType, QuestionSubtype } from "../../domain/entities/Question.js";
 import {
@@ -35,26 +37,48 @@ import { buildLetterOrderReviewData, buildWordOrderReviewData } from "../shared/
 const questionUseCases = new TutorQuestionUseCases(
   new MongooseQuestionRepository(),
   new MongooseLessonRepository(),
-  new MongooseExpressionRepository()
+  new MongooseExpressionRepository(),
+  new MongooseWordRepository()
 );
 const expressionRepo = new MongooseExpressionRepository();
+const wordRepo = new MongooseWordRepository();
+const sentenceRepo = new MongooseSentenceRepository();
 const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
 
-function buildQuestionSourcePayload(question: { sourceId?: string; translationIndex: number }, expression: { id: string; text: string; translations: string[]; status: string; audio?: { provider?: string; model?: string; voice?: string; locale?: string; format?: string; url?: string; s3Key?: string } } | null) {
-  if (!expression) return question.sourceId || null;
+type QuestionSourceEntity = {
+  id: string;
+  text: string;
+  translations: string[];
+  status: string;
+  audio?: {
+    provider?: string;
+    model?: string;
+    voice?: string;
+    locale?: string;
+    format?: string;
+    url?: string;
+    s3Key?: string;
+  };
+};
+
+function buildQuestionSourcePayload(
+  question: { sourceId?: string; translationIndex: number },
+  source: { id: string; text: string; translations: string[]; status: string; audio?: { provider?: string; model?: string; voice?: string; locale?: string; format?: string; url?: string; s3Key?: string } } | null
+) {
+  if (!source) return question.sourceId || null;
   return {
-    _id: expression.id,
-    text: expression.text,
-    translations: expression.translations,
-    selectedTranslation: getSelectedTranslation(expression.translations, question.translationIndex),
+    _id: source.id,
+    text: source.text,
+    translations: source.translations,
+    selectedTranslation: getSelectedTranslation(source.translations, question.translationIndex),
     selectedTranslationIndex: question.translationIndex,
-    status: expression.status,
-    audio: expression.audio
+    status: source.status,
+    audio: source.audio
       ? {
-          audioUrl: String(expression.audio.url || ""),
-          audioProvider: String(expression.audio.provider || ""),
-          voice: String(expression.audio.voice || ""),
-          locale: String(expression.audio.locale || "")
+          audioUrl: String(source.audio.url || ""),
+          audioProvider: String(source.audio.provider || ""),
+          voice: String(source.audio.voice || ""),
+          locale: String(source.audio.locale || "")
         }
       : undefined
   };
@@ -83,6 +107,31 @@ function getContextResponseValidationMessage(code: ReturnType<typeof validateCon
     default:
       return "invalid context-response question";
   }
+}
+
+async function findSourceByType(
+  sourceType: "word" | "expression" | "sentence" | undefined,
+  sourceId: string | undefined
+): Promise<QuestionSourceEntity | null> {
+  if (!sourceId) return null;
+  if (sourceType === "word") {
+    return (await wordRepo.findById(sourceId)) as QuestionSourceEntity | null;
+  }
+  if (sourceType === "sentence") {
+    return (await sentenceRepo.findById(sourceId)) as QuestionSourceEntity | null;
+  }
+  return (await expressionRepo.findById(sourceId)) as QuestionSourceEntity | null;
+}
+
+async function serializeQuestionWithSource<
+  T extends { id: string; sourceId?: string; sourceType?: "word" | "expression" | "sentence"; translationIndex: number }
+>(question: T) {
+  const source = await findSourceByType(question.sourceType, question.sourceId);
+  return {
+    ...question,
+    _id: question.id,
+    source: buildQuestionSourcePayload(question, source)
+  };
 }
 
 export async function createQuestion(req: AuthRequest, res: Response) {
@@ -150,13 +199,14 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   if (subtypeUsesMatching(String(subtype))) {
     const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, String(subtype));
     if (!parsedMatchingPairs) {
-      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
+      return res.status(400).json({ error: "This matching question requires at least four valid content pairs." });
     }
     parsedInteractionData = await buildMatchingInteractionData({
       matchingPairs: parsedMatchingPairs,
       subtype: String(subtype),
       lessonId: String(lessonId),
-      expressions: expressionRepo
+      expressions: expressionRepo,
+      words: wordRepo
     });
     if (parsedInteractionData === "content_not_found") {
       return res.status(404).json({ error: "source not found" });
@@ -164,11 +214,8 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     if (parsedInteractionData === "invalid_translation_index") {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    if (parsedInteractionData === "matching_image_not_supported") {
-      return res.status(400).json({ error: "Image matching is not wired in the new content model yet." });
-    }
     if (parsedInteractionData === "matching_pairs_required") {
-      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
+      return res.status(400).json({ error: "This matching question requires at least four valid content pairs." });
     }
     parsedOptions = [];
     answerIndex = 0;
@@ -217,7 +264,7 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   const created = await questionUseCases.create(
     {
       lessonId: String(lessonId),
-      sourceType: "expression",
+      sourceType: parsedInteractionData?.sourceType || "expression",
       sourceId: parsedInteractionData?.sourceId || String(targetExpression?.id || sourceId),
       relatedSourceRefs: parsedInteractionData?.relatedSourceRefs || [],
       translationIndex: parsedInteractionData ? parsedInteractionData.translationIndex : parsedTranslationIndex,
@@ -276,16 +323,38 @@ export async function listQuestions(req: AuthRequest, res: Response) {
   if (listed === "lesson_not_found") return res.status(404).json({ error: "lesson not found" });
 
   const questions = listed;
-  const expressions = await expressionRepo.findByIds(
-    questions.map((question) => question.sourceId).filter((id): id is string => Boolean(id))
-  );
+  const expressionIds = questions
+    .filter((question) => question.sourceType === "expression" || !question.sourceType)
+    .map((question) => question.sourceId)
+    .filter((id): id is string => Boolean(id));
+  const wordIds = questions
+    .filter((question) => question.sourceType === "word")
+    .map((question) => question.sourceId)
+    .filter((id): id is string => Boolean(id));
+  const sentenceIds = questions
+    .filter((question) => question.sourceType === "sentence")
+    .map((question) => question.sourceId)
+    .filter((id): id is string => Boolean(id));
+  const [expressions, words, sentences] = await Promise.all([
+    expressionRepo.findByIds(expressionIds),
+    wordRepo.findByIds(wordIds),
+    sentenceRepo.findByIds(sentenceIds)
+  ]);
   const expressionMap = new Map(expressions.map((expression) => [expression.id, expression]));
+  const wordMap = new Map(words.map((word) => [word.id, word]));
+  const sentenceMap = new Map(sentences.map((sentence) => [sentence.id, sentence]));
   const data = questions.map((question) => {
-    const expression = question.sourceId ? expressionMap.get(question.sourceId) || null : null;
+    const source = question.sourceId
+      ? question.sourceType === "word"
+        ? wordMap.get(question.sourceId) || null
+        : question.sourceType === "sentence"
+          ? sentenceMap.get(question.sourceId) || null
+          : expressionMap.get(question.sourceId) || null
+      : null;
     return {
       ...question,
       _id: question.id,
-      source: buildQuestionSourcePayload(question, expression)
+      source: buildQuestionSourcePayload(question, source)
     };
   });
   const filtered = q
@@ -321,13 +390,8 @@ export async function getQuestionById(req: AuthRequest, res: Response) {
 
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!question) return res.status(404).json({ error: "question not found" });
-  const expression = question.sourceId ? await expressionRepo.findById(question.sourceId) : null;
   return res.status(200).json({
-    question: {
-      ...question,
-      _id: question.id,
-      source: buildQuestionSourcePayload(question, expression)
-    }
+    question: await serializeQuestionWithSource(question)
   });
 }
 
@@ -344,7 +408,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   const question = await questionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!question) return res.status(404).json({ error: "question not found" });
 
-  const { type, subtype, sourceId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData, interactionData } = req.body ?? {};
+  const { type, subtype, sourceType, sourceId, translationIndex, promptTemplate, options, correctIndex, explanation, reviewData, interactionData } = req.body ?? {};
   const update: Record<string, unknown> = {};
   const effectiveType = String(type || question.type);
   const effectiveSubtype = String(subtype || question.subtype);
@@ -374,17 +438,21 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.promptTemplate = String(promptTemplate).trim();
   }
   let targetSourceId = question.sourceId;
+  let targetSourceType = (String(sourceType || question.sourceType || "expression") as "word" | "expression" | "sentence");
   if (!subtypeUsesMatching(effectiveSubtype) && sourceId !== undefined) {
     if (!mongoose.Types.ObjectId.isValid(String(sourceId))) {
       return res.status(400).json({ error: "invalid source id" });
     }
-    const expression = await expressionRepo.findById(String(sourceId));
-    if (!expression || expression.language !== tutorLanguage) {
+    if (sourceType !== undefined && !["word", "expression", "sentence"].includes(String(sourceType))) {
+      return res.status(400).json({ error: "invalid source type" });
+    }
+    const source = await findSourceByType(targetSourceType, String(sourceId));
+    if (!source || ("language" in source && (source as { language?: string }).language !== tutorLanguage)) {
       return res.status(404).json({ error: "source not found" });
     }
-    update.sourceType = "expression";
-    update.sourceId = expression.id;
-    targetSourceId = expression.id;
+    update.sourceType = targetSourceType;
+    update.sourceId = source.id;
+    targetSourceId = source.id;
   }
   if (!subtypeUsesMatching(effectiveSubtype) && translationIndex !== undefined) {
     if (!targetSourceId) return res.status(400).json({ error: "source not found" });
@@ -392,11 +460,11 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (!Number.isInteger(parsedTranslationIndex) || parsedTranslationIndex < 0) {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    const expression = await expressionRepo.findById(targetSourceId);
-    if (!expression || expression.language !== tutorLanguage) {
+    const source = await findSourceByType(targetSourceType, targetSourceId);
+    if (!source || ("language" in source && (source as { language?: string }).language !== tutorLanguage)) {
       return res.status(404).json({ error: "source not found" });
     }
-    if (parsedTranslationIndex >= expression.translations.length) {
+    if (parsedTranslationIndex >= source.translations.length) {
       return res.status(400).json({ error: "invalid translation index" });
     }
     update.translationIndex = parsedTranslationIndex;
@@ -422,13 +490,14 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   if (subtypeUsesMatching(effectiveSubtype)) {
     const parsedMatchingPairs = parseQuestionMatchingPairs(interactionData, effectiveSubtype);
     if (!parsedMatchingPairs) {
-      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
+      return res.status(400).json({ error: "This matching question requires at least four valid content pairs." });
     }
     parsedInteractionData = await buildMatchingInteractionData({
       matchingPairs: parsedMatchingPairs,
       subtype: effectiveSubtype,
       lessonId: question.lessonId,
-      expressions: expressionRepo
+      expressions: expressionRepo,
+      words: wordRepo
     });
     if (parsedInteractionData === "content_not_found") {
       return res.status(404).json({ error: "source not found" });
@@ -436,11 +505,8 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (parsedInteractionData === "invalid_translation_index") {
       return res.status(400).json({ error: "invalid translation index" });
     }
-    if (parsedInteractionData === "matching_image_not_supported") {
-      return res.status(400).json({ error: "Image matching is not wired in the new content model yet." });
-    }
     if (parsedInteractionData === "matching_pairs_required") {
-      return res.status(400).json({ error: "This matching question requires at least two valid content pairs." });
+      return res.status(400).json({ error: "This matching question requires at least four valid content pairs." });
     }
     update.sourceType = parsedInteractionData.sourceType;
     update.sourceId = parsedInteractionData.sourceId;
@@ -452,13 +518,13 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.reviewData = undefined;
   } else if (effectiveSubtype === "fg-letter-order") {
     if (!targetSourceId) return res.status(400).json({ error: "source not found" });
-    const targetExpression = await expressionRepo.findById(targetSourceId);
-    if (!targetExpression) {
+    const targetSource = await findSourceByType(targetSourceType, targetSourceId);
+    if (!targetSource) {
       return res.status(404).json({ error: "source not found" });
     }
     const spellingReview = buildLetterOrderReviewData({
-      phraseText: targetExpression.text,
-      meaning: getSelectedTranslation(targetExpression.translations, Number(update.translationIndex ?? question.translationIndex))
+      phraseText: targetSource.text,
+      meaning: getSelectedTranslation(targetSource.translations, Number(update.translationIndex ?? question.translationIndex))
     });
     if (!spellingReview) {
       return res.status(400).json({ error: "This spelling question requires a content item with at least two letters." });
@@ -470,14 +536,14 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.interactionData = undefined;
   } else if (subtypeUsesOrderArrangement(effectiveSubtype)) {
     if (!targetSourceId) return res.status(400).json({ error: "source not found" });
-    const targetExpression = await expressionRepo.findById(targetSourceId);
-    if (!targetExpression) {
+    const targetSource = await findSourceByType(targetSourceType, targetSourceId);
+    if (!targetSource) {
       return res.status(404).json({ error: "source not found" });
     }
     const wordOrderReview = buildWordOrderReviewData({
-      phraseText: targetExpression.text,
+      phraseText: targetSource.text,
       meaning: getSelectedTranslation(
-        targetExpression.translations,
+        targetSource.translations,
         Number(update.translationIndex ?? question.translationIndex)
       )
     });
@@ -497,7 +563,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     update.reviewData = undefined;
   } else if (subtypeUsesChoiceOptions(effectiveSubtype)) {
     const currentSourceText = targetSourceId
-      ? String((await expressionRepo.findById(targetSourceId))?.text || "")
+      ? String((await findSourceByType(targetSourceType, targetSourceId))?.text || "")
       : "";
     if (options !== undefined) {
       const parsedOptions = parseQuestionOptions(options);
@@ -566,7 +632,7 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
   if (updated === "source_not_found") return res.status(404).json({ error: "source not found" });
   if (updated === "source_not_in_lesson") return res.status(400).json({ error: "source not in lesson" });
   if (updated === "question_not_found" || !updated) return res.status(404).json({ error: "question not found" });
-  return res.status(200).json({ question: updated });
+  return res.status(200).json({ question: await serializeQuestionWithSource(updated) });
 }
 
 export async function deleteQuestion(req: AuthRequest, res: Response) {

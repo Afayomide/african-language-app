@@ -235,10 +235,15 @@ export class CurriculumArchitectService {
         existingChapterTitles: input.existingTitles
       });
 
-      if (validation.accepted.length > 0) {
+      if (validation.accepted.length === input.requestedChapterCount) {
         accepted = validation.accepted.slice(0, input.requestedChapterCount);
         break;
       }
+
+      const countMismatchReasons =
+        validation.accepted.length > 0 && validation.accepted.length < input.requestedChapterCount
+          ? [`expected ${input.requestedChapterCount} valid chapters but only ${validation.accepted.length} were accepted`]
+          : [];
 
       logAiValidation("curriculum_architect", {
         context: input.logContext,
@@ -252,7 +257,10 @@ export class CurriculumArchitectService {
       });
 
       if (attempt < 3) {
-        retryInstruction = buildRetryInstruction(validation.rejected.flatMap((item) => item.reasons));
+        retryInstruction = buildRetryInstruction([
+          ...validation.rejected.flatMap((item) => item.reasons),
+          ...countMismatchReasons
+        ]);
         logAiRetry("curriculum_architect", {
           attempt,
           language: input.language,

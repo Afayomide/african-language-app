@@ -119,6 +119,22 @@ function buildCreateOrUpdateInput(body: Record<string, unknown>) {
   }
   if (body.lemma !== undefined) update.lemma = String(body.lemma).trim();
   if (body.partOfSpeech !== undefined) update.partOfSpeech = String(body.partOfSpeech).trim();
+  if (body.image !== undefined) {
+    if (!body.image || typeof body.image !== "object") return "invalid_image" as const;
+    const image = body.image as {
+      imageAssetId?: unknown;
+      url?: unknown;
+      thumbnailUrl?: unknown;
+      altText?: unknown;
+    };
+    const url = String(image.url || "").trim();
+    const thumbnailUrl = String(image.thumbnailUrl || "").trim();
+    const altText = String(image.altText || "").trim();
+    const imageAssetId = String(image.imageAssetId || "").trim();
+    update.image = url || thumbnailUrl || altText || imageAssetId
+      ? { imageAssetId: imageAssetId || undefined, url, thumbnailUrl, altText }
+      : null;
+  }
   if (body.status !== undefined) {
     const status = String(body.status);
     if (!isValidStatus(status)) return "invalid_status" as const;
@@ -135,6 +151,7 @@ export async function createWord(req: AuthRequest, res: Response) {
   if (baseInput === "invalid_lesson_ids") return res.status(400).json({ error: "invalid lesson id" });
   if (baseInput === "invalid_translations") return res.status(400).json({ error: "at least one translation required" });
   if (baseInput === "invalid_difficulty") return res.status(400).json({ error: "invalid difficulty" });
+  if (baseInput === "invalid_image") return res.status(400).json({ error: "invalid image" });
   if (baseInput === "invalid_status") return res.status(400).json({ error: "invalid status" });
   if (!baseInput.language) return res.status(400).json({ error: "language required" });
   if (!baseInput.text) return res.status(400).json({ error: "text required" });
@@ -159,6 +176,7 @@ export async function createWord(req: AuthRequest, res: Response) {
       : { provider: "", model: "", voice: "", locale: "", format: "", url: "", s3Key: "" },
     lemma: baseInput.lemma || "",
     partOfSpeech: baseInput.partOfSpeech || "",
+    image: baseInput.image || null,
     status: baseInput.status || "draft",
     lessonIds: baseInput.lessonIds,
     createdBy: String(req.body?.createdBy || req.user?.id || "system")
@@ -232,6 +250,7 @@ export async function updateWord(req: AuthRequest, res: Response) {
   if (baseInput === "invalid_lesson_ids") return res.status(400).json({ error: "invalid lesson id" });
   if (baseInput === "invalid_translations") return res.status(400).json({ error: "at least one translation required" });
   if (baseInput === "invalid_difficulty") return res.status(400).json({ error: "invalid difficulty" });
+  if (baseInput === "invalid_image") return res.status(400).json({ error: "invalid image" });
   if (baseInput === "invalid_status") return res.status(400).json({ error: "invalid status" });
   const parsedAudioUpload = parseAudioUpload(req.body?.audioUpload);
   if (parsedAudioUpload === "invalid_audio_upload") return res.status(400).json({ error: "invalid audio upload" });

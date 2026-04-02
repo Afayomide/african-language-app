@@ -13,7 +13,7 @@ export function useLearnerHubOverview(enabled = true) {
       .getOverview()
       .then((data) => {
         setLanguageLabel(data.stats.currentLanguage || 'Yoruba')
-        setStreakDays(data.stats.streakDays || 0)
+        setStreakDays(data.stats.languageStreakDays || data.stats.streakDays || 0)
       })
       .catch(() => {})
   }, [enabled])

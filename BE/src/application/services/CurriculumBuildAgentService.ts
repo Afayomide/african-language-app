@@ -47,6 +47,26 @@ type CurriculumUnitContentGenerationResult = {
 };
 
 type CurriculumUnitContentGenerator = {
+  previewGeneratePlan(input: {
+    unitId: string;
+    language: CurriculumArchitectPlanInput["language"];
+    level: CurriculumArchitectPlanInput["level"];
+    createdBy: string;
+    lessonCount: number;
+    sentencesPerLesson: number;
+    reviewContentPerLesson?: number;
+    proverbsPerLesson: number;
+    topics?: string[];
+    extraInstructions?: string;
+    lessonGenerationInstruction?: string;
+    planLoggingFlow?: "generate" | "regenerate";
+  }): Promise<{
+    unitId: string;
+    requestedLessons: number;
+    actualLessonCount: number;
+    coreLessons: LlmUnitPlanLesson[];
+    lessonSequence: Array<LlmUnitPlanLesson & { lessonMode: "core" | "review"; sourceCoreLessonIndexes?: number[] }>;
+  }>;
   regenerateFromApprovedPlan(input: {
     unitId: string;
     language: CurriculumArchitectPlanInput["language"];
@@ -254,33 +274,6 @@ export class CurriculumBuildAgentService {
       issues: mergedIssues,
       summary: ok ? summary : `${summary} ${extraIssues.length > 0 ? `Persisted artifact review found ${extraIssues.length} unresolved issue(s).` : ""}`.trim()
     };
-  }
-
-  private buildContentPlanLessons(lessonPlan: Array<{ title: string; description: string }>): LlmUnitPlanLesson[] {
-    return lessonPlan.map((lesson) => {
-      const title = String(lesson.title || "").trim();
-      const description = String(lesson.description || "").trim();
-      const focus = title || "Lesson focus";
-      const descriptionSentence = description || `Practice ${focus.toLowerCase()} in short conversations.`;
-      return {
-        title,
-        description: descriptionSentence,
-        objectives: [
-          `Learn the core language for ${focus.toLowerCase()}.`,
-          `Use ${focus.toLowerCase()} in a short exchange.`
-        ],
-        conversationGoal: `Use ${focus.toLowerCase()} naturally in a practical conversation.`,
-        situations: [
-          descriptionSentence,
-          `A short real-life interaction focused on ${focus.toLowerCase()}.`
-        ],
-        sentenceGoals: [
-          `Say one short sentence using ${focus.toLowerCase()}.`,
-          `Recognize and respond to ${focus.toLowerCase()} in context.`
-        ],
-        focusSummary: focus
-      };
-    });
   }
 
   private async updateLessonPlanFromContentGeneration(input: {
@@ -655,17 +648,32 @@ export class CurriculumBuildAgentService {
         const chapter = await this.chapters.findById(unit.chapterId);
         if (!chapter) continue;
 
-        const plannedLessons = await this.lessonPlanner.planLessonsForUnit({
-          chapter,
-          unit,
-          languageId: markedRunning.languageId,
-          requestedLessonCount: DEFAULT_REQUESTED_LESSONS_PER_UNIT,
-          topic: markedRunning.topic,
-          extraInstructions: markedRunning.extraInstructions,
-          cefrTarget: markedRunning.cefrTarget,
-          priorUnitTitles: markedRunning.artifacts.priorUnitTitles,
-          memorySummary: markedRunning.artifacts.memorySummary
+        const previewPlan = await this.unitContentGenerator.previewGeneratePlan({
+          unitId: unit.id,
+          language: markedRunning.language,
+          level: markedRunning.level,
+          createdBy: markedRunning.createdBy,
+          lessonCount: DEFAULT_REQUESTED_LESSONS_PER_UNIT,
+          sentencesPerLesson: DEFAULT_SENTENCES_PER_LESSON,
+          reviewContentPerLesson: DEFAULT_REVIEW_CONTENT_PER_LESSON,
+          proverbsPerLesson: DEFAULT_PROVERBS_PER_LESSON,
+          topics: markedRunning.topic ? [markedRunning.topic] : [],
+          extraInstructions: markedRunning.extraInstructions || undefined,
+          lessonGenerationInstruction: markedRunning.extraInstructions || undefined,
+          planLoggingFlow: "generate"
         });
+        const plannedLessons: CurriculumBuildJobArtifacts["lessonPlan"] = previewPlan.lessonSequence.map((lesson, index) => ({
+          chapterId: chapter.id,
+          chapterTitle: chapter.title,
+          unitId: unit.id,
+          unitTitle: unit.title,
+          title: lesson.title,
+          description: lesson.description || "",
+          orderIndex: index,
+          status: "planned",
+          lessonId: null
+        }));
+        const expectedLessonSequenceCount = previewPlan.actualLessonCount || previewPlan.lessonSequence.length;
 
         await this.recordArtifact({
           job: markedRunning,
@@ -687,7 +695,7 @@ export class CurriculumBuildAgentService {
           unitId: unit.id,
           unitTitle: unit.title,
           lessonPlan: plannedLessons,
-          requestedLessonCount: DEFAULT_REQUESTED_LESSONS_PER_UNIT
+          requestedLessonCount: expectedLessonSequenceCount
         });
         let acceptedLessonPlan = plannedLessons;
         let lessonCheckpointCritic = initialLessonCritic;
@@ -721,7 +729,7 @@ export class CurriculumBuildAgentService {
             unitId: unit.id,
             unitTitle: unit.title,
             lessonPlan: acceptedLessonPlan,
-            requestedLessonCount: DEFAULT_REQUESTED_LESSONS_PER_UNIT
+            requestedLessonCount: expectedLessonSequenceCount
           });
         }
 
@@ -808,13 +816,7 @@ export class CurriculumBuildAgentService {
           }
         });
 
-        const contentPlanLessons = this.buildContentPlanLessons(
-          acceptedLessonPlan.map((lesson) => ({
-            title: lesson.title,
-            description: lesson.description,
-            orderIndex: lesson.orderIndex
-          }))
-        );
+        const contentPlanLessons = previewPlan.coreLessons;
 
         await this.recordArtifact({
           job: markedRunning,
@@ -835,13 +837,13 @@ export class CurriculumBuildAgentService {
           language: markedRunning.language,
           level: markedRunning.level,
           createdBy: markedRunning.createdBy,
-          lessonCount: contentPlanLessons.length,
+          lessonCount: previewPlan.coreLessons.length,
           sentencesPerLesson: DEFAULT_SENTENCES_PER_LESSON,
           reviewContentPerLesson: DEFAULT_REVIEW_CONTENT_PER_LESSON,
           proverbsPerLesson: DEFAULT_PROVERBS_PER_LESSON,
           topics: markedRunning.topic ? [markedRunning.topic] : [],
           extraInstructions: markedRunning.extraInstructions || undefined,
-          planLessons: contentPlanLessons
+          planLessons: previewPlan.coreLessons
         });
 
         await this.recordArtifact({

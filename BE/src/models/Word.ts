@@ -5,7 +5,13 @@ const WordSchema = new Schema(
   {
     ...buildBaseContentFields(),
     lemma: { type: String, default: "" },
-    partOfSpeech: { type: String, default: "" }
+    partOfSpeech: { type: String, default: "" },
+    image: {
+      imageAssetId: { type: Schema.Types.ObjectId, ref: "ImageAsset", default: null },
+      url: { type: String, default: "" },
+      thumbnailUrl: { type: String, default: "" },
+      altText: { type: String, default: "" }
+    }
   },
   { timestamps: true }
 );

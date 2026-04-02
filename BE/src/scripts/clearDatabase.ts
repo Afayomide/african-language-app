@@ -12,7 +12,10 @@ import ExerciseQuestionModel from "../models/ExerciseQuestion.js";
 import SentenceModel from "../models/Sentence.js";
 import UnitContentItemModel from "../models/UnitContentItem.js";
 import WordModel from "../models/Word.js";
+import CurriculumBuildArtifactModel from "../models/CurriculumBuildArtifact.js";
+import CurriculumBuildJobModel from "../models/CurriculumBuildJob.js";
 import LearnerContentPerformanceModel from "../models/learner/LearnerContentPerformance.js";
+import LearnerLanguageStateModel from "../models/learner/LearnerLanguageState.js";
 import LearnerQuestionMissModel from "../models/learner/LearnerQuestionMiss.js";
 import LessonProgressModel from "../models/learner/LessonProgress.js";
 import LearnerProfileModel from "../models/learner/LearnerProfile.js";
@@ -109,6 +112,9 @@ async function clearDatabase() {
     const lessonProgressResult = await LessonProgressModel.deleteMany({});
     console.log(`Deleted ${lessonProgressResult.deletedCount} lesson progress records.`);
 
+    const learnerLanguageStatesResult = await LearnerLanguageStateModel.deleteMany({});
+    console.log(`Deleted ${learnerLanguageStatesResult.deletedCount} learner language state records.`);
+
     const learnerProfilesResult = await LearnerProfileModel.deleteMany({});
     console.log(`Deleted ${learnerProfilesResult.deletedCount} learner profiles.`);
 
@@ -117,6 +123,12 @@ async function clearDatabase() {
 
     const learnerQuestionMissResult = await LearnerQuestionMissModel.deleteMany({});
     console.log(`Deleted ${learnerQuestionMissResult.deletedCount} learner question miss records.`);
+
+    const curriculumBuildArtifactsResult = await CurriculumBuildArtifactModel.deleteMany({});
+    console.log(`Deleted ${curriculumBuildArtifactsResult.deletedCount} curriculum build artifacts.`);
+
+    const curriculumBuildJobsResult = await CurriculumBuildJobModel.deleteMany({});
+    console.log(`Deleted ${curriculumBuildJobsResult.deletedCount} curriculum build jobs.`);
 
     const voiceSubmissionResult = await VoiceAudioSubmissionModel.deleteMany({});
     console.log(`Deleted ${voiceSubmissionResult.deletedCount} voice submissions.`);

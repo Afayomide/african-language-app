@@ -299,9 +299,11 @@ function buildLessonSuggestPrompt(input: {
     "- proverbs.translation and contextNote should be in English.",
     "- If you cannot produce a real proverb for this lesson, return an empty proverbs array instead of ordinary phrases.",
     "- Keep objectives short and measurable.",
-    "- For beginner level, at least 6 seedExpressions should be 1 to 3 words.",
-    "- For beginner level, every seedExpression must be 1 to 3 words.",
-    "- For beginner level, avoid full questions and full answer sentences in seedExpressions.",
+    // Temporarily relaxed. Beginner seed-expression length is currently too restrictive
+    // for real conversational planning and is disabled until the planner rules are revisited.
+    // "- For beginner level, at least 6 seedExpressions should be 1 to 3 words.",
+    // "- For beginner level, every seedExpression must be 1 to 3 words.",
+    // "- For beginner level, avoid full questions and full answer sentences in seedExpressions.",
     "- Treat the provided curriculum context as approved prior curriculum memory.",
     "- Continue the curriculum like a teacher from that memory, not from scratch.",
     "- Reuse earlier content deliberately for reinforcement and spaced repetition, but avoid shallow duplication.",

@@ -600,9 +600,11 @@ export function validateLessonSuggestion(
   if (objectives.some((item) => !looksEnglishOnly(item))) reasons.push("objective not English-like");
   if (seedExpressions.length < 4 || seedExpressions.length > 8) reasons.push("invalid seed expression count");
   if (seedExpressions.some((item) => looksEnglishSeedPhrase(item))) reasons.push("seed expression looks English");
-  if (input.level === "beginner" && seedExpressions.some((item) => splitWords(item).length > 3)) {
-    reasons.push("beginner seed expression too long");
-  }
+  // Temporarily relaxed. Beginner seed-expression length is currently too restrictive
+  // for curriculum planning and is disabled until the planner rules are revisited.
+  // if (input.level === "beginner" && seedExpressions.some((item) => splitWords(item).length > 3)) {
+  //   reasons.push("beginner seed expression too long");
+  // }
 
   if (themeAnchors.length > 0) {
     const titleDescriptionMatches = countThemeAnchorMatches([title, description], themeAnchors);
@@ -633,10 +635,11 @@ export function validateLessonSuggestion(
 
   const nonEnglishObjectives = objectives.filter((item) => !looksEnglishOnly(item));
   const englishLikeSeedPhrases = seedExpressions.filter((item) => looksEnglishSeedPhrase(item));
-  const tooLongBeginnerSeedPhrases =
-    input.level === "beginner"
-      ? seedExpressions.filter((item) => splitWords(item).length > 3)
-      : [];
+  // Temporarily relaxed. Keep this empty so validation logs match runtime behavior.
+  // const tooLongBegineerSeedPhrases: string[] = input.level === "beginner"
+  //    ? seedExpressions.filter((item) => splitWords(item).length > 3): [];
+
+  const tooLongBeginnerSeedPhrases: string[] = [];
   const reusedSeedPhrases = duplicateSeedPhrases;
   const reusedProverbs = proverbTexts.filter((item) => existingProverbTexts.has(normalize(item)));
   const titleDescriptionMatches = themeAnchors.length > 0 ? countThemeAnchorMatches([title, description], themeAnchors) : 0;

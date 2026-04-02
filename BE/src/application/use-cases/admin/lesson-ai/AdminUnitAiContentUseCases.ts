@@ -270,7 +270,6 @@ function buildPhraseOrderReviewData(phrase: TeachingContent): NonNullable<Questi
   const sentence = String(phrase.text || "").trim();
   const words = splitWords(sentence);
   if (words.length < 2) return null;
-
   return {
     sentence,
     words,
@@ -739,56 +738,185 @@ function filterDraftsForLesson(
   return drafts.filter((draft) => draft.subtype !== "mc-select-translation");
 }
 
-function buildContentMatchTranslationQuestionDraft(
-  lessonId: string,
-  contentItems: Array<(WordEntity | ExpressionEntity) & { kind: "word" | "expression" }>
-) {
+function normalizeMatchingWordPartOfSpeech(value: string) {
+  return normalize(value).split(/[^a-z]+/).filter(Boolean)[0] || "";
+}
+
+function getMatchingWordPosBucket(word: WordEntity) {
+  const normalizedPos = normalizeMatchingWordPartOfSpeech(word.partOfSpeech);
+  if (normalizedPos === "noun" || normalizedPos === "pronoun") return 0;
+  if (!normalizedPos || normalizedPos === "unknown") return 1;
+  return 2;
+}
+
+function buildMatchingImageSnapshot(word: WordEntity, translation: string) {
+  if (word.image?.url) {
+    return {
+      imageAssetId: String(word.image.imageAssetId || ""),
+      url: String(word.image.url || ""),
+      thumbnailUrl: String(word.image.thumbnailUrl || ""),
+      altText: String(word.image.altText || translation || word.text || "Image match")
+    };
+  }
+  return null;
+}
+
+function hashMatchingSeed(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+type MatchingWordCandidate = {
+  word: WordEntity;
+  translation: string;
+  source: "lesson" | "language";
+  score: number;
+};
+
+function buildMatchingWordCandidates(input: {
+  lessonWords: WordEntity[];
+  languageWords: WordEntity[];
+  preferImages?: boolean;
+}) {
+  const lessonIds = new Set(input.lessonWords.map((item) => item.id));
+  const seenTexts = new Set<string>();
+  const seenPairs = new Set<string>();
+  const dedupeAndRank = (word: WordEntity, source: "lesson" | "language"): MatchingWordCandidate | null => {
+    if (source === "language" && word.status !== "published") return null;
+    const text = String(word.text || "").trim();
+    const translation = pickTranslation(word);
+    const normalizedText = normalize(text);
+    const normalizedTranslation = normalize(translation);
+    if (!word.id || !normalizedText || !normalizedTranslation) return null;
+    const pairKey = `${normalizedText}:${normalizedTranslation}`;
+    if (seenTexts.has(normalizedText) || seenPairs.has(pairKey)) return null;
+    const posBucket = getMatchingWordPosBucket(word);
+    const imagePenalty = input.preferImages && !word.image?.url ? 1 : 0;
+    const sourcePenalty = source === "lesson" ? 0 : 10;
+    seenTexts.add(normalizedText);
+    seenPairs.add(pairKey);
+    return {
+      word,
+      translation,
+      source,
+      score: sourcePenalty + posBucket * 3 + imagePenalty
+    };
+  };
+
+  const lessonCandidates = input.lessonWords
+    .map((word) => dedupeAndRank(word, "lesson"))
+    .filter((item): item is MatchingWordCandidate => Boolean(item))
+    .sort((left, right) => left.score - right.score || left.word.difficulty - right.word.difficulty || left.word.text.localeCompare(right.word.text));
+
+  const languageCandidates = input.languageWords
+    .filter((word) => !lessonIds.has(word.id))
+    .map((word) => dedupeAndRank(word, "language"))
+    .filter((item): item is MatchingWordCandidate => Boolean(item))
+    .sort((left, right) => left.score - right.score || left.word.difficulty - right.word.difficulty || left.word.text.localeCompare(right.word.text));
+
+  return { lessonCandidates, languageCandidates };
+}
+
+function selectMatchingWords(input: {
+  lessonWords: WordEntity[];
+  languageWords: WordEntity[];
+  maxPairs: number;
+  preferImages?: boolean;
+}) {
+  const { lessonCandidates, languageCandidates } = buildMatchingWordCandidates(input);
+  const selected: MatchingWordCandidate[] = [];
+  const lessonTargetCount = languageCandidates.length > 0 ? Math.min(3, lessonCandidates.length) : Math.min(input.maxPairs, lessonCandidates.length);
+
+  selected.push(...lessonCandidates.slice(0, lessonTargetCount));
+
+  if (selected.length < input.maxPairs && languageCandidates.length > 0) {
+    const languageNeed = Math.max(1, input.maxPairs - selected.length);
+    selected.push(...languageCandidates.slice(0, languageNeed));
+  }
+
+  const remainingLanguageCandidates = languageCandidates.filter(
+    (candidate) => !selected.some((item) => item.word.id === candidate.word.id)
+  );
+  if (selected.length < input.maxPairs) {
+    for (const candidate of [...lessonCandidates.slice(lessonTargetCount), ...remainingLanguageCandidates]) {
+      if (selected.some((item) => item.word.id === candidate.word.id)) continue;
+      selected.push(candidate);
+      if (selected.length >= input.maxPairs) break;
+    }
+  }
+
+  return selected.slice(0, input.maxPairs);
+}
+
+function buildWordMatchingQuestionDraft(input: {
+  lessonId: string;
+  subtype: "mt-match-image" | "mt-match-translation";
+  lessonWords: WordEntity[];
+  languageWords: WordEntity[];
+}) {
   const matchingPairs: NonNullable<QuestionEntity["interactionData"]>["matchingPairs"] = [];
   const usedContentIds = new Set<string>();
   const usedTranslations = new Set<string>();
+  const preferImages = input.subtype === "mt-match-image";
+  const selectedWords = selectMatchingWords({
+    lessonWords: input.lessonWords,
+    languageWords: input.languageWords,
+    maxPairs: 4,
+    preferImages
+  });
 
-  for (const item of contentItems) {
-    const translation = pickTranslation(item);
+  for (const item of selectedWords) {
+    const translation = item.translation;
     const translationKey = normalize(translation);
-    if (!item.id || !translationKey || usedContentIds.has(item.id) || usedTranslations.has(translationKey)) {
+    if (!item.word.id || !translationKey || usedContentIds.has(item.word.id) || usedTranslations.has(translationKey)) {
       continue;
     }
 
     matchingPairs.push({
-      pairId: `${item.kind}-${item.id}-${matchingPairs.length + 1}`,
-      contentType: item.kind,
-      contentId: item.id,
-      contentText: item.text,
+      pairId: `word-${item.word.id}-${matchingPairs.length + 1}`,
+      contentType: "word",
+      contentId: item.word.id,
+      contentText: item.word.text,
       translationIndex: 0,
       translation,
-      image: null
+      image: preferImages ? buildMatchingImageSnapshot(item.word, translation) : null
     });
-    usedContentIds.add(item.id);
+    usedContentIds.add(item.word.id);
     usedTranslations.add(translationKey);
 
     if (matchingPairs.length >= 4) break;
   }
 
-  if (matchingPairs.length < 2) return null;
+  if (matchingPairs.length < 4) return null;
   const primaryPair = matchingPairs[0];
   if (!primaryPair.contentId || !primaryPair.contentType) return null;
   const relatedSourceRefs = matchingPairs
     .flatMap((pair) => (pair.contentId && pair.contentType ? [{ type: pair.contentType, id: pair.contentId }] : []));
-  if (relatedSourceRefs.length < 2) return null;
+  if (relatedSourceRefs.length < 4) return null;
 
   return {
-    lessonId,
+    lessonId: input.lessonId,
     sourceType: primaryPair.contentType,
     sourceId: primaryPair.contentId,
     relatedSourceRefs,
     translationIndex: primaryPair.translationIndex,
     type: "matching" as const,
-    subtype: "mt-match-translation" as const,
-    promptTemplate: "Match each item to the correct translation.",
+    subtype: input.subtype,
+    promptTemplate:
+      input.subtype === "mt-match-image"
+        ? "Match each word to the correct image."
+        : "Match each word to the correct translation.",
     options: [],
     correctIndex: 0,
     interactionData: { matchingPairs },
-    explanation: "Match each item to its English meaning.",
+    explanation:
+      input.subtype === "mt-match-image"
+        ? "Match each word to the correct picture."
+        : "Match each word to its English meaning.",
     status: "draft" as const
   };
 }
@@ -3470,14 +3598,24 @@ export class AdminUnitAiContentUseCases {
       }
     }
 
-    const stage2MatchingContent = focusedLessonContent.filter(
-      (item): item is (WordEntity | ExpressionEntity) & { kind: "word" | "expression" } =>
-        (item.kind === "word" || item.kind === "expression") && stage2ContentSet.has(getContentKey(item))
-    );
-    const stage2MatchingDraft = buildContentMatchTranslationQuestionDraft(
-      input.lesson.id,
-      stage2MatchingContent
-    );
+    const stage2MatchingSubtype: "mt-match-image" | "mt-match-translation" =
+      hashMatchingSeed(`${input.lesson.id}:${input.lesson.title}`) % 3 === 0
+        ? "mt-match-image"
+        : "mt-match-translation";
+    const stage2MatchingDraft = buildWordMatchingQuestionDraft({
+      lessonId: input.lesson.id,
+      subtype: stage2MatchingSubtype,
+      lessonWords: Array.from(
+        new Map(
+          [...focusedLessonWords, ...currentLessonWords, ...supportWords].map((item) => [item.id, item] as const)
+        ).values()
+      ),
+      languageWords: Array.from(
+        new Map(
+          [...input.wordLanguagePool, ...input.wordRepetitionPool, ...focusedLessonWords, ...supportWords].map((item) => [item.id, item] as const)
+        ).values()
+      )
+    });
     if (!isSentenceOnlyReviewUnit && stage2MatchingDraft) {
       pendingQuestionCreates.push({
         stage: 2,

@@ -667,10 +667,22 @@ function MatchingCard({
       onClick={onClick}
       disabled={disabled}
     >
-      {image?.url ? (
+      {image ? (
         <div className="space-y-3">
           <div className="overflow-hidden rounded-[1rem] bg-[#f1eee2]">
-            <img src={image.url} alt={image.altText} className={cx('w-full object-cover', isDesktopViewport ? 'h-32' : 'h-24')} />
+            {image.url ? (
+              <img src={image.url} alt={image.altText} className={cx('w-full object-cover', isDesktopViewport ? 'h-32' : 'h-24')} />
+            ) : (
+              <div className={cx(
+                'flex w-full items-center justify-center bg-[linear-gradient(135deg,#f5efe2,#e7ddc9)] text-[#8a7d70]',
+                isDesktopViewport ? 'h-32' : 'h-24'
+              )}>
+                <div className="text-center">
+                  <Lightbulb className="mx-auto h-6 w-6" />
+                  <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em]">Image Coming Soon</p>
+                </div>
+              </div>
+            )}
           </div>
           <p className={cx('font-body font-semibold leading-snug text-[#39382f]', isDesktopViewport ? 'text-base' : 'text-sm')}>
             {image.altText || label}
@@ -701,6 +713,7 @@ function MatchingCard({
 function MatchingExerciseSurface({
   isDesktopViewport,
   lessonTitle,
+  isImageMatching,
   isAnswered,
   selectedMatches,
   selectedMatchingLeftId,
@@ -712,6 +725,7 @@ function MatchingExerciseSurface({
 }: {
   isDesktopViewport: boolean
   lessonTitle?: string
+  isImageMatching: boolean
   isAnswered: boolean
   selectedMatches: Record<string, string>
   selectedMatchingLeftId: string | null
@@ -728,7 +742,11 @@ function MatchingExerciseSurface({
           <div>
             <h2 className="font-display text-[2.4rem] font-extrabold tracking-[-0.04em] text-[#191713]">Match the Pairs</h2>
             <p className="mt-2 text-base font-medium text-[#66655a]">
-              {lessonTitle ? `Lesson focus: ${lessonTitle}` : 'Match each Yoruba phrase with its English meaning.'}
+              {lessonTitle
+                ? `Lesson focus: ${lessonTitle}`
+                : isImageMatching
+                  ? 'Match each word with the correct image.'
+                  : 'Match each Yoruba word with its English meaning.'}
             </p>
           </div>
           <div className="rounded-full bg-[#f7f3ea] px-4 py-2 text-sm font-bold text-[#5f5951] shadow-[0_10px_20px_rgba(57,56,47,0.04)]">
@@ -761,14 +779,14 @@ function MatchingExerciseSurface({
           </div>
 
           <div className="space-y-4">
-            <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#b0a498]">English</p>
+            <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#b0a498]">{isImageMatching ? 'Images' : 'English'}</p>
             {matchingRightItems.map((item) => {
               const isUsed = Object.values(selectedMatches).includes(item.id)
               return (
                 <MatchingCard
                   key={item.id}
                   label={item.label}
-                  caption="Translation"
+                  caption={isImageMatching ? 'Image' : 'Translation'}
                   matched={Boolean(isUsed && isAnswered)}
                   selected={Boolean(selectedMatchingLeftId && !isUsed)}
                   icon="right"
@@ -827,10 +845,11 @@ function MatchingExerciseSurface({
             <MatchingCard
               key={item.id}
               label={item.label}
-              caption="Translation"
+              caption={isImageMatching ? 'Image' : 'Translation'}
               matched={Boolean(isUsed && isAnswered)}
               selected={Boolean(selectedMatchingLeftId && !isUsed)}
               icon="right"
+              image={item.image}
               onClick={() => onSelectMatchingRight(item.id)}
               disabled={isAnswered}
               isDesktopViewport={false}
@@ -1295,6 +1314,7 @@ export function ExerciseBlock({
         <MatchingExerciseSurface
           isDesktopViewport={isDesktopViewport}
           lessonTitle={lessonTitle}
+          isImageMatching={exerciseData.subtype === 'mt-match-image'}
           isAnswered={isAnswered}
           selectedMatches={selectedMatches}
           selectedMatchingLeftId={selectedMatchingLeftId}

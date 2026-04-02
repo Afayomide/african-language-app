@@ -96,6 +96,8 @@ export async function login(req: Request, res: Response) {
       return res.status(error.status).json({ error: error.message });
     }
 
+    console.error("[LEARNER_PROFILE_UPDATE] unexpected error", error);
+
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }
@@ -134,6 +136,8 @@ export async function updateProfile(req: AuthRequest, res: Response) {
     currentLanguage,
     dailyGoalMinutes
   } = req.body ?? {};
+
+  console.log(req.body);
 
   if (displayName !== undefined && !String(displayName).trim()) {
     return res.status(400).json({ error: "Display name cannot be empty." });

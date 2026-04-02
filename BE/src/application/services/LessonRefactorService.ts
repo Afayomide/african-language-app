@@ -274,7 +274,7 @@ function buildMatchTranslationPairs(
     if (pairs.length >= 4) break;
   }
 
-  return pairs.length >= 2 ? pairs : [];
+  return pairs.length >= 4 ? pairs : [];
 }
 
 export function buildMatchTranslationQuestionDraft(
@@ -283,12 +283,12 @@ export function buildMatchTranslationQuestionDraft(
   preferredExpressionTexts?: string[]
 ) {
   const matchingPairs = buildMatchTranslationPairs(expressions, preferredExpressionTexts);
-  if (matchingPairs.length < 2) return null;
+  if (matchingPairs.length < 4) return null;
   const primaryContentId = matchingPairs[0].contentId;
   const relatedSourceRefs = Array.from(
     new Set(matchingPairs.map((pair) => pair.contentId).filter((item): item is string => Boolean(item)))
   ).map((id) => ({ type: "expression" as const, id }));
-  if (!primaryContentId || relatedSourceRefs.length < 2) return null;
+  if (!primaryContentId || relatedSourceRefs.length < 4) return null;
 
   return {
     lessonId,

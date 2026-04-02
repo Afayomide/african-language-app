@@ -197,6 +197,12 @@ export interface Word {
   audio: Audio;
   lemma: string;
   partOfSpeech: string;
+  image?: {
+    imageAssetId?: string;
+    url: string;
+    thumbnailUrl?: string;
+    altText: string;
+  } | null;
   status: Status;
   deletedAt?: string | null;
   createdAt: string;
@@ -381,6 +387,7 @@ export interface LessonAuditFinding {
 
 export interface LessonAuditResult {
   ok: boolean;
+  publishBlocked: boolean;
   errors: number;
   warnings: number;
   metrics: {

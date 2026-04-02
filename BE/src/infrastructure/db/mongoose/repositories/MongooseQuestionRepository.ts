@@ -64,7 +64,7 @@ function toEntity(doc: any): QuestionEntity {
                   contentText: item.contentText ? String(item.contentText) : undefined,
                   translationIndex: Number(item.translationIndex || 0),
                   translation: String(item.translation || ""),
-                  image: item.image?.url
+                  image: item.image?.url || item.image?.altText || item.image?.imageAssetId
                     ? {
                         imageAssetId: item.image.imageAssetId
                           ? typeof item.image.imageAssetId === "string"

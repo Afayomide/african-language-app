@@ -1,5 +1,6 @@
 import type { QuestionInteractionData, QuestionMatchingPair } from "../../domain/entities/Question.js";
 import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
+import type { WordRepository } from "../../domain/repositories/WordRepository.js";
 import type { ParsedMatchingPair } from "../../interfaces/http/validators/question.validators.js";
 
 function getTranslationByIndex(translations: string[], index: number) {
@@ -19,51 +20,69 @@ export async function buildMatchingInteractionData(input: {
   subtype: string;
   lessonId: string;
   expressions: ExpressionRepository;
+  words: WordRepository;
 }) {
-  if (input.subtype === "mt-match-image") {
-    return "matching_image_not_supported" as const;
-  }
-
   const resolvedPairs: QuestionMatchingPair[] = [];
 
   for (let index = 0; index < input.matchingPairs.length; index += 1) {
     const pair = input.matchingPairs[index];
-    const expression = await input.expressions.findById(pair.contentId);
-    if (!expression) {
+    const entity =
+      pair.contentType === "word"
+        ? await input.words.findById(pair.contentId)
+        : await input.expressions.findById(pair.contentId);
+    if (!entity) {
       return "content_not_found" as const;
     }
-    if (pair.translationIndex < 0 || pair.translationIndex >= expression.translations.length) {
+    if (pair.translationIndex < 0 || pair.translationIndex >= entity.translations.length) {
       return "invalid_translation_index" as const;
     }
 
+    const translation = getTranslationByIndex(entity.translations, pair.translationIndex);
+    const image =
+      input.subtype === "mt-match-image"
+        ? entity.kind === "word" && entity.image?.url
+          ? {
+              imageAssetId: String(entity.image.imageAssetId || ""),
+              url: String(entity.image.url || ""),
+              thumbnailUrl: String(entity.image.thumbnailUrl || ""),
+              altText: String(entity.image.altText || translation || entity.text || "Image match")
+            }
+          : {
+              imageAssetId: String(pair.imageAssetId || ""),
+              url: "",
+              thumbnailUrl: "",
+              altText: translation || entity.text || "Image match"
+            }
+        : null;
+
     resolvedPairs.push({
-      pairId: sanitizePairId(`${expression.id}-${pair.translationIndex}-${index + 1}`),
-      contentType: "expression",
-      contentId: expression.id,
-      contentText: expression.text,
+      pairId: sanitizePairId(`${pair.contentType}-${entity.id}-${pair.translationIndex}-${index + 1}`),
+      contentType: pair.contentType,
+      contentId: entity.id,
+      contentText: entity.text,
       translationIndex: pair.translationIndex,
-      translation: getTranslationByIndex(expression.translations, pair.translationIndex),
-      image: null
+      translation,
+      image
     });
   }
 
-  if (resolvedPairs.length < 2) {
+  if (resolvedPairs.length < 4) {
     return "matching_pairs_required" as const;
   }
 
   const uniquePairIds = new Set(resolvedPairs.map((item) => item.pairId));
-  if (uniquePairIds.size < 2) {
+  if (uniquePairIds.size < 4) {
     return "matching_pairs_required" as const;
   }
 
   return {
-    sourceType: "expression" as const,
+    sourceType: (resolvedPairs[0]?.contentType || "expression") as "word" | "expression",
     sourceId: String(resolvedPairs[0].contentId || ""),
     translationIndex: resolvedPairs[0].translationIndex,
     relatedSourceRefs: resolvedPairs
-      .map((item) => item.contentId)
-      .filter((item): item is string => Boolean(item))
-      .map((id) => ({ type: "expression" as const, id })),
+      .flatMap((item) =>
+        item.contentId && item.contentType ? [{ type: item.contentType, id: item.contentId }] : []
+      ),
     interactionData: {
       matchingPairs: resolvedPairs
     } satisfies QuestionInteractionData

@@ -89,28 +89,31 @@ export class MongooseLearnerLanguageStateRepository implements LearnerLanguageSt
     const languageId = await enrichLanguageId(languageCode, {
       languageId: update.languageId ?? create.languageId
     });
+    const setOnInsert = {
+      userId,
+      languageCode,
+      isEnrolled: create.isEnrolled ?? true,
+      dailyGoalMinutes: create.dailyGoalMinutes,
+      totalXp: create.totalXp ?? 0,
+      currentStreak: create.currentStreak ?? 0,
+      longestStreak: create.longestStreak ?? 0,
+      lastActiveDate: create.lastActiveDate,
+      completedLessonsCount: create.completedLessonsCount ?? 0,
+      weeklyActivity: create.weeklyActivity ?? [],
+      achievements: create.achievements ?? [],
+      currentChapterId: create.currentChapterId ?? null,
+      currentUnitId: create.currentUnitId ?? null
+    };
+    const set = {
+      ...update,
+      ...(languageId ? { languageId } : {})
+    };
+    const insertOnlyEntries = Object.entries(setOnInsert).filter(([key]) => !(key in set));
     const doc = await LearnerLanguageStateModel.findOneAndUpdate(
       { userId, languageCode },
       {
-        $setOnInsert: {
-          userId,
-          languageCode,
-          isEnrolled: create.isEnrolled ?? true,
-          dailyGoalMinutes: create.dailyGoalMinutes,
-          totalXp: create.totalXp ?? 0,
-          currentStreak: create.currentStreak ?? 0,
-          longestStreak: create.longestStreak ?? 0,
-          lastActiveDate: create.lastActiveDate,
-          completedLessonsCount: create.completedLessonsCount ?? 0,
-          weeklyActivity: create.weeklyActivity ?? [],
-          achievements: create.achievements ?? [],
-          currentChapterId: create.currentChapterId ?? null,
-          currentUnitId: create.currentUnitId ?? null
-        },
-        $set: {
-          ...update,
-          ...(languageId ? { languageId } : {})
-        }
+        $setOnInsert: Object.fromEntries(insertOnlyEntries),
+        $set: set
       },
       { upsert: true, new: true }
     );

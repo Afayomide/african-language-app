@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "seed:admin": "node --enable-source-maps --import tsx src/scripts/seedAdmin.ts",
+    "languages:list": "node --enable-source-maps --import tsx src/scripts/listLanguages.ts",
     "db:clear": "node --enable-source-maps --import tsx src/scripts/clearDatabase.ts",
     "migrate:review-tracking": "node --enable-source-maps --import tsx src/scripts/migrateReviewTracking.ts",
     "audio:backfill-analysis": "node --enable-source-maps --import tsx src/scripts/backfillAudioAnalysis.ts",
