@@ -61,11 +61,10 @@ export default function LessonOverviewPage() {
       (Array.isArray(lesson.stageProgress) &&
         lesson.stageProgress.length > 0 &&
         lesson.stageProgress.every((stage) => stage.status === 'completed'))
-    const resumeStageNumber = isCompleted ? 1 : (lesson.currentStageIndex ?? 0) + 1
     const primaryLabel = isCompleted
       ? 'Review Lesson'
       : progress > 0
-        ? `Continue From Stage ${resumeStageNumber}`
+        ? 'Continue Lesson'
         : 'Start Learning'
     const subtitle =
       lesson.description ||

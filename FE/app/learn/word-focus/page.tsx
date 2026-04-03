@@ -19,7 +19,7 @@ export default function WordFocusHubPage() {
 
   return (
     <LearnerHubLayout
-      activeNav="vocabulary"
+      activeNav="learn"
       languageLabel={languageLabel}
       title="Yoruba Learning"
       headerProgressPercent={66}

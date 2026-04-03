@@ -46,7 +46,9 @@ export class LearnerAuthUseCases {
     if (!profile) {
       profile = await this.learnerProfiles.create({
         userId: user.id,
-        displayName: input.name.trim(),
+        name: input.name.trim(),
+        username: "",
+        avatarUrl: "",
         proficientLanguage: "",
         countryOfOrigin: "",
         onboardingCompleted: false,
@@ -96,7 +98,9 @@ export class LearnerAuthUseCases {
     if (!profile) {
       profile = await this.learnerProfiles.create({
         userId: user.id,
-        displayName: "",
+        name: "",
+        username: "",
+        avatarUrl: "",
         proficientLanguage: "",
         countryOfOrigin: "",
         onboardingCompleted: false,
@@ -132,11 +136,22 @@ export class LearnerAuthUseCases {
   }
 
   async me(input: { userId: string; email: string; role: AuthRole }) {
-    let profile = await this.learnerProfiles.findByUserId(input.userId);
+    const [existingProfile, user] = await Promise.all([
+      this.learnerProfiles.findByUserId(input.userId),
+      this.users.findById(input.userId)
+    ]);
+
+    if (!user) {
+      throw new AuthError(404, "User not found.");
+    }
+
+    let profile = existingProfile;
     if (!profile) {
       profile = await this.learnerProfiles.create({
         userId: input.userId,
-        displayName: "",
+        name: "",
+        username: "",
+        avatarUrl: "",
         proficientLanguage: "",
         countryOfOrigin: "",
         onboardingCompleted: false,
@@ -145,29 +160,12 @@ export class LearnerAuthUseCases {
       });
     }
 
-    await this.learnerLanguageStates.upsertByUserAndLanguage(
-      input.userId,
-      profile.currentLanguage,
-      {
-        userId: input.userId,
-        languageCode: profile.currentLanguage,
-        dailyGoalMinutes: profile.dailyGoalMinutes,
-        isEnrolled: true
-      }
-    );
-
-    console.log("LearnerAuthUseCases.me - user:", {
-      id: input.userId,
-      email: input.email,
-      role: input.role
-    });
-    console.log("LearnerAuthUseCases.me - profile:", profile);
-
     return {
       user: {
         id: input.userId,
-        email: input.email,
-        role: input.role
+        email: user.email,
+        role: input.role,
+        roles: user.roles
       },
       profile,
       requiresOnboarding: !profile.onboardingCompleted
@@ -177,7 +175,10 @@ export class LearnerAuthUseCases {
   async updateProfile(
     userId: string,
     input: Partial<{
-      displayName: string;
+      name: string;
+      username: string;
+      avatarUrl: string;
+      email: string;
       proficientLanguage: string;
       countryOfOrigin: string;
       currentLanguage: "yoruba" | "igbo" | "hausa";
@@ -188,7 +189,9 @@ export class LearnerAuthUseCases {
     if (!profile) {
       profile = await this.learnerProfiles.create({
         userId,
-        displayName: "",
+        name: "",
+        username: "",
+        avatarUrl: "",
         proficientLanguage: "",
         countryOfOrigin: "",
         onboardingCompleted: false,
@@ -197,7 +200,14 @@ export class LearnerAuthUseCases {
       });
     }
 
-    const nextDisplayName = input.displayName !== undefined ? input.displayName.trim() : profile.displayName;
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw new AuthError(404, "User not found.");
+    }
+
+    const nextName = input.name !== undefined ? input.name.trim() : profile.name;
+    const nextUsername = input.username !== undefined ? input.username : profile.username || "";
+    const nextAvatarUrl = input.avatarUrl !== undefined ? input.avatarUrl.trim() : (profile.avatarUrl || "");
     const nextProficientLanguage =
       input.proficientLanguage !== undefined ? input.proficientLanguage.trim() : profile.proficientLanguage;
     const nextCountryOfOrigin =
@@ -205,9 +215,32 @@ export class LearnerAuthUseCases {
     const nextCurrentLanguage = input.currentLanguage || profile.currentLanguage;
     const nextDailyGoalMinutes =
       input.dailyGoalMinutes && input.dailyGoalMinutes > 0 ? input.dailyGoalMinutes : profile.dailyGoalMinutes;
+    const nextEmail = input.email !== undefined ? input.email.trim().toLowerCase() : user.email;
+
+    let updatedUser = user;
+    if (nextEmail !== user.email) {
+      const existing = await this.users.findByEmail(nextEmail);
+      if (existing && existing.id !== userId) {
+        throw new AuthError(409, "Email is already in use by another account.");
+      }
+      const userWithNewEmail = await this.users.updateEmail(userId, nextEmail);
+      if (!userWithNewEmail) {
+        throw new AuthError(500, "Failed to update email address.");
+      }
+      updatedUser = userWithNewEmail;
+    }
+
+    if (nextUsername) {
+      const existingProfile = await this.learnerProfiles.findByUsername(nextUsername);
+      if (existingProfile && existingProfile.userId !== userId) {
+        throw new AuthError(409, "Username is already in use.");
+      }
+    }
 
     const updated = await this.learnerProfiles.updateByUserId(userId, {
-      displayName: nextDisplayName,
+      name: nextName,
+      username: nextUsername,
+      avatarUrl: nextAvatarUrl,
       proficientLanguage: nextProficientLanguage,
       countryOfOrigin: nextCountryOfOrigin,
       onboardingCompleted: Boolean(nextProficientLanguage && nextCountryOfOrigin),
@@ -236,8 +269,40 @@ export class LearnerAuthUseCases {
 
 
     return {
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: "learner" as const,
+        roles: updatedUser.roles
+      },
       profile: updated,
       requiresOnboarding: !updated.onboardingCompleted
     };
+  }
+
+  async changePassword(
+    userId: string,
+    input: {
+      currentPassword: string;
+      newPassword: string;
+    }
+  ) {
+    const user = await this.users.findById(userId);
+    if (!user || !user.roles.includes("learner")) {
+      throw new AuthError(404, "User not found.");
+    }
+
+    const passwordMatches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!passwordMatches) {
+      throw new AuthError(400, "Current password is incorrect.");
+    }
+
+    const nextPasswordHash = await bcrypt.hash(input.newPassword, 10);
+    const updatedUser = await this.users.updatePasswordHash(userId, nextPasswordHash);
+    if (!updatedUser) {
+      throw new AuthError(500, "Failed to update password.");
+    }
+
+    return { success: true };
   }
 }

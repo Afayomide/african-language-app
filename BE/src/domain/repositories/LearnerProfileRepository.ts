@@ -3,9 +3,12 @@ import type { Language } from "../entities/Lesson.js";
 
 export interface LearnerProfileRepository {
   findByUserId(userId: string): Promise<LearnerProfileEntity | null>;
+  findByUsername(username: string): Promise<LearnerProfileEntity | null>;
   create(input: {
     userId: string;
-    displayName: string;
+    name: string;
+    username?: string;
+    avatarUrl?: string;
     proficientLanguage?: string;
     countryOfOrigin?: string;
     onboardingCompleted?: boolean;
@@ -15,7 +18,9 @@ export interface LearnerProfileRepository {
   updateByUserId(
     userId: string,
     update: Partial<{
-      displayName: string;
+      name: string;
+      username: string;
+      avatarUrl: string;
       proficientLanguage: string;
       countryOfOrigin: string;
       onboardingCompleted: boolean;
@@ -30,4 +35,5 @@ export interface LearnerProfileRepository {
       achievements: string[];
     }>
   ): Promise<LearnerProfileEntity | null>;
+  countWithHigherTotalXp(totalXp: number): Promise<number>;
 }

@@ -10,7 +10,6 @@ import {
 import type {
   ExerciseQuestion,
   Language,
-  LearningContentComponent,
   Lesson,
   LessonFlowData,
   PopulatedLessonBlock,
@@ -19,7 +18,6 @@ import type {
   StageCompletionResult,
 } from './types'
 import { ExerciseBlock } from './components/studyComponents/ExerciseBlock'
-import { StageTransitionOverlay } from './components/studyComponents/StageTransitionOverlay'
 import { ContentStudyBlock, ProverbStudyBlock, TeacherNoteBlock } from './components/studyComponents/StaticStudyBlocks'
 import { StudyFooter } from './components/studyComponents/StudyFooter'
 import { StudyHeader } from './components/studyComponents/StudyHeader'
@@ -29,7 +27,6 @@ import {
   SOUNDS,
   XP_PER_BLOCK,
   buildMatchingFallbackItems,
-  buildStageTransitionCopy,
   buildWordOrderDisplayOrder,
   getChoiceSupportText,
   getListeningHeading,
@@ -37,7 +34,6 @@ import {
   getListeningSupportText,
   normalizeWordSequence,
   replacePromptToken,
-  type StageTransitionCopy,
 } from './components/studyComponents/studyHelpers'
 
 type StageSlice = {
@@ -119,13 +115,10 @@ export function LessonPlayer({
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [currentStageBlockIndex, setCurrentStageBlockIndex] = useState(0)
   const [isRetryMode, setIsRetryMode] = useState(false)
-  const [retryRound, setRetryRound] = useState(0)
   const [retryQueue, setRetryQueue] = useState<number[]>([])
   const [nextRetryQueue, setNextRetryQueue] = useState<number[]>([])
   const [retryPosition, setRetryPosition] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [isStageIntro, setIsStageIntro] = useState(false)
-  const [isStageComplete, setIsStageComplete] = useState(false)
   const [selectedOption, setSelectedAnswer] = useState<number | null>(null)
   const [selectedWords, setSelectedWords] = useState<number[]>([])
   const [selectedMatchingLeftId, setSelectedMatchingLeftId] = useState<string | null>(null)
@@ -146,7 +139,6 @@ export function LessonPlayer({
   const [isComparingSpeech, setIsComparingSpeech] = useState(false)
   const [speakingFeedback, setSpeakingFeedback] = useState<PronunciationComparisonResponse['comparison'] | null>(null)
   const [speakingError, setSpeakingError] = useState('')
-  const [stageTransitionCopy, setStageTransitionCopy] = useState<StageTransitionCopy | null>(null)
   const [viewportHeight, setViewportHeight] = useState<number | null>(null)
   const [viewportWidth, setViewportWidth] = useState<number | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -214,12 +206,9 @@ export function LessonPlayer({
         )
         setCurrentStageBlockIndex(0)
         setIsRetryMode(false)
-        setRetryRound(0)
         setRetryQueue([])
         setNextRetryQueue([])
         setRetryPosition(0)
-        setIsStageIntro(false)
-        setIsStageComplete(false)
         setStageStartedAt(Date.now())
         setSelectedAnswer(null)
         setSelectedWords([])
@@ -232,7 +221,6 @@ export function LessonPlayer({
         setXpEarned(0)
         setMistakesCount(0)
         setStageMistakesCount(0)
-        setStageTransitionCopy(null)
         resetSpeakingState()
       })
       .catch((error) => {
@@ -311,14 +299,18 @@ export function LessonPlayer({
 
   const currentStage = stageMeta[currentStageIndex] || null
   const currentStageBlocks = currentStage?.blocks || []
-  const activeStageBlockIndex = isRetryMode ? retryQueue[retryPosition] ?? 0 : currentStageBlockIndex
-  const currentBlock = currentStageBlocks[activeStageBlockIndex]
-  const completedStageBlockCount = currentStage
-    ? Math.min(currentStage.blockCount, isStageComplete ? currentStage.blockCount : activeStageBlockIndex)
-    : 0
+  const currentGlobalBlockIndex = isRetryMode
+    ? retryQueue[retryPosition] ?? 0
+    : currentStage
+      ? currentStage.start + currentStageBlockIndex
+      : 0
+  const currentBlock = blocks[currentGlobalBlockIndex]
+  const completedLessonBlockCount = isRetryMode
+    ? blocks.length
+    : Math.min(blocks.length, Math.max(0, currentGlobalBlockIndex))
   const progress =
-    currentStage && currentStage.blockCount > 0
-      ? Math.min(100, Math.round((completedStageBlockCount / currentStage.blockCount) * 100))
+    blocks.length > 0
+      ? Math.min(100, Math.round((completedLessonBlockCount / blocks.length) * 100))
       : 0
   const isExerciseBlock = currentBlock?.type === 'question'
   const exerciseData: ExerciseQuestion | null = isExerciseBlock ? currentBlock.data : null
@@ -376,8 +368,8 @@ export function LessonPlayer({
   const correctOrder: number[] =
     exerciseData?.interactionData?.correctOrder || exerciseData?.reviewData?.correctOrder || []
   const wordOrderDisplayOrder = useMemo(
-    () => buildWordOrderDisplayOrder(interactionWords, `${exerciseData?._id || currentStageIndex}:${promptText}:${interactionWords.join("||")}`),
-    [exerciseData?._id, currentStageIndex, interactionWords, promptText],
+    () => buildWordOrderDisplayOrder(interactionWords, `${exerciseData?._id || currentGlobalBlockIndex}:${promptText}:${interactionWords.join("||")}`),
+    [currentGlobalBlockIndex, exerciseData?._id, interactionWords, promptText],
   )
   const listeningAudioUrl = isListeningQuestion ? questionSource?.audio?.url : undefined
   const questionSentenceText =
@@ -438,12 +430,6 @@ export function LessonPlayer({
     : isCorrect
       ? 'Correct!'
       : 'Try this one again'
-  const stageBlockPositionLabel = currentStage
-    ? `${Math.min(activeStageBlockIndex + 1, Math.max(currentStage.blockCount, 1))} / ${Math.max(
-        currentStage.blockCount,
-        1,
-      )}`
-    : '0 / 0'
   const listeningHeading = getListeningHeading(exerciseData?.subtype)
   const listeningSupportText = getListeningSupportText(exerciseData?.subtype)
   const choiceSupportText = getChoiceSupportText(exerciseData?.subtype)
@@ -476,16 +462,9 @@ export function LessonPlayer({
   const resetStageState = useCallback(() => {
     clearStageAdvanceTimeout()
     setCurrentStageBlockIndex(0)
-    setIsRetryMode(false)
-    setRetryRound(0)
-    setRetryQueue([])
-    setNextRetryQueue([])
-    setRetryPosition(0)
     setStageMistakesCount(0)
     setStageQuestionResults({})
-    setIsStageComplete(false)
-    setStageTransitionCopy(null)
-    setStageStartedAt(null)
+    setStageStartedAt(Date.now())
     resetAnswerState()
     resetSpeakingState()
   }, [clearStageAdvanceTimeout, resetAnswerState, resetSpeakingState])
@@ -535,7 +514,7 @@ export function LessonPlayer({
         const sourceType = exerciseData.sourceType || exerciseData.source?.kind
         const sourceId = exerciseData.sourceId || exerciseData.source?._id
         if (sourceType && sourceId) {
-          const resultKey = String(activeStageBlockIndex)
+          const resultKey = String(currentGlobalBlockIndex)
           setStageQuestionResults((prev) => {
             const current = prev[resultKey]
             const nextAttempts = Math.max(1, (current?.attempts || 0) + 1)
@@ -564,21 +543,14 @@ export function LessonPlayer({
 
       setMistakesCount((prev) => prev + 1)
       setStageMistakesCount((prev) => prev + 1)
-      const failedBlockIndex = isRetryMode ? retryQueue[retryPosition] : currentStageBlockIndex
+      const failedBlockIndex = currentGlobalBlockIndex
       if (isRetryMode) {
         setNextRetryQueue((prev) => appendUnique(prev, failedBlockIndex))
       } else {
         setRetryQueue((prev) => appendUnique(prev, failedBlockIndex))
       }
     },
-    [activeStageBlockIndex, appendUnique, currentStageBlockIndex, exerciseData, isRetryMode, playFeedbackSound, retryPosition, retryQueue],
-  )
-
-  const playUiSound = useCallback(
-    (type: 'stageStart' | 'stageComplete' | 'continue') => {
-      playUiAudio(SOUNDS[type], 0.35)
-    },
-    [playUiAudio],
+    [appendUnique, currentGlobalBlockIndex, exerciseData, isRetryMode, playFeedbackSound],
   )
 
   const getMatchingRightItem = useCallback(
@@ -607,47 +579,46 @@ export function LessonPlayer({
     setSelectedMatchingLeftId(null)
   }
 
+  const finishLesson = useCallback(() => {
+    clearStageAdvanceTimeout()
+    if (onLessonComplete) {
+      onLessonComplete({ lessonId, xpEarned, language: lesson?.language })
+    } else {
+      onExit()
+    }
+  }, [clearStageAdvanceTimeout, lesson?.language, lessonId, onExit, onLessonComplete, xpEarned])
+
+  const startLessonRetry = useCallback(() => {
+    setIsRetryMode(true)
+    setRetryPosition(0)
+    setNextRetryQueue([])
+    resetAnswerState()
+    resetSpeakingState()
+  }, [resetAnswerState, resetSpeakingState])
+
   const handleAdvanceStage = useCallback(() => {
     clearStageAdvanceTimeout()
-    playUiSound('continue')
     if (isLastStage) {
-      if (onLessonComplete) {
-        onLessonComplete({ lessonId, xpEarned, language: lesson?.language })
-      } else {
-        onExit()
+      if (retryQueue.length > 0) {
+        startLessonRetry()
+        return
       }
+      finishLesson()
       return
     }
 
     setCurrentStageIndex((prev) => prev + 1)
     resetStageState()
-    setIsStageIntro(false)
-    setStageStartedAt(Date.now())
-    playUiSound('stageStart')
-  }, [clearStageAdvanceTimeout, isLastStage, lesson?.language, lessonId, onExit, onLessonComplete, playUiSound, resetStageState, xpEarned])
+  }, [clearStageAdvanceTimeout, finishLesson, isLastStage, resetStageState, retryQueue.length, startLessonRetry])
 
   const completeCurrentStage = useCallback(async () => {
     if (!lessonId || !currentStage) return
     const elapsedMs = stageStartedAt ? Date.now() - stageStartedAt : 0
     const minutesSpent = Math.max(1, Math.round(elapsedMs / 60000))
-    playUiSound('stageComplete')
-    setIsStageComplete(true)
-    setStageTransitionCopy(
-      buildStageTransitionCopy({
-        mistakesCount: stageMistakesCount,
-        stageNumber: currentStageIndex + 1,
-        totalStages: Math.max(stageMeta.length, 1),
-        isLastStage,
-        preview,
-      }),
-    )
     resetAnswerState()
 
     if (!onCompleteStage) {
-      clearStageAdvanceTimeout()
-      stageAdvanceTimeoutRef.current = setTimeout(() => {
-        handleAdvanceStage()
-      }, isLastStage ? 1600 : 1400)
+      handleAdvanceStage()
       return
     }
 
@@ -675,23 +646,15 @@ export function LessonPlayer({
       console.error('Failed to save stage progress', error)
     } finally {
       setIsSavingStage(false)
-      clearStageAdvanceTimeout()
-      stageAdvanceTimeoutRef.current = setTimeout(() => {
-        handleAdvanceStage()
-      }, isLastStage ? 1600 : 1400)
+      handleAdvanceStage()
     }
   }, [
-    clearStageAdvanceTimeout,
     currentStage,
     currentStageIndex,
     handleAdvanceStage,
-    isLastStage,
     lessonId,
     onCompleteStage,
-    playUiSound,
-    preview,
     resetAnswerState,
-    stageMeta.length,
     stageMistakesCount,
     stageQuestionResults,
     stageStartedAt,
@@ -733,15 +696,6 @@ export function LessonPlayer({
       return
     }
 
-    if (!isRetryMode && retryQueue.length > 0) {
-      setIsRetryMode(true)
-      setRetryRound(1)
-      setRetryPosition(0)
-      setNextRetryQueue([])
-      resetAnswerState()
-      return
-    }
-
     if (isRetryMode && retryPosition < retryQueue.length - 1) {
       setRetryPosition((prev) => prev + 1)
       resetAnswerState()
@@ -752,8 +706,12 @@ export function LessonPlayer({
       setRetryQueue(nextRetryQueue)
       setNextRetryQueue([])
       setRetryPosition(0)
-      setRetryRound((prev) => prev + 1)
       resetAnswerState()
+      return
+    }
+
+    if (isRetryMode) {
+      finishLesson()
       return
     }
 
@@ -848,13 +806,13 @@ export function LessonPlayer({
   }, [onComparePronunciation, recordedSpeechBlob, registerExerciseEvaluation, speakingTarget])
 
   useEffect(() => {
-    if (isStageComplete || currentBlock?.type !== 'proverb' || !lesson?.language || !culturalSoundResolver) {
+    if (currentBlock?.type !== 'proverb' || !lesson?.language || !culturalSoundResolver) {
       return
     }
     const audio = new Audio(culturalSoundResolver(lesson.language, 'proverb'))
     audio.volume = 0.42
     audio.play().catch(() => {})
-  }, [currentBlock, culturalSoundResolver, isStageComplete, lesson?.language])
+  }, [currentBlock, culturalSoundResolver, lesson?.language])
 
   if (isLoading) {
     return (
@@ -865,7 +823,7 @@ export function LessonPlayer({
     )
   }
 
-  if (!currentStage || (!currentBlock && !isStageComplete)) {
+  if (!currentStage || !currentBlock) {
     return <div className="flex min-h-screen items-center justify-center">{emptyMessage}</div>
   }
 
@@ -874,7 +832,6 @@ export function LessonPlayer({
       <div
         className={cx(
           'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,213,171,0.2),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0),rgba(253,249,241,0.78))]',
-          isStageComplete && 'opacity-0',
         )}
       />
 
@@ -883,217 +840,172 @@ export function LessonPlayer({
         preview={preview}
         progress={progress}
         xpEarned={xpEarned}
-        isStageComplete={isStageComplete}
+        isStageComplete={false}
         isShortViewport={isShortViewport}
         isUltraShortViewport={isUltraShortViewport}
-        immersiveExerciseChrome={Boolean(isExerciseBlock && exerciseData && !isStageIntro)}
+        immersiveExerciseChrome={Boolean(isExerciseBlock && exerciseData)}
       />
 
       <div
         className={cx(
           'relative z-10 flex-1 overflow-y-visible px-4 sm:px-6',
-          isStageComplete && 'pointer-events-none opacity-0',
           isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-28 pt-3' : 'pb-32 pt-6',
         )}
       >
         <div className={cx('mx-auto flex w-full flex-col', isMatchingQuestion ? 'max-w-[70rem]' : isSpeakingQuestion ? 'max-w-5xl' : 'max-w-4xl')}>
-          {isStageIntro ? (
-            <section className="hidden">
-              <div className="w-full rounded-[2rem] border border-primary/15 bg-white/95 p-8 text-center shadow-sm sm:p-10">
-                <p className="text-xs font-black uppercase tracking-[0.3em] text-primary/60">Stage {currentStageIndex + 1}</p>
-                <h2 className="mt-4 text-3xl font-black text-foreground sm:text-4xl">{currentStage.title}</h2>
-                {currentStage.description ? (
-                  <p className="mx-auto mt-4 max-w-xl text-base font-medium leading-relaxed text-foreground/65">
-                    {currentStage.description}
-                  </p>
-                ) : null}
-                <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 text-left">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-primary/70">Activities</p>
-                    <p className="mt-2 text-3xl font-black text-primary">{currentStage.blockCount}</p>
-                  </div>
-                  <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-left">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-700/70">Stage XP</p>
-                    <p className="mt-2 text-3xl font-black text-amber-700">+{stageXpEarned}</p>
-                  </div>
-                </div>
-                <div className="mt-8 rounded-3xl border border-border/70 bg-muted/40 p-5 text-left">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-foreground/45">Focus</p>
-                  <p className="mt-2 text-lg font-bold text-foreground">
-                    {preview ? 'Review the lesson exactly as a learner would see it.' : 'One stage at a time. Finish this stage before moving on.'}
-                  </p>
-                </div>
-              </div>
-            </section>
-          ) : (
-            <>
-              {currentBlock.type === 'text' ? (
-                <TeacherNoteBlock
-                  content={currentBlock.content}
-                  isShortViewport={isShortViewport}
-                  isUltraShortViewport={isUltraShortViewport}
-                />
-              ) : null}
+          <>
+            {currentBlock.type === 'text' ? (
+              <TeacherNoteBlock
+                content={currentBlock.content}
+                isShortViewport={isShortViewport}
+                isUltraShortViewport={isUltraShortViewport}
+              />
+            ) : null}
 
-              {currentBlock.type === 'content' ? (
-                <ContentStudyBlock
-                  contentEyebrow={currentContentEyebrow}
-                  content={currentBlock.data}
-                  language={lesson?.language}
-                  isShortViewport={isShortViewport}
-                  isUltraShortViewport={isUltraShortViewport}
-                  isDesktopViewport={isDesktopViewport}
-                  onPlayAudio={playAudioUrl}
-                  onPlayClick={playClick}
-                />
-              ) : null}
+            {currentBlock.type === 'content' ? (
+              <ContentStudyBlock
+                contentEyebrow={currentContentEyebrow}
+                content={currentBlock.data}
+                language={lesson?.language}
+                isShortViewport={isShortViewport}
+                isUltraShortViewport={isUltraShortViewport}
+                isDesktopViewport={isDesktopViewport}
+                onPlayAudio={playAudioUrl}
+                onPlayClick={playClick}
+              />
+            ) : null}
 
-              {currentBlock.type === 'proverb' ? (
-                <ProverbStudyBlock
-                  proverb={currentBlock.data}
-                  isShortViewport={isShortViewport}
-                  isUltraShortViewport={isUltraShortViewport}
-                />
-              ) : null}
+            {currentBlock.type === 'proverb' ? (
+              <ProverbStudyBlock
+                proverb={currentBlock.data}
+                isShortViewport={isShortViewport}
+                isUltraShortViewport={isUltraShortViewport}
+              />
+            ) : null}
 
-              {isExerciseBlock && exerciseData ? (
-                <ExerciseBlock
-                  exerciseData={exerciseData}
-                  isUltraShortViewport={isUltraShortViewport}
-                  isShortViewport={isShortViewport}
-                  isDesktopViewport={isDesktopViewport}
-                  lessonTitle={lesson?.title}
-                  isListeningQuestion={isListeningQuestion}
-                  isSpeakingQuestion={isSpeakingQuestion}
-                  isContextResponseQuestion={isContextResponseQuestion}
-                  isChoiceQuestion={isChoiceQuestion}
-                  isMatchingQuestion={isMatchingQuestion}
-                  isWordOrderQuestion={isWordOrderQuestion}
-                  inlineSourceComponent={inlineSourceComponent}
-                  sourceText={sourceText}
-                  renderedPrompt={renderedPrompt}
-                  renderedPromptParts={renderedPromptParts}
-                  listeningHeading={listeningHeading}
-                  choiceSupportText={choiceSupportText}
-                  questionSentenceText={questionSentenceText}
-                  shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
-                  meaningText={meaningText}
-                  questionSentenceAudioUrl={questionSentenceAudioUrl}
-                  questionSentenceComponents={questionSentenceComponents}
-                  interactionWords={interactionWords}
-                  listeningSupportText={listeningSupportText}
-                  listeningAudioUrl={listeningAudioUrl}
-                  listeningPromptDetail={listeningPromptDetail}
-                  isPlayingPrompt={isPlayingPrompt}
-                  speakingTarget={speakingTarget}
-                  hasSpeakingReference={hasSpeakingReference}
-                  canPracticeSpeaking={canPracticeSpeaking}
-                  isRecordingSpeech={isRecordingSpeech}
-                  isComparingSpeech={isComparingSpeech}
-                  recordedSpeechUrl={recordedSpeechUrl}
-                  speakingError={speakingError}
-                  speakingFeedback={speakingFeedback}
-                  selectedOption={selectedOption}
-                  selectedWords={selectedWords}
-                  selectedMatches={selectedMatches}
-                  selectedMatchingLeftId={selectedMatchingLeftId}
-                  matchingLeftItems={matchingLeftItems}
-                  matchingRightItems={matchingRightItems}
-                  orderPromptPlaceholder={orderPromptPlaceholder}
-                  wordOrderDisplayOrder={wordOrderDisplayOrder}
-                  isAnswered={isAnswered}
-                  onPlayAudio={playAudioUrl}
-                  onPlayClick={playClick}
-                  onToggleListeningPrompt={() => {
-                    if (!listeningAudioUrl) return
-                    playClick()
-                    setIsPlayingPrompt(true)
-                    playAudioUrl(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
-                  }}
-                  onPlayListeningSlow={() => {
-                    playClick()
-                    playAudioUrl(listeningAudioUrl, 0.6)
-                  }}
-                  onToggleRecording={() => {
-                    playClick()
-                    if (isRecordingSpeech) {
-                      stopSpeakingRecording()
-                    } else {
-                      void startSpeakingRecording()
-                    }
-                  }}
-                  onReplayRecording={() => {
-                    playClick()
-                    if (recordedSpeechUrl) playAudioUrl(recordedSpeechUrl)
-                  }}
-                  onSubmitSpeakingAttempt={() => {
-                    playClick()
-                    void submitSpeakingAttempt()
-                  }}
-                  onSelectOption={(idx) => {
-                    if (isAnswered) return
-                    setSelectedAnswer(idx)
-                    playClick()
-                  }}
-                  onSelectMatchingLeft={handleSelectMatchingLeft}
-                  onSelectMatchingRight={handleSelectMatchingRight}
-                  getMatchingRightItem={getMatchingRightItem}
-                  onRemoveSelectedWord={(selectedIndex) => {
-                    if (isAnswered) return
-                    setSelectedWords((prevWords) =>
-                      prevWords.filter((_, currentSelectedIndex) => currentSelectedIndex !== selectedIndex),
-                    )
-                  }}
-                  onAddSelectedWord={(wordIndex) => {
-                    if (isAnswered) return
-                    setSelectedWords((prevWords) => [...prevWords, wordIndex])
-                    playClick()
-                  }}
-                />
-              ) : null}
-            </>
-          )}
+            {isExerciseBlock && exerciseData ? (
+              <ExerciseBlock
+                exerciseData={exerciseData}
+                isUltraShortViewport={isUltraShortViewport}
+                isShortViewport={isShortViewport}
+                isDesktopViewport={isDesktopViewport}
+                lessonTitle={lesson?.title}
+                isListeningQuestion={isListeningQuestion}
+                isSpeakingQuestion={isSpeakingQuestion}
+                isContextResponseQuestion={isContextResponseQuestion}
+                isChoiceQuestion={isChoiceQuestion}
+                isMatchingQuestion={isMatchingQuestion}
+                isWordOrderQuestion={isWordOrderQuestion}
+                inlineSourceComponent={inlineSourceComponent}
+                sourceText={sourceText}
+                renderedPrompt={renderedPrompt}
+                renderedPromptParts={renderedPromptParts}
+                listeningHeading={listeningHeading}
+                choiceSupportText={choiceSupportText}
+                questionSentenceText={questionSentenceText}
+                shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
+                meaningText={meaningText}
+                questionSentenceAudioUrl={questionSentenceAudioUrl}
+                questionSentenceComponents={questionSentenceComponents}
+                interactionWords={interactionWords}
+                listeningSupportText={listeningSupportText}
+                listeningAudioUrl={listeningAudioUrl}
+                listeningPromptDetail={listeningPromptDetail}
+                isPlayingPrompt={isPlayingPrompt}
+                speakingTarget={speakingTarget}
+                hasSpeakingReference={hasSpeakingReference}
+                canPracticeSpeaking={canPracticeSpeaking}
+                isRecordingSpeech={isRecordingSpeech}
+                isComparingSpeech={isComparingSpeech}
+                recordedSpeechUrl={recordedSpeechUrl}
+                speakingError={speakingError}
+                speakingFeedback={speakingFeedback}
+                selectedOption={selectedOption}
+                selectedWords={selectedWords}
+                selectedMatches={selectedMatches}
+                selectedMatchingLeftId={selectedMatchingLeftId}
+                matchingLeftItems={matchingLeftItems}
+                matchingRightItems={matchingRightItems}
+                orderPromptPlaceholder={orderPromptPlaceholder}
+                wordOrderDisplayOrder={wordOrderDisplayOrder}
+                isAnswered={isAnswered}
+                onPlayAudio={playAudioUrl}
+                onPlayClick={playClick}
+                onToggleListeningPrompt={() => {
+                  if (!listeningAudioUrl) return
+                  playClick()
+                  setIsPlayingPrompt(true)
+                  playAudioUrl(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
+                }}
+                onPlayListeningSlow={() => {
+                  playClick()
+                  playAudioUrl(listeningAudioUrl, 0.6)
+                }}
+                onToggleRecording={() => {
+                  playClick()
+                  if (isRecordingSpeech) {
+                    stopSpeakingRecording()
+                  } else {
+                    void startSpeakingRecording()
+                  }
+                }}
+                onReplayRecording={() => {
+                  playClick()
+                  if (recordedSpeechUrl) playAudioUrl(recordedSpeechUrl)
+                }}
+                onSubmitSpeakingAttempt={() => {
+                  playClick()
+                  void submitSpeakingAttempt()
+                }}
+                onSelectOption={(idx) => {
+                  if (isAnswered) return
+                  setSelectedAnswer(idx)
+                  playClick()
+                }}
+                onSelectMatchingLeft={handleSelectMatchingLeft}
+                onSelectMatchingRight={handleSelectMatchingRight}
+                getMatchingRightItem={getMatchingRightItem}
+                onRemoveSelectedWord={(selectedIndex) => {
+                  if (isAnswered) return
+                  setSelectedWords((prevWords) =>
+                    exerciseData?.subtype === 'fg-letter-order'
+                      ? prevWords.slice(0, -1)
+                      : prevWords.filter((_, currentSelectedIndex) => currentSelectedIndex !== selectedIndex),
+                  )
+                }}
+                onAddSelectedWord={(wordIndex) => {
+                  if (isAnswered) return
+                  setSelectedWords((prevWords) => [...prevWords, wordIndex])
+                  playClick()
+                }}
+              />
+            ) : null}
+          </>
         </div>
       </div>
 
-      {isStageComplete && stageTransitionCopy ? (
-        <StageTransitionOverlay
-          title={stageTransitionCopy.title}
-          subtitle={stageTransitionCopy.subtitle}
-          stageXpEarned={stageXpEarned}
-          stageMistakesCount={stageMistakesCount}
-          isSavingStage={isSavingStage}
-          isLastStage={isLastStage}
-          isShortViewport={isShortViewport}
-          isUltraShortViewport={isUltraShortViewport}
-          isVeryShortViewport={isVeryShortViewport}
-        />
-      ) : null}
-
-      {!isStageComplete ? (
-        <StudyFooter
-          isAnswered={isAnswered}
-          isCorrect={isCorrect}
-          isExerciseBlock={isExerciseBlock}
-          isSpeakingQuestion={isSpeakingQuestion}
-          preview={preview}
-          answerStatusLabel={answerStatusLabel}
-          explanation={exerciseData?.explanation}
-          canCheck={canCheck}
-          canCheckSpeaking={canCheckSpeaking}
-          isSpeakingBusy={Boolean(isRecordingSpeech || isComparingSpeech)}
-          isSavingStage={isSavingStage}
-          isShortViewport={isShortViewport}
-          isUltraShortViewport={isUltraShortViewport}
-          isVeryShortViewport={isVeryShortViewport}
-          onCheck={handleCheck}
-          onCheckSpeaking={() => {
-            playClick()
-            void submitSpeakingAttempt()
-          }}
-          onNext={handleNext}
-        />
-      ) : null}
+      <StudyFooter
+        isAnswered={isAnswered}
+        isCorrect={isCorrect}
+        isExerciseBlock={isExerciseBlock}
+        isSpeakingQuestion={isSpeakingQuestion}
+        preview={preview}
+        answerStatusLabel={answerStatusLabel}
+        explanation={exerciseData?.explanation}
+        canCheck={canCheck}
+        canCheckSpeaking={canCheckSpeaking}
+        isSpeakingBusy={Boolean(isRecordingSpeech || isComparingSpeech)}
+        isSavingStage={isSavingStage}
+        isShortViewport={isShortViewport}
+        isUltraShortViewport={isUltraShortViewport}
+        isVeryShortViewport={isVeryShortViewport}
+        onCheck={handleCheck}
+        onCheckSpeaking={() => {
+          playClick()
+          void submitSpeakingAttempt()
+        }}
+        onNext={handleNext}
+      />
     </main>
   )
 }

@@ -105,6 +105,12 @@ export class AdminWordUseCases {
     return deleted;
   }
 
+  async finish(id: string) {
+    const current = await this.words.findById(id);
+    if (!current || current.status !== "draft") return null;
+    return this.words.updateById(id, { status: "finished" });
+  }
+
   async publish(id: string) {
     const current = await this.words.findById(id);
     if (!current || current.status !== "finished") return null;

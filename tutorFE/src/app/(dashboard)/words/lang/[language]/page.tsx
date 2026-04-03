@@ -1,21 +1,11 @@
-
 'use client'
 
-import { use, useEffect, useMemo, useState } from "react";
+import { useEffect, useState, Suspense, use } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { aiService, lessonService, wordService } from "@/services";
-import type { Word, Lesson, Language, Level, Status } from "@/types";
+import { Word, Lesson, Language, Level, Status } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -24,6 +14,16 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Edit, Trash, ArrowLeft, Volume2, Sparkles, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -33,40 +33,57 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { ArrowLeft, Plus, Trash2, Volume2, CheckCircle, Type, Sparkles } from "lucide-react";
+import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
+import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
+
+const LANGUAGE_LABELS: Record<Language, string> = {
+  yoruba: "Yoruba",
+  igbo: "Igbo",
+  hausa: "Hausa"
+};
 
 function isLanguage(value: string): value is Language {
   return value === "yoruba" || value === "igbo" || value === "hausa";
 }
 
-export default function WordsByLanguagePage({ params }: { params: Promise<{ language: string }> }) {
-  const { language: rawLanguage } = use(params);
-  const language: Language = isLanguage(rawLanguage) ? rawLanguage : "yoruba";
-  const router = useRouter();
+function WordsByLanguageContent({ params }: { params: Promise<{ language: string }> }) {
+  const { language: languageParam } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const lessonIdParam = searchParams.get("lessonId");
+
+  const isValidLanguageParam = isLanguage(languageParam);
+  const language: Language = isValidLanguageParam ? (languageParam as Language) : "yoruba";
   const [items, setItems] = useState<Word[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [selectedLessonId, setSelectedLessonId] = useState(searchParams.get("lessonId") || "all");
-  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-  const [search, setSearch] = useState("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedLessonId, setSelectedLessonId] = useState<string>(lessonIdParam || "all");
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedWords, setSeedWords] = useState("");
   const [extraInstructions, setExtraInstructions] = useState("");
   const [generationLevel, setGenerationLevel] = useState<Level>("beginner");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    void loadLessons();
-  }, [language]);
+    if (!isValidLanguageParam) return;
+    void fetchLessons();
+  }, [isValidLanguageParam]);
 
   useEffect(() => {
-    void loadItems();
-  }, [language, selectedLessonId, statusFilter, search]);
+    if (!isValidLanguageParam) return;
+    void fetchItems();
+  }, [selectedLessonId, isValidLanguageParam, page, search, limit, statusFilter]);
 
   useEffect(() => {
     const lesson = lessons.find((item) => item._id === selectedLessonId);
@@ -75,36 +92,84 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
     }
   }, [lessons, selectedLessonId]);
 
-  async function loadLessons() {
+  useEffect(() => {
+    setPage(1);
+  }, [selectedLessonId, search, statusFilter]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    const qPage = Number(searchParams.get("page") || "1");
+    const qLimit = Number(searchParams.get("limit") || "20");
+    const qStatus = searchParams.get("status");
+    const lessonId = searchParams.get("lessonId") || "all";
+    setSearch(q);
+    setPage(Number.isInteger(qPage) && qPage > 0 ? qPage : 1);
+    setLimit([10, 20, 50].includes(qLimit) ? qLimit : 20);
+    if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
+      setStatusFilter(qStatus);
+    }
+    setSelectedLessonId(lessonId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (selectedLessonId && selectedLessonId !== "all") params.set("lessonId", selectedLessonId);
+    else params.delete("lessonId");
+    if (search) params.set("q", search);
+    else params.delete("q");
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else params.delete("status");
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    const nextQuery = params.toString();
+    if (nextQuery === searchParams.toString()) return;
+    router.replace(`${pathname}?${nextQuery}`);
+  }, [selectedLessonId, search, statusFilter, page, limit, pathname, router, searchParams]);
+
+  async function fetchLessons() {
     try {
       const data = await lessonService.listLessons();
-      setLessons(data.filter((lesson) => lesson.language === language).sort((a, b) => a.orderIndex - b.orderIndex));
+      setLessons(data.sort((a, b) => a.orderIndex - b.orderIndex));
+      if (lessonIdParam && !data.some((lesson) => lesson._id === lessonIdParam)) {
+        setSelectedLessonId("all");
+      }
     } catch {
-      toast.error("Failed to load lessons");
+      toast.error("Failed to fetch lessons");
     }
   }
 
-  async function loadItems() {
+  async function fetchItems() {
     setIsLoading(true);
     try {
-      const result = await wordService.listWordsPage({ lessonId: selectedLessonId === "all" ? undefined : selectedLessonId, status: statusFilter === "all" ? undefined : statusFilter, q: search || undefined });
-      setItems(result.items);
+      const data = await wordService.listWordsPage({
+        lessonId: selectedLessonId === "all" ? undefined : selectedLessonId,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        q: search || undefined,
+        page,
+        limit
+      });
+      setItems(data.items);
       setSelectedIds([]);
+      setTotal(data.total);
+      setTotalPages(data.pagination.totalPages);
     } catch {
-      toast.error("Failed to load words");
+      toast.error("Failed to fetch words");
     } finally {
       setIsLoading(false);
     }
   }
 
-  const allSelected = useMemo(() => items.length > 0 && selectedIds.length === items.length, [items.length, selectedIds.length]);
+  if (!isValidLanguageParam) {
+    return <div>Invalid language</div>;
+  }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this item?")) return;
+    if (!confirm("Are you sure you want to delete this word?")) return;
     try {
       await wordService.deleteWord(id);
       toast.success("Word deleted");
-      await loadItems();
+      void fetchItems();
     } catch {
       toast.error("Failed to delete word");
     }
@@ -117,31 +182,47 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
     }
     try {
       const result = await wordService.bulkDeleteWords(selectedIds);
-      toast.success(`${result.deletedCount} words deleted`);
-      await loadItems();
+      toast.success(`${result.deletedCount} word(s) deleted`);
+      setSelectedIds([]);
+      void fetchItems();
     } catch {
-      toast.error("Failed to delete selected words");
+      toast.error("Failed to bulk delete words");
     }
   }
 
-  async function handleStatusAction(id: string) {
+  async function handleBulkFinish() {
+    const finishable = items
+      .filter((item) => selectedIds.includes(item._id) && item.status === "draft")
+      .map((item) => item._id);
+    if (finishable.length === 0) {
+      toast.error("No selected draft words to finish");
+      return;
+    }
+    try {
+      await Promise.all(finishable.map((id) => wordService.finishWord(id)));
+      toast.success(`Marked ${finishable.length} word(s) as finished`);
+      setSelectedIds([]);
+      void fetchItems();
+    } catch {
+      toast.error("Failed to bulk finish words");
+    }
+  }
+
+  async function handleFinish(id: string) {
     try {
       await wordService.finishWord(id);
-      toast.success("Word finished");
-      await loadItems();
+      toast.success("Word sent to admin for publish");
+      void fetchItems();
     } catch {
-      toast.error("Failed to finish word");
+      toast.error("Failed to mark word as finished");
     }
   }
 
-  async function handleGenerateAudio(id: string) {
-    try {
-      await wordService.generateWordAudio(id);
-      toast.success("Audio generated");
-      await loadItems();
-    } catch {
-      toast.error("Failed to generate audio");
-    }
+  function handlePlayAudio(url: string) {
+    const audio = new Audio(url);
+    void audio.play().catch(() => {
+      toast.error("Unable to play audio");
+    });
   }
 
   async function handleGenerateLessonAudio() {
@@ -149,32 +230,32 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
       toast.error("Select a lesson first");
       return;
     }
+
     try {
       const result = await wordService.generateLessonWordAudio(selectedLessonId);
       toast.success(`Audio generated for ${result.updatedCount} words`);
-      await loadItems();
+      void fetchItems();
     } catch {
       toast.error("Failed to generate lesson audio");
     }
   }
 
-  async function handleGenerateAI() {
+  async function handleGenerateAI(seedWordsList?: string[], extraText?: string) {
     setIsGenerating(true);
     try {
       await aiService.generateWords(
         selectedLessonId === "all" ? undefined : selectedLessonId,
-        selectedLessonId === "all" ? generationLevel : lessons.find((item) => item._id === selectedLessonId)?.level || generationLevel,
-        seedWords
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        extraInstructions.trim() || undefined
+        selectedLessonId === "all"
+          ? generationLevel
+          : lessons.find((item) => item._id === selectedLessonId)?.level || generationLevel,
+        seedWordsList,
+        extraText?.trim() || undefined
       );
       toast.success("AI words generated successfully");
+      void fetchItems();
       setIsDialogOpen(false);
       setSeedWords("");
       setExtraInstructions("");
-      await loadItems();
     } catch {
       toast.error("AI generation failed");
     } finally {
@@ -184,25 +265,34 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/words')}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/words")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Words - {language.charAt(0).toUpperCase() + language.slice(1)}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Manage words and their lesson assignments.</p>
-          </div>
+          <h1 className="text-3xl font-bold">{LANGUAGE_LABELS[language]} Words</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleGenerateLessonAudio}>
-            <Volume2 className="mr-2 h-4 w-4" />
-            Lesson Audio
+          <Button
+            variant="outline"
+            onClick={handleBulkDelete}
+            disabled={selectedIds.length === 0}
+            className={TABLE_BULK_BUTTON_CLASS.delete}
+          >
+            Delete Selected ({selectedIds.length})
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleBulkFinish}
+            disabled={selectedIds.length === 0}
+            className={TABLE_BULK_BUTTON_CLASS.finish}
+          >
+            Bulk Finish
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
                 Generate with AI
               </Button>
             </DialogTrigger>
@@ -232,18 +322,18 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="wordSeedWords">Seed Words / Topics</Label>
+                  <Label htmlFor="seedWords">Seed Words / Topics</Label>
                   <Input
-                    id="wordSeedWords"
+                    id="seedWords"
                     placeholder="e.g. family, body, classroom"
                     value={seedWords}
                     onChange={(event) => setSeedWords(event.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="wordExtraInstructions">Extra Description (Optional)</Label>
+                  <Label htmlFor="extraInstructions">Extra Description (Optional)</Label>
                   <Input
-                    id="wordExtraInstructions"
+                    id="extraInstructions"
                     placeholder='e.g. "Focus on beginner nouns used in daily conversation"'
                     value={extraInstructions}
                     onChange={(event) => setExtraInstructions(event.target.value)}
@@ -254,14 +344,37 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleGenerateAI} disabled={isGenerating}>
+                <Button
+                  onClick={() =>
+                    handleGenerateAI(
+                      seedWords
+                        ? seedWords
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        : undefined,
+                      extraInstructions
+                    )
+                  }
+                  disabled={isGenerating}
+                >
                   {isGenerating ? "Generating..." : "Generate"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {selectedLessonId !== "all" && (
+            <Button variant="outline" onClick={handleGenerateLessonAudio}>
+              <Volume2 className="mr-2 h-4 w-4" />
+              Generate Lesson Audio
+            </Button>
+          )}
           <Button asChild>
-            <Link href={`/words/new?language=${language}${selectedLessonId !== 'all' ? `&lessonId=${selectedLessonId}` : ''}`}>
+            <Link
+              href={`/words/new?language=${language}${
+                selectedLessonId !== "all" ? `&lessonId=${selectedLessonId}` : ""
+              }`}
+            >
               <Plus className="mr-2 h-4 w-4" />
               New Word
             </Link>
@@ -269,90 +382,181 @@ export default function WordsByLanguagePage({ params }: { params: Promise<{ lang
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search text, translation, notes" />
-        <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
-          <SelectTrigger><SelectValue placeholder="All lessons" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All lessons</SelectItem>
-            {lessons.map((lesson) => (
-              <SelectItem key={lesson._id} value={lesson._id}>{lesson.title}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | Status)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="finished">Finished</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" onClick={handleBulkDelete} disabled={selectedIds.length === 0}>
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete Selected
-        </Button>
+      <div className="flex items-center gap-4 rounded-md border bg-white p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Filter by Lesson:</span>
+          <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
+            <SelectTrigger className="w-[280px]">
+              <SelectValue placeholder="All Lessons" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Lessons</SelectItem>
+              {lessons.map((lesson) => (
+                <SelectItem key={lesson._id} value={lesson._id}>
+                  {lesson.orderIndex + 1}. {lesson.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Status:</span>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | Status)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="finished">Finished</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="rounded-xl border bg-card">
+      <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
+        <div className="px-6 pt-4">
+          <DataTableControls
+            search={search}
+            onSearchChange={setSearch}
+            page={page}
+            limit={limit}
+            onLimitChange={(value) => {
+              setLimit(value);
+              setPage(1);
+            }}
+            totalPages={totalPages}
+            total={total}
+            label="Search words"
+            onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+            onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          />
+        </div>
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-primary/5">
             <TableRow>
-              <TableHead className="w-10">
+              <TableHead className="w-12">
                 <input
                   type="checkbox"
-                  checked={allSelected}
-                  onChange={(event) => setSelectedIds(event.target.checked ? items.map((item) => item._id) : [])}
+                  checked={items.length > 0 && selectedIds.length === items.length}
+                  onChange={(event) =>
+                    setSelectedIds(event.target.checked ? items.map((item) => item._id) : [])
+                  }
                 />
               </TableHead>
-              <TableHead>Word</TableHead>
-              <TableHead>Translations</TableHead>
-              <TableHead>Lessons</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="pl-8 font-bold text-primary">Text</TableHead>
+              <TableHead className="font-bold text-primary">Translation</TableHead>
+              <TableHead className="font-bold text-primary">Difficulty</TableHead>
+              <TableHead className="font-bold text-primary">Status</TableHead>
+              <TableHead className="font-bold text-primary">Created At</TableHead>
+              <TableHead className="font-bold text-primary">Updated At</TableHead>
+              <TableHead className="pr-8 text-right font-bold text-primary">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>
-            ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={6}>No words found.</TableCell></TableRow>
-            ) : items.map((item) => (
-              <TableRow key={item._id}>
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item._id)}
-                    onChange={(event) => setSelectedIds((current) => event.target.checked ? Array.from(new Set([...current, item._id])) : current.filter((entry) => entry !== item._id))}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{item.text}</div>
-                  {item.partOfSpeech ? <div className="text-xs text-muted-foreground">{item.partOfSpeech}</div> : null}
-                </TableCell>
-                <TableCell className="max-w-xs whitespace-normal text-sm text-muted-foreground">{item.translations.join(", ")}</TableCell>
-                <TableCell>{item.lessonIds.length}</TableCell>
-                <TableCell><Badge className={workflowStatusBadgeClass(item.status)}>{item.status}</Badge></TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="icon" asChild>
-                      <Link href={`/words/${item._id}`}><Type className="h-4 w-4" /></Link>
-                    </Button>
-                    <Button variant="outline" size="icon" onClick={() => handleGenerateAudio(item._id)}>
-                      <Volume2 className="h-4 w-4" />
-                    </Button>
-                    {item.status === "finished" ? <Button variant="outline" size="icon" onClick={() => handleStatusAction(item._id)}><CheckCircle className="h-4 w-4" /></Button> : null}
-                    <Button variant="outline" size="icon" onClick={() => handleDelete(item._id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">
+                  No words found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              items.map((item) => (
+                <TableRow key={item._id} className="group transition-colors hover:bg-secondary/30">
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item._id)}
+                      onChange={(event) =>
+                        setSelectedIds((prev) =>
+                          event.target.checked
+                            ? Array.from(new Set([...prev, item._id]))
+                            : prev.filter((id) => id !== item._id)
+                        )
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="pl-8 font-bold text-foreground">{item.text}</TableCell>
+                  <TableCell className="font-medium text-muted-foreground italic">
+                    {item.translations.join(" | ")}
+                  </TableCell>
+                  <TableCell>{item.difficulty}/5</TableCell>
+                  <TableCell>
+                    <Badge className={workflowStatusBadgeClass(item.status)}>
+                      {item.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-medium text-muted-foreground">
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-medium text-muted-foreground">
+                    {new Date(item.updatedAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="pr-8 text-right">
+                    <div className="flex justify-end gap-2">
+                      {item.audio?.url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePlayAudio(item.audio.url)}
+                          title="Play audio"
+                          className={TABLE_ACTION_ICON_CLASS.play}
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => router.push(`/words/${item._id}`)}
+                        title="Edit"
+                        className={TABLE_ACTION_ICON_CLASS.edit}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      {item.status === "draft" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleFinish(item._id)}
+                          title="Mark as finished"
+                          className={TABLE_ACTION_ICON_CLASS.finish}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(item._id)}
+                        title="Delete"
+                        className={TABLE_ACTION_ICON_CLASS.delete}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
     </div>
+  );
+}
+
+export default function WordsByLanguagePage({ params }: { params: Promise<{ language: string }> }) {
+  return (
+    <Suspense fallback={<div>Loading words...</div>}>
+      <WordsByLanguageContent params={params} />
+    </Suspense>
   );
 }

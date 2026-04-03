@@ -33,15 +33,16 @@ function toEntity(doc: LessonProgressDocument): LessonProgressEntity {
 
 export class MongooseLessonProgressRepository implements LessonProgressRepository {
   async findByUserAndLessonId(userId: string, lessonId: string): Promise<LessonProgressEntity | null> {
-    const progress = await LessonProgressModel.findOne({ userId, lessonId });
+    const progress = await LessonProgressModel.findOne({ userId, lessonId }).lean();
     return progress ? toEntity(progress) : null;
   }
 
   async listByUserAndLessonIds(userId: string, lessonIds: string[]): Promise<LessonProgressEntity[]> {
+    if (lessonIds.length === 0) return [];
     const progresses = await LessonProgressModel.find({
       userId,
       lessonId: { $in: lessonIds }
-    });
+    }).lean();
     return progresses.map(toEntity);
   }
 

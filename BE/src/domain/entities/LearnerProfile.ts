@@ -10,7 +10,9 @@ export type LearnerProfileEntity = {
   _id?: string;
   userId: string;
   activeLanguageId?: string | null;
-  displayName: string;
+  name: string;
+  username?: string;
+  avatarUrl?: string;
   proficientLanguage: string;
   countryOfOrigin: string;
   onboardingCompleted: boolean;
@@ -23,4 +25,6 @@ export type LearnerProfileEntity = {
   completedLessonsCount: number;
   weeklyActivity: LearnerWeeklyActivity[];
   achievements: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
 };

@@ -62,12 +62,12 @@ async function enrichLanguageId(
 
 export class MongooseLearnerLanguageStateRepository implements LearnerLanguageStateRepository {
   async findByUserAndLanguage(userId: string, languageCode: Language): Promise<LearnerLanguageStateEntity | null> {
-    const doc = await LearnerLanguageStateModel.findOne({ userId, languageCode });
+    const doc = await LearnerLanguageStateModel.findOne({ userId, languageCode }).lean();
     return doc ? toEntity(doc) : null;
   }
 
   async listByUser(userId: string): Promise<LearnerLanguageStateEntity[]> {
-    const docs = await LearnerLanguageStateModel.find({ userId }).sort({ createdAt: 1 });
+    const docs = await LearnerLanguageStateModel.find({ userId }).sort({ createdAt: 1 }).lean();
     return docs.map(toEntity);
   }
 

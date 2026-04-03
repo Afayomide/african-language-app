@@ -14,6 +14,9 @@ export type LearnerLanguageSummary = {
   dailyGoalMinutes: number
   todayMinutes: number
   completedLessonsCount: number
+  totalLessonsCount?: number
+  dailyProgressPercent?: number
+  courseProgressPercent?: number
 }
 
 type Props = {

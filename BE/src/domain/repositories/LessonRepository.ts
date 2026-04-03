@@ -26,10 +26,33 @@ export type LessonUpdateInput = Partial<
   Pick<LessonEntity, "title" | "unitId" | "language" | "level" | "kind" | "orderIndex" | "description" | "topics" | "proverbs" | "stages" | "status">
 >;
 
+export type LessonSummaryEntity = Pick<
+  LessonEntity,
+  | "id"
+  | "_id"
+  | "languageId"
+  | "title"
+  | "unitId"
+  | "language"
+  | "level"
+  | "kind"
+  | "orderIndex"
+  | "description"
+  | "status"
+  | "createdBy"
+  | "publishedAt"
+  | "deletedAt"
+  | "createdAt"
+  | "updatedAt"
+> & {
+  stageCount: number;
+};
+
 export interface LessonRepository {
   findLastOrderIndex(unitId: string): Promise<number | null>;
   create(input: LessonCreateInput): Promise<LessonEntity>;
   list(filter: LessonListFilter): Promise<LessonEntity[]>;
+  listSummaries(filter: LessonListFilter): Promise<LessonSummaryEntity[]>;
   findById(id: string): Promise<LessonEntity | null>;
   findByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null>;
   updateById(id: string, update: LessonUpdateInput): Promise<LessonEntity | null>;

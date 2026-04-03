@@ -25,6 +25,7 @@ import {
 import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 import { Logo } from '@/components/branding/logo'
 import { LanguageSwitcher, type LearnerLanguageSummary } from '@/components/learner/language-switcher'
+import { WeeklyBars, DEFAULT_LEARNER_WEEK as DEFAULT_WEEK } from '@/components/learner/weekly-bars'
 import { learnerDashboardService } from '@/services'
 import { cn } from '@/lib/utils'
 
@@ -49,6 +50,7 @@ type DashboardData = {
     languageLongestStreak?: number
     totalXp: number
     globalTotalXp?: number
+    globalRank?: number
     dailyGoalMinutes: number
     todayMinutes: number
     dailyProgressPercent?: number
@@ -90,7 +92,7 @@ type DashboardData = {
     level: string
     completedAt: string | null
   }[]
-  weeklyOverview: { day: string; completed: boolean; minutes: number }[]
+  weeklyOverview: { day: string; completed: boolean; minutes: number; dateKey?: string; isToday?: boolean }[]
   achievements: string[]
 }
 
@@ -188,27 +190,18 @@ const LESSON_STATUS_LABELS: Record<UnitLesson['status'], string> = {
 
 const DESKTOP_NAV_ITEMS = [
   { label: 'Dashboard', icon: Home, href: '/dashboard', active: true },
-  { label: 'Lessons', icon: BookOpen, href: '/learn/spelling', active: false },
-  { label: 'Vocabulary', icon: Languages, href: '/learn/word-focus', active: false },
-  { label: 'Progress', icon: ChartColumnBig, href: '/dashboard', active: false },
+  { label: 'Learn', icon: GraduationCap, href: '/curriculum', active: false },
+  { label: 'Profile', icon: User, href: '/profile', active: false },
+  { label: 'Settings', icon: Settings, href: '/settings', active: false },
 ]
 
 const MOBILE_NAV_ITEMS = [
-  { label: 'Learn', icon: GraduationCap, href: '/dashboard', active: true, emphasis: true },
-  { label: 'Practice', icon: Languages, href: '/learn/translation', active: false, emphasis: true },
-  { label: 'Streaks', icon: Flame, href: '/dashboard', active: false, emphasis: true },
-  { label: 'Profile', icon: User, href: '/dashboard', active: false, emphasis: true },
+  { label: 'Dashboard', icon: Home, href: '/dashboard', active: true, emphasis: true },
+  { label: 'Learn', icon: GraduationCap, href: '/curriculum', active: false, emphasis: true },
+  { label: 'Profile', icon: User, href: '/profile', active: false, emphasis: true },
+  { label: 'Settings', icon: Settings, href: '/settings', active: false, emphasis: true },
 ]
 
-const DEFAULT_WEEK = [
-  { day: 'Mon', completed: false, minutes: 0 },
-  { day: 'Tue', completed: false, minutes: 0 },
-  { day: 'Wed', completed: false, minutes: 0 },
-  { day: 'Thu', completed: false, minutes: 0 },
-  { day: 'Fri', completed: false, minutes: 0 },
-  { day: 'Sat', completed: false, minutes: 0 },
-  { day: 'Sun', completed: false, minutes: 0 },
-]
 
 function normalizeLanguage(value?: string): SupportedLanguage {
   const normalized = String(value || '').trim().toLowerCase()
@@ -221,6 +214,12 @@ function titleCaseLanguage(value?: string) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
+function firstName(value?: string) {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return 'Scholar'
+  return trimmed.split(/\s+/)[0] || 'Scholar'
+}
+
 export default function DashboardScreen() {
   const { logout, isLoading: isAuthLoading, isAuthenticated, refreshSession, session } = useLearnerAuth()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -229,10 +228,36 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (isAuthLoading || !isAuthenticated || session?.requiresOnboarding) return
-    learnerDashboardService
-      .getOverview()
-      .then((payload) => setData(payload))
-      .catch((error) => console.error('Failed to load dashboard', error))
+
+    let isMounted = true
+    const loadDashboard = async () => {
+      try {
+        const payload = await learnerDashboardService.getOverview()
+        if (isMounted) setData(payload)
+      } catch (error) {
+        console.error('Failed to load dashboard', error)
+      }
+    }
+
+    void loadDashboard()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadDashboard()
+      }
+    }
+
+    const handleFocus = () => {
+      void loadDashboard()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      isMounted = false
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [isAuthLoading, isAuthenticated, session?.requiresOnboarding])
 
   useEffect(() => {
@@ -258,7 +283,8 @@ export default function DashboardScreen() {
     : 0)
   const masteryLessons: MasteryLesson[] = data?.completedLessons?.slice(0, 4) || []
   const weeklyOverview = data?.weeklyOverview?.length ? data.weeklyOverview : DEFAULT_WEEK
-  const learnerName = session?.profile?.displayName || session?.user?.email?.split('@')[0] || 'Scholar'
+  const learnerName = session?.profile?.name || 'Scholar'
+  const learnerFirstName = firstName(learnerName)
   const languageKey = normalizeLanguage(data?.stats.currentLanguage)
   const languageLabel = titleCaseLanguage(data?.stats.currentLanguage)
   const copy = LANGUAGE_UI_COPY[languageKey]
@@ -289,6 +315,7 @@ export default function DashboardScreen() {
         languageKey={languageKey}
         languageLabel={languageLabel}
         languageCopy={copy}
+        learnerFirstName={learnerFirstName}
         learnerName={learnerName}
         masteryLessons={masteryLessons}
         nextLessonHref={nextLessonHref}
@@ -306,6 +333,7 @@ export default function DashboardScreen() {
         languageKey={languageKey}
         languageCopy={copy}
         languageLabel={languageLabel}
+        learnerFirstName={learnerFirstName}
         nextLessonHref={nextLessonHref}
         onSelectLanguage={handleLanguageChange}
         weeklyOverview={weeklyOverview}
@@ -323,6 +351,7 @@ function DashboardDesktop({
   languageKey,
   languageCopy,
   languageLabel,
+  learnerFirstName,
   learnerName,
   masteryLessons,
   nextLessonHref,
@@ -339,6 +368,7 @@ function DashboardDesktop({
   languageKey: SupportedLanguage
   languageCopy: (typeof LANGUAGE_UI_COPY)[SupportedLanguage]
   languageLabel: string
+  learnerFirstName: string
   learnerName: string
   masteryLessons: MasteryLesson[]
   nextLessonHref: string
@@ -421,12 +451,9 @@ function DashboardDesktop({
               >
                 <Bell className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                className="transition-colors hover:text-[#a94600]"
-              >
+              <Link href="/settings" className="transition-colors hover:text-[#a94600]" aria-label="Settings">
                 <Settings className="h-4 w-4" />
-              </button>
+              </Link>
               <button
                 type="button"
                 className="transition-colors hover:text-[#a94600]"
@@ -474,7 +501,7 @@ function DashboardDesktop({
                     languageCopy.lessonFallbackDescription}
                 </p> */}
                 <h2 className="font-display text-[48px] font-extrabold leading-[0.95] tracking-[-0.05em]">
-                  {languageCopy.greeting}
+                  {languageCopy.greeting}, {learnerFirstName}
                 </h2>
                 <p className="mt-4 text-sm font-medium leading-6 text-stone-200">
                   {data?.nextLesson?.description ||
@@ -787,6 +814,7 @@ function DashboardMobile({
   languageKey,
   languageCopy,
   languageLabel,
+  learnerFirstName,
   nextLessonHref,
   onSelectLanguage,
   weeklyOverview,
@@ -799,6 +827,7 @@ function DashboardMobile({
   languageKey: SupportedLanguage
   languageCopy: (typeof LANGUAGE_UI_COPY)[SupportedLanguage]
   languageLabel: string
+  learnerFirstName: string
   nextLessonHref: string
   onSelectLanguage: (language: SupportedLanguage) => void
   weeklyOverview: DashboardData['weeklyOverview']
@@ -811,14 +840,17 @@ function DashboardMobile({
         <Link href="/dashboard" className="text-[#7c2d12]" aria-label="Home">
           <X className="h-4 w-4" />
         </Link>
-        <h1 className="font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{languageLabel}</h1>
+        {/* <h1 className="font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{languageLabel}</h1> */}
+        <h1 className="font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">Tembo</h1> 
+
         <div className="w-4" />
       </header>
 
       <div className="space-y-8 px-6 pb-28 pt-20">
         <section>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a7d70]">Your language journey</p>
-          <h2 className="mt-1 font-display text-[34px] font-extrabold tracking-[-0.05em] text-[#191713]">{languageCopy.greeting}</h2>
+          <h2 className="mt-1 font-display text-[34px] font-extrabold tracking-[-0.05em] text-[#191713]">
+            {languageCopy.greeting} {learnerFirstName}
+          </h2>
           <LanguageSwitcher
             languages={data?.learnerLanguages || []}
             activeLanguage={languageKey}
@@ -831,78 +863,119 @@ function DashboardMobile({
 
         <section className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#a94600,#953d00)] px-6 py-6 text-white shadow-[0_18px_32px_rgba(169,70,0,0.24)]">
           <div className="absolute bottom-0 right-0 h-full w-1/2 opacity-20">
-            <img alt="Decorative textile pattern" className="h-full w-full object-cover" src={HERO_PATTERN} />
+            <img
+              alt="Decorative textile pattern"
+              className="h-full w-full object-cover"
+              src={HERO_PATTERN}
+            />
           </div>
           <div className="relative z-10">
             <div className="mb-10 flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-display text-[26px] font-extrabold tracking-[-0.04em]">{languageLabel} Core</h3>
+                <h3 className="font-display text-[26px] font-extrabold tracking-[-0.04em]">
+                  {languageLabel} Core
+                </h3>
                 <p className="text-sm font-medium text-white/80">
-                  {activeUnit?.level ? `${activeUnit.level.charAt(0).toUpperCase()}${activeUnit.level.slice(1)}` : 'Beginner'} •{' '}
-                  {data?.nextLesson?.unitTitle || activeUnit?.title || languageCopy.moduleFallback}
+                  {activeUnit?.level
+                    ? `${activeUnit.level.charAt(0).toUpperCase()}${activeUnit.level.slice(1)}`
+                    : "Beginner"}{" "}
+                  •{" "}
+                  {data?.nextLesson?.unitTitle ||
+                    activeUnit?.title ||
+                    languageCopy.moduleFallback}
                 </p>
               </div>
               <div className="rounded-2xl bg-white/16 p-3">
                 <BookOpen className="h-5 w-5" />
               </div>
             </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em] text-white/92">
-                  <span>Course Progress</span>
-                  <span>{courseProgressPercent}%</span>
-                </div>
-                <div className="h-3 rounded-full bg-white/16 p-[2px]">
-                  <div className="h-full rounded-full bg-white" style={{ width: `${courseProgressPercent}%` }} />
-                </div>
-                <p className="text-xs font-semibold text-white/80">
-                  {data?.stats.completedLessonsCount || 0} lessons complete · {data?.stats.totalXp || 0} XP
-                </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em] text-white/92">
+                <span>Course Progress</span>
+                <span>{courseProgressPercent}%</span>
               </div>
-            </div>
-          </section>
-
-          <section className="grid grid-cols-2 gap-4">
-          <MobileStatCard icon={Flame} label="Global streak" value={String(data?.stats.streakDays || 0)} footer="All languages" accent="primary" />
-          <MobileStatCard icon={Languages} label={`${languageLabel} streak`} value={String(data?.stats.languageStreakDays || 0)} footer="Current track" accent="secondary" />
-          </section>
-
-          <section className="rounded-[28px] bg-[#f7f3ea] p-6">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">Daily Goal</h3>
-                <p className="text-sm text-[#66655a]">
-                  {data?.stats.todayMinutes || 0} of {data?.stats.dailyGoalMinutes || 0} minutes
-                </p>
+              <div className="h-3 rounded-full bg-white/16 p-[2px]">
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{ width: `${courseProgressPercent}%` }}
+                />
               </div>
-              <Target className="h-5 w-5 text-[#a94600]" />
+              <p className="text-xs font-semibold text-white/80">
+                {data?.stats.completedLessonsCount || 0} lessons complete ·{" "}
+                {data?.stats.totalXp || 0} XP
+              </p>
             </div>
-            <div className="h-3 rounded-full bg-white p-[2px]">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(135deg,#a94600,#ffae86)]"
-                style={{ width: `${Math.max(dailyProgressPercent, 0)}%` }}
-              />
-            </div>
-            <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">
-              {dailyProgressPercent}% of daily goal
-            </p>
-          </section>
+          </div>
+        </section>
 
-          <section className="rounded-[28px] bg-[#f7f3ea] p-6">
-            <div className="mb-6 flex items-center gap-4">
+        <section className="grid grid-cols-2 gap-4">
+          <MobileStatCard
+            icon={Flame}
+            label="Global streak"
+            value={String(data?.stats.streakDays || 0)}
+            footer="All languages"
+            accent="primary"
+          />
+          <MobileStatCard
+            icon={Languages}
+            label={`${languageLabel} streak`}
+            value={String(data?.stats.languageStreakDays || 0)}
+            footer="Current track"
+            accent="secondary"
+          />
+        </section>
+
+        <section className="rounded-[28px] bg-[#f7f3ea] p-6">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">
+                Daily Goal
+              </h3>
+              <p className="text-sm text-[#66655a]">
+                {data?.stats.todayMinutes || 0} of{" "}
+                {data?.stats.dailyGoalMinutes || 0} minutes
+              </p>
+            </div>
+            <Target className="h-5 w-5 text-[#a94600]" />
+          </div>
+          <div className="h-3 rounded-full bg-white p-[2px]">
+            <div
+              className="h-full rounded-full bg-[linear-gradient(135deg,#a94600,#ffae86)]"
+              style={{ width: `${Math.max(dailyProgressPercent, 0)}%` }}
+            />
+          </div>
+          <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">
+            {dailyProgressPercent}% of daily goal
+          </p>
+        </section>
+
+        <section className="rounded-[28px] bg-[#f7f3ea] p-6">
+          <div className="mb-6 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b9eeab]/55 text-[#2d5a27]">
               <Target className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">Next Lesson</h3>
-              <p className="text-sm text-[#66655a]">{nextLesson?.unitTitle || activeUnit?.title || languageCopy.moduleFallback}</p>
+              <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">
+                Next Lesson
+              </h3>
+              <p className="text-sm text-[#66655a]">
+                {nextLesson?.unitTitle ||
+                  activeUnit?.title ||
+                  languageCopy.moduleFallback}
+              </p>
             </div>
           </div>
-          <Link href={nextLessonHref} className="flex items-center justify-between rounded-2xl bg-white px-4 py-4">
+          <Link
+            href={nextLessonHref}
+            className="flex items-center justify-between rounded-2xl bg-white px-4 py-4"
+          >
             <div className="flex items-center gap-3">
               <span className="text-lg font-bold text-[#a94600]">
-                {String((nextLesson?.orderIndex ?? 0) + 1).padStart(2, '0')}
+                {String((nextLesson?.orderIndex ?? 0) + 1).padStart(2, "0")}
               </span>
-              <span className="text-sm font-bold text-[#191713]">{nextLesson?.title || 'Formal Greetings'}</span>
+              <span className="text-sm font-bold text-[#191713]">
+                {nextLesson?.title || "Formal Greetings"}
+              </span>
             </div>
             <ArrowRight className="h-4 w-4 text-[#a59d95]" />
           </Link>
@@ -917,7 +990,9 @@ function DashboardMobile({
 
         <section className="space-y-4">
           <div className="flex items-end justify-between gap-3">
-            <h3 className="font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#191713]">Momentum</h3>
+            <h3 className="font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#191713]">
+              Momentum
+            </h3>
             <span className="text-sm font-bold text-[#416f39]">This Week</span>
           </div>
           <div className="rounded-[28px] bg-[#f7f3ea] p-6">
@@ -931,20 +1006,31 @@ function DashboardMobile({
         </section>
 
         <section className="pb-2">
-          <h3 className="mb-4 font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#191713]">Cultural Insight</h3>
+          <h3 className="mb-4 font-display text-[26px] font-extrabold tracking-[-0.04em] text-[#191713]">
+            Cultural Insight
+          </h3>
           <div className="overflow-hidden rounded-[28px] bg-[#f7f3ea]">
             <div className="h-40 w-full overflow-hidden">
-              <img alt="Traditional Yoruba fabric" className="h-full w-full object-cover" src={CULTURAL_IMAGE} />
+              <img
+                alt="Traditional Yoruba fabric"
+                className="h-full w-full object-cover"
+                src={CULTURAL_IMAGE}
+              />
             </div>
             <div className="p-6">
               <span className="inline-flex rounded-full bg-[#b9eeab]/55 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#2d5a27]">
                 Tradition
               </span>
-              <h4 className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.04em] text-[#191713]">{languageCopy.insightTitle}</h4>
+              <h4 className="mt-3 font-display text-[24px] font-extrabold tracking-[-0.04em] text-[#191713]">
+                {languageCopy.insightTitle}
+              </h4>
               <p className="mt-2 text-sm leading-6 text-[#66655a]">
                 {languageCopy.insightBody}
               </p>
-              <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#8b3900]">
+              <button
+                type="button"
+                className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#8b3900]"
+              >
                 Read more
                 <ArrowRight className="h-4 w-4" />
               </button>
@@ -955,26 +1041,33 @@ function DashboardMobile({
 
       <nav className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-[#ebe4db] bg-[#fff7ef]/95 px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(175,75,6,0.06)] backdrop-blur-2xl">
         <div className="flex justify-around">
-          {MOBILE_NAV_ITEMS.map(({ label, icon: Icon, href, active, emphasis }) => {
-            const strong = emphasis && active
-            return (
-              <Link
-                key={label}
-                href={href}
-                className={cn(
-                  'flex min-w-[4.5rem] flex-col items-center justify-center rounded-2xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all',
-                  strong ? 'scale-105 bg-[linear-gradient(135deg,#c2410c,#9a3412)] text-white shadow-md' : 'text-[#78716c] opacity-80 hover:opacity-100',
-                )}
-              >
-                <Icon className={cn('h-5 w-5', strong ? 'text-white' : '')} strokeWidth={strong ? 2.2 : 1.8} />
-                <span className="mt-1 tracking-widest">{label}</span>
-              </Link>
-            )
-          })}
+          {MOBILE_NAV_ITEMS.map(
+            ({ label, icon: Icon, href, active, emphasis }) => {
+              const strong = emphasis && active;
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  className={cn(
+                    "flex min-w-[4.5rem] flex-col items-center justify-center rounded-2xl px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all",
+                    strong
+                      ? "scale-105 bg-[linear-gradient(135deg,#c2410c,#9a3412)] text-white shadow-md"
+                      : "text-[#78716c] opacity-80 hover:opacity-100",
+                  )}
+                >
+                  <Icon
+                    className={cn("h-5 w-5", strong ? "text-white" : "")}
+                    strokeWidth={strong ? 2.2 : 1.8}
+                  />
+                  <span className="mt-1 tracking-widest">{label}</span>
+                </Link>
+              );
+            },
+          )}
         </div>
       </nav>
     </div>
-  )
+  );
 }
 
 function StatPanel({
@@ -1037,42 +1130,6 @@ function StatPanel({
           {footer}
         </div>
       )}
-    </div>
-  )
-}
-
-function WeeklyBars({ data, compact }: { data: DashboardData['weeklyOverview']; compact: boolean }) {
-  const normalized = data.length ? data : DEFAULT_WEEK
-  const maxMinutes = Math.max(...normalized.map((item) => item.minutes), 1)
-  const todayKey = new Date().toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3).toLowerCase()
-
-  return (
-    <div className={cn('flex items-end justify-between gap-3', compact ? 'h-48' : 'h-56 px-4')}>
-      {normalized.map((item) => {
-        const shortDay = item.day.slice(0, 3)
-        const isToday = shortDay.toLowerCase() === todayKey
-        const ratio = item.minutes > 0 ? item.minutes / maxMinutes : 0
-        const barHeight = compact ? Math.max(32, Math.round(32 + ratio * 88)) : Math.max(40, Math.round(40 + ratio * 132))
-
-        return (
-          <div key={item.day} className="flex flex-1 flex-col items-center gap-3">
-            <div className={cn('relative w-full overflow-hidden rounded-full bg-[#ece8db]', compact ? 'h-full max-h-[132px]' : 'h-full max-h-[180px]')}>
-              <div
-                className={cn(
-                  'absolute bottom-0 inset-x-0 rounded-full',
-                  isToday
-                    ? 'bg-[linear-gradient(180deg,#ffae86,#a94600)]'
-                    : item.minutes > 0
-                      ? 'bg-[#d9cfc0]'
-                      : 'bg-transparent',
-                )}
-                style={{ height: `${barHeight}px` }}
-              />
-            </div>
-            <span className={cn('text-[10px] font-bold uppercase', isToday ? 'text-[#a94600]' : 'text-[#8a7d70]')}>{shortDay}</span>
-          </div>
-        )
-      })}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import type {
   LessonCreateInput,
   LessonListFilter,
   LessonRepository,
+  LessonSummaryEntity,
   LessonUpdateInput
 } from "../../../../domain/repositories/LessonRepository.js";
 import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
@@ -119,6 +120,46 @@ function toEntity(doc: LessonPersistenceDoc): LessonEntity {
   };
 }
 
+function toSummaryEntity(doc: Pick<
+  LessonPersistenceDoc,
+  | "_id"
+  | "languageId"
+  | "title"
+  | "unitId"
+  | "language"
+  | "level"
+  | "kind"
+  | "orderIndex"
+  | "description"
+  | "status"
+  | "createdBy"
+  | "publishedAt"
+  | "deletedAt"
+  | "createdAt"
+  | "updatedAt"
+  | "stages"
+>): LessonSummaryEntity {
+  return {
+    id: doc._id.toString(),
+    _id: doc._id.toString(),
+    languageId: doc.languageId ? String(doc.languageId) : null,
+    title: doc.title,
+    unitId: doc.unitId ? String(doc.unitId) : "",
+    language: doc.language,
+    level: doc.level,
+    kind: doc.kind === "review" ? "review" : "core",
+    orderIndex: doc.orderIndex,
+    description: String(doc.description || ""),
+    status: doc.status,
+    createdBy: String(doc.createdBy),
+    publishedAt: doc.publishedAt || null,
+    deletedAt: doc.deletedAt || null,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    stageCount: Array.isArray(doc.stages) ? doc.stages.length : 0
+  };
+}
+
 export class MongooseLessonRepository implements LessonRepository {
   async findLastOrderIndex(unitId: string): Promise<number | null> {
     const last = await LessonModel.findOne({ unitId, isDeleted: { $ne: true } }).sort({
@@ -146,6 +187,21 @@ export class MongooseLessonRepository implements LessonRepository {
       .sort({ language: 1, orderIndex: 1, createdAt: 1 })
       .lean();
     return lessons.map(toEntity);
+  }
+
+  async listSummaries(filter: LessonListFilter): Promise<LessonSummaryEntity[]> {
+    const query: Record<string, string | object> = { isDeleted: { $ne: true } };
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (filter.unitId) query.unitId = filter.unitId;
+    if (filter.status) query.status = filter.status;
+
+    const lessons = await LessonModel.find(query)
+      .select("_id languageId title unitId language level kind orderIndex description status createdBy publishedAt deletedAt createdAt updatedAt stages")
+      .sort({ language: 1, orderIndex: 1, createdAt: 1 })
+      .lean();
+    return lessons.map((lesson) => toSummaryEntity(lesson as LessonPersistenceDoc));
   }
 
   async findById(id: string): Promise<LessonEntity | null> {

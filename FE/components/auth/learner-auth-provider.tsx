@@ -37,16 +37,25 @@ type LearnerAuthContextValue = {
     dailyGoalMinutes?: number
   }) => Promise<AuthActionResult>
   updateProfile: (input: {
-    displayName?: string
+    name?: string
+    username?: string
+    avatarUrl?: string
+    email?: string
     proficientLanguage?: string
     countryOfOrigin?: string
     currentLanguage?: 'yoruba' | 'igbo' | 'hausa'
     dailyGoalMinutes?: number
   }) => Promise<LearnerSession>
+  changePassword: (input: { currentPassword: string; newPassword: string }) => Promise<void>
   logout: () => Promise<void>
 }
 
 const LearnerAuthContext = createContext<LearnerAuthContextValue | null>(null)
+
+function normalizeLearnerUsername(value: unknown) {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return /^[a-z0-9_]{3,24}$/.test(candidate) ? candidate : ''
+}
 
 function toSession(payload: unknown): LearnerSession | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
@@ -55,9 +64,21 @@ function toSession(payload: unknown): LearnerSession | null {
   const profile = record.profile
   if (!user || typeof user !== 'object' || !profile || typeof profile !== 'object') return null
 
+  const profileRecord = profile as Record<string, unknown>
+  const normalizedProfile: LearnerProfile = {
+    ...(profileRecord as unknown as LearnerProfile),
+    name:
+      typeof profileRecord.name === 'string' && profileRecord.name.trim()
+        ? profileRecord.name
+        : typeof profileRecord.displayName === 'string'
+          ? profileRecord.displayName
+          : '',
+    username: normalizeLearnerUsername(profileRecord.username),
+  }
+
   return {
     user: user as LearnerAuthUser,
-    profile: profile as LearnerProfile,
+    profile: normalizedProfile,
     requiresOnboarding: Boolean(record.requiresOnboarding),
   }
 }
@@ -146,14 +167,17 @@ export function LearnerAuthProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const updateProfile = useCallback(async (input: {
-    displayName?: string
+    name?: string
+    username?: string
+    avatarUrl?: string
+    email?: string
     proficientLanguage?: string
     countryOfOrigin?: string
     currentLanguage?: 'yoruba' | 'igbo' | 'hausa'
     dailyGoalMinutes?: number
   }) => {
     const payload = await learnerAuthService.updateProfile(input)
-    const currentUser = session?.user
+    const currentUser = (payload?.user as LearnerAuthUser | undefined) || session?.user
     const nextProfile = payload?.profile as LearnerProfile | undefined
     if (!currentUser || !nextProfile) {
       const refreshed = await refreshSession()
@@ -172,6 +196,10 @@ export function LearnerAuthProvider({ children }: { children: React.ReactNode })
     return nextSession
   }, [refreshSession, session?.user])
 
+  const changePassword = useCallback(async (input: { currentPassword: string; newPassword: string }) => {
+    await learnerAuthService.changePassword(input)
+  }, [])
+
   const logout = useCallback(async () => {
     await learnerAuthService.logout()
     setSession(null)
@@ -186,8 +214,9 @@ export function LearnerAuthProvider({ children }: { children: React.ReactNode })
     login,
     signup,
     updateProfile,
+    changePassword,
     logout,
-  }), [isLoading, login, logout, refreshSession, session, updateProfile, signup])
+  }), [changePassword, isLoading, login, logout, refreshSession, session, updateProfile, signup])
 
   const shouldShowLoading = isLoading && !PUBLIC_ROUTES.has(pathname)
   const shouldHideChildren =

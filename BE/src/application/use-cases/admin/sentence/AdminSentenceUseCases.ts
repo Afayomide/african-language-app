@@ -145,6 +145,12 @@ export class AdminSentenceUseCases {
     return deleted;
   }
 
+  async finish(id: string) {
+    const current = await this.sentences.findById(id);
+    if (!current || current.status !== "draft") return null;
+    return this.sentences.updateById(id, { status: "finished" });
+  }
+
   async publish(id: string) {
     const current = await this.sentences.findById(id);
     if (!current || current.status !== "finished") return null;

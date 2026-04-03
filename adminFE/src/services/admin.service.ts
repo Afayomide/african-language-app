@@ -540,6 +540,11 @@ export const wordService = {
     return response.data.word;
   },
 
+  async finishWord(id: string) {
+    const response = await api.put<{ word: Word }>(feAdminRoutes.finishWord(id));
+    return response.data.word;
+  },
+
   async generateWordAudio(id: string) {
     const response = await api.put<{ word: Word }>(feAdminRoutes.generateWordAudio(id));
     return response.data.word;
@@ -631,6 +636,11 @@ export const sentenceService = {
 
   async publishSentence(id: string) {
     const response = await api.put<{ sentence: Sentence }>(feAdminRoutes.publishSentence(id));
+    return response.data.sentence;
+  },
+
+  async finishSentence(id: string) {
+    const response = await api.put<{ sentence: Sentence }>(feAdminRoutes.finishSentence(id));
     return response.data.sentence;
   },
 

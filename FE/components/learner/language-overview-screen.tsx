@@ -230,11 +230,18 @@ export function LanguageOverviewScreen({
               className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[#f4ebe1]/70"
               aria-label="Close curriculum"
             >
-              <MaterialIcon icon="close" className="text-[24px] text-[#af4b06]" />
+              <MaterialIcon
+                icon="close"
+                className="text-[24px] text-[#af4b06]"
+              />
             </Link>
-            <h1 className="font-display text-[20px] font-bold tracking-tight text-[#1a1410]">{languageLabel} Path</h1>
+            <h1 className="font-display text-[20px] font-bold tracking-tight text-[#1a1410]">
+              {languageLabel} Path
+            </h1>
             <div className="rounded-full bg-[#f4ebe1] px-3 py-1">
-              <span className="text-sm font-bold text-[#af4b06]">{overallProgress}%</span>
+              <span className="text-sm font-bold text-[#af4b06]">
+                {overallProgress}%
+              </span>
             </div>
           </header>
 
@@ -245,28 +252,27 @@ export function LanguageOverviewScreen({
             <section className="relative mb-10 overflow-hidden rounded-3xl bg-[#fdf9f1] p-6 text-center">
               <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-[#a94600]/10 blur-2xl" />
               <div className="relative z-10">
-                <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-[#ffdeac] shadow-sm">
+                {/* <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-[#ffdeac] shadow-sm">
                   <MaterialIcon icon="auto_stories" filled className="text-[40px] text-[#6e4b00]" />
-                </div>
-                <h2 className="font-display text-2xl font-extrabold text-[#39382f]">{currentChapter?.title || `${languageLabel} Roadmap`}</h2>
-                <p className="mx-auto mt-2 max-w-[240px] text-sm leading-relaxed text-[#66655a]">
-                  {currentChapter?.description || `Move through chapters, units, and lessons in order. Your next lesson stays pinned to the active path.`}
-                </p>
+                </div> */}
                 <LanguageSwitcher
                   languages={data?.learnerLanguages || []}
-                  activeLanguage={(data?.stats.currentLanguage as Language | undefined) || undefined}
+                  activeLanguage={
+                    (data?.stats.currentLanguage as Language | undefined) ||
+                    undefined
+                  }
                   compact
                   className="mt-5 justify-center"
                   disabled={isSwitchingLanguage}
                   onSelect={onSelectLanguage}
                 />
                 <div className="mt-5 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-[#66655a]">
-                  <span>{chapters.length} Chapters</span>
+                  {/* <span>{chapters.length} Chapters</span> */}
                   <span className="h-1 w-1 rounded-full bg-[#bcb9ad]" />
-                  <span>
+                  {/* <span>
                     {completedLessonsCount}
                     {totalLessonsCount ? ` of ${totalLessonsCount}` : ''} Lessons Complete
-                  </span>
+                  </span> */}
                 </div>
                 <div className="mt-5 overflow-hidden rounded-full bg-[#ece8db] p-1">
                   <div
@@ -275,42 +281,56 @@ export function LanguageOverviewScreen({
                   />
                 </div>
                 <p className="mt-3 text-xs font-semibold text-[#66655a]">
-                  Daily goal {dailyProgress}% · Language streak {languageStreakDays} days · XP {data?.stats.totalXp || 0}
+                  Daily goal {dailyProgress}% · Language streak{" "}
+                  {languageStreakDays} days · XP {data?.stats.totalXp || 0}
                 </p>
               </div>
             </section>
 
             <div className="space-y-6">
               {chapters.map((chapter, chapterIndex) => {
-                const isExpanded = chapter.id === activeChapter?.id
+                const isExpanded = chapter.id === activeChapter?.id;
                 return (
-                  <section key={chapter.id} className="rounded-[30px] bg-transparent">
+                  <section
+                    key={chapter.id}
+                    className="rounded-[30px] bg-transparent"
+                  >
                     <button
                       type="button"
                       onClick={() => setExpandedChapterId(chapter.id)}
                       className={cn(
-                        'relative w-full overflow-hidden rounded-3xl bg-[#fdf9f1] p-5 text-left shadow-sm transition-transform active:scale-[0.99]',
-                        chapter.status === 'locked' && 'opacity-75',
+                        "relative w-full overflow-hidden rounded-3xl bg-[#fdf9f1] p-5 text-left shadow-sm transition-transform active:scale-[0.99]",
+                        chapter.status === "locked" && "opacity-75",
                       )}
                     >
                       <div className="absolute right-0 top-0 -mr-10 -mt-10 h-28 w-28 rounded-full bg-[#a94600]/8 blur-2xl" />
                       <div className="relative flex items-start gap-4">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffdeac] shadow-sm">
-                          <MaterialIcon icon="auto_stories" filled className="text-[28px] text-[#6e4b00]" />
+                          <MaterialIcon
+                            icon="auto_stories"
+                            filled
+                            className="text-[28px] text-[#6e4b00]"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-4">
                             <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#66655a]">Chapter {chapterIndex + 1}</p>
-                              <h3 className="mt-1 font-display text-xl font-extrabold text-[#1a1410]">{chapter.title}</h3>
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#66655a]">
+                                Chapter {chapterIndex + 1}
+                              </p>
+                              <h3 className="mt-1 font-display text-xl font-extrabold text-[#1a1410]">
+                                {chapter.title}
+                              </h3>
                             </div>
                             <div className="rounded-full bg-[#f4ebe1] px-3 py-1 text-sm font-bold text-[#af4b06]">
                               {chapter.progressPercent}%
                             </div>
                           </div>
-                          <p className="mt-2 text-sm leading-relaxed text-[#66655a]">{chapter.description}</p>
-                          <div className="mt-4 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#66655a]">
-                            <span>{chapter.completedUnits}/{chapter.totalUnits} Units</span>
+                          <div className="mt-3 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#66655a]">
+                            <span>
+                              {chapter.completedUnits}/{chapter.totalUnits}{" "}
+                              Units
+                            </span>
                             <span className="h-1 w-1 rounded-full bg-[#bcb9ad]" />
                             <span>{chapter.level}</span>
                           </div>
@@ -324,61 +344,94 @@ export function LanguageOverviewScreen({
                           <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(169,70,0,0.08)_10px,rgba(169,70,0,0.08)_20px)]" />
                           <div
                             className="absolute left-0 top-0 w-full rounded-full bg-[#a94600] shadow-[0_0_12px_rgba(169,70,0,0.35)]"
-                            style={{ height: `${Math.max(chapter.progressPercent, 10)}%` }}
+                            style={{
+                              height: `${Math.max(chapter.progressPercent, 10)}%`,
+                            }}
                           />
                         </div>
                         <div className="relative flex w-full flex-col items-center gap-16">
                           {chapter.units.map((unit, unitIndex) => {
                             const chapterCurrentUnitOrder =
                               chapter.id === currentChapter?.id
-                                ? chapter.units.find((item) => item.id === globalCurrentUnitId)?.orderIndex ?? Number.MAX_SAFE_INTEGER
-                                : Number.MAX_SAFE_INTEGER
-                            const isSelectedUnit = unit.id === activeUnit?.id
-                            const isCurrentUnit = unit.id === globalCurrentUnitId && chapter.id === currentChapter?.id
-                            const isUnitCompleted = unit.progressPercent >= 100
+                                ? (chapter.units.find(
+                                    (item) => item.id === globalCurrentUnitId,
+                                  )?.orderIndex ?? Number.MAX_SAFE_INTEGER)
+                                : Number.MAX_SAFE_INTEGER;
+                            const isSelectedUnit = unit.id === activeUnit?.id;
+                            const isCurrentUnit =
+                              unit.id === globalCurrentUnitId &&
+                              chapter.id === currentChapter?.id;
+                            const isUnitCompleted = unit.progressPercent >= 100;
                             const isUnitLocked =
-                              chapter.status === 'locked' ||
-                              (!isCurrentUnit && !isUnitCompleted && chapter.id === currentChapter?.id && unit.orderIndex > chapterCurrentUnitOrder)
-                            const unitLabel = isUnitCompleted ? 'COMPLETED' : isCurrentUnit ? 'CURRENT UNIT' : isUnitLocked ? 'LOCKED' : 'OPEN'
+                              chapter.status === "locked" ||
+                              (!isCurrentUnit &&
+                                !isUnitCompleted &&
+                                chapter.id === currentChapter?.id &&
+                                unit.orderIndex > chapterCurrentUnitOrder);
+                            const unitLabel = isUnitCompleted
+                              ? "COMPLETED"
+                              : isCurrentUnit
+                                ? "CURRENT UNIT"
+                                : isUnitLocked
+                                  ? "LOCKED"
+                                  : "OPEN";
 
                             const currentLessonIndex =
                               isCurrentUnit && globalCurrentLessonId
-                                ? unit.lessons.findIndex((item) => item.id === globalCurrentLessonId)
-                                : -1
-                            const unitHeight = Math.max(420, (unit.lessons.length - 1) * 112 + 180)
+                                ? unit.lessons.findIndex(
+                                    (item) => item.id === globalCurrentLessonId,
+                                  )
+                                : -1;
+                            const unitHeight = Math.max(
+                              420,
+                              (unit.lessons.length - 1) * 112 + 180,
+                            );
 
                             return (
-                              <div key={unit.id} className="relative w-full max-w-[24rem] space-y-12">
+                              <div
+                                key={unit.id}
+                                className="relative w-full max-w-[24rem] space-y-12"
+                              >
                                 <div className="flex justify-center">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setExpandedChapterId(chapter.id)
-                                      if (!isUnitLocked) setExpandedUnitId(unit.id)
+                                      setExpandedChapterId(chapter.id);
+                                      if (!isUnitLocked)
+                                        setExpandedUnitId(unit.id);
                                     }}
                                     className={cn(
-                                      'rounded-full px-6 py-2 text-xs font-bold tracking-tight shadow-md transition-transform active:scale-[0.98]',
+                                      "rounded-full px-6 py-2 text-xs font-bold tracking-tight shadow-md transition-transform active:scale-[0.98]",
                                       isCurrentUnit || isSelectedUnit
-                                        ? 'bg-[#416f39] text-white'
+                                        ? "bg-[#416f39] text-white"
                                         : isUnitLocked
-                                          ? 'bg-[#ece8db] text-[#66655a]'
-                                          : 'bg-[#416f39] text-white/95',
+                                          ? "bg-[#ece8db] text-[#66655a]"
+                                          : "bg-[#416f39] text-white/95",
                                     )}
                                   >
                                     {unit.title}
                                   </button>
                                 </div>
 
-                                <div className="relative" style={{ minHeight: `${unitHeight}px` }}>
+                                <div
+                                  className="relative"
+                                  style={{ minHeight: `${unitHeight}px` }}
+                                >
                                   {unit.lessons.map((lesson, lessonIndex) => {
-                                    const lessonIsCompleted = lesson.status === 'completed'
-                                    const lessonIsCurrent = lesson.id === globalCurrentLessonId && isCurrentUnit
+                                    const lessonIsCompleted =
+                                      lesson.status === "completed";
+                                    const lessonIsCurrent =
+                                      lesson.id === globalCurrentLessonId &&
+                                      isCurrentUnit;
                                     const lessonIsLocked =
                                       isUnitLocked ||
-                                      (currentLessonIndex >= 0 && lessonIndex > currentLessonIndex && !lessonIsCompleted) ||
-                                      (!isCurrentUnit && !isUnitCompleted)
-                                    const lessonHref = `/lesson-overview?lessonId=${lesson.id}`
-                                    const position = getWeaverLessonPosition(lessonIndex)
+                                      (currentLessonIndex >= 0 &&
+                                        lessonIndex > currentLessonIndex &&
+                                        !lessonIsCompleted) ||
+                                      (!isCurrentUnit && !isUnitCompleted);
+                                    const lessonHref = `/lesson-overview?lessonId=${lesson.id}`;
+                                    const position =
+                                      getWeaverLessonPosition(lessonIndex);
 
                                     return (
                                       <div
@@ -387,14 +440,20 @@ export function LanguageOverviewScreen({
                                         style={{
                                           top: `${position.top}px`,
                                           transform:
-                                            position.side === 'left'
+                                            position.side === "left"
                                               ? `translateX(calc(-50% - ${position.offset}px))`
                                               : `translateX(calc(-50% + ${position.offset}px))`,
                                         }}
                                       >
                                         <Link
-                                          href={lessonIsLocked ? '#' : lessonHref}
-                                          className={cn('group relative flex flex-col items-center', lessonIsLocked && 'pointer-events-none opacity-50 grayscale')}
+                                          href={
+                                            lessonIsLocked ? "#" : lessonHref
+                                          }
+                                          className={cn(
+                                            "group relative flex flex-col items-center",
+                                            lessonIsLocked &&
+                                              "pointer-events-none opacity-50 grayscale",
+                                          )}
                                           aria-disabled={lessonIsLocked}
                                         >
                                           {lessonIsCurrent ? (
@@ -405,37 +464,62 @@ export function LanguageOverviewScreen({
                                           {lessonIsCurrent ? (
                                             <div className="h-20 w-20 rounded-full border-4 border-[#a94600] bg-white p-1 shadow-xl transition-transform group-hover:scale-105">
                                               <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#ffdeac]">
-                                                <MaterialIcon icon="bolt" filled className="relative z-10 text-[30px] text-[#a94600]" />
+                                                <MaterialIcon
+                                                  icon="bolt"
+                                                  filled
+                                                  className="relative z-10 text-[30px] text-[#a94600]"
+                                                />
                                                 <div className="absolute inset-0 bg-[linear-gradient(90deg,#a94600_2px,transparent_2px),linear-gradient(#a94600_2px,transparent_2px)] bg-[length:24px_24px] opacity-[0.05]" />
                                               </div>
                                             </div>
                                           ) : (
                                             <div
                                               className={cn(
-                                                'flex h-16 w-16 items-center justify-center rounded-full transition-transform group-hover:scale-110',
-                                                lessonIsCompleted && 'bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30',
-                                                !lessonIsCompleted && lessonIsLocked && 'border-2 border-dashed border-[#bcb9ad] bg-[#ece8db] text-[#838175]',
-                                                !lessonIsCompleted && !lessonIsLocked && 'bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30',
+                                                "flex h-16 w-16 items-center justify-center rounded-full transition-transform group-hover:scale-110",
+                                                lessonIsCompleted &&
+                                                  "bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30",
+                                                !lessonIsCompleted &&
+                                                  lessonIsLocked &&
+                                                  "border-2 border-dashed border-[#bcb9ad] bg-[#ece8db] text-[#838175]",
+                                                !lessonIsCompleted &&
+                                                  !lessonIsLocked &&
+                                                  "bg-[#a94600] text-white shadow-lg ring-4 ring-[#ffae86]/30",
                                               )}
                                             >
                                               <MaterialIcon
-                                                icon={lessonIsCompleted ? 'check' : lessonIsLocked ? 'lock' : 'play_arrow'}
-                                                filled={lessonIsCompleted || !lessonIsLocked}
-                                                className={cn('text-[28px]', !lessonIsLocked && !lessonIsCompleted && 'translate-x-[1px]')}
+                                                icon={
+                                                  lessonIsCompleted
+                                                    ? "check"
+                                                    : lessonIsLocked
+                                                      ? "lock"
+                                                      : "play_arrow"
+                                                }
+                                                filled={
+                                                  lessonIsCompleted ||
+                                                  !lessonIsLocked
+                                                }
+                                                className={cn(
+                                                  "text-[28px]",
+                                                  !lessonIsLocked &&
+                                                    !lessonIsCompleted &&
+                                                    "translate-x-[1px]",
+                                                )}
                                               />
                                             </div>
                                           )}
                                           <span
                                             className={cn(
-                                              'mt-3 max-w-[6rem] text-center text-[10px] font-bold uppercase leading-tight tracking-[0.14em]',
-                                              lessonIsCurrent ? 'text-[#a94600]' : 'text-[#66655a]',
+                                              "mt-3 max-w-[6rem] text-center text-[10px] font-bold uppercase leading-tight tracking-[0.14em]",
+                                              lessonIsCurrent
+                                                ? "text-[#a94600]"
+                                                : "text-[#66655a]",
                                             )}
                                           >
                                             {lesson.title}
                                           </span>
                                         </Link>
                                       </div>
-                                    )
+                                    );
                                   })}
                                 </div>
 
@@ -447,20 +531,26 @@ export function LanguageOverviewScreen({
                                   </span>
                                 </div>
                               </div>
-                            )
+                            );
                           })}
 
                           <div className="mt-4 flex flex-col items-center">
                             <div className="flex h-24 w-24 rotate-3 items-center justify-center rounded-[26px] border-4 border-[#fffbff] bg-[#ffdeac] text-[#765100] shadow-xl">
-                              <MaterialIcon icon="military_tech" filled className="text-[44px]" />
+                              <MaterialIcon
+                                icon="military_tech"
+                                filled
+                                className="text-[44px]"
+                              />
                             </div>
-                            <span className="mt-5 font-display text-xs font-extrabold uppercase tracking-[0.24em] text-[#66655a]">Chapter Mastery</span>
+                            <span className="mt-5 font-display text-xs font-extrabold uppercase tracking-[0.24em] text-[#66655a]">
+                              Chapter Mastery
+                            </span>
                           </div>
                         </div>
                       </div>
                     ) : null}
                   </section>
-                )
+                );
               })}
             </div>
           </div>
@@ -470,12 +560,12 @@ export function LanguageOverviewScreen({
               href={nextLessonHref}
               className="flex w-full items-center justify-center gap-3 rounded-[28px] bg-[linear-gradient(45deg,#a94600,#ffae86)] px-6 py-5 font-display text-lg font-extrabold text-white shadow-[0px_8px_24px_rgba(169,70,0,0.25)] transition-transform active:scale-[0.97]"
             >
-              {data?.nextLesson ? 'CONTINUE LEARNING' : 'REVIEW MASTERY'}
+              {data?.nextLesson ? "CONTINUE LEARNING" : "REVIEW MASTERY"}
               <MaterialIcon icon="arrow_forward" className="text-[24px]" />
             </Link>
           </div>
         </div>
       </div>
     </main>
-  )
+  );
 }

@@ -6,8 +6,13 @@ import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/
 import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
 import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
 import {
+  isValidHttpUrl,
+  isValidPersonName,
   isStrongEnoughPassword,
   isValidEmail,
+  isValidUsername,
+  normalizePersonName,
+  normalizeUsername,
   normalizeEmail
 } from "../../interfaces/http/validators/auth.validators.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
@@ -30,6 +35,9 @@ export async function signup(req: Request, res: Response) {
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, email, and password are required." });
   }
+  if (!isValidPersonName(String(name))) {
+    return res.status(400).json({ error: "Name can only contain letters, spaces, apostrophes, and hyphens." });
+  }
   if (!isValidEmail(String(email))) {
     return res.status(400).json({ error: "Please enter a valid email address." });
   }
@@ -46,7 +54,7 @@ export async function signup(req: Request, res: Response) {
       : undefined;
 
     const result = await useCases.signup({
-      name: String(name),
+      name: normalizePersonName(String(name)),
       email: normalizeEmail(String(email)),
       password: String(password),
       language: normalizedLanguage,
@@ -113,7 +121,6 @@ export async function me(req: AuthRequest, res: Response) {
       email: req.user.email,
       role: req.user.role
     });
-
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AuthError) {
@@ -130,17 +137,33 @@ export async function updateProfile(req: AuthRequest, res: Response) {
   }
 
   const {
+    name,
     displayName,
+    username,
+    avatarUrl,
+    email,
     proficientLanguage,
     countryOfOrigin,
     currentLanguage,
     dailyGoalMinutes
   } = req.body ?? {};
 
-  console.log(req.body);
+  const resolvedName = name !== undefined ? name : displayName;
 
-  if (displayName !== undefined && !String(displayName).trim()) {
-    return res.status(400).json({ error: "Display name cannot be empty." });
+  if (resolvedName !== undefined && !String(resolvedName).trim()) {
+    return res.status(400).json({ error: "Name cannot be empty." });
+  }
+  if (resolvedName !== undefined && !isValidPersonName(String(resolvedName))) {
+    return res.status(400).json({ error: "Name can only contain letters, spaces, apostrophes, and hyphens." });
+  }
+  if (username !== undefined && String(username).trim() && !isValidUsername(String(username))) {
+    return res.status(400).json({ error: "Username must be 3-24 characters and use only lowercase letters, numbers, or underscores." });
+  }
+  if (avatarUrl !== undefined && String(avatarUrl).trim() && !isValidHttpUrl(String(avatarUrl))) {
+    return res.status(400).json({ error: "Avatar URL must be a valid http or https URL." });
+  }
+  if (email !== undefined && !isValidEmail(String(email))) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
   }
   if (proficientLanguage !== undefined && !String(proficientLanguage).trim()) {
     return res.status(400).json({ error: "Proficient language cannot be empty." });
@@ -163,18 +186,15 @@ export async function updateProfile(req: AuthRequest, res: Response) {
 
   try {
     const result = await useCases.updateProfile(req.user.id, {
-      displayName: displayName !== undefined ? String(displayName) : undefined,
+      name: resolvedName !== undefined ? normalizePersonName(String(resolvedName)) : undefined,
+      username: username !== undefined ? (String(username).trim() ? normalizeUsername(String(username)) : "") : undefined,
+      avatarUrl: avatarUrl !== undefined ? String(avatarUrl).trim() : undefined,
+      email: email !== undefined ? normalizeEmail(String(email)) : undefined,
       proficientLanguage: proficientLanguage !== undefined ? String(proficientLanguage) : undefined,
       countryOfOrigin: countryOfOrigin !== undefined ? String(countryOfOrigin) : undefined,
       currentLanguage:
         currentLanguage !== undefined ? (String(currentLanguage) as "yoruba" | "igbo" | "hausa") : undefined,
       dailyGoalMinutes: parsedDailyGoalMinutes
-    });
-
-    console.log("[LEARNER_PROFILE_UPDATE] saved", {
-      user: req.user,
-      profile: result.profile,
-      requiresOnboarding: result.requiresOnboarding
     });
 
     return res.status(200).json(result);
@@ -183,6 +203,40 @@ export async function updateProfile(req: AuthRequest, res: Response) {
       return res.status(error.status).json({ error: error.message });
     }
 
+    console.error("[LEARNER_PROFILE_UPDATE] unexpected error", error);
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+}
+
+export async function changePassword(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "You are not authorized to perform this action." });
+  }
+
+  const { currentPassword, newPassword } = req.body ?? {};
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current password and new password are required." });
+  }
+  if (!isStrongEnoughPassword(String(newPassword))) {
+    return res.status(400).json({ error: "Password must be at least 8 characters long." });
+  }
+  if (String(currentPassword) === String(newPassword)) {
+    return res.status(400).json({ error: "New password must be different from the current password." });
+  }
+
+  try {
+    const result = await useCases.changePassword(req.user.id, {
+      currentPassword: String(currentPassword),
+      newPassword: String(newPassword)
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    console.error("[LEARNER_PASSWORD_CHANGE] unexpected error", error);
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

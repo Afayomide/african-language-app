@@ -24,13 +24,24 @@ export const learnerAuthService = {
   },
 
   async updateProfile(data: {
-    displayName?: string;
+    name?: string;
+    username?: string;
+    avatarUrl?: string;
+    email?: string;
     proficientLanguage?: string;
     countryOfOrigin?: string;
     currentLanguage?: "yoruba" | "igbo" | "hausa";
     dailyGoalMinutes?: number;
   }) {
     const response = await api.put(feLearnerRoutes.updateProfile(), data);
+    return response.data;
+  },
+
+  async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+  }) {
+    const response = await api.put(feLearnerRoutes.changePassword(), data);
     return response.data;
   },
 

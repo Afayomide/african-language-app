@@ -89,7 +89,7 @@ export function Logo({
             wordmarkSizes[size]
           )}
         >
-          LinguaHub
+          Tembolang
         </span>
       )}
     </>

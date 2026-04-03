@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { bulkDeleteWords, createWord, deleteWord, generateLessonWordsAudio, generateWordAudioById, getWordById, listWords, publishWord, updateWord } from "../../controllers/admin/word.controller.js";
+import { bulkDeleteWords, createWord, deleteWord, finishWord, generateLessonWordsAudio, generateWordAudioById, getWordById, listWords, publishWord, updateWord } from "../../controllers/admin/word.controller.js";
 import { requireAdmin, requireAuth } from "../../utils/authMiddleware.js";
 
 const router = Router();
@@ -9,6 +9,7 @@ router.delete("/bulk-delete", bulkDeleteWords);
 router.get("/", listWords);
 router.put("/bulk/:lessonId/generate-audio", generateLessonWordsAudio);
 router.put("/:id/generate-audio", generateWordAudioById);
+router.put("/:id/finish", finishWord);
 router.get("/:id", getWordById);
 router.put("/:id", updateWord);
 router.delete("/:id", deleteWord);

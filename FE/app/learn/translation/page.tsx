@@ -14,7 +14,7 @@ export default function TranslationHubPage() {
 
   return (
     <LearnerHubLayout
-      activeNav="lessons"
+      activeNav="learn"
       languageLabel={languageLabel}
       title="Yoruba Learning"
       streakDays={streakDays}

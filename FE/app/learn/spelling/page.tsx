@@ -16,7 +16,7 @@ export default function SpellingHubPage() {
 
   return (
     <LearnerHubLayout
-      activeNav="lessons"
+      activeNav="learn"
       languageLabel={languageLabel}
       title="Yoruba Learning"
       streakDays={streakDays}

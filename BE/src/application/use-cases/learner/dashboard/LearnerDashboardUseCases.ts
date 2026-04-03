@@ -6,6 +6,7 @@ import type { LessonProgressRepository } from "../../../../domain/repositories/L
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
 import type { ChapterRepository } from "../../../../domain/repositories/ChapterRepository.js";
 import { LANGUAGE_VALUES, type Language, type LessonEntity } from "../../../../domain/entities/Lesson.js";
+import type { LessonSummaryEntity } from "../../../../domain/repositories/LessonRepository.js";
 import {
   calculateCourseProgressPercent,
   calculateDailyProgressPercent,
@@ -133,9 +134,9 @@ function buildOrderedPublishedUnits<T extends { id: string; chapterId?: string |
     });
 }
 
-function buildOrderedPublishedLessons<T extends { id: string; orderIndex: number; createdAt: Date }>(
-  orderedUnits: T[],
-  lessons: LessonEntity[]
+function buildOrderedPublishedLessons<TUnit extends { id: string }, TLesson extends { id: string; unitId: string; orderIndex: number; createdAt: Date }>(
+  orderedUnits: TUnit[],
+  lessons: TLesson[]
 ) {
   const unitPositionMap = new Map(orderedUnits.map((unit, index) => [unit.id, index]));
   return lessons
@@ -185,23 +186,25 @@ export class LearnerDashboardUseCases {
     const languageState = await this.ensureLearnerLanguageState({ userId, language, profile });
     if (!languageState) return null;
     const scopedLanguageId = languageState.languageId || (profile.currentLanguage === language ? profile.activeLanguageId || null : null);
-    const learnerLanguages = sortLearnerLanguages(await this.learnerLanguageStates.listByUser(userId), language);
-
-    const publishedLessons = await this.lessons.list({
-      status: "published",
-      language,
-      languageId: scopedLanguageId
-    });
-    const publishedChapters = await this.chapters.list({
-      status: "published",
-      language,
-      languageId: scopedLanguageId
-    });
-    const publishedUnits = await this.units.list({
-      status: "published",
-      language,
-      languageId: scopedLanguageId
-    });
+    const [learnerLanguageRows, publishedLessons, publishedChapters, publishedUnits] = await Promise.all([
+      this.learnerLanguageStates.listByUser(userId),
+      this.lessons.listSummaries({
+        status: "published",
+        language,
+        languageId: scopedLanguageId
+      }),
+      this.chapters.list({
+        status: "published",
+        language,
+        languageId: scopedLanguageId
+      }),
+      this.units.list({
+        status: "published",
+        language,
+        languageId: scopedLanguageId
+      })
+    ]);
+    const learnerLanguages = sortLearnerLanguages(learnerLanguageRows, language);
 
     const progresses = await this.progress.listByUserAndLessonIds(
       userId,
@@ -245,7 +248,13 @@ export class LearnerDashboardUseCases {
 
     const weeklyOverview = thisWeek.map((entry) => {
       const minutes = weekMap.get(entry.dateKey) || 0;
-      return { day: entry.day, minutes, completed: minutes > 0 };
+      return {
+        day: entry.day,
+        dateKey: entry.dateKey,
+        minutes,
+        completed: minutes > 0,
+        isToday: entry.dateKey === toDayKey(isoDay(new Date()))
+      };
     });
 
     const todayMinutes = weeklyOverview[weeklyOverview.length - 1]?.minutes || 0;
@@ -255,6 +264,7 @@ export class LearnerDashboardUseCases {
     const totalXp = filteredTotalXp;
     const completedLessonsCount = filteredCompletedLessonsCount;
     const totalLessonsCount = orderedLessons.length;
+    const globalRank = (await this.learnerProfiles.countWithHigherTotalXp(profile.totalXp)) + 1;
     const dailyGoalMinutes = languageState.dailyGoalMinutes;
     const dailyProgressPercent = calculateDailyProgressPercent(todayMinutes, dailyGoalMinutes);
     const courseProgressPercent = calculateCourseProgressPercent(completedLessonsCount, totalLessonsCount);
@@ -268,19 +278,25 @@ export class LearnerDashboardUseCases {
 
     const learnerLanguageSummaries = await Promise.all(
       learnerLanguages.map(async (state) => {
-        const summaryScopedLanguageId =
-          state.languageId || (profile.currentLanguage === state.languageCode ? profile.activeLanguageId || null : null);
-        const languageLessons = await this.lessons.list({
-          status: "published",
-          language: state.languageCode,
-          languageId: summaryScopedLanguageId
-        });
-        const languageProgresses = languageLessons.length
-          ? await this.progress.listByUserAndLessonIds(
-              userId,
-              languageLessons.map((lesson) => lesson.id)
-            )
-          : [];
+        let languageLessons: LessonSummaryEntity[] = publishedLessons;
+        let languageProgresses = progresses;
+
+        if (state.languageCode !== language) {
+          const summaryScopedLanguageId =
+            state.languageId || (profile.currentLanguage === state.languageCode ? profile.activeLanguageId || null : null);
+          languageLessons = await this.lessons.listSummaries({
+            status: "published",
+            language: state.languageCode,
+            languageId: summaryScopedLanguageId
+          });
+          languageProgresses = languageLessons.length
+            ? await this.progress.listByUserAndLessonIds(
+                userId,
+                languageLessons.map((lesson) => lesson.id)
+              )
+            : [];
+        }
+
         const languageCompletedLessonsCount = languageProgresses.filter((item) => item.status === "completed").length;
         const languageTotalXp = languageProgresses.reduce((sum, item) => sum + (item.xpEarned || 0), 0);
         const languageTodayMinutes = getTodayMinutes(state.weeklyActivity);
@@ -318,7 +334,7 @@ export class LearnerDashboardUseCases {
             status: lessonProgress?.status || "not_started",
             progressPercent: lessonProgress?.progressPercent || 0,
             currentStageIndex: lessonProgress?.currentStageIndex || 0,
-            totalStages: Array.isArray(lesson.stages) ? lesson.stages.length : 0
+            totalStages: lesson.stageCount
           };
         });
 
@@ -421,6 +437,7 @@ export class LearnerDashboardUseCases {
         languageLongestStreak: languageState.longestStreak,
         totalXp,
         globalTotalXp: profile.totalXp,
+        globalRank,
         dailyGoalMinutes,
         todayMinutes,
         dailyProgressPercent,
@@ -441,7 +458,7 @@ export class LearnerDashboardUseCases {
             level: nextLesson.level,
             orderIndex: nextLesson.orderIndex,
             currentStageIndex: progressByLessonId.get(nextLesson.id)?.currentStageIndex || 0,
-            totalStages: Array.isArray(nextLesson.stages) ? nextLesson.stages.length : 0,
+            totalStages: nextLesson.stageCount,
             progressPercent: progressByLessonId.get(nextLesson.id)?.progressPercent || 0
           }
         : null,

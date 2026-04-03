@@ -2,12 +2,9 @@
 
 import Link from 'next/link'
 import {
-  BarChart3,
   Bell,
-  BookOpen,
   GraduationCap,
   Home,
-  Languages,
   LogOut,
   Search,
   Settings,
@@ -19,7 +16,7 @@ import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 import { Logo } from '@/components/branding/logo'
 import { cn } from '@/lib/utils'
 
-export type LearnerHubNavId = 'dashboard' | 'lessons' | 'vocabulary' | 'progress'
+export type LearnerHubNavId = 'dashboard' | 'learn' | 'profile' | 'settings'
 
 const DEFAULT_AVATAR =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuChHsMGj_MWqxZDMDUlyYwVvVcrjDU8deEgWcVtkFJoD-tvNp2dyxs94WERV7pwX_Xzdq62PkBrGD4afYfXJTdfZAbSF9gqcECVjLD23Gp5drdCF-ZcPimXPHdRQuDjlBWRzjIR_JOxQSVC5q-XIbc9dCMPFB9UMuIL_TR8HTQwsqqcVTNwrVVfH4PQsROCSnZDQRTY9nUk-gPBAyasFZdIsnvKZLbABsZUGrVYWQb9P1ypIxJYpcY0yWP-qp_m9f4HKxerXKLzL-OK'
@@ -37,16 +34,10 @@ type LearnerHubLayoutProps = {
 
 const NAV = [
   { id: 'dashboard' as const, label: 'Dashboard', icon: Home, href: '/dashboard' },
-  { id: 'lessons' as const, label: 'Lessons', icon: BookOpen, href: '/learn/spelling' },
-  { id: 'vocabulary' as const, label: 'Vocabulary', icon: Languages, href: '/learn/word-focus' },
-  { id: 'progress' as const, label: 'Progress', icon: BarChart3, href: '/dashboard' },
+  { id: 'learn' as const, label: 'Learn', icon: GraduationCap, href: '/curriculum' },
+  { id: 'profile' as const, label: 'Profile', icon: User, href: '/profile' },
+  { id: 'settings' as const, label: 'Settings', icon: Settings, href: '/settings' },
 ]
-
-function mobileTabForNav(activeNav: LearnerHubNavId): 'learn' | 'practice' | 'streaks' | 'profile' {
-  if (activeNav === 'dashboard') return 'learn'
-  if (activeNav === 'progress') return 'streaks'
-  return 'practice'
-}
 
 export function LearnerHubLayout({
   children,
@@ -57,9 +48,9 @@ export function LearnerHubLayout({
   streakDays,
 }: LearnerHubLayoutProps) {
   const { logout, session } = useLearnerAuth()
-  const learnerName = session?.profile?.displayName || session?.user?.email?.split('@')[0] || 'Scholar'
+  const learnerName = session?.profile?.name || session?.profile?.displayName || session?.user?.email?.split('@')[0] || 'Scholar'
+  const learnerAvatar = session?.profile?.avatarUrl || DEFAULT_AVATAR
   const streak = streakDays ?? 0
-  const mobileTab = mobileTabForNav(activeNav)
 
   return (
     <div className="min-h-screen bg-[#fffbff] text-[#39382f]">
@@ -96,7 +87,7 @@ export function LearnerHubLayout({
             Daily Challenge
           </Link>
           <div className="flex items-center gap-3 border-t border-[#ebe4db] pt-6">
-            <img alt="" className="h-10 w-10 rounded-full object-cover ring-2 ring-[#a94600]/15" src={DEFAULT_AVATAR} />
+            <img alt="" className="h-10 w-10 rounded-full object-cover ring-2 ring-[#a94600]/15" src={learnerAvatar} />
             <div>
               <p className="text-sm font-bold text-[#2d2a23]">{learnerName}</p>
               <button
@@ -143,9 +134,9 @@ export function LearnerHubLayout({
             <button type="button" className="text-[#6d685f] transition-colors hover:text-[#a94600]" aria-label="Notifications">
               <Bell className="h-4 w-4" />
             </button>
-            <button type="button" className="text-[#6d685f] transition-colors hover:text-[#a94600]" aria-label="Settings">
+            <Link href="/settings" className="text-[#6d685f] transition-colors hover:text-[#a94600]" aria-label="Settings">
               <Settings className="h-4 w-4" />
-            </button>
+            </Link>
           </div>
         </header>
 
@@ -163,10 +154,9 @@ export function LearnerHubLayout({
 
       <nav className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-[#ebe4db] bg-[#fff7ef]/95 px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(175,75,6,0.06)] backdrop-blur-2xl lg:hidden">
         <div className="flex justify-around">
-          <MobileNavLink href="/dashboard" active={mobileTab === 'learn'} icon={GraduationCap} label="Learn" emphasis />
-          <MobileNavLink href="/learn/translation" active={mobileTab === 'practice'} icon={Languages} label="Practice" emphasis />
-          <MobileNavLink href="/dashboard" active={mobileTab === 'streaks'} icon={Flame} label="Streaks" emphasis />
-          <MobileNavLink href="/dashboard" active={mobileTab === 'profile'} icon={User} label="Profile" emphasis />
+          {NAV.map(({ id, label, icon, href }) => (
+            <MobileNavLink key={id} href={href} active={activeNav === id} icon={icon} label={label} emphasis />
+          ))}
         </div>
       </nav>
     </div>

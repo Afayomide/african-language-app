@@ -8,7 +8,10 @@ function toEntity(doc: {
   _id: { toString(): string };
   userId: { toString(): string };
   activeLanguageId?: { toString(): string } | null;
-  displayName: string;
+  name?: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
   proficientLanguage?: string;
   countryOfOrigin?: string;
   onboardingCompleted?: boolean;
@@ -21,13 +24,17 @@ function toEntity(doc: {
   completedLessonsCount: number;
   weeklyActivity?: Array<{ date: Date; minutes: number }>;
   achievements?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }): LearnerProfileEntity {
   return {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     userId: doc.userId.toString(),
     activeLanguageId: doc.activeLanguageId ? doc.activeLanguageId.toString() : null,
-    displayName: doc.displayName,
+    name: String(doc.name || doc.displayName || ""),
+    username: String(doc.username || ""),
+    avatarUrl: String(doc.avatarUrl || ""),
     proficientLanguage: String(doc.proficientLanguage || ""),
     countryOfOrigin: String(doc.countryOfOrigin || ""),
     onboardingCompleted: Boolean(doc.onboardingCompleted),
@@ -42,19 +49,28 @@ function toEntity(doc: {
       date: new Date(item.date),
       minutes: Number(item.minutes) || 0
     })),
-    achievements: (doc.achievements || []).map(String)
+    achievements: (doc.achievements || []).map(String),
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
   };
 }
 
 export class MongooseLearnerProfileRepository implements LearnerProfileRepository {
   async findByUserId(userId: string): Promise<LearnerProfileEntity | null> {
-    const profile = await LearnerProfileModel.findOne({ userId });
+    const profile = await LearnerProfileModel.findOne({ userId }).lean();
+    return profile ? toEntity(profile) : null;
+  }
+
+  async findByUsername(username: string): Promise<LearnerProfileEntity | null> {
+    const profile = await LearnerProfileModel.findOne({ username }).lean();
     return profile ? toEntity(profile) : null;
   }
 
   async create(input: {
     userId: string;
-    displayName: string;
+    name: string;
+    username?: string;
+    avatarUrl?: string;
     proficientLanguage?: string;
     countryOfOrigin?: string;
     onboardingCompleted?: boolean;
@@ -62,14 +78,20 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
     dailyGoalMinutes: number;
   }): Promise<LearnerProfileEntity> {
     const activeLanguageId = await findLanguageIdByCode(input.currentLanguage);
-    const created = await LearnerProfileModel.create({ ...input, activeLanguageId: activeLanguageId || null });
+    const created = await LearnerProfileModel.create({
+      ...input,
+      displayName: input.name,
+      activeLanguageId: activeLanguageId || null
+    });
     return toEntity(created);
   }
 
   async updateByUserId(
     userId: string,
     update: Partial<{
-      displayName: string;
+      name: string;
+      username: string;
+      avatarUrl: string;
       proficientLanguage: string;
       countryOfOrigin: string;
       onboardingCompleted: boolean;
@@ -85,13 +107,26 @@ export class MongooseLearnerProfileRepository implements LearnerProfileRepositor
     }>
   ): Promise<LearnerProfileEntity | null> {
     const activeLanguageId = update.currentLanguage ? await findLanguageIdByCode(update.currentLanguage) : undefined;
+    const normalizedUpdate =
+      update.name === undefined
+        ? update
+        : {
+            ...update,
+            displayName: update.name
+          };
     const updated = await LearnerProfileModel.findOneAndUpdate(
       { userId },
-      activeLanguageId === undefined ? update : { ...update, activeLanguageId: activeLanguageId || null },
+      activeLanguageId === undefined
+        ? normalizedUpdate
+        : { ...normalizedUpdate, activeLanguageId: activeLanguageId || null },
       {
         new: true
       }
     );
     return updated ? toEntity(updated) : null;
+  }
+
+  async countWithHigherTotalXp(totalXp: number): Promise<number> {
+    return LearnerProfileModel.countDocuments({ totalXp: { $gt: Math.max(0, Number(totalXp) || 0) } });
   }
 }

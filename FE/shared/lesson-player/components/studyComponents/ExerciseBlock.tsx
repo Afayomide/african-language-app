@@ -18,6 +18,7 @@ type SpeakingFeedback = {
 
 const SPELLING_CONTEXT_IMAGE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBSJLUFH1PuZO_HDC5ipmEuAY-Kh5GRfoqWpdKzxi29fwLDMMhANMm0SBtNGrYKJJDU2AiMdwxtBDqE5-W1buTwq8UGKzHkxhFo1ftxYagVq-ij1BAcwKLdljp_nWOSbwO-0-MM8i68YKEAUOowLNOflSINW3Bz4fQ9IACW9I9gtRY0pPvm8uSbCvC9aTLe7DQ6Ldz7nAgYjjI4vB2iy0imeXI3NjkgnjJoBd8DBIY292h9KL6Dno3V2ya2GjAtGcyr_wLt8g_aSSD0'
+const MATCHING_DECORATIVE_IMAGE = '/images/stitch/matching-earth-ethos-pattern.png'
 
 function splitOptionText(option: string) {
   const trimmed = String(option || '').trim()
@@ -130,7 +131,7 @@ function TranslationOptionCard({
   isDesktopViewport: boolean
   onClick: () => void
 }) {
-  const label = isDesktopViewport ? String.fromCharCode(65 + index) : `Option ${index + 1}`
+  const label = isDesktopViewport ? String.fromCharCode(65 + index) : `${index + 1}`
   const parts = splitOptionText(option)
   const isWrongSelection = isAnswered && selected && !isCorrect
   const isRightSelection = isAnswered && isCorrect
@@ -142,11 +143,26 @@ function TranslationOptionCard({
         'group relative overflow-hidden text-left transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none',
         isDesktopViewport
           ? 'flex items-center rounded-[1.55rem] border-2 p-6'
-          : 'flex flex-col items-start rounded-[1.65rem] border-2 p-5',
-        !selected && !isRightSelection && !isWrongSelection && 'border-transparent bg-[#fffdf8] shadow-[0_10px_24px_rgba(57,56,47,0.04)] hover:border-[#ffbe9b] hover:bg-[#fff7ef]',
-        selected && !isAnswered && (isDesktopViewport ? 'border-[#a94600] bg-[#ffae86] shadow-[0_8px_24px_rgba(169,70,0,0.1)] scale-[1.01]' : 'border-[#a94600] bg-[#ffdeac] shadow-[0_8px_24px_rgba(169,70,0,0.1)] -translate-y-0.5'),
-        isRightSelection && 'border-[#57a764] bg-[#edf7ea] text-[#2d7c37]',
-        isWrongSelection && 'border-[#fa7150] bg-[#fff1ee] text-[#b23d21]',
+          : 'flex items-center rounded-[1.2rem] border p-5',
+        !selected &&
+          !isRightSelection &&
+          !isWrongSelection &&
+          (isDesktopViewport
+            ? 'border-transparent bg-[#fffdf8] shadow-[0_10px_24px_rgba(57,56,47,0.04)] hover:border-[#ffbe9b] hover:bg-[#fff7ef]'
+            : 'border-transparent bg-[#fdf9f1] shadow-[0_4px_0_0_rgba(236,232,219,1)] hover:bg-[#ece8db] hover:shadow-[0_2px_0_0_rgba(236,232,219,1)] active:translate-y-[2px]'),
+        selected &&
+          !isAnswered &&
+          (isDesktopViewport
+            ? 'border-[#a94600] bg-[#ffae86] shadow-[0_8px_24px_rgba(169,70,0,0.1)] scale-[1.01]'
+            : 'border-[#af4b06] bg-[#fff7ef] shadow-[0_4px_0_0_rgba(175,75,6,0.35)]'),
+        isRightSelection &&
+          (isDesktopViewport
+            ? 'border-[#57a764] bg-[#edf7ea] text-[#2d7c37]'
+            : 'border-[#2c694e] bg-[#edf7ea] text-[#2c694e] shadow-[0_4px_0_0_rgba(44,105,78,0.22)]'),
+        isWrongSelection &&
+          (isDesktopViewport
+            ? 'border-[#fa7150] bg-[#fff1ee] text-[#b23d21]'
+            : 'border-[#ba1a1a] bg-[#fff1ee] text-[#b23d21] shadow-[0_4px_0_0_rgba(186,26,26,0.18)]'),
       )}
       onClick={onClick}
     >
@@ -166,13 +182,24 @@ function TranslationOptionCard({
           {label}
         </span>
       ) : (
-        <span className={cx('mb-1 text-[10px] font-black uppercase tracking-[0.14em]', selected && !isAnswered ? 'text-[#a94600]' : 'text-[#8a7d70]')}>
+        <span
+          className={cx(
+            'mr-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold transition-colors',
+            isRightSelection
+              ? 'bg-[#ffffff] text-[#2c694e]'
+            : isWrongSelection
+                ? 'bg-[#ffffff] text-[#ba1a1a]'
+                : selected && !isAnswered
+                  ? 'bg-[#ffffff] text-[#8a3800]'
+                  : 'bg-[#ece8db] text-[#66655a] group-hover:bg-[#ffffff]',
+          )}
+        >
           {label}
         </span>
       )}
 
       <div className="min-w-0 flex-1">
-        <p className={cx('font-display font-bold leading-snug text-[#191713]', isDesktopViewport ? 'text-xl' : 'text-lg')}>
+        <p className={cx('font-display font-bold leading-snug text-[#191713]', isDesktopViewport ? 'text-xl' : 'text-[1.05rem]')}>
           {parts.primary}
         </p>
         {parts.secondary ? (
@@ -182,8 +209,16 @@ function TranslationOptionCard({
         ) : null}
       </div>
 
+      {!isDesktopViewport && isRightSelection ? (
+        <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#2c694e]" />
+      ) : null}
+
+      {!isDesktopViewport && isWrongSelection ? (
+        <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#ba1a1a]" />
+      ) : null}
+
       {!isDesktopViewport && selected && !isAnswered ? (
-        <CheckCircle2 className="absolute right-4 top-4 h-5 w-5 text-[#a94600]" />
+        <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#a94600]" />
       ) : null}
     </button>
   )
@@ -650,19 +685,40 @@ function MatchingCard({
   disabled?: boolean
   isDesktopViewport: boolean
 }) {
+  const mobileCardTextColor = matched
+    ? 'text-[#2c694e]'
+    : answeredWrong
+      ? 'text-[#93000a]'
+      : selected
+        ? 'text-[#8a3800]'
+        : 'text-[#574239]'
+
   return (
     <button
       type="button"
       className={cx(
         'w-full text-left transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none',
-        isDesktopViewport ? 'rounded-[1.5rem] p-6' : 'relative rounded-[1.2rem] p-4',
-        matched
-          ? 'border border-[#57a764] bg-[#edf7ea] shadow-none'
-          : answeredWrong
-            ? 'border border-[#fa7150] bg-[#fff1ee] shadow-none'
-            : selected
-              ? 'border border-[#a94600] bg-[#ffdeac] shadow-[0_10px_24px_rgba(169,70,0,0.1)]'
-              : 'border border-transparent bg-[#fdf9f1] shadow-[0_10px_24px_rgba(57,56,47,0.04)] hover:border-[#ffbe9b] hover:bg-[#fff7ef]',
+        isDesktopViewport
+          ? cx(
+              'rounded-[1.5rem] p-6',
+              matched
+                ? 'border border-[#57a764] bg-[#edf7ea] shadow-none'
+                : answeredWrong
+                  ? 'border border-[#fa7150] bg-[#fff1ee] shadow-none'
+                  : selected
+                    ? 'border border-[#a94600] bg-[#ffdeac] shadow-[0_10px_24px_rgba(169,70,0,0.1)]'
+                    : 'border border-transparent bg-[#fdf9f1] shadow-[0_10px_24px_rgba(57,56,47,0.04)] hover:border-[#ffbe9b] hover:bg-[#fff7ef]',
+            )
+          : cx(
+              'relative min-h-[7.75rem] rounded-[1.35rem] px-4 py-5 text-center',
+              matched
+                ? 'border-2 border-[#2c694e] bg-[#aeeecb] shadow-[0_4px_0_0_rgba(44,105,78,1)]'
+                : answeredWrong
+                  ? 'border-2 border-[#ba1a1a] bg-[#ffdad6] shadow-[0_4px_0_0_rgba(186,26,26,0.25)]'
+                  : selected
+                    ? 'border-2 border-[#af4b06] bg-[#ffffff] shadow-[0_4px_0_0_rgba(138,56,0,1)]'
+                    : 'border border-transparent bg-[#ffffff] shadow-[0_4px_0_0_rgba(227,226,225,1)] hover:translate-y-[2px] hover:shadow-[0_2px_0_0_rgba(227,226,225,1)]',
+            ),
       )}
       onClick={onClick}
       disabled={disabled}
@@ -686,6 +742,18 @@ function MatchingCard({
           </div>
           <p className={cx('font-body font-semibold leading-snug text-[#39382f]', isDesktopViewport ? 'text-base' : 'text-sm')}>
             {image.altText || label}
+          </p>
+        </div>
+      ) : !isDesktopViewport ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3">
+          {matched ? (
+            <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-[#2c694e]" />
+          ) : null}
+          {icon === 'left' ? (
+            <Volume2 className={cx('h-4 w-4', mobileCardTextColor)} />
+          ) : null}
+          <p className={cx('break-words font-display text-[1.2rem] font-bold leading-tight', mobileCardTextColor)}>
+            {label}
           </p>
         </div>
       ) : (
@@ -803,59 +871,71 @@ function MatchingExerciseSurface({
     )
   }
 
+  const mobileRows = matchingLeftItems.map((leftItem, index) => ({
+    leftItem,
+    rightItem: matchingRightItems[index] || null,
+  }))
+
   return (
     <section className="mx-auto w-full max-w-md space-y-6 pt-1">
-      <div className="space-y-4">
-        <h2 className="font-display text-[1.8rem] font-extrabold leading-none tracking-[-0.04em] text-[#8b2f00] uppercase">
-          Match the Pairs
+      <div className="space-y-2 text-center">
+        <h2 className="font-display text-[2rem] font-extrabold tracking-[-0.05em] text-[#8a3800]">
+          {isImageMatching ? 'Image Matching' : 'Vocabulary Matching'}
         </h2>
-
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-[linear-gradient(135deg,#865d00,#c89234)] shadow-[0_10px_24px_rgba(134,93,0,0.15)]" />
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#a94600]">Lesson Focus</p>
-            <p className="font-display text-lg font-bold leading-tight text-[#191713]">{lessonTitle || 'Matching Practice'}</p>
-          </div>
-        </div>
+        <p className="mx-auto max-w-[18rem] text-[1rem] font-medium leading-snug text-[#574239]">
+          {isImageMatching
+            ? 'Connect the Yoruba terms with their matching images.'
+            : 'Connect the Yoruba terms with their English meanings'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {matchingLeftItems.map((item) => {
-          const matchedRight = selectedMatches[item.id] ? getMatchingRightItem(selectedMatches[item.id]) : null
-          const matchedWrong = Boolean(isAnswered && selectedMatches[item.id] && selectedMatches[item.id] !== item.id)
-          return (
-            <MatchingCard
-              key={item.id}
-              label={item.label}
-              caption="Term"
-              selected={selectedMatchingLeftId === item.id}
-              matched={Boolean(matchedRight) && !matchedWrong}
-              answeredWrong={matchedWrong}
-              icon="left"
-              onClick={() => onSelectMatchingLeft(item.id)}
-              disabled={isAnswered}
-              isDesktopViewport={false}
-            />
-          )
-        })}
+      <div className="space-y-3">
+        {mobileRows.map(({ leftItem, rightItem }) => {
+          if (!rightItem) return null
 
-        {matchingRightItems.map((item) => {
-          const isUsed = Object.values(selectedMatches).includes(item.id)
+          const selectedRightId = selectedMatches[leftItem.id]
+          const leftMatched = Boolean(selectedRightId)
+          const leftAnsweredWrong = Boolean(isAnswered && selectedRightId && selectedRightId !== leftItem.id)
+          const usedByLeftId = Object.entries(selectedMatches).find(([, rightId]) => rightId === rightItem.id)?.[0]
+          const rightAnsweredWrong = Boolean(isAnswered && usedByLeftId && usedByLeftId !== rightItem.id)
+          const rightMatched = Boolean(usedByLeftId && !rightAnsweredWrong)
+
           return (
-            <MatchingCard
-              key={item.id}
-              label={item.label}
-              caption={isImageMatching ? 'Image' : 'Translation'}
-              matched={Boolean(isUsed && isAnswered)}
-              selected={Boolean(selectedMatchingLeftId && !isUsed)}
-              icon="right"
-              image={item.image}
-              onClick={() => onSelectMatchingRight(item.id)}
-              disabled={isAnswered}
-              isDesktopViewport={false}
-            />
+            <div key={`${leftItem.id}-${rightItem.id}`} className="grid grid-cols-2 gap-3">
+              <MatchingCard
+                label={leftItem.label}
+                caption="Term"
+                selected={selectedMatchingLeftId === leftItem.id}
+                matched={leftMatched && !leftAnsweredWrong}
+                answeredWrong={leftAnsweredWrong}
+                icon="left"
+                onClick={() => onSelectMatchingLeft(leftItem.id)}
+                disabled={isAnswered}
+                isDesktopViewport={false}
+              />
+              <MatchingCard
+                label={rightItem.label}
+                caption={isImageMatching ? 'Image' : 'Translation'}
+                matched={rightMatched}
+                answeredWrong={rightAnsweredWrong}
+                icon="right"
+                image={rightItem.image}
+                onClick={() => onSelectMatchingRight(rightItem.id)}
+                disabled={isAnswered}
+                isDesktopViewport={false}
+              />
+            </div>
           )
         })}
+      </div>
+
+      <div className="flex justify-center pt-2 opacity-40">
+        <img
+          src={MATCHING_DECORATIVE_IMAGE}
+          alt=""
+          aria-hidden="true"
+          className="h-16 w-16 object-contain"
+        />
       </div>
     </section>
   )
@@ -903,6 +983,7 @@ function WordOrderExerciseSurface({
   const remainingWordSlots = Math.max(0, interactionWords.length - selectedWords.length)
   const promptAudioUrl = questionSentenceAudioUrl || exerciseData.source?.audio?.url
   const builtAnswerText = selectedSequence.join(isLetterOrderQuestion ? '' : ' ')
+  const canUndoLetterSelection = isLetterOrderQuestion && selectedWords.length > 0 && !isAnswered
 
   const buildCard = questionSentenceText ? (
     <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
@@ -1075,12 +1156,20 @@ function WordOrderExerciseSurface({
 
       <div className="rounded-[2rem] bg-[#fdf9f1] px-6 py-8 shadow-[0_14px_34px_rgba(57,56,47,0.05)]">
         {isLetterOrderQuestion ? (
-          <div className="text-center">
+          <button
+            type="button"
+            className={cx(
+              'block w-full text-center transition-all',
+              canUndoLetterSelection && 'active:scale-[0.99]',
+            )}
+            onClick={() => onRemoveSelectedWord(selectedWords.length - 1)}
+            disabled={!canUndoLetterSelection}
+          >
             <p className="font-display text-[2.5rem] font-extrabold tracking-[-0.05em] text-[#a94600]">
               {builtAnswerText || '—'}
             </p>
             <div className="mx-auto mt-4 h-1 w-48 rounded-full bg-[#d8cfc1]/55" />
-          </div>
+          </button>
         ) : (
           <div className="flex min-h-[120px] flex-wrap content-center items-center justify-center gap-3">
             {selectedWords.length === 0 && !isAnswered ? (

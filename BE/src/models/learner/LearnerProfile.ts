@@ -12,7 +12,10 @@ const LearnerProfileSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     activeLanguageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
+    name: { type: String, default: "" },
     displayName: { type: String, default: "" },
+    username: { type: String, default: "", trim: true, lowercase: true },
+    avatarUrl: { type: String, default: "" },
     proficientLanguage: { type: String, default: "" },
     countryOfOrigin: { type: String, default: "" },
     onboardingCompleted: { type: Boolean, default: false },
@@ -31,6 +34,15 @@ const LearnerProfileSchema = new Schema(
 
 LearnerProfileSchema.index({ currentLanguage: 1, updatedAt: -1 });
 LearnerProfileSchema.index({ currentStreak: -1, totalXp: -1 });
+LearnerProfileSchema.index(
+  { username: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      username: { $type: "string", $ne: "" }
+    }
+  }
+);
 
 export type LearnerProfileDocument = InferSchemaType<typeof LearnerProfileSchema> & {
   _id: mongoose.Types.ObjectId;

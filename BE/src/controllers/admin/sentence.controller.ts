@@ -279,6 +279,15 @@ export async function publishSentence(req: AuthRequest, res: Response) {
   return res.status(200).json({ sentence: payload });
 }
 
+export async function finishSentence(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  const sentence = await sentenceUseCases.finish(id);
+  if (!sentence) return res.status(404).json({ error: "sentence not found or not draft" });
+  const [payload] = await hydrateSentencePayloads([sentence]);
+  return res.status(200).json({ sentence: payload });
+}
+
 export async function generateSentenceAudioById(req: AuthRequest, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });

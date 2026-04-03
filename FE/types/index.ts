@@ -12,7 +12,10 @@ export type LearnerAuthUser = {
 export type LearnerProfile = {
   id: string;
   userId: string;
-  displayName: string;
+  name: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
   proficientLanguage: string;
   countryOfOrigin: string;
   onboardingCompleted: boolean;
@@ -22,6 +25,8 @@ export type LearnerProfile = {
   currentStreak: number;
   longestStreak: number;
   completedLessonsCount: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 };
 
 export type LessonBlock = 

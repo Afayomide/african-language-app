@@ -20,23 +20,33 @@ function toEntity(doc: {
 
 export class MongooseUserRepository implements UserRepository {
   async findById(id: string): Promise<UserEntity | null> {
-    const user = await UserModel.findById(id);
+    const user = await UserModel.findById(id).lean();
     return user ? toEntity(user) : null;
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const user = await UserModel.findOne({ email });
+    const user = await UserModel.findOne({ email }).lean();
     return user ? toEntity(user) : null;
   }
 
   async findByIds(ids: string[]): Promise<UserEntity[]> {
-    const users = await UserModel.find({ _id: { $in: ids } });
+    const users = await UserModel.find({ _id: { $in: ids } }).lean();
     return users.map(toEntity);
   }
 
   async create(input: { email: string; passwordHash: string; roles: UserRole[] }): Promise<UserEntity> {
     const created = await UserModel.create(input);
     return toEntity(created);
+  }
+
+  async updateEmail(userId: string, email: string): Promise<UserEntity | null> {
+    const updated = await UserModel.findByIdAndUpdate(userId, { email }, { new: true });
+    return updated ? toEntity(updated) : null;
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<UserEntity | null> {
+    const updated = await UserModel.findByIdAndUpdate(userId, { passwordHash }, { new: true });
+    return updated ? toEntity(updated) : null;
   }
 
   async addRole(userId: string, role: UserRole): Promise<UserEntity | null> {

@@ -276,6 +276,15 @@ export async function publishWord(req: AuthRequest, res: Response) {
   return res.status(200).json({ word: payload });
 }
 
+export async function finishWord(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  const word = await wordUseCases.finish(id);
+  if (!word) return res.status(404).json({ error: "word not found or not draft" });
+  const [payload] = await hydrateWordPayloads([word]);
+  return res.status(200).json({ word: payload });
+}
+
 export async function generateWordAudioById(req: AuthRequest, res: Response) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
