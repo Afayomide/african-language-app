@@ -288,6 +288,29 @@ function TranslationExerciseSurface(props: {
     listeningSupportText,
     choiceSupportText,
   })
+  const headingText = isContextResponseQuestion
+    ? 'Choose the best response'
+    : isListeningQuestion
+      ? listeningHeading
+      : renderPromptText({ renderedPrompt, renderedPromptParts, sourceText })
+  const scenarioCard = isContextResponseQuestion ? (
+    <div
+      className={cx(
+        'rounded-[1.55rem] border border-[#efe4d8] bg-white shadow-[0_10px_24px_rgba(57,56,47,0.04)]',
+        isDesktopViewport ? 'max-w-3xl px-6 py-5' : 'px-5 py-4',
+      )}
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8a7d70]">Scenario</p>
+      <p
+        className={cx(
+          'mt-3 leading-relaxed text-[#39382f]',
+          isDesktopViewport ? 'text-lg font-semibold' : 'text-sm font-medium',
+        )}
+      >
+        {renderedPrompt}
+      </p>
+    </div>
+  ) : null
 
   if (isDesktopViewport) {
     return (
@@ -300,13 +323,11 @@ function TranslationExerciseSurface(props: {
                   {questionChipLabel}
                 </span>
                 <h2 className="font-display text-[2.3rem] font-extrabold leading-[1.06] tracking-[-0.04em] text-[#191713] lg:text-[3.35rem]">
-                  {isListeningQuestion
-                    ? listeningHeading
-                    : renderPromptText({ renderedPrompt, renderedPromptParts, sourceText })}
+                  {headingText}
                 </h2>
               </div>
 
-              {promptAudioUrl ? (
+              {promptAudioUrl && !isContextResponseQuestion ? (
                 <AudioCircleButton
                   onClick={() => {
                     onPlayClick()
@@ -319,6 +340,8 @@ function TranslationExerciseSurface(props: {
                 />
               ) : null}
             </div>
+
+            {scenarioCard}
 
             {listeningPromptDetail ? (
               <div className="max-w-xl rounded-[1.4rem] border border-[#efe4d8] bg-white px-5 py-4">
@@ -390,7 +413,7 @@ function TranslationExerciseSurface(props: {
         </div>
 
         <div className="flex items-start gap-4">
-          {promptAudioUrl ? (
+          {promptAudioUrl && !isContextResponseQuestion ? (
             <AudioCircleButton
               onClick={() => {
                 onPlayClick()
@@ -404,13 +427,18 @@ function TranslationExerciseSurface(props: {
             />
           ) : null}
 
-          <h2 className="min-w-0 flex-1 font-display text-[2rem] font-bold leading-[1.1] tracking-[-0.04em] text-[#191713]">
-            {isListeningQuestion
-              ? listeningHeading
-              : renderPromptText({ renderedPrompt, renderedPromptParts, sourceText })}
+          <h2
+            className={cx(
+              'min-w-0 flex-1 font-display font-bold leading-[1.1] tracking-[-0.04em] text-[#191713]',
+              isContextResponseQuestion ? 'text-[1.45rem]' : 'text-[2rem]',
+            )}
+          >
+            {headingText}
           </h2>
         </div>
       </header>
+
+      {scenarioCard}
 
       {listeningPromptDetail ? (
         <div className="rounded-[1.35rem] bg-[#f1eee2] px-4 py-3 text-sm font-semibold text-[#5f5951]">
