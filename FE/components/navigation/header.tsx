@@ -1,9 +1,6 @@
-'use client'
-
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/branding/logo'
-import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 
 interface NavLink {
   label: string
@@ -14,6 +11,7 @@ interface HeaderProps {
   navLinks?: NavLink[]
   showAuthButtons?: boolean
   variant?: 'default' | 'minimal'
+  isAuthenticated?: boolean
 }
 
 const defaultNavLinks: NavLink[] = [
@@ -25,9 +23,8 @@ export function Header({
   navLinks = defaultNavLinks,
   showAuthButtons = true,
   variant = 'default',
+  isAuthenticated = false,
 }: HeaderProps) {
-  const { isAuthenticated } = useLearnerAuth()
-
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/20 bg-background/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">

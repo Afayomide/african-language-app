@@ -1,40 +1,21 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { LogoShowcase } from '@/components/branding/logo-showcase'
 import { ArrowRight } from 'lucide-react'
-import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
+import { HeroCharacterCarousel } from '@/components/sections/hero-character-carousel'
 
-export function InteractiveHeroSection() {
-  const { isAuthenticated } = useLearnerAuth()
-  const [scrollY, setScrollY] = useState(0)
-  const [activeCharacter, setActiveCharacter] = useState(0)
-
+export function InteractiveHeroSection({
+  primaryHref = '/auth/signup',
+  primaryLabel = 'Start Learning',
+}: {
+  primaryHref?: string
+  primaryLabel?: string
+}) {
   const characters = [
     { src: '/characters/yoruba-woman.jpg', name: 'Yoruba' },
     { src: '/characters/hausa-woman.jpg', name: 'Hausa' },
     { src: '/characters/igbo-woman.jpg', name: 'Igbo' },
     { src: '/characters/pidgin-character.jpg', name: 'Pidgin' },
   ]
-
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveCharacter((prev) => (prev + 1) % characters.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [characters.length])
-
-  const primaryHref = isAuthenticated ? '/dashboard' : '/language-selection'
-  const primaryLabel = isAuthenticated ? 'Go to Dashboard' : 'Start Learning'
 
   return (
     <section className="relative overflow-hidden px-4 py-16 md:py-32 min-h-screen flex items-center">
@@ -43,12 +24,10 @@ export function InteractiveHeroSection() {
 
       {/* Animated blob backgrounds */}
       <div
-        className="absolute -left-32 -top-32 w-96 h-96 bg-primary/20 rounded-full blur-3xl"
-        style={{ transform: `translateY(${scrollY * 0.3}px)` }}
+        className="absolute -left-32 -top-32 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse"
       />
       <div
-        className="absolute -right-32 -bottom-32 w-96 h-96 bg-accent/15 rounded-full blur-3xl"
-        style={{ transform: `translateY(${-scrollY * 0.2}px)` }}
+        className="absolute -right-32 -bottom-32 w-96 h-96 bg-accent/15 rounded-full blur-3xl animate-pulse"
       />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
 
@@ -90,13 +69,15 @@ export function InteractiveHeroSection() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="px-8 text-base font-semibold border-2 hover:bg-foreground/5 transition-all duration-200 bg-transparent"
-              >
-                Learn More
-              </Button>
+              <Link href="#features">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="px-8 text-base font-semibold border-2 hover:bg-foreground/5 transition-all duration-200 bg-transparent"
+                >
+                  Learn More
+                </Button>
+              </Link>
             </div>
 
             {/* Stats */}
@@ -116,65 +97,7 @@ export function InteractiveHeroSection() {
             </div>
           </div>
 
-          {/* Right Character Animation */}
-          <div className="relative h-[500px] md:h-[600px] order-1 lg:order-2">
-            {/* Character carousel */}
-            <div className="relative w-full h-full flex items-center justify-center">
-              {characters.map((character, index) => (
-                <div
-                  key={character.name}
-                  className={`absolute inset-0 transition-all duration-1000 ease-out ${
-                    index === activeCharacter
-                      ? 'opacity-100 scale-100'
-                      : 'opacity-0 scale-95 pointer-events-none'
-                  }`}
-                >
-                  {/* Character frame */}
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    {/* Decorative background circle */}
-                    <div className="absolute inset-12 rounded-full bg-gradient-to-br from-primary/10 to-accent/10 blur-3xl animate-pulse" />
-
-                    {/* Character image */}
-                    <div className="relative w-64 h-80 md:w-72 md:h-96 rounded-3xl overflow-hidden shadow-2xl border-8 border-white/50 backdrop-blur-sm">
-                      <Image
-                        src={character.src || "/placeholder.svg"}
-                        alt={character.name}
-                        fill
-                        className="object-cover"
-                        sizes="300px"
-                        priority={index === activeCharacter}
-                      />
-                      {/* Gradient overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-
-                      {/* Character label */}
-                      <div className="absolute bottom-4 left-4 right-4 text-white text-center">
-                        <p className="text-2xl font-black drop-shadow-lg">
-                          {character.name}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Character selector dots */}
-              <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-3">
-                {characters.map((character, index) => (
-                  <button
-                    key={character.name}
-                    onClick={() => setActiveCharacter(index)}
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      index === activeCharacter
-                        ? 'bg-primary w-8'
-                        : 'bg-border/50 hover:bg-primary/50'
-                    }`}
-                    aria-label={`Show ${character.name}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+          <HeroCharacterCarousel characters={characters} />
         </div>
       </div>
     </section>

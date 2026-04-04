@@ -1,5 +1,3 @@
-"use client";
-
 import { CTASection } from "@/components/sections/cta-section";
 import { FeaturesSection } from "@/components/sections/features-section";
 import { HowItWorksSection } from "@/components/sections/how-it-works-section";
@@ -8,9 +6,36 @@ import { CulturalShowcaseSection } from "@/components/sections/cultural-showcase
 import { AfricaMapSection } from "@/components/sections/africa-map-section";
 import { Header } from "@/components/navigation/header";
 import { Footer } from "@/components/navigation/footer";
+import { getLearnerServerSession } from "@/lib/learnerServerSession";
+import { defaultOgImage, siteDescription, siteName, siteUrl } from "@/lib/seo";
 import { Book, Zap, Users } from "lucide-react";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await getLearnerServerSession();
+  const isAuthenticated = Boolean(session);
+  const primaryHref = isAuthenticated ? "/dashboard" : "/auth/signup";
+  const primaryLabel = isAuthenticated ? "Go to Dashboard" : "Start Learning";
+  const ctaHref = isAuthenticated ? "/dashboard" : "/auth/signup";
+  const ctaLabel = isAuthenticated ? "Go to Dashboard" : "Start Your Journey";
+  const siteOrigin = siteUrl.toString().replace(/\/$/, "");
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: siteName,
+      url: siteOrigin,
+      logo: `${siteOrigin}${defaultOgImage}`,
+      description: siteDescription,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: siteName,
+      url: siteOrigin,
+      description: siteDescription,
+    },
+  ];
+
   const features = [
     {
       icon: Zap,
@@ -62,11 +87,16 @@ export default function LandingPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <Header />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
-      <InteractiveHeroSection />
+      <Header isAuthenticated={isAuthenticated} />
 
-      <AfricaMapSection />
+      <InteractiveHeroSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
+
+      <AfricaMapSection startHref={primaryHref} />
 
       <CulturalShowcaseSection />
 
@@ -77,6 +107,8 @@ export default function LandingPage() {
       <CTASection
         title="Ready to Learn?"
         description="Join thousands of learners exploring African languages through culture, conversation, and daily life."
+        ctaHref={ctaHref}
+        ctaLabel={ctaLabel}
       />
 
       <Footer />

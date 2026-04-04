@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { siteName } from '@/lib/seo'
 
 interface LogoProps {
   href?: string | null
@@ -62,7 +63,7 @@ export function Logo({
       >
         <Image
           src="/logo.png"
-          alt="LinguaHub logo"
+          alt={`${siteName} logo`}
           width={markImageSizes[size].width}
           height={markImageSizes[size].height}
           className={cn(
@@ -89,7 +90,7 @@ export function Logo({
             wordmarkSizes[size]
           )}
         >
-          Tembolang
+          Kela
         </span>
       )}
     </>

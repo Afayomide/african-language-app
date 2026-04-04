@@ -1,8 +1,8 @@
 import React from 'react'
 import type { Metadata, Viewport } from 'next'
 import { Manrope, Plus_Jakarta_Sans } from 'next/font/google'
-import { LearnerAuthProvider } from '@/components/auth/learner-auth-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { defaultOgImage, siteDescription, siteName, siteUrl } from '@/lib/seo'
 
 import './globals.css'
 
@@ -10,9 +10,59 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' })
 
 export const metadata: Metadata = {
-  title: 'Learn African Languages | Language Learning App',
-  description: 'Learn Yoruba, Igbo, Hausa, and Pidgin with AI-powered practice and real African cultural context.',
-  generator: 'v0.app',
+  metadataBase: siteUrl,
+  applicationName: siteName,
+  title: {
+    default: `Learn African Languages | ${siteName}`,
+    template: `%s | ${siteName}`,
+  },
+  description: siteDescription,
+  keywords: [
+    'learn Yoruba',
+    'learn Igbo',
+    'learn Hausa',
+    'African language learning',
+    'language app',
+    'Yoruba lessons',
+    'Igbo lessons',
+    'Hausa lessons',
+    'AI language learning',
+  ],
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName,
+    title: `Learn African Languages | ${siteName}`,
+    description: siteDescription,
+    images: [
+      {
+        url: defaultOgImage,
+        width: 512,
+        height: 512,
+        alt: `${siteName} logo`,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Learn African Languages | ${siteName}`,
+    description: siteDescription,
+    images: [defaultOgImage],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   icons: {
     icon: '/icon-192.png',
     apple: '/apple-touch-icon.png',
@@ -42,10 +92,8 @@ export default function RootLayout({
         />
       </head>
       <body className={`${manrope.variable} ${plusJakartaSans.variable} font-sans antialiased`}>
-        <LearnerAuthProvider>
-          {children}
-          <Toaster richColors position="top-center" />
-        </LearnerAuthProvider>
+        {children}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   )

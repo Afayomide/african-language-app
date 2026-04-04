@@ -1,5 +1,3 @@
-'use client'
-
 interface Step {
   step: string
   title: string

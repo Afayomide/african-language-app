@@ -1,9 +1,6 @@
-'use client'
-
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
-import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 
 interface CTASectionProps {
   title: string
@@ -16,25 +13,21 @@ export function CTASection({
   title,
   description,
   ctaLabel = 'Start Your Journey',
-  ctaHref = '/language-selection',
+  ctaHref = '/auth/signup',
 }: CTASectionProps) {
-  const { isAuthenticated } = useLearnerAuth()
-  const resolvedHref = isAuthenticated ? '/dashboard' : ctaHref
-  const resolvedLabel = isAuthenticated ? 'Go to Dashboard' : ctaLabel
-
   return (
     <section className="relative px-4 py-20">
-      <div className="mx-auto max-w-4xl rounded-2xl bg-gradient-to-r from-primary/90 to-accent/90 p-12 text-center">
+      <div className="mx-auto max-w-4xl rounded-2xl bg-primary/90 p-12 text-center">
         <h2 className="mb-4 text-3xl font-bold text-primary-foreground">
           {title}
         </h2>
         <p className="mb-8 text-lg text-primary-foreground/90">{description}</p>
-        <Link href={resolvedHref}>
+        <Link href={ctaHref}>
           <Button
             size="lg"
             className="gap-2 bg-white px-8 text-base text-primary hover:bg-primary-foreground"
           >
-            {resolvedLabel}
+            {ctaLabel}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
