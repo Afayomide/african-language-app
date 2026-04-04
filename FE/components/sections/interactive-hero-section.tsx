@@ -81,7 +81,7 @@ export function InteractiveHeroSection({
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-border/20">
+            {/* <div className="grid grid-cols-3 gap-4 pt-8 border-t border-border/20">
               <div className="space-y-1">
                 <p className="text-2xl font-black text-primary">4</p>
                 <p className="text-sm text-foreground/60">Languages</p>
@@ -94,7 +94,7 @@ export function InteractiveHeroSection({
                 <p className="text-2xl font-black text-primary">95%</p>
                 <p className="text-sm text-foreground/60">Satisfaction</p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <HeroCharacterCarousel characters={characters} />

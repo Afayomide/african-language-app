@@ -38,6 +38,7 @@ import {
   useLearnerOverviewQuery,
 } from '@/hooks/queries/learner-overview'
 import { cn } from '@/lib/utils'
+import { siteName } from '@/lib/seo'
 type SupportedLanguage = 'yoruba' | 'igbo' | 'hausa'
 
 const LANGUAGE_UI_COPY: Record<
@@ -438,7 +439,7 @@ function DashboardDesktop({
                       type="button"
                       className="inline-flex h-12 items-center justify-center rounded-xl bg-white/10 px-6 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-white/20"
                     >
-                      Preview
+                      Review
                     </button>
                   </Link>
                 </div>
@@ -741,77 +742,69 @@ function DashboardMobile({
   weeklyOverview: DashboardData['weeklyOverview']
 }) {
   const nextLesson = data?.nextLesson
+  const heroLessonLabel =
+    nextLesson?.progressPercent && nextLesson.progressPercent > 0 ? 'Continue Lesson' : 'Start Lesson'
 
   return (
     <div className="lg:hidden">
-      <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between bg-[#fff7ef]/90 px-6 backdrop-blur-xl">
+      <header className="fixed inset-x-0 top-0 z-30 grid h-[72px] grid-cols-[32px_1fr_auto] items-center gap-3 bg-[#fff7ef]/90 px-4 backdrop-blur-xl">
         <Link href="/dashboard" className="text-[#7c2d12]" aria-label="Home">
           <X className="h-4 w-4" />
         </Link>
-        {/* <h1 className="font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{languageLabel}</h1> */}
-        <h1 className="font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">Tembo</h1> 
-
-        <div className="w-4" />
+        <h1 className="justify-self-center font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{siteName}</h1>
+        <LanguageSwitcher
+          languages={data?.learnerLanguages || []}
+          activeLanguage={languageKey}
+          compact
+          labelOnly
+          className="max-w-[180px] flex-nowrap justify-end gap-1 overflow-x-auto pr-1"
+          disabled={isSwitchingLanguage}
+          onSelect={onSelectLanguage}
+        />
       </header>
 
-      <div className="space-y-8 px-6 pb-28 pt-20">
-        <section>
-          <h2 className="mt-1 font-display text-[34px] font-extrabold tracking-[-0.05em] text-[#191713]">
-            {languageCopy.greeting} {learnerFirstName}
-          </h2>
-          <LanguageSwitcher
-            languages={data?.learnerLanguages || []}
-            activeLanguage={languageKey}
-            compact
-            className="mt-4"
-            disabled={isSwitchingLanguage}
-            onSelect={onSelectLanguage}
+      <div className="space-y-8 px-6 pb-28 pt-24">
+        <section className="relative h-[320px] overflow-hidden rounded-[26px] bg-[#fdf9f1] shadow-[0_18px_32px_rgba(57,56,47,0.12)]">
+          <img
+            alt="Nigerian marketplace"
+            className="h-full w-full object-cover"
+            src={HERO_PATTERN}
           />
-        </section>
-
-        <section className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#a94600,#953d00)] px-6 py-6 text-white shadow-[0_18px_32px_rgba(169,70,0,0.24)]">
-          <div className="absolute bottom-0 right-0 h-full w-1/2 opacity-20">
-            <img
-              alt="Decorative textile pattern"
-              className="h-full w-full object-cover"
-              src={HERO_PATTERN}
-            />
-          </div>
-          <div className="relative z-10">
-            <div className="mb-10 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-display text-[26px] font-extrabold tracking-[-0.04em]">
-                  {languageLabel} Core
-                </h3>
-                <p className="text-sm font-medium text-white/80">
-                  {activeUnit?.level
-                    ? `${activeUnit.level.charAt(0).toUpperCase()}${activeUnit.level.slice(1)}`
-                    : "Beginner"}{" "}
-                  •{" "}
-                  {data?.nextLesson?.unitTitle ||
-                    activeUnit?.title ||
-                    languageCopy.moduleFallback}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-white/16 p-3">
-                <BookOpen className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em] text-white/92">
-                <span>Course Progress</span>
-                <span>{courseProgressPercent}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-white/16 p-[2px]">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${courseProgressPercent}%` }}
-                />
-              </div>
-              <p className="text-xs font-semibold text-white/80">
-                {data?.stats.completedLessonsCount || 0} lessons complete ·{" "}
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,14,11,0.82),rgba(15,14,11,0.52),rgba(15,14,11,0.14))]" />
+          <div className="absolute inset-0 flex flex-col justify-end px-7 pb-7 text-white">
+            <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#ffdeac]">
+              Continue journey
+            </p>
+            <h3 className="max-w-[260px] font-display text-[2rem] font-extrabold leading-[0.96] tracking-[-0.05em]">
+              {languageCopy.greeting}, {learnerFirstName}
+            </h3>
+            <p className="mt-3 max-w-[270px] text-[13px] font-medium leading-5 text-stone-200">
+              {data?.nextLesson?.description || languageCopy.lessonFallbackDescription}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
+                Course {courseProgressPercent}%
+              </span>
+              <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
+                {data?.stats.completedLessonsCount || 0} Lessons Complete
+              </span>
+              <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/90 backdrop-blur-md">
                 {data?.stats.totalXp || 0} XP
-              </p>
+              </span>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <Link
+                href={nextLessonHref}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#a94600,#ffae86)] px-5 text-[13px] font-bold text-white shadow-[0_18px_32px_rgba(169,70,0,0.22)]"
+              >
+                {heroLessonLabel}
+              </Link>
+              <Link
+                href={`/curriculum?language=${encodeURIComponent(languageKey)}`}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-white/10 px-4 text-[13px] font-bold text-white backdrop-blur-md transition-colors hover:bg-white/20"
+              >
+                Review
+              </Link>
             </div>
           </div>
         </section>
@@ -857,7 +850,7 @@ function DashboardMobile({
           </p>
         </section>
 
-        <section className="rounded-[28px] bg-[#f7f3ea] p-6">
+        {/* <section className="rounded-[28px] bg-[#f7f3ea] p-6">
           <div className="mb-6 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b9eeab]/55 text-[#2d5a27]">
               <Target className="h-5 w-5" />
@@ -894,7 +887,7 @@ function DashboardMobile({
             Continue Learning
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </section>
+        </section> */}
 
         <section className="space-y-4">
           <div className="flex items-end justify-between gap-3">

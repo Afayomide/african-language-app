@@ -26,6 +26,7 @@ type Props = {
   disabled?: boolean
   className?: string
   compact?: boolean
+  labelOnly?: boolean
 }
 
 const LANGUAGE_LABELS: Record<Language, { title: string; short: string }> = {
@@ -41,6 +42,7 @@ export function LanguageSwitcher({
   disabled = false,
   className,
   compact = false,
+  labelOnly = false,
 }: Props) {
   if (!languages.length) return null
 
@@ -64,15 +66,17 @@ export function LanguageSwitcher({
               disabled && !isActive && 'opacity-70',
             )}
           >
-            <span
-              className={cn(
-                'flex items-center justify-center rounded-full font-black uppercase tracking-[0.18em]',
-                compact ? 'h-7 w-7 text-[10px]' : 'h-8 w-8 text-[11px]',
-                isActive ? 'bg-[#a94600] text-white' : 'bg-[#f4ebe1] text-[#8a7d70]',
-              )}
-            >
-              {meta.short}
-            </span>
+            {!labelOnly ? (
+              <span
+                className={cn(
+                  'flex items-center justify-center rounded-full font-black uppercase tracking-[0.18em]',
+                  compact ? 'h-7 w-7 text-[10px]' : 'h-8 w-8 text-[11px]',
+                  isActive ? 'bg-[#a94600] text-white' : 'bg-[#f4ebe1] text-[#8a7d70]',
+                )}
+              >
+                {meta.short}
+              </span>
+            ) : null}
             <span className="flex flex-col">
               <span className={cn('font-bold', compact ? 'text-xs' : 'text-sm')}>{meta.title}</span>
               {!compact ? (
