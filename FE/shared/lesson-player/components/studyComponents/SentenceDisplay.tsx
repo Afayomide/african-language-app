@@ -95,7 +95,7 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
 }
 
 function MeaningSegmentGlossPanel({ segment }: { segment: MeaningSegmentDisplay }) {
-  const joinedSourceWords = segment.sourceWords.join(' ').trim()
+  const joinedSourceWords = segment.sourceWords.join(' ')
 
   return (
     <div className="space-y-3">

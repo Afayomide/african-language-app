@@ -21,12 +21,12 @@ const SPELLING_CONTEXT_IMAGE =
 const MATCHING_DECORATIVE_IMAGE = '/images/stitch/matching-earth-ethos-pattern.png'
 
 function splitOptionText(option: string) {
-  const trimmed = String(option || '').trim()
-  const match = trimmed.match(/^(.*?)(\s*\(([^)]+)\))$/)
-  if (!match) return { primary: trimmed, secondary: '' }
+  const raw = String(option ?? '')
+  const match = raw.match(/^(.*?)(\s*\(([^)]+)\))$/)
+  if (!match) return { primary: raw, secondary: '' }
   return {
-    primary: match[1]?.trim() || trimmed,
-    secondary: match[3]?.trim() || '',
+    primary: match[1] ?? raw,
+    secondary: match[3] ?? '',
   }
 }
 
@@ -59,7 +59,7 @@ function renderPromptWithTrailingAccent(prompt: string) {
     <>
       {prefix}
       {':' + ' '}
-      <span className="text-[#a94600] italic">{rest.join(':').trim()}</span>
+      <span className="text-[#a94600] italic">{rest.join(':')}</span>
     </>
   )
 }
@@ -979,6 +979,8 @@ function WordOrderExerciseSurface({
   onAddSelectedWord: (wordIndex: number) => void
 }) {
   const isLetterOrderQuestion = exerciseData.subtype === 'fg-letter-order'
+  const renderOrderToken = (token: string) => (/^\s+$/.test(token) ? '' : token)
+  const describeOrderToken = (token: string) => (/^\s+$/.test(token) ? 'space' : token)
   const selectedSequence = selectedWords.map((wordIdx) => interactionWords[wordIdx] || '')
   const remainingWordSlots = Math.max(0, interactionWords.length - selectedWords.length)
   const promptAudioUrl = questionSentenceAudioUrl || exerciseData.source?.audio?.url
@@ -1053,8 +1055,9 @@ function WordOrderExerciseSurface({
                     className="flex h-16 w-16 items-center justify-center rounded-[1.1rem] bg-white font-display text-[1.8rem] font-black text-[#a94600] shadow-[0_8px_18px_rgba(57,56,47,0.08)] transition-all active:translate-y-0.5"
                     onClick={() => onRemoveSelectedWord(idx)}
                     disabled={isAnswered}
+                    aria-label={`Selected ${describeOrderToken(interactionWords[wordIdx] || '')}`}
                   >
-                    {interactionWords[wordIdx]}
+                    {renderOrderToken(interactionWords[wordIdx] || '')}
                   </button>
                 ))}
                 {Array.from({ length: remainingWordSlots }).map((_, index) => (
@@ -1079,8 +1082,9 @@ function WordOrderExerciseSurface({
                       )}
                       onClick={() => onAddSelectedWord(wordIndex)}
                       disabled={isAnswered || isUsed}
+                      aria-label={`Add ${describeOrderToken(word)}`}
                     >
-                      {word}
+                      {renderOrderToken(word)}
                     </button>
                   )
                 })}
@@ -1205,8 +1209,9 @@ function WordOrderExerciseSurface({
               )}
               onClick={() => onAddSelectedWord(wordIndex)}
               disabled={isAnswered || isUsed}
+              aria-label={isLetterOrderQuestion ? `Add ${describeOrderToken(word)}` : `Add ${word}`}
             >
-              {word}
+              {isLetterOrderQuestion ? renderOrderToken(word) : word}
             </button>
           )
         })}

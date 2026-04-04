@@ -19,7 +19,7 @@ function capitalizeLabel(value: string) {
 }
 
 function splitTranslationNote(input: string) {
-  const text = String(input || '').trim()
+  const text = String(input ?? '')
   if (!text) return { main: '', note: '' }
 
   const match = text.match(/^(.*?)(\s*\(([^)]+)\))$/)
@@ -28,8 +28,8 @@ function splitTranslationNote(input: string) {
   }
 
   return {
-    main: match[1]?.trim() || text,
-    note: match[3]?.trim() || '',
+    main: match[1] ?? text,
+    note: match[3] ?? '',
   }
 }
 

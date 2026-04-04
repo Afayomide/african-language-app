@@ -2,75 +2,15 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { LanguageSwitcher, type LearnerLanguageSummary } from '@/components/learner/language-switcher'
+import { LanguageSwitcher } from '@/components/learner/language-switcher'
+import type {
+  LearnerOverviewChapter as ChapterSummary,
+  LearnerOverviewData as DashboardData,
+  LearnerOverviewUnit as UnitSummary,
+  LearnerOverviewNextLesson,
+} from '@/hooks/queries/learner-overview'
 import type { Language } from '@/types'
 import { cn } from '@/lib/utils'
-
-type LessonSummary = {
-  id: string
-  title: string
-  description: string
-  level: string
-  orderIndex: number
-  status: 'not_started' | 'in_progress' | 'completed'
-  progressPercent: number
-  currentStageIndex?: number
-  totalStages?: number
-}
-
-type UnitSummary = {
-  id: string
-  chapterId?: string | null
-  title: string
-  description: string
-  level: string
-  orderIndex: number
-  progressPercent: number
-  completedLessons: number
-  totalLessons: number
-  lessons: LessonSummary[]
-}
-
-type ChapterSummary = {
-  id: string
-  title: string
-  description: string
-  level: string
-  orderIndex: number
-  progressPercent: number
-  completedUnits: number
-  totalUnits: number
-  status: 'current' | 'completed' | 'locked' | 'available'
-  units: UnitSummary[]
-}
-
-type DashboardData = {
-  stats: {
-    currentLanguage: string
-    streakDays: number
-    languageStreakDays?: number
-    totalXp: number
-    dailyGoalMinutes: number
-    todayMinutes: number
-    dailyProgressPercent?: number
-    courseProgressPercent?: number
-    completedLessonsCount?: number
-    totalLessonsCount?: number
-  }
-  learnerLanguages?: LearnerLanguageSummary[]
-  nextLesson: {
-    id: string
-    unitId?: string
-    unitTitle?: string
-    title: string
-    description: string
-    currentStageIndex?: number
-    totalStages?: number
-    progressPercent?: number
-    orderIndex?: number
-  } | null
-  chapters?: ChapterSummary[]
-}
 
 type Props = {
   data: DashboardData | null
@@ -107,7 +47,7 @@ function computeChapterProgress(chapters: ChapterSummary[]) {
   return Math.round((totals.completed / totals.total) * 100)
 }
 
-function deriveCurrentChapter(chapters: ChapterSummary[], nextLesson: DashboardData['nextLesson']) {
+function deriveCurrentChapter(chapters: ChapterSummary[], nextLesson: LearnerOverviewNextLesson | null) {
   if (!chapters.length) return null
   if (nextLesson?.unitId) {
     const match = chapters.find((chapter) => chapter.units.some((unit) => unit.id === nextLesson.unitId))
@@ -116,7 +56,7 @@ function deriveCurrentChapter(chapters: ChapterSummary[], nextLesson: DashboardD
   return chapters.find((chapter) => chapter.status === 'current') || chapters.find((chapter) => chapter.progressPercent < 100) || chapters[0]
 }
 
-function deriveCurrentUnit(chapter: ChapterSummary | null, nextLesson: DashboardData['nextLesson']) {
+function deriveCurrentUnit(chapter: ChapterSummary | null, nextLesson: LearnerOverviewNextLesson | null) {
   if (!chapter?.units.length) return null
   if (nextLesson?.unitId) {
     const match = chapter.units.find((unit) => unit.id === nextLesson.unitId)
@@ -125,7 +65,7 @@ function deriveCurrentUnit(chapter: ChapterSummary | null, nextLesson: Dashboard
   return chapter.units.find((unit) => unit.progressPercent < 100) || chapter.units[0]
 }
 
-function deriveCurrentLesson(unit: UnitSummary | null, nextLesson: DashboardData['nextLesson']) {
+function deriveCurrentLesson(unit: UnitSummary | null, nextLesson: LearnerOverviewNextLesson | null) {
   if (!unit?.lessons.length) return null
   if (nextLesson?.id) {
     const match = unit.lessons.find((lesson) => lesson.id === nextLesson.id)
@@ -192,33 +132,33 @@ export function LanguageOverviewScreen({
     data?.stats.dailyProgressPercent ??
     (data?.stats.dailyGoalMinutes ? Math.min(100, Math.round((data.stats.todayMinutes / data.stats.dailyGoalMinutes) * 100)) : 0)
 
-  if (isLoading) {
-    return (
-      <main className="min-h-screen bg-[#fffbff] text-[#39382f]">
-        <div className="mx-auto flex min-h-screen max-w-[32rem] flex-col px-6 py-8 md:py-10">
-          <div className="mb-6 flex items-center justify-between rounded-full bg-[#fffdfa] px-2 py-2 shadow-sm">
-            <div className="h-10 w-10 animate-pulse rounded-full bg-[#f4ebe1]" />
-            <div className="h-5 w-32 animate-pulse rounded-full bg-[#f4ebe1]" />
-            <div className="h-8 w-14 animate-pulse rounded-full bg-[#f4ebe1]" />
-          </div>
-          <div className="animate-pulse rounded-[28px] bg-[#fdf9f1] p-6 shadow-sm">
-            <div className="mx-auto mb-4 h-20 w-20 rounded-2xl bg-[#ffdeac]" />
-            <div className="mx-auto h-7 w-40 rounded-full bg-[#ece8db]" />
-            <div className="mx-auto mt-3 h-4 w-56 rounded-full bg-[#ece8db]" />
-          </div>
-          <div className="relative mt-10 flex flex-1 flex-col items-center gap-8">
-            <div className="absolute bottom-0 top-0 w-3 rounded-full bg-[#ece8db]" />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className={cn('relative flex flex-col items-center', UNIT_OFFSETS[index % UNIT_OFFSETS.length])}>
-                <div className="h-20 w-20 rounded-full bg-[#ece8db] shadow-[0px_8px_0px_#d6d1c3]" />
-                <div className="mt-4 h-4 w-24 rounded-full bg-[#ece8db]" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <main className="min-h-screen bg-[#fffbff] text-[#39382f]">
+  //       <div className="mx-auto flex min-h-screen max-w-[32rem] flex-col px-6 py-8 md:py-10">
+  //         <div className="mb-6 flex items-center justify-between rounded-full bg-[#fffdfa] px-2 py-2 shadow-sm">
+  //           <div className="h-10 w-10 animate-pulse rounded-full bg-[#f4ebe1]" />
+  //           <div className="h-5 w-32 animate-pulse rounded-full bg-[#f4ebe1]" />
+  //           <div className="h-8 w-14 animate-pulse rounded-full bg-[#f4ebe1]" />
+  //         </div>
+  //         <div className="animate-pulse rounded-[28px] bg-[#fdf9f1] p-6 shadow-sm">
+  //           <div className="mx-auto mb-4 h-20 w-20 rounded-2xl bg-[#ffdeac]" />
+  //           <div className="mx-auto h-7 w-40 rounded-full bg-[#ece8db]" />
+  //           <div className="mx-auto mt-3 h-4 w-56 rounded-full bg-[#ece8db]" />
+  //         </div>
+  //         <div className="relative mt-10 flex flex-1 flex-col items-center gap-8">
+  //           <div className="absolute bottom-0 top-0 w-3 rounded-full bg-[#ece8db]" />
+  //           {Array.from({ length: 4 }).map((_, index) => (
+  //             <div key={index} className={cn('relative flex flex-col items-center', UNIT_OFFSETS[index % UNIT_OFFSETS.length])}>
+  //               <div className="h-20 w-20 rounded-full bg-[#ece8db] shadow-[0px_8px_0px_#d6d1c3]" />
+  //               <div className="mt-4 h-4 w-24 rounded-full bg-[#ece8db]" />
+  //             </div>
+  //           ))}
+  //         </div>
+  //       </div>
+  //     </main>
+  //   )
+  // }
 
   return (
     <main className="min-h-screen bg-[#fffbff] text-[#39382f]">
