@@ -50,6 +50,8 @@ export type LessonStageProgress = {
   completedAt?: string | Date;
 };
 
+export type LessonKind = "core" | "review";
+
 export type PopulatedLessonBlock = 
   | { type: "text"; content: string }
   | { type: "content"; contentType: "word" | "expression" | "sentence"; data: LearningContent }
@@ -179,6 +181,7 @@ export interface Lesson {
   title: string;
   language: Language;
   level: Level;
+  kind?: LessonKind;
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;

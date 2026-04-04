@@ -1,6 +1,6 @@
-import { CheckCircle2, GripVertical, Languages, Lightbulb, Loader2, Mic, Volume2 } from 'lucide-react'
+import { CheckCircle2, GripVertical, Languages, Lightbulb, Loader2, Mic, Turtle, Volume2 } from 'lucide-react'
 import type { ExerciseQuestion, LearningContentComponent, QuestionMatchingDisplayItem } from '../../types'
-import { SentenceContentDisplay, SentenceMeaningDisplay } from './SentenceDisplay'
+import { SentenceContentDisplay, SentenceGlossToken, SentenceMeaningDisplay } from './SentenceDisplay'
 import { cx } from './StudyUi'
 
 type AudioPlayerFn = (url?: string, speed?: number, onEnd?: () => void) => void
@@ -34,10 +34,14 @@ function renderPromptText({
   renderedPrompt,
   renderedPromptParts,
   sourceText,
+  inlineSourceComponent,
+  disableInlineGloss,
 }: {
   renderedPrompt: string
   renderedPromptParts: string[]
   sourceText: string
+  inlineSourceComponent?: LearningContentComponent | null
+  disableInlineGloss?: boolean
 }) {
   if (!sourceText || renderedPromptParts.length <= 1) return renderedPrompt
 
@@ -45,7 +49,18 @@ function renderPromptText({
     <span key={`prompt-part-${index}`}>
       {part}
       {index < renderedPromptParts.length - 1 ? (
-        <span className="border-b-2 border-dashed border-[#ffbe9b] text-[#a94600] italic">{sourceText}</span>
+        disableInlineGloss ? (
+          <span className="text-[#a94600]">{sourceText}</span>
+        ) : inlineSourceComponent ? (
+          <SentenceGlossToken
+            component={inlineSourceComponent}
+            buttonClassName="border-[#ffbe9b] px-0 font-medium text-[#a94600] hover:border-[#ffbe9b]"
+          >
+            {sourceText}
+          </SentenceGlossToken>
+        ) : (
+          <span className="border-b border-[#ffbe9b] text-[#a94600]">{sourceText}</span>
+        )
       ) : null}
     </span>
   ))
@@ -62,22 +77,6 @@ function renderPromptWithTrailingAccent(prompt: string) {
       <span className="text-[#a94600] italic">{rest.join(':')}</span>
     </>
   )
-}
-
-function getExerciseHint({
-  isListeningQuestion,
-  isContextResponseQuestion,
-  listeningSupportText,
-  choiceSupportText,
-}: {
-  isListeningQuestion: boolean
-  isContextResponseQuestion: boolean
-  listeningSupportText: string
-  choiceSupportText: string
-}) {
-  if (isContextResponseQuestion && choiceSupportText) return choiceSupportText
-  if (isListeningQuestion && listeningSupportText) return listeningSupportText
-  return 'Choose the closest meaning and pay attention to tone and context.'
 }
 
 function AudioCircleButton({
@@ -231,12 +230,13 @@ function TranslationExerciseSurface(props: {
   isShortViewport: boolean
   isListeningQuestion: boolean
   isContextResponseQuestion: boolean
+  isReviewLesson: boolean
   sourceText: string
   renderedPrompt: string
   renderedPromptParts: string[]
+  inlineSourceComponent: LearningContentComponent | null
   listeningHeading: string
   choiceSupportText: string
-  questionChipLabel: string
   questionSentenceText: string
   shouldShowMeaningSentenceCard: boolean
   meaningText: string
@@ -251,6 +251,7 @@ function TranslationExerciseSurface(props: {
   onPlayAudio: AudioPlayerFn
   onPlayClick: () => void
   onToggleListeningPrompt: () => void
+  onPlayListeningSlow: () => void
   onSelectOption: (index: number) => void
 }) {
   const {
@@ -258,12 +259,13 @@ function TranslationExerciseSurface(props: {
     isDesktopViewport,
     isListeningQuestion,
     isContextResponseQuestion,
+    isReviewLesson,
     sourceText,
     renderedPrompt,
     renderedPromptParts,
+    inlineSourceComponent,
     listeningHeading,
     choiceSupportText,
-    questionChipLabel,
     questionSentenceText,
     shouldShowMeaningSentenceCard,
     meaningText,
@@ -278,21 +280,34 @@ function TranslationExerciseSurface(props: {
     onPlayAudio,
     onPlayClick,
     onToggleListeningPrompt,
+    onPlayListeningSlow,
     onSelectOption,
   } = props
 
   const promptAudioUrl = isListeningQuestion ? listeningAudioUrl : questionSentenceAudioUrl || exerciseData.source?.audio?.url
-  const hintText = getExerciseHint({
-    isListeningQuestion,
-    isContextResponseQuestion,
-    listeningSupportText,
-    choiceSupportText,
-  })
+  const isSimplePromptChoiceQuestion = !isListeningQuestion && !isContextResponseQuestion
+  const taskLabel =
+    exerciseData.subtype === 'mc-select-translation'
+      ? exerciseData.source?.kind === 'sentence' || questionSentenceText
+        ? 'Translate this sentence'
+        : exerciseData.source?.kind === 'expression'
+          ? 'Translate this expression'
+          : exerciseData.source?.kind === 'word'
+            ? 'Translate this word'
+            : 'Translate this'
+      : exerciseData.subtype === 'mc-select-missing-word'
+        ? 'Choose the missing word'
+        : exerciseData.subtype === 'fg-gap-fill'
+          ? 'Fill in the blank'
+          : ''
+  const usesSeparateSourceCard = isSimplePromptChoiceQuestion && Boolean(taskLabel)
   const headingText = isContextResponseQuestion
     ? 'Choose the best response'
     : isListeningQuestion
       ? listeningHeading
-      : renderPromptText({ renderedPrompt, renderedPromptParts, sourceText })
+      : usesSeparateSourceCard
+        ? taskLabel
+      : renderPromptText({ renderedPrompt, renderedPromptParts, sourceText, inlineSourceComponent, disableInlineGloss: isReviewLesson })
   const scenarioCard = isContextResponseQuestion ? (
     <div
       className={cx(
@@ -311,6 +326,72 @@ function TranslationExerciseSurface(props: {
       </p>
     </div>
   ) : null
+  const showListeningSentenceCard = Boolean(questionSentenceText) && !usesSeparateSourceCard && !(listeningPromptDetail && questionSentenceText === listeningPromptDetail)
+  const listeningControls = isListeningQuestion && promptAudioUrl ? (
+    <div className={cx('flex items-center justify-center gap-3', isDesktopViewport ? 'pt-1' : 'pt-0')}>
+      <AudioCircleButton
+        onClick={() => {
+          onPlayClick()
+          onToggleListeningPrompt()
+        }}
+        isSquare
+        pulse={isPlayingPrompt}
+        ariaLabel="Play listening prompt audio"
+      />
+      <button
+        type="button"
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-[#f1eee2] text-[#8b3900] shadow-[0_10px_24px_rgba(57,56,47,0.05)] transition-all hover:bg-[#ece8db] active:scale-95"
+        onClick={() => {
+          onPlayClick()
+          onPlayListeningSlow()
+        }}
+        aria-label="Play listening prompt slowly"
+      >
+        <Turtle className="h-6 w-6" />
+      </button>
+    </div>
+  ) : null
+  const translationSourceCard = usesSeparateSourceCard ? (
+    <div
+      className={cx(
+        'rounded-[1.65rem] border border-[#efe4d8] bg-white shadow-[0_10px_24px_rgba(57,56,47,0.04)]',
+        isDesktopViewport ? 'p-5 lg:p-6' : 'p-4',
+      )}
+    >
+      {questionSentenceText ? (
+        questionSentenceComponents.length > 0 ? (
+          <SentenceContentDisplay
+            text={questionSentenceText}
+            components={questionSentenceComponents}
+            audioUrl={questionSentenceAudioUrl}
+            disableGloss={isReviewLesson}
+            onPlayAudio={onPlayAudio}
+          />
+        ) : (
+          <p className={cx('text-center font-display font-black tracking-[-0.03em] text-[#191713]', isDesktopViewport ? 'text-3xl' : 'text-2xl')}>
+            {questionSentenceText}
+          </p>
+        )
+      ) : (
+        <div className={cx('flex items-center justify-center', isDesktopViewport ? 'gap-5' : 'gap-4')}>
+          {promptAudioUrl ? (
+            <AudioCircleButton
+              onClick={() => {
+                onPlayClick()
+                onPlayAudio(promptAudioUrl)
+              }}
+              isSquare={!isDesktopViewport}
+              isLarge={isDesktopViewport}
+              ariaLabel="Play source audio"
+            />
+          ) : null}
+          <p className={cx('text-center font-display font-black tracking-[-0.05em] text-[#191713]', isDesktopViewport ? 'text-[3rem] leading-[1.02]' : 'text-[2.25rem] leading-[1.08]')}>
+            {sourceText}
+          </p>
+        </div>
+      )}
+    </div>
+  ) : null
 
   if (isDesktopViewport) {
     return (
@@ -318,16 +399,13 @@ function TranslationExerciseSurface(props: {
         <div className="rounded-[2rem] border border-[#efe4d8] bg-[#fdf9f1] px-8 py-8 shadow-[0_20px_44px_rgba(57,56,47,0.06)] lg:px-10 lg:py-10">
           <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl space-y-4">
-                <span className="inline-flex rounded-full bg-[#ffdeac] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#6e4b00]">
-                  {questionChipLabel}
-                </span>
+              <div className="max-w-3xl">
                 <h2 className="font-display text-[2.3rem] font-extrabold leading-[1.06] tracking-[-0.04em] text-[#191713] lg:text-[3.35rem]">
                   {headingText}
                 </h2>
               </div>
 
-              {promptAudioUrl && !isContextResponseQuestion ? (
+              {promptAudioUrl && !isContextResponseQuestion && !usesSeparateSourceCard && !isListeningQuestion ? (
                 <AudioCircleButton
                   onClick={() => {
                     onPlayClick()
@@ -342,6 +420,8 @@ function TranslationExerciseSurface(props: {
             </div>
 
             {scenarioCard}
+            {listeningControls}
+            {translationSourceCard}
 
             {listeningPromptDetail ? (
               <div className="max-w-xl rounded-[1.4rem] border border-[#efe4d8] bg-white px-5 py-4">
@@ -350,7 +430,7 @@ function TranslationExerciseSurface(props: {
               </div>
             ) : null}
 
-            {questionSentenceText ? (
+            {showListeningSentenceCard ? (
               <div className="rounded-[1.7rem] border border-[#efe4d8] bg-white p-5 lg:p-6">
                 {shouldShowMeaningSentenceCard ? (
                   <SentenceMeaningDisplay
@@ -393,11 +473,6 @@ function TranslationExerciseSurface(props: {
                 />
               ))}
             </div>
-
-            <div className="flex items-start gap-3 pt-2 text-[#7d7467]">
-              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-[#86745c]" />
-              <p className="text-sm font-medium italic leading-relaxed">{hintText}</p>
-            </div>
           </div>
         </div>
       </section>
@@ -407,13 +482,8 @@ function TranslationExerciseSurface(props: {
   return (
     <section className="mx-auto w-full max-w-md space-y-6 pt-1">
       <header className="space-y-4">
-        <div className="flex items-center gap-4">
-          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-[#a94600]">{questionChipLabel}</span>
-          <div className="h-px flex-1 bg-[#ddd2c2]" />
-        </div>
-
         <div className="flex items-start gap-4">
-          {promptAudioUrl && !isContextResponseQuestion ? (
+          {promptAudioUrl && !isContextResponseQuestion && !usesSeparateSourceCard && !isListeningQuestion ? (
             <AudioCircleButton
               onClick={() => {
                 onPlayClick()
@@ -439,6 +509,8 @@ function TranslationExerciseSurface(props: {
       </header>
 
       {scenarioCard}
+      {listeningControls}
+      {translationSourceCard}
 
       {listeningPromptDetail ? (
         <div className="rounded-[1.35rem] bg-[#f1eee2] px-4 py-3 text-sm font-semibold text-[#5f5951]">
@@ -446,7 +518,7 @@ function TranslationExerciseSurface(props: {
         </div>
       ) : null}
 
-      {questionSentenceText ? (
+      {showListeningSentenceCard ? (
         <div className="rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]">
           {shouldShowMeaningSentenceCard ? (
             <SentenceMeaningDisplay
@@ -486,11 +558,6 @@ function TranslationExerciseSurface(props: {
             }}
           />
         ))}
-      </div>
-
-      <div className="flex items-center gap-3 rounded-[1rem] bg-[#f1eee2] px-4 py-3 text-[#6f6558] shadow-[0_8px_20px_rgba(57,56,47,0.04)]">
-        <Lightbulb className="h-4 w-4 shrink-0 text-[#416f39]" />
-        <p className="text-xs font-medium leading-tight">{hintText}</p>
       </div>
     </section>
   )
@@ -533,8 +600,7 @@ function SpeakingExerciseSurface({
     return (
       <section className="mx-auto w-full max-w-5xl space-y-10 pt-4">
         <div className="text-center">
-          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Speaking Practice</span>
-          <h2 className="mt-3 font-display text-[2.45rem] font-extrabold italic tracking-[-0.04em] text-[#191713]">
+          <h2 className="font-display text-[2.45rem] font-extrabold italic tracking-[-0.04em] text-[#191713]">
             Listen and repeat
           </h2>
         </div>
@@ -627,10 +693,6 @@ function SpeakingExerciseSurface({
 
   return (
     <section className="mx-auto w-full max-w-md space-y-8 pt-8">
-      <div className="text-center">
-        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Speak this phrase</span>
-      </div>
-
       <div className="mx-auto w-full max-w-sm rounded-[2rem] bg-[#fdf9f1] px-8 py-10 text-center shadow-[0_18px_38px_rgba(57,56,47,0.06)]">
         <h3 className="font-display text-[3.2rem] font-extrabold tracking-[-0.06em] text-[#191713]">{speakingTarget.text}</h3>
         {meaningText ? <p className="mt-2 text-xl text-[#66655a]">{meaningText}</p> : null}
@@ -1007,6 +1069,7 @@ function WordOrderExerciseSurface({
   onAddSelectedWord: (wordIndex: number) => void
 }) {
   const isLetterOrderQuestion = exerciseData.subtype === 'fg-letter-order'
+  const taskLabel = isLetterOrderQuestion ? 'Arrange the letters' : 'Arrange the words'
   const renderOrderToken = (token: string) => (/^\s+$/.test(token) ? '' : token)
   const describeOrderToken = (token: string) => (/^\s+$/.test(token) ? 'space' : token)
   const selectedSequence = selectedWords.map((wordIdx) => interactionWords[wordIdx] || '')
@@ -1037,17 +1100,20 @@ function WordOrderExerciseSurface({
         <p className="text-center font-display text-2xl font-black tracking-[-0.03em] text-[#191713]">{questionSentenceText}</p>
       )}
     </div>
+  ) : meaningText ? (
+    <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
+      <p className={cx('text-center font-display font-black tracking-[-0.03em] text-[#191713]', isDesktopViewport ? 'text-3xl' : 'text-2xl')}>
+        {meaningText}
+      </p>
+    </div>
   ) : null
 
   if (isDesktopViewport) {
     return (
       <section className="mx-auto w-full max-w-4xl space-y-8 pt-2">
-        <div className="space-y-4 text-center">
-          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">
-            {isLetterOrderQuestion ? 'Spelling Exercise' : 'Word Order'}
-          </span>
+        <div className="text-center">
           <h2 className="font-display text-[2.25rem] font-bold leading-[1.15] tracking-[-0.04em] text-[#191713]">
-            {renderPromptWithTrailingAccent(renderedPrompt)}
+            {taskLabel}
           </h2>
         </div>
 
@@ -1166,12 +1232,9 @@ function WordOrderExerciseSurface({
 
   return (
     <section className="mx-auto w-full max-w-md space-y-8 pt-1">
-      <div className="space-y-3">
-        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8a7d70]">
-          {isLetterOrderQuestion ? 'Word Focus' : 'Word Order'}
-        </span>
+      <div>
         <h2 className="font-display text-[2rem] font-bold leading-[1.12] tracking-[-0.04em] text-[#191713]">
-          {renderPromptWithTrailingAccent(renderedPrompt)}
+          {taskLabel}
         </h2>
       </div>
 
@@ -1260,6 +1323,8 @@ export function ExerciseBlock({
   isChoiceQuestion,
   isMatchingQuestion,
   isWordOrderQuestion,
+  isReviewLesson,
+  inlineSourceComponent,
   sourceText,
   renderedPrompt,
   renderedPromptParts,
@@ -1317,6 +1382,7 @@ export function ExerciseBlock({
   isChoiceQuestion: boolean
   isMatchingQuestion: boolean
   isWordOrderQuestion: boolean
+  isReviewLesson: boolean
   inlineSourceComponent: LearningContentComponent | null
   sourceText: string
   renderedPrompt: string
@@ -1364,15 +1430,6 @@ export function ExerciseBlock({
   onRemoveSelectedWord: (selectedIndex: number) => void
   onAddSelectedWord: (wordIndex: number) => void
 }) {
-  const sourceKind = exerciseData.source?.kind || exerciseData.sourceType
-  const questionChipLabel = isListeningQuestion
-    ? 'Translation Task'
-    : sourceKind === 'sentence'
-      ? 'Sentence Focus'
-      : sourceKind === 'expression'
-        ? 'Expression Focus'
-        : 'Word Focus'
-
   void isUltraShortViewport
   void isShortViewport
   void speakingFeedback
@@ -1389,12 +1446,13 @@ export function ExerciseBlock({
           isShortViewport={isShortViewport}
           isListeningQuestion={isListeningQuestion}
           isContextResponseQuestion={isContextResponseQuestion}
+          isReviewLesson={isReviewLesson}
           sourceText={sourceText}
           renderedPrompt={renderedPrompt}
           renderedPromptParts={renderedPromptParts}
+          inlineSourceComponent={inlineSourceComponent}
           listeningHeading={listeningHeading}
           choiceSupportText={choiceSupportText}
-          questionChipLabel={questionChipLabel}
           questionSentenceText={questionSentenceText}
           shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
           meaningText={meaningText}
@@ -1409,6 +1467,7 @@ export function ExerciseBlock({
           onPlayAudio={onPlayAudio}
           onPlayClick={onPlayClick}
           onToggleListeningPrompt={onToggleListeningPrompt}
+          onPlayListeningSlow={onPlayListeningSlow}
           onSelectOption={onSelectOption}
         />
       ) : null}

@@ -173,7 +173,7 @@ function buildReviewFallback(question: {
   const sentence = String(question.reviewData?.sentence || question.source?.text || "").trim();
   const meaning = String(question.reviewData?.meaning || question.source?.translation || "").trim();
   const existingWords = Array.isArray(question.reviewData?.words)
-    ? question.reviewData?.words?.map((w) => String(w).trim()).filter(Boolean)
+    ? question.reviewData.words.map((w) => String(w)).filter((w) => w.length > 0)
     : [];
   const words = existingWords && existingWords.length > 1 ? existingWords : sentence.split(" ").filter(Boolean);
   const providedOrder = Array.isArray(question.reviewData?.correctOrder)
@@ -1042,7 +1042,7 @@ export class LearnerLessonUseCases {
         originalQuestion.type === "matching"
           ? buildMatchingInteractionData(originalQuestion)
           : originalQuestion.reviewData
-            ? {
+              ? {
                 ...buildReviewFallback({
                   source: sourceDisplay ? { text: sourceDisplay.text, translation: selectedTranslation } : undefined,
                   reviewData: originalQuestion.reviewData

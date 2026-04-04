@@ -11,7 +11,8 @@ export function StudyFooter({
   explanation,
   canCheck,
   canCheckSpeaking,
-  isSpeakingBusy,
+  isRecordingSpeech,
+  isCheckingSpeakingAnswer,
   isSavingStage,
   isShortViewport,
   isUltraShortViewport,
@@ -29,7 +30,8 @@ export function StudyFooter({
   explanation?: string
   canCheck: boolean
   canCheckSpeaking?: boolean
-  isSpeakingBusy?: boolean
+  isRecordingSpeech?: boolean
+  isCheckingSpeakingAnswer?: boolean
   isSavingStage: boolean
   isShortViewport: boolean
   isUltraShortViewport: boolean
@@ -39,7 +41,7 @@ export function StudyFooter({
   onNext: () => void
 }) {
   const statusLabel = isSpeakingQuestion ? (isCorrect ? 'Passed.' : 'Not quite. Try again.') : answerStatusLabel
-  const showStatus = isAnswered || Boolean(isSpeakingBusy)
+  const showStatus = isAnswered || Boolean(isCheckingSpeakingAnswer)
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-[#fffbff] via-[#fffbff]/94 to-transparent">
@@ -68,7 +70,7 @@ export function StudyFooter({
                     isAnswered ? (isCorrect ? 'text-[#2d7c37]' : 'text-[#b23d21]') : 'text-[#8a7d70]',
                   )}
                 >
-                  {isSpeakingBusy ? (
+                  {isCheckingSpeakingAnswer ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : isAnswered ? (
                     isCorrect ? <Check className="h-5 w-5 stroke-[3px]" /> : <X className="h-5 w-5 stroke-[3px]" />
@@ -78,7 +80,7 @@ export function StudyFooter({
                 </div>
                 <div className="min-w-0">
                   <p className={cx('font-display font-black leading-tight', isUltraShortViewport ? 'text-sm' : isShortViewport ? 'text-base' : 'text-lg')}>
-                    {isSpeakingBusy ? 'Checking your answer...' : statusLabel}
+                    {isCheckingSpeakingAnswer ? 'Checking your answer...' : statusLabel}
                   </p>
                   {isAnswered && !isCorrect && explanation && !isVeryShortViewport ? (
                     <p className={cx('mt-1 font-medium leading-relaxed opacity-90', isUltraShortViewport ? 'text-[11px]' : 'text-sm')}>{explanation}</p>
@@ -111,13 +113,13 @@ export function StudyFooter({
                   className={cx(
                     'h-16 w-full max-w-3xl rounded-2xl font-display text-lg font-extrabold uppercase tracking-[0.05em]',
                     isUltraShortViewport && 'h-14 text-base',
-                    !(canCheckSpeaking && !isSpeakingBusy) && 'opacity-40 grayscale',
+                    (!(canCheckSpeaking && !isCheckingSpeakingAnswer) || isRecordingSpeech) && 'opacity-40 grayscale',
                   )}
                   onClick={onCheckSpeaking}
-                  disabled={!canCheckSpeaking || Boolean(isSpeakingBusy)}
+                  disabled={!canCheckSpeaking || Boolean(isCheckingSpeakingAnswer) || Boolean(isRecordingSpeech)}
                 >
-                  {isSpeakingBusy ? 'Checking...' : 'Check Answer'}
-                  {!isSpeakingBusy ? <ArrowRight className="h-5 w-5" /> : null}
+                  {isCheckingSpeakingAnswer ? 'Checking...' : 'Check Answer'}
+                  {!isCheckingSpeakingAnswer ? <ArrowRight className="h-5 w-5" /> : null}
                 </Button>
               ) : (
                 <Button

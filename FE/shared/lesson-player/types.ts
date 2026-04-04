@@ -27,6 +27,7 @@ export type Lesson = {
   title: string;
   language: Language;
   level: Level;
+  kind?: "core" | "review";
   description: string;
   topics: string[];
   proverbs: Array<{ text: string; translation: string; contextNote: string }>;

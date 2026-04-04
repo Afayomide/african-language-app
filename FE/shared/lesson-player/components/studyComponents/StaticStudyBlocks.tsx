@@ -106,7 +106,6 @@ export function TeacherNoteBlock({
 }
 
 export function ContentStudyBlock({
-  contentEyebrow,
   content,
   language,
   isShortViewport,
@@ -115,7 +114,6 @@ export function ContentStudyBlock({
   onPlayAudio,
   onPlayClick,
 }: {
-  contentEyebrow: string
   content: LearningContent
   language?: Language
   isShortViewport: boolean
@@ -158,11 +156,7 @@ export function ContentStudyBlock({
       <div className={cx('mx-auto w-full', isDesktopLayout ? 'max-w-[64rem]' : 'max-w-[26rem]')}>
         <div className={cx(isDesktopLayout ? 'grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(315px,0.78fr)]' : 'space-y-8')}>
           <div className={cx(isDesktopLayout ? 'space-y-7 lg:pr-2' : 'space-y-6')}>
-            <div className={cx(isDesktopLayout ? 'space-y-3 text-left' : 'text-center')}>
-              <p className={cx('font-black uppercase text-[#8a7d70]', isDesktopLayout ? 'text-xs tracking-[0.24em]' : isUltraShortViewport ? 'text-[9px] tracking-[0.3em]' : isShortViewport ? 'text-[10px] tracking-[0.32em]' : 'text-xs tracking-[0.34em]')}>
-                {contentEyebrow}
-              </p>
-
+            <div className={cx(isDesktopLayout ? 'text-left' : 'text-center')}>
               {isDesktopLayout ? (
                 content.kind === 'sentence' && Array.isArray(content.components) && content.components.length > 0 ? (
                   <div className="max-w-2xl pt-1">
@@ -304,9 +298,6 @@ export function ContentStudyBlock({
                   <p className="mt-1 text-sm italic text-white/85">{contextCopy}</p>
                 </div>
               </div>
-              <div className="absolute -right-5 -top-3 rounded-full bg-[#ffdeac] px-5 py-3 text-[11px] font-black tracking-tight text-[#6e4b00] shadow-[0_12px_24px_rgba(134,93,0,0.15)] -rotate-6">
-                {content.pronunciation ? 'Grammar Tip: Tones Matter! ↗ ↘' : 'Grammar Tip: Listen Closely'}
-              </div>
             </div>
           ) : null}
         </div>
@@ -328,11 +319,7 @@ export function ContentStudyBlock({
               </div>
             ))}
           </div>
-        ) : (
-          <p className={cx('mt-8 text-center text-[#8a7d70]/80', isUltraShortViewport ? 'px-6 text-[11px] leading-relaxed' : isShortViewport ? 'px-10 text-sm leading-relaxed' : 'px-16 text-sm leading-relaxed')}>
-            Repeat this phrase aloud to perfect your tone and rhythm.
-          </p>
-        )}
+        ) : null}
       </div>
     </section>
   )

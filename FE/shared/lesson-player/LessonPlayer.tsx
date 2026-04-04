@@ -337,13 +337,7 @@ export function LessonPlayer({
   const matchingRightItems: QuestionMatchingDisplayItem[] =
     exerciseData?.interactionData?.rightItems?.length ? exerciseData.interactionData.rightItems : matchingFallback.rightItems
   const questionSource = exerciseData?.source || null
-  const currentContentKind = currentBlock?.type === 'content' ? currentBlock.data?.kind || 'expression' : null
-  const currentContentEyebrow =
-    currentContentKind === 'sentence'
-      ? 'Sentence Practice'
-      : currentContentKind === 'word'
-        ? 'Word Focus'
-        : 'New Expression'
+  const isReviewLesson = Boolean(lesson?.kind === 'review' || /^review\b/i.test(String(lesson?.title || '')))
   const sourceText = questionSource?.text || ''
   const promptText = exerciseData?.promptTemplate || exerciseData?.prompt || 'Choose the right answer'
   const isShortViewport = viewportHeight !== null && viewportHeight <= 860
@@ -864,7 +858,6 @@ export function LessonPlayer({
 
             {currentBlock.type === 'content' ? (
               <ContentStudyBlock
-                contentEyebrow={currentContentEyebrow}
                 content={currentBlock.data}
                 language={lesson?.language}
                 isShortViewport={isShortViewport}
@@ -896,6 +889,7 @@ export function LessonPlayer({
                 isChoiceQuestion={isChoiceQuestion}
                 isMatchingQuestion={isMatchingQuestion}
                 isWordOrderQuestion={isWordOrderQuestion}
+                isReviewLesson={isReviewLesson}
                 inlineSourceComponent={inlineSourceComponent}
                 sourceText={sourceText}
                 renderedPrompt={renderedPrompt}
@@ -994,7 +988,8 @@ export function LessonPlayer({
         explanation={exerciseData?.explanation}
         canCheck={canCheck}
         canCheckSpeaking={canCheckSpeaking}
-        isSpeakingBusy={Boolean(isRecordingSpeech || isComparingSpeech)}
+        isRecordingSpeech={isRecordingSpeech}
+        isCheckingSpeakingAnswer={isComparingSpeech}
         isSavingStage={isSavingStage}
         isShortViewport={isShortViewport}
         isUltraShortViewport={isUltraShortViewport}

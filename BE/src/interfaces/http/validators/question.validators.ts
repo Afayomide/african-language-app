@@ -149,7 +149,7 @@ export function parseQuestionMatchingPairs(interactionData: unknown, subtype: st
 
 export function parseQuestionOptions(options: unknown) {
   if (!Array.isArray(options)) return null;
-  const sanitized = options.map((item) => String(item).trim()).filter(Boolean);
+  const sanitized = options.map((item) => String(item)).filter((item) => item.length > 0);
   if (sanitized.length < 2) return null;
   return sanitized;
 }
@@ -216,7 +216,7 @@ export function parseQuestionReviewData(reviewData: unknown) {
   if (!sentence) return null;
 
   if (!Array.isArray(payload.words)) return null;
-  const words = payload.words.map((item) => String(item).trim()).filter(Boolean);
+  const words = payload.words.map((item) => String(item)).filter((item) => item.length > 0);
   if (words.length < 2) return null;
 
   if (!Array.isArray(payload.correctOrder)) return null;

@@ -155,12 +155,14 @@ export function InlineAudioButton({
   )
 }
 
-function SentenceGlossToken({
+export function SentenceGlossToken({
   component,
   children,
+  buttonClassName,
 }: {
   component: LearningContentComponent
   children: ReactNode
+  buttonClassName?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -168,7 +170,10 @@ function SentenceGlossToken({
     <span className="relative inline-flex items-center gap-1 align-baseline" onMouseLeave={() => setIsOpen(false)}>
       <button
         type="button"
-        className="inline rounded-none border-b border-[#d9c5b3] bg-transparent px-0.5 py-0 font-bold text-[#39382f] transition-colors hover:border-[#c8a88f] hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+        className={cx(
+          'inline rounded-none border-b border-[#d9c5b3] bg-transparent px-0.5 py-0 font-bold text-[#39382f] transition-colors hover:border-[#c8a88f] hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20',
+          buttonClassName,
+        )}
         onMouseEnter={() => setIsOpen(true)}
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -255,11 +260,13 @@ export function SentenceContentDisplay({
   text,
   components,
   audioUrl,
+  disableGloss = false,
   onPlayAudio,
 }: {
   text: string
   components: LearningContentComponent[]
   audioUrl?: string
+  disableGloss?: boolean
   onPlayAudio: AudioPlayerFn
 }) {
   const parts = useMemo(() => buildSentenceRenderParts(text, components), [text, components])
@@ -275,9 +282,15 @@ export function SentenceContentDisplay({
                 {part.text}
               </span>
             ) : (
-              <SentenceGlossToken key={`component-${part.component.id}-${index}`} component={part.component}>
-                {part.text}
-              </SentenceGlossToken>
+              disableGloss ? (
+                <span key={`component-${part.component.id}-${index}`} className="whitespace-pre-wrap text-[#191713]">
+                  {part.text}
+                </span>
+              ) : (
+                <SentenceGlossToken key={`component-${part.component.id}-${index}`} component={part.component}>
+                  {part.text}
+                </SentenceGlossToken>
+              )
             ),
           )}
         </div>
