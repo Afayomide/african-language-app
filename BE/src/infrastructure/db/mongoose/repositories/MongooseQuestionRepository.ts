@@ -96,6 +96,7 @@ export class MongooseQuestionRepository implements QuestionRepository {
 
   async list(filter: QuestionListFilter): Promise<QuestionEntity[]> {
     const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    if (filter.ids) query._id = { $in: filter.ids };
     if (filter.lessonId) query.lessonId = filter.lessonId;
     if (filter.lessonIds) query.lessonId = { $in: filter.lessonIds };
     if (filter.type) query.type = filter.type;
@@ -103,6 +104,16 @@ export class MongooseQuestionRepository implements QuestionRepository {
     if (filter.status) query.status = filter.status;
 
     const questions = await ExerciseQuestionModel.find(query).sort({ createdAt: -1 });
+    return questions.map(toEntity);
+  }
+
+  async listDeleted(filter: Pick<QuestionListFilter, "ids" | "lessonId" | "lessonIds">): Promise<QuestionEntity[]> {
+    const query: Record<string, unknown> = { isDeleted: true };
+    if (filter.ids) query._id = { $in: filter.ids };
+    if (filter.lessonId) query.lessonId = filter.lessonId;
+    if (filter.lessonIds) query.lessonId = { $in: filter.lessonIds };
+
+    const questions = await ExerciseQuestionModel.find(query).sort({ updatedAt: -1, createdAt: -1 });
     return questions.map(toEntity);
   }
 

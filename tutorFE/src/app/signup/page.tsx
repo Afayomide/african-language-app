@@ -7,24 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { Settings } from "lucide-react";
-import type { Language } from "@/types";
 
 export default function SignupPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [language, setLanguage] = useState<Language>("yoruba");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -41,7 +32,6 @@ export default function SignupPage() {
       const response = await authService.signup({
         email,
         password,
-        language,
         displayName
       });
 
@@ -65,7 +55,7 @@ export default function SignupPage() {
           <div className="space-y-2">
             <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">Tutor Signup</CardTitle>
             <CardDescription className="text-sm">
-              Create your tutor account. Admin activation is required before login.
+              Create your tutor account. After admin activation, you will choose the language you want to teach during onboarding.
             </CardDescription>
           </div>
         </CardHeader>
@@ -99,22 +89,6 @@ export default function SignupPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="language" className="ml-1 text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                Language
-              </Label>
-              <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yoruba">Yoruba</SelectItem>
-                  <SelectItem value="igbo">Igbo</SelectItem>
-                  <SelectItem value="hausa">Hausa</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">

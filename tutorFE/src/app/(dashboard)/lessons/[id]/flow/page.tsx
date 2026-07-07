@@ -43,6 +43,14 @@ type EditableContent = Word | Expression | Sentence
 
 type SavingState = Record<string, boolean>
 
+type HydratedGlossComponent = {
+  id: string
+  kind: "word" | "expression"
+  text: string
+  translations: string[]
+  explanation?: string
+}
+
 const CHOICE_SUBTYPES = new Set<QuestionSubtype>([
   "mc-select-translation",
   "mc-select-context-response",
@@ -107,6 +115,51 @@ function fromCsv(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function GlossPreview({
+  title,
+  components,
+}: {
+  title?: string
+  components: HydratedGlossComponent[]
+}) {
+  if (components.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-primary/15 bg-primary/5 p-3 space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+        {title || "Component gloss"}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {components.map((component) => (
+          <span key={`${component.kind}:${component.id}:${component.text}`} className="group relative inline-flex">
+            <span className="inline-flex cursor-help items-center rounded-full border border-primary/25 bg-background px-3 py-1 text-sm font-semibold text-foreground transition-colors group-hover:border-primary/45 group-hover:bg-primary/5">
+              {component.text}
+            </span>
+            <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-56 -translate-x-1/2 rounded-xl border bg-background px-3 py-2 text-left shadow-xl group-hover:block">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {component.kind}
+              </span>
+              <span className="mt-1 block text-sm font-semibold text-foreground">
+                {component.translations[0] || "No translation"}
+              </span>
+              {component.translations.length > 1 ? (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {component.translations.slice(1).join(" | ")}
+                </span>
+              ) : null}
+              {component.explanation ? (
+                <span className="mt-2 block text-xs text-muted-foreground">
+                  {component.explanation}
+                </span>
+              ) : null}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function matchingPairsFromQuestion(question: ExerciseQuestion): MatchingEditablePair[] {
@@ -202,6 +255,23 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
     if (type === "word") return wordMap.get(refId) || null
     if (type === "sentence") return sentenceMap.get(refId) || null
     return expressionMap.get(refId) || null
+  }
+
+  function hydrateContentComponents(content: EditableContent | null): HydratedGlossComponent[] {
+    if (!content || !("components" in content) || !Array.isArray(content.components)) return []
+
+    return content.components.reduce<HydratedGlossComponent[]>((acc, component) => {
+        const source = component.type === "word" ? wordMap.get(component.refId) : expressionMap.get(component.refId)
+        if (!source) return acc
+        acc.push({
+          id: source._id,
+          kind: component.type,
+          text: component.textSnapshot || source.text,
+          translations: source.translations || [],
+          explanation: source.explanation || ""
+        })
+        return acc
+      }, [])
   }
 
   function updateStages(next: LessonStage[]) {
@@ -642,9 +712,11 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                 const question = block.type === "question" ? questionMap.get(block.refId) || null : null
                 const proverb = block.type === "proverb" ? proverbMap.get(block.refId) || null : null
                 const linkedContent = block.type === "content" ? getContentByType(block.contentType, block.refId) : null
+                const linkedContentComponents = hydrateContentComponents(linkedContent)
                 const questionSourceId = question ? getQuestionSourceId(question) : ""
                 const questionSourceType = question ? getQuestionSourceType(question) : "expression"
                 const questionSource = question && questionSourceId ? getContentByType(questionSourceType, questionSourceId) : null
+                const questionSourceComponents = hydrateContentComponents(questionSource)
                 const questionMatchingPairs = question ? matchingPairsFromQuestion(question) : []
 
                 return (
@@ -813,6 +885,12 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                                 placeholder="Explanation"
                                 className="min-h-[88px]"
                               />
+                              {linkedContentComponents.length > 0 ? (
+                                <GlossPreview
+                                  title={`${block.contentType} gloss preview`}
+                                  components={linkedContentComponents}
+                                />
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -938,6 +1016,12 @@ export default function LessonFlowPage({ params }: { params: Promise<{ id: strin
                                       </SelectContent>
                                     </Select>
                                   )}
+                                  {questionSourceComponents.length > 0 ? (
+                                    <GlossPreview
+                                      title="Question source gloss preview"
+                                      components={questionSourceComponents}
+                                    />
+                                  ) : null}
                                 </>
                               )}
 

@@ -72,10 +72,10 @@ type LessonDisplayContent = {
   };
   selectedTranslation: string;
   selectedTranslationIndex: number;
-  components?: LessonDisplaySentenceComponent[];
+  components?: LessonDisplayComponent[];
 };
 
-type LessonDisplaySentenceComponent = {
+type LessonDisplayComponent = {
   id: string;
   kind: "word" | "expression";
   text: string;
@@ -271,6 +271,10 @@ function getQuestionSourceRef(question: QuestionEntity): { type: ContentType; id
   return null;
 }
 
+function contentSupportsDisplayComponents(entity: ResolvedContentEntity) {
+  return entity.kind === "sentence" || entity.kind === "expression";
+}
+
 function toDisplayContent(
   entity: ResolvedContentEntity,
   selectedTranslationIndex: number,
@@ -279,11 +283,11 @@ function toDisplayContent(
   const translations = Array.isArray(entity.translations) ? entity.translations : [];
   const selectedTranslation = getTranslationByIndex(translations, selectedTranslationIndex);
   const components =
-    entity.kind === "sentence" && resolvedContentMap
+    contentSupportsDisplayComponents(entity) && resolvedContentMap
       ? entity.components
           .slice()
           .sort((left, right) => left.orderIndex - right.orderIndex)
-          .reduce<LessonDisplaySentenceComponent[]>((acc, component) => {
+          .reduce<LessonDisplayComponent[]>((acc, component) => {
             const resolved = resolvedContentMap.get(`${component.type}:${component.refId}`);
             if (!resolved || resolved.kind === "sentence") return acc;
             acc.push({
@@ -838,16 +842,16 @@ export class LearnerLessonUseCases {
     });
 
     const resolvedContentMap = await this.contentLookup.findMany(allContentRefs);
-    const sentenceComponentRefs = Array.from(
+    const nestedComponentRefs = Array.from(
       new Map(
         Array.from(resolvedContentMap.values())
-          .filter((item): item is Extract<ResolvedContentEntity, { kind: "sentence" }> => item.kind === "sentence")
+          .filter((item): item is Extract<ResolvedContentEntity, { kind: "sentence" | "expression" }> => contentSupportsDisplayComponents(item))
           .flatMap((item) => item.components.map((component) => [`${component.type}:${component.refId}`, { type: component.type, id: component.refId }] as const))
       ).values()
     );
-    if (sentenceComponentRefs.length > 0) {
-      const sentenceComponentMap = await this.contentLookup.findMany(sentenceComponentRefs);
-      for (const [key, value] of sentenceComponentMap.entries()) {
+    if (nestedComponentRefs.length > 0) {
+      const nestedComponentMap = await this.contentLookup.findMany(nestedComponentRefs);
+      for (const [key, value] of nestedComponentMap.entries()) {
         resolvedContentMap.set(key, value);
       }
     }
@@ -1379,16 +1383,16 @@ export class LearnerLessonUseCases {
 
     // 4. Fetch all content
     const resolvedContentMap = await this.contentLookup.findMany(allContentRefs);
-    const sentenceComponentRefs = Array.from(
+    const nestedComponentRefs = Array.from(
       new Map(
         Array.from(resolvedContentMap.values())
-          .filter((item): item is Extract<ResolvedContentEntity, { kind: "sentence" }> => item.kind === "sentence")
+          .filter((item): item is Extract<ResolvedContentEntity, { kind: "sentence" | "expression" }> => contentSupportsDisplayComponents(item))
           .flatMap((item) => item.components.map((component) => [`${component.type}:${component.refId}`, { type: component.type, id: component.refId }] as const))
       ).values()
     );
-    if (sentenceComponentRefs.length > 0) {
-      const sentenceComponents = await this.contentLookup.findMany(sentenceComponentRefs);
-      for (const [key, value] of sentenceComponents.entries()) {
+    if (nestedComponentRefs.length > 0) {
+      const nestedComponents = await this.contentLookup.findMany(nestedComponentRefs);
+      for (const [key, value] of nestedComponents.entries()) {
         resolvedContentMap.set(key, value);
       }
     }

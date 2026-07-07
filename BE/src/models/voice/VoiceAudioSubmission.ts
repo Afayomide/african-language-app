@@ -5,6 +5,7 @@ import {
   CONTENT_AUDIO_WORKFLOW_STATUS_VALUES,
   ContentAudioSchema
 } from "../shared/contentFields.js";
+import { LANGUAGE_VALUES } from "../../domain/entities/Lesson.js";
 
 const CONTENT_TYPE_VALUES = ["word", "expression", "sentence"] as const;
 
@@ -19,7 +20,7 @@ const VoiceAudioSubmissionSchema = new Schema(
       required: true,
       index: true
     },
-    language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
+    language: { type: String, enum: [...LANGUAGE_VALUES], required: true, index: true },
     audio: {
       type: ContentAudioSchema,
       required: true,

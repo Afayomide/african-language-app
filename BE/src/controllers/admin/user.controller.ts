@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import UserModel from "../../models/User.js";
 import TutorProfileModel from "../../models/tutor/TutorProfile.js";
 import VoiceArtistProfileModel from "../../models/voice/VoiceArtistProfile.js";
+import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import {
   getSearchQuery,
   parsePaginationQuery
@@ -157,15 +158,34 @@ export async function assignUserRole(req: Request, res: Response) {
   user.roles = nextRoles;
   await user.save();
 
-  if (role === "tutor" || role === "voice_artist") {
-    const profileModel = role === "tutor" ? TutorProfileModel : VoiceArtistProfileModel;
-    const existingProfile = await profileModel.findOne({ userId: id }).lean();
+  if (role === "tutor") {
+    const existingProfile = await TutorProfileModel.findOne({ userId: id }).lean();
     const finalLanguage = language || existingProfile?.language;
-    if (!finalLanguage || !["yoruba", "igbo", "hausa"].includes(finalLanguage)) {
+    if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
       return res.status(400).json({ error: "A valid language is required for tutor or voice artist." });
     }
 
-    await profileModel.findOneAndUpdate(
+    await TutorProfileModel.findOneAndUpdate(
+      { userId: id },
+      {
+        $set: {
+          language: finalLanguage,
+          displayName,
+          isActive: existingProfile?.isActive || false
+        }
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  if (role === "voice_artist") {
+    const existingProfile = await VoiceArtistProfileModel.findOne({ userId: id }).lean();
+    const finalLanguage = language || existingProfile?.language;
+    if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
+      return res.status(400).json({ error: "A valid language is required for tutor or voice artist." });
+    }
+
+    await VoiceArtistProfileModel.findOneAndUpdate(
       { userId: id },
       {
         $set: {
@@ -214,7 +234,7 @@ export async function activateUserRole(req: Request, res: Response) {
     role === "voice_artist" ? await VoiceArtistProfileModel.findOne({ userId: id }).lean() : null;
   const finalLanguage = language || existingTutor?.language || existingVoice?.language;
 
-  if (!finalLanguage || !["yoruba", "igbo", "hausa"].includes(finalLanguage)) {
+  if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
     return res.status(400).json({ error: "A valid language is required to activate this role." });
   }
 

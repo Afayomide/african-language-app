@@ -65,7 +65,18 @@ export class MongooseWordRepository implements WordRepository {
       Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
     }
     if (filter.status) query.status = filter.status;
+    if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const words = await WordModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
+    return words.map(toEntity);
+  }
+
+  async listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<WordEntity[]> {
+    const query: Record<string, unknown> = { isDeleted: true };
+    if (filter?.languageId || filter?.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (Array.isArray(filter?.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
+    const words = await WordModel.find(query).sort({ updatedAt: -1, createdAt: -1 }).lean();
     return words.map(toEntity);
   }
 
@@ -103,6 +114,15 @@ export class MongooseWordRepository implements WordRepository {
     const word = await WordModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
+    return word ? toEntity(word) : null;
+  }
+
+  async restoreById(id: string): Promise<WordEntity | null> {
+    const word = await WordModel.findOneAndUpdate(
+      { _id: id, isDeleted: true },
+      { isDeleted: false, deletedAt: null },
       { new: true }
     );
     return word ? toEntity(word) : null;

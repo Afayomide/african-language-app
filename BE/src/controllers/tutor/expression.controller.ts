@@ -364,7 +364,7 @@ export async function generateExpressionAudioById(req: AuthRequest, res: Respons
   if (!lesson) return res.status(404).json({ error: "lesson not found or out of scope" });
 
   try {
-    const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa", lessonId: lesson.id });
+    const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa" | "pidgin", lessonId: lesson.id });
     const updated = await expressionRepo.updateById(expression.id, { audio });
     if (!updated) return res.status(404).json({ error: "expression not found" });
     const [payload] = await hydrateExpressionPayloads([updated]);
@@ -391,7 +391,7 @@ export async function generateLessonExpressionsAudio(req: AuthRequest, res: Resp
 
   for (const expression of expressions) {
     try {
-      const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa", lessonId: lesson.id });
+      const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa" | "pidgin", lessonId: lesson.id });
       const updated = await expressionRepo.updateById(expression.id, { audio });
       if (updated) updatedIds.push(expression.id);
       else failedIds.push(expression.id);

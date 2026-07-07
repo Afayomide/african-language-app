@@ -24,6 +24,8 @@ export type UnitPlanLesson = {
   situations: string[];
   sentenceGoals: string[];
   focusSummary?: string;
+  targetWords?: Array<{ text: string; translations?: string[] }>;
+  targetExpressions?: Array<{ text: string; translations?: string[] }>;
 };
 
 export type UnitPlanSequenceLesson = UnitPlanLesson & {
@@ -51,8 +53,19 @@ type AppliedUnitContentResult = UnitContentResult | UnitRevisionResult;
 
 export type UnitContentPlanPreviewResult = {
   unitId: string;
+  mode?: "generate" | "regenerate";
+  createdBy?: string;
+  createdAt?: string;
   requestedLessons: number;
   actualLessonCount: number;
+  settings?: {
+    lessonCount: number;
+    sentencesPerLesson: number;
+    reviewContentPerLesson?: number;
+    proverbsPerLesson: number;
+    topics?: string[];
+    extraInstructions?: string;
+  };
   coreLessons: UnitPlanLesson[];
   lessonSequence: UnitPlanSequenceLesson[];
 };
@@ -68,6 +81,11 @@ type LessonRefactorResult = {
     rationale?: string;
     operations: Array<{ type: string }>;
   } | null;
+};
+
+type UnitSuggestion = {
+  title?: string;
+  description?: string;
 };
 
 export const aiService = {
@@ -163,6 +181,20 @@ export const aiService = {
     const response = await api.post<{ suggestion: Partial<Lesson> }>(
       feAiRoutes.suggestLesson(),
       { topic, language, level }
+    );
+    return response.data.suggestion;
+  },
+
+  async suggestUnit(payload: {
+    language: Language;
+    level: Level;
+    chapterId: string;
+    hintTopic?: string;
+    excludeUnitId?: string;
+  }) {
+    const response = await api.post<{ suggestion: UnitSuggestion }>(
+      feAdminRoutes.suggestUnit(),
+      payload
     );
     return response.data.suggestion;
   },

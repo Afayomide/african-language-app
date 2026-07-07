@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { aiService, expressionService, lessonService } from "@/services";
@@ -34,7 +36,7 @@ function NewExpressionContent() {
   const lessonIdParam = searchParams.get("lessonId");
   const languageParam = searchParams.get("language");
   const initialLanguage: Language | undefined =
-    languageParam === "yoruba" || languageParam === "igbo" || languageParam === "hausa"
+    isLanguage(languageParam)
       ? languageParam
       : undefined;
 

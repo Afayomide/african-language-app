@@ -1,6 +1,7 @@
-export type Language = "yoruba" | "igbo" | "hausa";
+export type Language = string;
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Status = "draft" | "finished" | "published";
+export type LanguageStatus = "active" | "hidden" | "archived";
 export type ContentType = "word" | "expression" | "sentence";
 export type UnitKind = "core" | "review";
 export type UnitReviewStyle = "none" | "star" | "gym";
@@ -21,6 +22,38 @@ export type LessonStage = {
   orderIndex: number;
   blocks: LessonBlock[];
 };
+
+export interface PublicLanguage {
+  id: string;
+  code: Language;
+  name: string;
+  nativeName: string;
+  status: LanguageStatus;
+  orderIndex: number;
+  locale: string;
+  region: string;
+  branding: {
+    heroGreeting: string;
+    heroSubtitle: string;
+    proverbLabel: string;
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+    iconName: string;
+  };
+  speechConfig: {
+    ttsLocale: string;
+    sttLocale: string;
+    ttsVoiceId: string;
+  };
+  learningConfig: {
+    scriptDirection: "ltr" | "rtl";
+    usesToneMarks: boolean;
+    usesDiacritics: boolean;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface Lesson {
   _id: string;
@@ -93,6 +126,51 @@ export interface Unit {
       proverbsGenerated: number;
       questionsGenerated: number;
       blocksGenerated: number;
+    }>;
+  } | null;
+  lastAiPreviewPlan?: {
+    mode: "generate" | "regenerate";
+    createdBy: string;
+    createdAt: string;
+    requestedLessons: number;
+    actualLessonCount: number;
+    settings: {
+      lessonCount: number;
+      sentencesPerLesson: number;
+      reviewContentPerLesson?: number;
+      proverbsPerLesson: number;
+      topics?: string[];
+      extraInstructions?: string;
+    };
+    coreLessons: Array<{
+      title: string;
+      description?: string;
+      objectives: string[];
+      conversationGoal: string;
+      situations: string[];
+      sentenceGoals: string[];
+      focusSummary?: string;
+      targetWords?: Array<{ text: string; translations?: string[] }>;
+      targetExpressions?: Array<{ text: string; translations?: string[] }>;
+      lessonMode?: "core" | "review";
+      sourceCoreLessonIndexes?: number[];
+      reviewSourceLessonIds?: string[];
+      reviewAnchorSentenceIds?: string[];
+    }>;
+    lessonSequence: Array<{
+      title: string;
+      description?: string;
+      objectives: string[];
+      conversationGoal: string;
+      situations: string[];
+      sentenceGoals: string[];
+      focusSummary?: string;
+      targetWords?: Array<{ text: string; translations?: string[] }>;
+      targetExpressions?: Array<{ text: string; translations?: string[] }>;
+      lessonMode?: "core" | "review";
+      sourceCoreLessonIndexes?: number[];
+      reviewSourceLessonIds?: string[];
+      reviewAnchorSentenceIds?: string[];
     }>;
   } | null;
   publishedAt?: string;
@@ -362,7 +440,10 @@ export interface Sentence {
 
 export interface UnitDeletedEntries {
   lessons: Lesson[];
+  words: Word[];
   expressions: Expression[];
+  sentences: Sentence[];
+  proverbs: Proverb[];
 }
 
 export interface Proverb {
@@ -374,6 +455,7 @@ export interface Proverb {
   contextNote: string;
   aiMeta: AIMeta;
   status: Status;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

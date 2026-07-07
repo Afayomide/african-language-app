@@ -23,6 +23,7 @@ import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongo
 import { MongooseCurriculumBuildArtifactRepository } from "../../infrastructure/db/mongoose/repositories/MongooseCurriculumBuildArtifactRepository.js";
 import { MongooseCurriculumBuildJobRepository } from "../../infrastructure/db/mongoose/repositories/MongooseCurriculumBuildJobRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
+import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import { getCefrBandForLevel } from "../../application/services/cefrMapping.js";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
@@ -81,7 +82,7 @@ const buildAgent = new CurriculumBuildAgentService(
 );
 
 function isValidLanguage(value: string): value is Language {
-  return ["yoruba", "igbo", "hausa"].includes(value);
+  return isValidLessonLanguage(value);
 }
 
 function parseRequestedChapterCount(value: unknown) {

@@ -1,4 +1,5 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { LANGUAGE_VALUES, LEVEL_VALUES, STATUS_VALUES } from "../domain/entities/Lesson.js";
 
 const UnitAiRunLessonSummarySchema = new Schema(
   {
@@ -51,23 +52,80 @@ const UnitAiRunSummarySchema = new Schema(
   { _id: false }
 );
 
+const UnitAiPreviewPlanLessonSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String },
+    objectives: { type: [String], default: [] },
+    conversationGoal: { type: String, default: "" },
+    situations: { type: [String], default: [] },
+    sentenceGoals: { type: [String], default: [] },
+    focusSummary: { type: String },
+    targetWords: {
+      type: [
+        {
+          text: { type: String, required: true },
+          translations: { type: [String], default: [] }
+        }
+      ],
+      default: []
+    },
+    targetExpressions: {
+      type: [
+        {
+          text: { type: String, required: true },
+          translations: { type: [String], default: [] }
+        }
+      ],
+      default: []
+    },
+    lessonMode: { type: String, enum: ["core", "review"] },
+    sourceCoreLessonIndexes: { type: [Number], default: [] },
+    reviewSourceLessonIds: { type: [String], default: [] },
+    reviewAnchorSentenceIds: { type: [String], default: [] }
+  },
+  { _id: false }
+);
+
+const UnitAiPreviewPlanSummarySchema = new Schema(
+  {
+    mode: { type: String, enum: ["generate", "regenerate"], required: true },
+    createdBy: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+    requestedLessons: { type: Number, required: true },
+    actualLessonCount: { type: Number, required: true },
+    settings: {
+      lessonCount: { type: Number, required: true },
+      sentencesPerLesson: { type: Number, required: true },
+      reviewContentPerLesson: { type: Number },
+      proverbsPerLesson: { type: Number, required: true },
+      topics: { type: [String], default: [] },
+      extraInstructions: { type: String }
+    },
+    coreLessons: { type: [UnitAiPreviewPlanLessonSchema], default: [] },
+    lessonSequence: { type: [UnitAiPreviewPlanLessonSchema], default: [] }
+  },
+  { _id: false }
+);
+
 const UnitSchema = new Schema(
   {
     chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", default: null, index: true },
     languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
-    language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
-    level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true, index: true },
+    language: { type: String, enum: [...LANGUAGE_VALUES], required: true, index: true },
+    level: { type: String, enum: [...LEVEL_VALUES], required: true, index: true },
     kind: { type: String, enum: ["core", "review"], default: "core", index: true },
     reviewStyle: { type: String, enum: ["none", "star", "gym"], default: "none" },
     reviewSourceUnitIds: { type: [Schema.Types.ObjectId], ref: "Unit", default: [] },
     orderIndex: { type: Number, default: 0, index: true },
-    status: { type: String, enum: ["draft", "finished", "published"], default: "draft", index: true },
+    status: { type: String, enum: [...STATUS_VALUES], default: "draft", index: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     lastAiRun: { type: UnitAiRunSummarySchema, default: null },
+    lastAiPreviewPlan: { type: UnitAiPreviewPlanSummarySchema, default: null },
     publishedAt: { type: Date }
   },
   { timestamps: true }

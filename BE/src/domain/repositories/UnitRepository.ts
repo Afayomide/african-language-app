@@ -1,5 +1,5 @@
 import type { Language, Status } from "../entities/Lesson.js";
-import type { UnitAiRunSummary, UnitEntity } from "../entities/Unit.js";
+import type { UnitAiPreviewPlanSummary, UnitAiRunSummary, UnitEntity } from "../entities/Unit.js";
 
 export type UnitListFilter = {
   chapterId?: string;
@@ -31,6 +31,10 @@ export type UnitAiRunUpdateInput = {
   lastAiRun: UnitAiRunSummary | null;
 };
 
+export type UnitAiPreviewPlanUpdateInput = {
+  lastAiPreviewPlan: UnitAiPreviewPlanSummary | null;
+};
+
 export interface UnitRepository {
   findLastOrderIndex(language: Language, chapterId?: string | null, languageId?: string | null): Promise<number | null>;
   create(input: UnitCreateInput): Promise<UnitEntity>;
@@ -38,6 +42,7 @@ export interface UnitRepository {
   findById(id: string): Promise<UnitEntity | null>;
   updateById(id: string, update: UnitUpdateInput): Promise<UnitEntity | null>;
   updateLastAiRun(id: string, update: UnitAiRunUpdateInput): Promise<UnitEntity | null>;
+  updateLastAiPreviewPlan(id: string, update: UnitAiPreviewPlanUpdateInput): Promise<UnitEntity | null>;
   softDeleteById(id: string): Promise<UnitEntity | null>;
   publishById(id: string, now: Date): Promise<UnitEntity | null>;
   findByIdsAndLanguage(ids: string[], language: Language, languageId?: string | null): Promise<Array<{ id: string }>>;

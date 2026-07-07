@@ -34,7 +34,7 @@ function toEntity(doc: LearnerContentPerformanceDocument): LearnerContentPerform
 }
 
 export class MongooseLearnerContentPerformanceRepository implements LearnerContentPerformanceRepository {
-  async listByUserAndLanguage(userId: string, language: "yoruba" | "igbo" | "hausa"): Promise<LearnerContentPerformanceEntity[]> {
+  async listByUserAndLanguage(userId: string, language: "yoruba" | "igbo" | "hausa" | "pidgin"): Promise<LearnerContentPerformanceEntity[]> {
     const docs = await LearnerContentPerformanceModel.find({ userId, language }).sort({ updatedAt: -1 });
     return docs.map(toEntity);
   }

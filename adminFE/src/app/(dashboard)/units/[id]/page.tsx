@@ -20,19 +20,45 @@ import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 import { Sparkles, ArrowLeft, Edit, ExternalLink, Plus, CheckCircle2, RefreshCcw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 type PersistedAiRun = NonNullable<Unit["lastAiRun"]>;
+type PersistedAiPreviewPlan = NonNullable<Unit["lastAiPreviewPlan"]>;
 type ApiError = { response?: { data?: { error?: string; message?: string } } };
 
 function normalizePlanLines(value: string) {
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return value.split("\n");
 }
 
 function joinPlanLines(values: string[]) {
   return values.join("\n");
+}
+
+type PlanTargetField = "targetWords" | "targetExpressions";
+type PlanTarget = NonNullable<UnitPlanLesson["targetWords"]>[number];
+
+function normalizePlanTargets(targets?: PlanTarget[]) {
+  return (targets || [])
+    .map((target) => ({
+      text: String(target.text || "").trim(),
+      translations: (target.translations || []).map((item) => String(item || "").trim()).filter(Boolean)
+    }))
+    .filter((target) => target.text);
+}
+
+function formatPlanTargetTranslations(target: PlanTarget) {
+  return (target.translations || []).join(" / ");
+}
+
+function formatPlanTargetsSummary(lesson: UnitPlanLesson) {
+  const words = normalizePlanTargets(lesson.targetWords).map((target) => target.text);
+  const expressions = normalizePlanTargets(lesson.targetExpressions).map((target) => target.text);
+  return [...words, ...expressions].join(" | ") || "—";
+}
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
 }
 
 function normalizeEditablePlanLesson(lesson: UnitPlanLesson): UnitPlanLesson {
@@ -43,7 +69,9 @@ function normalizeEditablePlanLesson(lesson: UnitPlanLesson): UnitPlanLesson {
     conversationGoal: lesson.conversationGoal.trim(),
     situations: lesson.situations.map((item) => item.trim()).filter(Boolean),
     sentenceGoals: lesson.sentenceGoals.map((item) => item.trim()).filter(Boolean),
-    focusSummary: lesson.focusSummary?.trim() || undefined
+    focusSummary: lesson.focusSummary?.trim() || undefined,
+    targetWords: normalizePlanTargets(lesson.targetWords),
+    targetExpressions: normalizePlanTargets(lesson.targetExpressions)
   };
 }
 
@@ -144,6 +172,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [isRevisingContent, setIsRevisingContent] = useState(false);
   const [revisionMode, setRevisionMode] = useState<"refactor" | "regenerate">("refactor");
   const [lastAiRun, setLastAiRun] = useState<PersistedAiRun | null>(null);
+  const [lastAiPreviewPlan, setLastAiPreviewPlan] = useState<PersistedAiPreviewPlan | null>(null);
 
   const isPublished = useMemo(() => unit?.status === "published", [unit?.status]);
 
@@ -162,6 +191,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         setReviewStyle(data.reviewStyle || "star");
         setReviewSourceUnitIds(data.reviewSourceUnitIds || []);
         setLastAiRun(data.lastAiRun || null);
+        setLastAiPreviewPlan(data.lastAiPreviewPlan || null);
       } catch (error) {
         toast.error("Failed to load unit.")
       } finally {
@@ -265,14 +295,26 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   }
 
   async function handleAiSuggest() {
-    if (!title.trim()) {
-      toast.error("Enter a topic in the title field first.");
+    if (kind === "review") {
+      toast.error("AI suggest is only available for core units.");
+      return;
+    }
+    if (!chapterId) {
+      toast.error("Select a chapter first.");
       return;
     }
 
     try {
       setIsSuggesting(true);
-      const suggestion = await aiService.suggestLesson(title.trim(), language, level);
+      const currentTitle = String(unit?.title || "").trim();
+      const hintTopic = title.trim() && title.trim() !== currentTitle ? title.trim() : undefined;
+      const suggestion = await aiService.suggestUnit({
+        language,
+        level,
+        chapterId,
+        hintTopic,
+        excludeUnitId: id
+      });
       if (suggestion.title && suggestion.title.trim()) setTitle(suggestion.title.trim());
       if (suggestion.description && suggestion.description.trim()) setDescription(suggestion.description.trim());
       toast.success("AI suggestion applied.");
@@ -321,13 +363,46 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     setEditablePlanLessons([]);
   }
 
+  function loadPersistedPreviewPlan(plan: PersistedAiPreviewPlan, targetUnit: Unit | null = unit) {
+    const normalizedLessons = plan.coreLessons.map((lesson) => normalizeEditablePlanLesson(lesson));
+    const autoInsertReviewLessons = targetUnit?.kind !== "review";
+    const lessonSequence = buildAutoReviewPlanSequence(normalizedLessons, { autoInsertReviewLessons });
+
+    setContentLessonCount(plan.settings.lessonCount || plan.requestedLessons);
+    setContentNewTargetsPerLesson(plan.settings.sentencesPerLesson || contentNewTargetsPerLesson);
+    setContentReviewContentPerLesson(plan.settings.reviewContentPerLesson ?? contentReviewContentPerLesson);
+    setContentProverbsPerLesson(plan.settings.proverbsPerLesson ?? contentProverbsPerLesson);
+    setContentTopic((plan.settings.topics || [])[0] || "");
+    setContentExtraInstructions(plan.settings.extraInstructions || "");
+    setEditablePlanLessons(normalizedLessons);
+    setContentPlanPreview({
+      unitId: targetUnit?._id || id,
+      mode: plan.mode,
+      createdBy: plan.createdBy,
+      createdAt: plan.createdAt,
+      requestedLessons: plan.requestedLessons,
+      actualLessonCount: lessonSequence.length,
+      settings: plan.settings,
+      coreLessons: normalizedLessons,
+      lessonSequence
+    });
+  }
+
   function handleGenerateContentDialogChange(open: boolean) {
     setIsGenerateContentDialogOpen(open);
-    resetContentPlanEditor();
+    if (open && lastAiPreviewPlan?.mode === "generate") {
+      loadPersistedPreviewPlan(lastAiPreviewPlan);
+      return;
+    }
+    if (!open) resetContentPlanEditor();
   }
 
   function handleReviseDialogChange(open: boolean) {
     setIsReviseDialogOpen(open);
+    if (open && revisionMode === "regenerate" && lastAiPreviewPlan?.mode === "regenerate") {
+      loadPersistedPreviewPlan(lastAiPreviewPlan);
+      return;
+    }
     if (!open || revisionMode === "regenerate") {
       resetContentPlanEditor();
     }
@@ -336,8 +411,107 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   function updateEditablePlanLesson(index: number, patch: Partial<UnitPlanLesson>) {
     setEditablePlanLessons((current) =>
       current.map((lesson, lessonIndex) =>
-        lessonIndex === index ? normalizeEditablePlanLesson({ ...lesson, ...patch }) : lesson
+        lessonIndex === index ? { ...lesson, ...patch } : lesson
       )
+    );
+  }
+
+  function updateEditablePlanTarget(
+    lessonIndex: number,
+    field: PlanTargetField,
+    targetIndex: number,
+    patch: Partial<PlanTarget>
+  ) {
+    setEditablePlanLessons((current) =>
+      current.map((lesson, index) => {
+        if (index !== lessonIndex) return lesson;
+        const targets = [...(lesson[field] || [])];
+        targets[targetIndex] = { ...(targets[targetIndex] || { text: "", translations: [] }), ...patch };
+        return { ...lesson, [field]: targets };
+      })
+    );
+  }
+
+  function addEditablePlanTarget(lessonIndex: number, field: PlanTargetField) {
+    setEditablePlanLessons((current) =>
+      current.map((lesson, index) =>
+        index === lessonIndex
+          ? { ...lesson, [field]: [...(lesson[field] || []), { text: "", translations: [] }] }
+          : lesson
+      )
+    );
+  }
+
+  function removeEditablePlanTarget(lessonIndex: number, field: PlanTargetField, targetIndex: number) {
+    setEditablePlanLessons((current) =>
+      current.map((lesson, index) =>
+        index === lessonIndex
+          ? { ...lesson, [field]: (lesson[field] || []).filter((_, index) => index !== targetIndex) }
+          : lesson
+      )
+    );
+  }
+
+  function renderPlanTargetEditor(lesson: UnitPlanLesson, lessonIndex: number) {
+    const renderTargets = (field: PlanTargetField, label: string, addLabel: string) => {
+      const targets = lesson[field] || [];
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label>{label}</Label>
+            <Button type="button" variant="outline" size="sm" onClick={() => addEditablePlanTarget(lessonIndex, field)}>
+              {addLabel}
+            </Button>
+          </div>
+          <div className="grid gap-2">
+            {targets.length === 0 ? (
+              <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                No explicit {label.toLowerCase()} set. Add one to stop helper words from becoming lesson targets.
+              </p>
+            ) : (
+              targets.map((target, targetIndex) => (
+                <div key={`${field}-${lessonIndex}-${targetIndex}`} className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_1.5fr_auto]">
+                  <Input
+                    placeholder={field === "targetWords" ? "Káàárọ̀" : "Ẹ káàárọ̀"}
+                    value={target.text}
+                    onChange={(event) => updateEditablePlanTarget(lessonIndex, field, targetIndex, { text: event.target.value })}
+                  />
+                  <Input
+                    placeholder="Meaning(s), separated with /"
+                    value={formatPlanTargetTranslations(target)}
+                    onChange={(event) =>
+                      updateEditablePlanTarget(lessonIndex, field, targetIndex, {
+                        translations: event.target.value.split("/")
+                      })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeEditablePlanTarget(lessonIndex, field, targetIndex)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="grid gap-3 rounded-lg border border-dashed bg-muted/20 p-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">Explicit lesson targets</p>
+          <p className="text-xs text-muted-foreground">
+            These are locked as the teachable Stage 1 items. Other words in generated sentences stay as support.
+          </p>
+        </div>
+        {renderTargets("targetWords", "Target Words", "Add Word")}
+        {renderTargets("targetExpressions", "Target Expressions", "Add Expression")}
+      </div>
     );
   }
 
@@ -391,11 +565,29 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       });
       const normalizedLessons = result.coreLessons.map((lesson) => normalizeEditablePlanLesson(lesson));
       const autoInsertReviewLessons = unit?.kind !== "review";
+      const lessonSequence = buildAutoReviewPlanSequence(normalizedLessons, { autoInsertReviewLessons });
       setEditablePlanLessons(normalizedLessons);
       setContentPlanPreview({
         ...result,
         coreLessons: normalizedLessons,
-        lessonSequence: buildAutoReviewPlanSequence(normalizedLessons, { autoInsertReviewLessons })
+        lessonSequence
+      });
+      setLastAiPreviewPlan({
+        mode,
+        createdBy: result.createdBy || unit?.createdBy || "",
+        createdAt: result.createdAt || new Date().toISOString(),
+        requestedLessons: result.requestedLessons,
+        actualLessonCount: lessonSequence.length,
+        settings: result.settings || {
+          lessonCount: contentLessonCount,
+          sentencesPerLesson: contentNewTargetsPerLesson,
+          reviewContentPerLesson: contentReviewContentPerLesson,
+          proverbsPerLesson: contentProverbsPerLesson,
+          topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
+          extraInstructions: contentExtraInstructions.trim() || undefined
+        },
+        coreLessons: normalizedLessons,
+        lessonSequence
       });
       toast.success(
         mode === "regenerate"
@@ -680,7 +872,13 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="title">Title</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAiSuggest} disabled={isSuggesting || isPublished}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAiSuggest}
+                  disabled={isSuggesting || isPublished || !chapterId || kind === "review"}
+                >
                   <Sparkles className="mr-2 h-4 w-4" />
                   AI Suggest
                 </Button>
@@ -696,9 +894,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yoruba">Yoruba</SelectItem>
-                    <SelectItem value="igbo">Igbo</SelectItem>
-                    <SelectItem value="hausa">Hausa</SelectItem>
+                    <LanguageSelectItems />
                   </SelectContent>
                 </Select>
               </div>
@@ -816,6 +1012,91 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
           </CardFooter>
         </form>
       </Card>
+
+      {lastAiPreviewPlan ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  Last {lastAiPreviewPlan.mode === "regenerate" ? "Regeneration" : "Generation"} Preview Plan
+                </CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Saved {formatDateTime(lastAiPreviewPlan.createdAt)} with {lastAiPreviewPlan.actualLessonCount} planned lesson slots.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  loadPersistedPreviewPlan(lastAiPreviewPlan);
+                  if (lastAiPreviewPlan.mode === "regenerate") {
+                    setRevisionMode("regenerate");
+                    setIsReviseDialogOpen(true);
+                  } else {
+                    setIsGenerateContentDialogOpen(true);
+                  }
+                }}
+              >
+                Open Saved Plan
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Requested Lessons</div>
+                <div className="text-2xl font-bold">{lastAiPreviewPlan.requestedLessons}</div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Actual Slots</div>
+                <div className="text-2xl font-bold">{lastAiPreviewPlan.actualLessonCount}</div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">New Targets / Lesson</div>
+                <div className="text-2xl font-bold">{lastAiPreviewPlan.settings.sentencesPerLesson}</div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">Review Items / Lesson</div>
+                <div className="text-2xl font-bold">{lastAiPreviewPlan.settings.reviewContentPerLesson ?? 0}</div>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader className="bg-primary/5">
+                <TableRow>
+                  <TableHead>Lesson</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Targets</TableHead>
+                  <TableHead>Focus</TableHead>
+                  <TableHead>Conversation Goal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lastAiPreviewPlan.lessonSequence.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                      No preview plan saved.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  lastAiPreviewPlan.lessonSequence.map((lesson, index) => (
+                    <TableRow key={`${lesson.title}-${index}`}>
+                      <TableCell className="font-medium">{lesson.title}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{lesson.lessonMode || "core"}</Badge>
+                      </TableCell>
+                      <TableCell>{formatPlanTargetsSummary(lesson)}</TableCell>
+                      <TableCell>{lesson.focusSummary || "—"}</TableCell>
+                      <TableCell>{lesson.conversationGoal || "—"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {lastAiRun ? (
         <Card>
@@ -1145,6 +1426,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                           onChange={(event) => updateEditablePlanLesson(index, { focusSummary: event.target.value })}
                         />
                       </div>
+                      {renderPlanTargetEditor(lesson, index)}
                       <div className="space-y-2">
                         <Label>Objectives</Label>
                         <Textarea
@@ -1336,6 +1618,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                             onChange={(event) => updateEditablePlanLesson(index, { focusSummary: event.target.value })}
                           />
                         </div>
+                        {renderPlanTargetEditor(lesson, index)}
                         <div className="space-y-2">
                           <Label>Objectives</Label>
                           <Textarea

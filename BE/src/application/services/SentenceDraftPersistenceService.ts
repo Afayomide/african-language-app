@@ -1,4 +1,5 @@
 import type { LessonEntity } from "../../domain/entities/Lesson.js";
+import type { ContentComponentRef } from "../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
 import type { SentenceEntity } from "../../domain/entities/Sentence.js";
 import type { WordEntity } from "../../domain/entities/Word.js";
@@ -14,6 +15,13 @@ function normalize(text: string) {
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
+function splitExpressionIntoWordTokens(value: string) {
+  return String(value || "")
+    .split(/\s+/)
+    .map((item) => item.trim().replace(/^[.,!?;:\"'()\[\]{}]+|[.,!?;:\"'()\[\]{}]+$/g, ""))
+    .filter(Boolean);
 }
 
 function resolveDifficulty(level: LessonEntity["level"]) {
@@ -152,13 +160,26 @@ export class SentenceDraftPersistenceService {
           continue;
         }
 
-        const expression = await this.upsertExpressionFromSentenceComponent({
-          lesson: input.lesson,
-          modelName: input.modelName,
-          text: component.text,
-          translations: component.translations
-        });
-        (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
+        if (component.fixed === true) {
+          const expression = await this.upsertExpressionFromSentenceComponent({
+            lesson: input.lesson,
+            modelName: input.modelName,
+            text: component.text,
+            translations: component.translations
+          });
+          (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
+          continue;
+        }
+
+        for (const tokenText of splitExpressionIntoWordTokens(component.text)) {
+          const word = await this.upsertWordFromSentenceComponent({
+            lesson: input.lesson,
+            modelName: input.modelName,
+            text: tokenText,
+            translations: component.translations
+          });
+          (component.role === "support" ? supportWords : coreWords).set(normalize(word.text), word);
+        }
       }
     }
 
@@ -190,24 +211,60 @@ export class SentenceDraftPersistenceService {
     const createdOrReused: SentenceEntity[] = [];
 
     for (const draft of input.sentenceDrafts) {
-      const componentRefs = draft.components
-        .map((component, index) => {
-          const key = normalize(component.text);
-          const content =
-            component.type === "word"
-              ? input.componentIndex.words.get(key)
-              : input.componentIndex.expressions.get(key);
-          if (!content) return null;
-          return {
+      const componentRefs: ContentComponentRef[] = [];
+      let orderIndex = 0;
+      for (const component of draft.components) {
+        const key = normalize(component.text);
+        if (component.type === "word") {
+          const content = input.componentIndex.words.get(key);
+          if (!content) {
+            componentRefs.length = 0;
+            break;
+          }
+          componentRefs.push({
             type: component.type,
             refId: content.id,
-            orderIndex: index,
+            orderIndex,
             textSnapshot: content.text
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+          });
+          orderIndex += 1;
+          continue;
+        }
 
-      if (componentRefs.length !== draft.components.length) continue;
+        if (component.fixed === true) {
+          const content = input.componentIndex.expressions.get(key);
+          if (!content) {
+            componentRefs.length = 0;
+            break;
+          }
+          componentRefs.push({
+            type: "expression" as const,
+            refId: content.id,
+            orderIndex,
+            textSnapshot: content.text
+          });
+          orderIndex += 1;
+          continue;
+        }
+
+        for (const tokenText of splitExpressionIntoWordTokens(component.text)) {
+          const content = input.componentIndex.words.get(normalize(tokenText));
+          if (!content) {
+            componentRefs.length = 0;
+            break;
+          }
+          componentRefs.push({
+            type: "word" as const,
+            refId: content.id,
+            orderIndex,
+            textSnapshot: content.text
+          });
+          orderIndex += 1;
+        }
+        if (componentRefs.length === 0) break;
+      }
+
+      if (componentRefs.length === 0) continue;
 
       const existing = byText.get(normalize(draft.text));
       if (existing) {

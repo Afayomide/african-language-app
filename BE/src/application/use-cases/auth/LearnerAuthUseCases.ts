@@ -19,7 +19,7 @@ export class LearnerAuthUseCases {
     name: string;
     email: string;
     password: string;
-    language?: "yoruba" | "igbo" | "hausa";
+    language?: "yoruba" | "igbo" | "hausa" | "pidgin";
     dailyGoalMinutes?: number;
   }) {
     const existing = await this.users.findByEmail(input.email);
@@ -181,7 +181,7 @@ export class LearnerAuthUseCases {
       email: string;
       proficientLanguage: string;
       countryOfOrigin: string;
-      currentLanguage: "yoruba" | "igbo" | "hausa";
+      currentLanguage: "yoruba" | "igbo" | "hausa" | "pidgin";
       dailyGoalMinutes: number;
     }>
   ) {

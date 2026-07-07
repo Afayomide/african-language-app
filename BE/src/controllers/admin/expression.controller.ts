@@ -386,7 +386,7 @@ export async function generateExpressionAudioById(req: AuthRequest, res: Respons
   try {
     const audio = await generatePhraseAudio({
       text: expression.text,
-      language: lesson.language as "yoruba" | "igbo" | "hausa",
+      language: lesson.language as "yoruba" | "igbo" | "hausa" | "pidgin",
       lessonId: lesson.id
     });
     const updated = await expressionRepo.updateById(expression.id, { audio });
@@ -412,7 +412,7 @@ export async function generateLessonExpressionsAudio(req: AuthRequest, res: Resp
 
   for (const expression of expressions) {
     try {
-      const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa", lessonId: lesson.id });
+      const audio = await generatePhraseAudio({ text: expression.text, language: lesson.language as "yoruba" | "igbo" | "hausa" | "pidgin", lessonId: lesson.id });
       const updated = await expressionRepo.updateById(expression.id, { audio });
       if (updated) updatedIds.push(expression.id);
       else failedIds.push(expression.id);

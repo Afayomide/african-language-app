@@ -5,6 +5,7 @@ export type WordListFilter = {
   language?: Language;
   languageId?: string | null;
   status?: Status;
+  ids?: string[];
 };
 
 export type WordCreateInput = Omit<WordEntity, "id" | "_id" | "createdAt" | "updatedAt" | "deletedAt" | "kind">;
@@ -13,9 +14,11 @@ export type WordUpdateInput = Partial<WordCreateInput>;
 export interface WordRepository {
   create(input: WordCreateInput): Promise<WordEntity>;
   list(filter: WordListFilter): Promise<WordEntity[]>;
+  listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<WordEntity[]>;
   findById(id: string): Promise<WordEntity | null>;
   findByIds(ids: string[]): Promise<WordEntity[]>;
   findByText(language: Language, text: string, languageId?: string | null): Promise<WordEntity | null>;
   updateById(id: string, update: WordUpdateInput): Promise<WordEntity | null>;
   softDeleteById(id: string): Promise<WordEntity | null>;
+  restoreById(id: string): Promise<WordEntity | null>;
 }

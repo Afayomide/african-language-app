@@ -5,7 +5,7 @@ import UnitModel from "../models/Unit.js";
 
 type CliOptions = {
   unitId: string;
-  language?: "yoruba" | "igbo" | "hausa";
+  language?: "yoruba" | "igbo" | "hausa" | "pidgin";
   onlyWithoutUnit: boolean;
   dryRun: boolean;
 };
@@ -27,10 +27,10 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   const rawLanguage = String(args.get("language") || "").trim().toLowerCase();
-  let language: "yoruba" | "igbo" | "hausa" | undefined;
+  let language: "yoruba" | "igbo" | "hausa" | "pidgin" | undefined;
   if (rawLanguage) {
     if (rawLanguage !== "yoruba" && rawLanguage !== "igbo" && rawLanguage !== "hausa") {
-      throw new Error("Invalid --language. Use yoruba, igbo, or hausa.");
+      throw new Error("Invalid --language. Use yoruba, igbo, hausa, or pidgin.");
     }
     language = rawLanguage;
   }

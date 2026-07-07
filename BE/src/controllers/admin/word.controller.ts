@@ -116,20 +116,24 @@ function buildCreateOrUpdateInput(body: Record<string, unknown>) {
   if (body.lemma !== undefined) update.lemma = String(body.lemma).trim();
   if (body.partOfSpeech !== undefined) update.partOfSpeech = String(body.partOfSpeech).trim();
   if (body.image !== undefined) {
-    if (!body.image || typeof body.image !== "object") return "invalid_image" as const;
-    const image = body.image as {
-      imageAssetId?: unknown;
-      url?: unknown;
-      thumbnailUrl?: unknown;
-      altText?: unknown;
-    };
-    const url = String(image.url || "").trim();
-    const thumbnailUrl = String(image.thumbnailUrl || "").trim();
-    const altText = String(image.altText || "").trim();
-    const imageAssetId = String(image.imageAssetId || "").trim();
-    update.image = url || thumbnailUrl || altText || imageAssetId
-      ? { imageAssetId: imageAssetId || undefined, url, thumbnailUrl, altText }
-      : null;
+    if (body.image === null) {
+      update.image = null;
+    } else if (typeof body.image !== "object") return "invalid_image" as const;
+    else {
+      const image = body.image as {
+        imageAssetId?: unknown;
+        url?: unknown;
+        thumbnailUrl?: unknown;
+        altText?: unknown;
+      };
+      const url = String(image.url || "").trim();
+      const thumbnailUrl = String(image.thumbnailUrl || "").trim();
+      const altText = String(image.altText || "").trim();
+      const imageAssetId = String(image.imageAssetId || "").trim();
+      update.image = url || thumbnailUrl || altText || imageAssetId
+        ? { imageAssetId: imageAssetId || undefined, url, thumbnailUrl, altText }
+        : null;
+    }
   }
   if (body.status !== undefined) {
     const status = String(body.status);

@@ -1,28 +1,35 @@
 'use client'
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Sidebar from "@/components/layout/Sidebar"
-import { authService } from "@/services/auth"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Sidebar from "@/components/layout/Sidebar";
+import { authService } from "@/services/auth";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [isAuthorized, setIsAuthorized] = useState(false)
-  const router = useRouter()
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
-      router.push("/login")
-    } else {
-      setIsAuthorized(true)
+      router.replace("/login");
+      return;
     }
-  }, [router])
+
+    const tutor = authService.getTutorProfile();
+    if (!tutor?.language) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    setIsAuthorized(true);
+  }, [router]);
 
   if (!isAuthorized) {
-    return null
+    return null;
   }
 
   return (
@@ -46,5 +53,5 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
-  )
+  );
 }

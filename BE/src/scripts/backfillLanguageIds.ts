@@ -10,7 +10,7 @@ import SentenceModel from "../models/Sentence.js";
 import ProverbModel from "../models/Proverb.js";
 import LearnerProfileModel from "../models/learner/LearnerProfile.js";
 
-type LanguageCode = "yoruba" | "igbo" | "hausa";
+type LanguageCode = "yoruba" | "igbo" | "hausa" | "pidgin";
 
 async function main() {
   const uri = process.env.MONGODB_URI;
@@ -33,7 +33,7 @@ async function main() {
     }
   }
 
-  const requiredCodes: LanguageCode[] = ["yoruba", "igbo", "hausa"];
+  const requiredCodes: LanguageCode[] = ["yoruba", "igbo", "hausa", "pidgin"];
   const missingCodes = requiredCodes.filter((code) => !idByCode.has(code));
   if (missingCodes.length > 0) {
     throw new Error(`Missing Language docs for codes: ${missingCodes.join(", ")}. Run seedLanguages first.`);

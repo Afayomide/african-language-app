@@ -89,6 +89,37 @@ const DEFAULT_LANGUAGES = [
   }
 ] as const;
 
+const ADDITIONAL_LANGUAGES = [
+  {
+    code: "pidgin",
+    name: "Nigerian Pidgin",
+    nativeName: "Naija",
+    status: "active",
+    orderIndex: 4,
+    locale: "pcm-NG",
+    region: "Nigeria",
+    branding: {
+      heroGreeting: "How far",
+      heroSubtitle: "Practice everyday Nigerian Pidgin with natural flow.",
+      proverbLabel: "Wise Talk",
+      primaryColor: "#8a4b00",
+      secondaryColor: "#6f5900",
+      accentColor: "#36694a",
+      iconName: "auto_stories"
+    },
+    speechConfig: {
+      ttsLocale: "pcm-NG",
+      sttLocale: "pcm-NG",
+      ttsVoiceId: ""
+    },
+    learningConfig: {
+      scriptDirection: "ltr",
+      usesToneMarks: false,
+      usesDiacritics: false
+    }
+  }
+] as const;
+
 async function main() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
@@ -102,6 +133,23 @@ async function main() {
       { code: language.code },
       { $set: language },
       { upsert: true, new: true }
+    );
+  }
+
+  for (const language of ADDITIONAL_LANGUAGES) {
+    const now = new Date();
+    await LanguageModel.collection.updateOne(
+      { code: language.code },
+      {
+        $set: {
+          ...language,
+          updatedAt: now
+        },
+        $setOnInsert: {
+          createdAt: now
+        }
+      },
+      { upsert: true }
     );
   }
 

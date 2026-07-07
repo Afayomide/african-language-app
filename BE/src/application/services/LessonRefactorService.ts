@@ -15,7 +15,7 @@ import type { LessonRepository } from "../../domain/repositories/LessonRepositor
 import type { QuestionRepository } from "../../domain/repositories/QuestionRepository.js";
 import type { SentenceRepository } from "../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../domain/repositories/WordRepository.js";
-import type { LlmClient, LlmLessonRefactorPatch } from "../../services/llm/types.js";
+import type { LlmClient, LlmLessonRefactorOperation, LlmLessonRefactorPatch } from "../../services/llm/types.js";
 import { buildLetterOrderReviewData } from "../../controllers/shared/spellingQuestion.js";
 import { ContentCurriculumService } from "./ContentCurriculumService.js";
 import {
@@ -649,6 +649,28 @@ function insertBlock(stage: LessonStage, block: LessonBlock, blockIndex?: number
     return;
   }
   stage.blocks.push(block);
+}
+
+const REVIEW_LESSON_BLOCKED_PATCH_OPERATIONS = new Set<LlmLessonRefactorOperation["type"]>([
+  "add_text_block",
+  "add_word_bundle",
+  "add_expression_bundle",
+  "add_sentence_bundle",
+  "replace_word_bundle",
+  "replace_expression_bundle",
+  "replace_sentence_bundle",
+  "add_match_translation_block"
+]);
+
+function shouldSkipReviewLessonPatchOperation(operation: LlmLessonRefactorOperation, stages: LessonStage[]) {
+  if (REVIEW_LESSON_BLOCKED_PATCH_OPERATIONS.has(operation.type)) return true;
+
+  if (operation.type === "move_block") {
+    const sourceBlock = stages[operation.fromStageIndex]?.blocks[operation.fromBlockIndex];
+    return sourceBlock?.type !== "question";
+  }
+
+  return false;
 }
 
 function buildLessonExpressionPool(languagePool: ExpressionEntity[], lessonExpressions: ExpressionEntity[]) {
@@ -1565,6 +1587,10 @@ export class LessonRefactorService {
     let blocksInserted = 0;
 
     for (const operation of input.patch.operations) {
+      if (currentLesson.kind === "review" && shouldSkipReviewLessonPatchOperation(operation, stages)) {
+        continue;
+      }
+
       if (operation.type === "add_text_block") {
         const stage = stages[operation.stageIndex];
         if (!stage) continue;

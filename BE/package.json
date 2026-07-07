@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "seed:admin": "node --enable-source-maps --import tsx src/scripts/seedAdmin.ts",
+    "languages:seed": "node --enable-source-maps --import tsx src/scripts/seedLanguages.ts",
     "languages:list": "node --enable-source-maps --import tsx src/scripts/listLanguages.ts",
+    "db:hard-delete-pidgin-units": "node --enable-source-maps --import tsx src/scripts/hardDeletePidginUnits.ts",
     "db:clear": "node --enable-source-maps --import tsx src/scripts/clearDatabase.ts",
     "migrate:review-tracking": "node --enable-source-maps --import tsx src/scripts/migrateReviewTracking.ts",
     "audio:backfill-analysis": "node --enable-source-maps --import tsx src/scripts/backfillAudioAnalysis.ts",
@@ -21,6 +23,8 @@
     "migrate:split-slash-translations": "node --enable-source-maps --import tsx src/scripts/splitSlashPhraseTranslations.ts",
     "migrate:lesson-blocks-to-stages": "node --enable-source-maps --import tsx src/scripts/migrateLessonBlocksToStages.ts",
     "migrate:merge-duplicate-phrases": "node --enable-source-maps --import tsx src/scripts/mergeDuplicatePhrases.ts",
+    "backfill:sentence-meaning-segments": "node --enable-source-maps --import tsx src/scripts/backfillSentenceMeaningSegments.ts",
+    "backfill:expression-components": "node --enable-source-maps --import tsx src/scripts/backfillExpressionComponents.ts",
     "lint": "eslint ."
   },
   "dependencies": {

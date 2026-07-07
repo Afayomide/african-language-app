@@ -210,6 +210,7 @@ export function parseQuestionReviewData(reviewData: unknown) {
     words?: unknown;
     correctOrder?: unknown;
     meaning?: unknown;
+    meaningSegments?: unknown;
   };
 
   const sentence = String(payload.sentence || "").trim();
@@ -233,5 +234,59 @@ export function parseQuestionReviewData(reviewData: unknown) {
   }
 
   const meaning = String(payload.meaning || "").trim();
-  return { sentence, words, correctOrder, meaning };
+
+  const meaningSegments = Array.isArray(payload.meaningSegments)
+    ? payload.meaningSegments
+        .map((segment) => {
+          if (!segment || typeof segment !== "object") return null;
+          const candidate = segment as {
+            text?: unknown;
+            sourceWordIndexes?: unknown;
+            sourceComponentIndexes?: unknown;
+          };
+          const text = String(candidate.text || "").trim();
+          if (!text) return null;
+          const sourceWordIndexes = Array.isArray(candidate.sourceWordIndexes)
+            ? Array.from(
+                new Set(
+                  candidate.sourceWordIndexes
+                    .map((item) => Number(item))
+                    .filter((item) => Number.isInteger(item) && item >= 0 && item < words.length)
+                )
+              )
+            : [];
+          const sourceComponentIndexes = Array.isArray(candidate.sourceComponentIndexes)
+            ? Array.from(
+                new Set(
+                  candidate.sourceComponentIndexes
+                    .map((item) => Number(item))
+                    .filter((item) => Number.isInteger(item) && item >= 0)
+                )
+              )
+            : [];
+          if (sourceWordIndexes.length === 0 && sourceComponentIndexes.length === 0) return null;
+          return {
+            text,
+            sourceWordIndexes,
+            ...(sourceComponentIndexes.length > 0 ? { sourceComponentIndexes } : {})
+          };
+        })
+        .filter(
+          (
+            segment
+          ): segment is {
+            text: string;
+            sourceWordIndexes: number[];
+            sourceComponentIndexes?: number[];
+          } => Boolean(segment)
+        )
+    : [];
+
+  return {
+    sentence,
+    words,
+    correctOrder,
+    meaning,
+    ...(meaningSegments.length > 0 ? { meaningSegments } : {})
+  };
 }

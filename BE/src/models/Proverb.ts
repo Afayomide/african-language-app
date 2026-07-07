@@ -1,4 +1,5 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { LANGUAGE_VALUES, STATUS_VALUES } from "../domain/entities/Lesson.js";
 
 const ProverbSchema = new Schema(
   {
@@ -7,7 +8,7 @@ const ProverbSchema = new Schema(
     languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
     language: {
       type: String,
-      enum: ["yoruba", "igbo", "hausa"],
+      enum: [...LANGUAGE_VALUES],
       required: true,
       index: true
     },
@@ -22,7 +23,7 @@ const ProverbSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "finished", "published"],
+      enum: [...STATUS_VALUES],
       default: "draft",
       index: true
     },

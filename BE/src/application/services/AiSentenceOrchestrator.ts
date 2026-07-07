@@ -10,7 +10,12 @@ import type {
   LlmClient,
   LlmGeneratedSentence
 } from "../../services/llm/types.js";
-import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
+import {
+  buildRetryInstruction,
+  logAiDuplicateReuse,
+  logAiRetry,
+  logAiValidation
+} from "../../services/llm/aiGenerationLogger.js";
 import { validateGeneratedSentences } from "../../services/llm/outputQuality.js";
 
 function normalizeText(text: string) {
@@ -31,6 +36,41 @@ function inferComponentType(text: string): "word" | "expression" {
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
+function isInvalidLlmJsonError(error: unknown) {
+  return error instanceof Error && error.message === "invalid_llm_json";
+}
+
+function collectExistingSentenceDuplicates(
+  generated: LlmGeneratedSentence[],
+  validation: ReturnType<typeof validateGeneratedSentences>,
+  existingSentences: string[]
+) {
+  const existingTextSet = new Set(existingSentences.map(normalizeText).filter(Boolean));
+  if (existingTextSet.size === 0) return [];
+
+  const acceptedTexts = new Set(validation.accepted.map((item) => normalizeText(String(item.text || ""))));
+  const rejectedReasonsByText = new Map(
+    validation.rejected.map((item) => [normalizeText(String(item.item.text || "")), item.reasons] as const)
+  );
+  const seen = new Set<string>();
+  const duplicates: Array<{ text: string; outcome: "accepted_for_reuse" | "rejected"; reasons?: string[] }> = [];
+
+  for (const sentence of generated) {
+    const text = String(sentence.text || "").trim();
+    const key = normalizeText(text);
+    if (!key || seen.has(key) || !existingTextSet.has(key)) continue;
+    seen.add(key);
+    const acceptedForReuse = acceptedTexts.has(key);
+    duplicates.push({
+      text,
+      outcome: acceptedForReuse ? "accepted_for_reuse" : "rejected",
+      reasons: acceptedForReuse ? undefined : rejectedReasonsByText.get(key) || []
+    });
+  }
+
+  return duplicates;
 }
 
 export function sanitizeGeneratedSentence(sentence: LlmGeneratedSentence): LlmGeneratedSentence | null {
@@ -235,6 +275,7 @@ export class AiSentenceOrchestrator {
     conversationGoal?: string;
     situations?: string[];
     sentenceGoals?: string[];
+    anchorSentences?: Array<{ text: string; translations: string[] }>;
     allowedExpressions?: Array<{ text: string; translations: string[] }>;
     allowedWords?: Array<{ text: string; translations: string[] }>;
     allowDerivedComponents?: boolean;
@@ -259,6 +300,7 @@ export class AiSentenceOrchestrator {
       conversationGoal: input.conversationGoal,
       situations: input.situations,
       sentenceGoals: input.sentenceGoals,
+      anchorSentences: input.anchorSentences,
       allowedExpressions: input.allowedExpressions,
       allowedWords: input.allowedWords,
       maxSentences: input.maxSentences,
@@ -286,12 +328,55 @@ export class AiSentenceOrchestrator {
   private async generateValidatedSentences(input: GenerateSentencesInput) {
     let retryInstruction = "";
     for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const generated = await this.llm.generateSentences({
-        ...input,
-        extraInstructions: [input.extraInstructions, retryInstruction].filter(Boolean).join(" ").trim() || undefined
-      });
+      let generated: LlmGeneratedSentence[];
+      try {
+        generated = await this.llm.generateSentences({
+          ...input,
+          extraInstructions: [input.extraInstructions, retryInstruction].filter(Boolean).join(" ").trim() || undefined
+        });
+      } catch (error) {
+        if (!isInvalidLlmJsonError(error)) throw error;
+
+        logAiValidation("sentences", {
+          context: input.lessonId ? "lesson" : "language",
+          attempt,
+          acceptedCount: 0,
+          rejectedCount: 0,
+          error: "invalid_llm_json"
+        });
+
+        if (attempt < 3) {
+          retryInstruction = [
+            "Previous attempt returned invalid JSON.",
+            "Regenerate and return ONLY a valid JSON object with a top-level sentences array.",
+            "Do not include markdown fences, comments, prose, trailing commas, or unescaped quotes."
+          ].join(" ");
+          logAiRetry("sentences", {
+            attempt,
+            lessonId: input.lessonId,
+            retryInstruction
+          });
+          continue;
+        }
+
+        return { accepted: [], rejected: [] };
+      }
 
       const validation = validateGeneratedSentences(generated, input);
+      const duplicateExistingSentences = collectExistingSentenceDuplicates(
+        generated,
+        validation,
+        input.existingSentences || []
+      );
+      if (duplicateExistingSentences.length > 0) {
+        logAiDuplicateReuse("sentences", {
+          context: input.lessonId ? "lesson" : "language",
+          lessonId: input.lessonId,
+          attempt,
+          duplicateCount: duplicateExistingSentences.length,
+          duplicates: duplicateExistingSentences.slice(0, 8)
+        });
+      }
       if (validation.accepted.length > 0) return validation;
 
       logAiValidation("sentences", {

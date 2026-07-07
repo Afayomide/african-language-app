@@ -30,6 +30,7 @@ import {
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { workflowStatusBadgeClass } from "@/lib/status-badge"
 import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles"
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 import {
   Dialog,
   DialogContent,
@@ -819,9 +820,7 @@ export default function EditLessonPage({ params }: { params: Promise<{ id: strin
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      <SelectItem value="yoruba" className="font-medium">Yoruba</SelectItem>
-                      <SelectItem value="igbo" className="font-medium">Igbo</SelectItem>
-                      <SelectItem value="hausa" className="font-medium">Hausa</SelectItem>
+                      <LanguageSelectItems />
                     </SelectContent>
                   </Select>
                 </div>

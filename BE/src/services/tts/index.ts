@@ -5,13 +5,15 @@ import { uploadAudio } from "../storage/s3.js";
 const LANGUAGE_LOCALES: Record<string, string> = {
   yoruba: "yo-NG",
   igbo: "ig-NG",
-  hausa: "ha-NG"
+  hausa: "ha-NG",
+  pidgin: "en-NG"
 };
 
 const LANGUAGE_VOICES: Record<string, string> = {
   yoruba: process.env.ELEVENLABS_VOICE_ID_YORUBA || "",
   igbo: process.env.ELEVENLABS_VOICE_ID_IGBO || "",
-  hausa: process.env.ELEVENLABS_VOICE_ID_HAUSA || ""
+  hausa: process.env.ELEVENLABS_VOICE_ID_HAUSA || "",
+  pidgin: process.env.ELEVENLABS_VOICE_ID_PIDGIN || ""
 };
 
 const DEFAULT_VOICE = process.env.ELEVENLABS_VOICE_ID_DEFAULT || "";
@@ -32,7 +34,7 @@ export type PhraseAudioMeta = {
 
 export async function generatePhraseAudio(input: {
   text: string;
-  language: "yoruba" | "igbo" | "hausa";
+  language: "yoruba" | "igbo" | "hausa" | "pidgin";
   lessonId: string;
 }) {
   const locale = LANGUAGE_LOCALES[input.language] || "";

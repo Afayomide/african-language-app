@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName, isLanguage } from "@/lib/languages";
+
 import { useEffect, useState, Suspense, use } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
@@ -38,16 +40,6 @@ import { Label } from "@/components/ui/label";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
-
-function isLanguage(value: string): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 function ExpressionsByLanguageContent({ params }: { params: Promise<{ language: string }> }) {
   const { language: languageParam } = use(params);
@@ -265,7 +257,7 @@ function ExpressionsByLanguageContent({ params }: { params: Promise<{ language: 
           <Button variant="ghost" size="icon" onClick={() => router.push("/expressions")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold">{LANGUAGE_LABELS[language]} Expressions</h1>
+          <h1 className="text-3xl font-bold">{getLanguageName(language)} Expressions</h1>
         </div>
         <div className="flex gap-2">
           <Button

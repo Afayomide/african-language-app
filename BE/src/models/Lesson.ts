@@ -1,12 +1,13 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { LANGUAGE_VALUES, LEVEL_VALUES, STATUS_VALUES } from "../domain/entities/Lesson.js";
 
 const LessonSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     unitId: { type: Schema.Types.ObjectId, ref: "Unit", required: true, index: true },
     languageId: { type: Schema.Types.ObjectId, ref: "Language", default: null, index: true },
-    language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true },
-    level: { type: String, enum: ["beginner", "intermediate", "advanced"], required: true },
+    language: { type: String, enum: [...LANGUAGE_VALUES], required: true },
+    level: { type: String, enum: [...LEVEL_VALUES], required: true },
     orderIndex: { type: Number, default: 0, index: true },
     description: { type: String, default: "" },
     topics: { type: [String], default: [] },
@@ -37,7 +38,7 @@ const LessonSchema = new Schema(
       }],
       default: []
     },
-    status: { type: String, enum: ["draft", "finished", "published"], default: "draft" },
+    status: { type: String, enum: [...STATUS_VALUES], default: "draft" },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },

@@ -1,8 +1,10 @@
+import type { Language } from "./Lesson.js";
+
 export type TutorProfileEntity = {
   id: string;
   _id?: string;
   userId: string;
-  language: "yoruba" | "igbo" | "hausa";
+  language?: Language | null;
   displayName: string;
   isActive: boolean;
   createdAt?: Date;

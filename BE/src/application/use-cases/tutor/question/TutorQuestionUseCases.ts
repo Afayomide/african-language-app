@@ -3,6 +3,7 @@ import type { ExpressionRepository } from "../../../../domain/repositories/Expre
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
 import type { QuestionRepository, QuestionUpdateInput } from "../../../../domain/repositories/QuestionRepository.js";
 import type { QuestionEntity } from "../../../../domain/entities/Question.js";
+import type { SentenceRepository } from "../../../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
 
 function lessonHasExpression(lesson: Awaited<ReturnType<LessonRepository["findById"]>>, expressionId: string) {
@@ -17,13 +18,14 @@ export class TutorQuestionUseCases {
     private readonly questions: QuestionRepository,
     private readonly lessons: LessonRepository,
     private readonly expressions: ExpressionRepository,
-    private readonly words: WordRepository
+    private readonly words: WordRepository,
+    private readonly sentences: SentenceRepository
   ) {}
 
   async create(
     input: {
       lessonId: string;
-      sourceType: "word" | "expression";
+      sourceType: "word" | "expression" | "sentence";
       sourceId: string;
       relatedSourceRefs?: QuestionEntity["relatedSourceRefs"];
       translationIndex?: number;
@@ -45,7 +47,9 @@ export class TutorQuestionUseCases {
     const source =
       input.sourceType === "word"
         ? await this.words.findById(input.sourceId)
-        : await this.expressions.findById(input.sourceId);
+        : input.sourceType === "sentence"
+          ? await this.sentences.findById(input.sourceId)
+          : await this.expressions.findById(input.sourceId);
     if (!source) return "source_not_found" as const;
     if (input.sourceType === "expression" && !lessonHasExpression(lesson, source.id)) {
       return "source_not_in_lesson" as const;

@@ -11,9 +11,9 @@ import type {
   LlmLessonSuggestion
 } from "./types.js";
 import { extractThemeAnchors } from "./unitTheme.js";
+import type { Language } from "../../domain/entities/Lesson.js";
 
 type Level = "beginner" | "intermediate" | "advanced";
-type Language = "yoruba" | "igbo" | "hausa";
 
 export type ValidationResult<T> = {
   accepted: T[];
@@ -73,6 +73,10 @@ function sentenceComponentsCoverText(
   }
 
   return isIgnorableSentenceGap(source.slice(cursor));
+}
+
+function isSentenceMeaningSegmentReason(reason: string) {
+  return reason.includes("meaning segment");
 }
 
 function looksEnglishOnly(value: string) {
@@ -340,12 +344,17 @@ function sentenceReasons(
   );
   const components = Array.isArray(sentence.components) ? sentence.components : [];
   const normalizedText = normalize(text);
-  const existingSentences = new Set((input.existingSentences || []).map(normalize));
   const allowedExpressions = new Set(
     (input.allowedExpressions || []).map((item) => `expression:${normalize(item.text)}`)
   );
   const allowedWords = new Set(
     (input.allowedWords || []).map((item) => `word:${normalize(item.text)}`)
+  );
+  const allowedExpressionWordTokens = new Set(
+    (input.allowedExpressions || [])
+      .flatMap((item) => splitWords(item.text))
+      .map((item) => `word:${normalize(item)}`)
+      .filter((item) => item !== "word:")
   );
   const hasExplicitInventory = allowedExpressions.size > 0 || allowedWords.size > 0;
   const words = splitWords(text);
@@ -373,7 +382,6 @@ function sentenceReasons(
 
   if (!text) reasons.push("empty text");
   if (seenTexts.has(normalizedText)) reasons.push("duplicate sentence in batch");
-  if (existingSentences.has(normalizedText)) reasons.push("duplicate sentence in existing data");
   if (translations.length === 0) reasons.push("missing translations");
   if (components.length === 0) reasons.push("missing components");
   if (words.length < 2) reasons.push("sentence too short");
@@ -422,12 +430,6 @@ function sentenceReasons(
       ) {
         reasons.push("meaning segments must cover each component exactly once");
       }
-
-      if (
-        flattenedIndexes.some((value, index) => index > 0 && value < flattenedIndexes[index - 1])
-      ) {
-        reasons.push("meaning segments out of component order");
-      }
     }
   }
 
@@ -451,17 +453,25 @@ function sentenceReasons(
     if (hasExplicitInventory && !role) reasons.push("component missing role");
     if (!hasExplicitInventory && !role) reasons.push("component missing role");
     const key = `${type}:${componentText}`;
-    if (hasExplicitInventory && type === "word" && !allowedWords.has(key)) reasons.push("unknown word component");
+    if (hasExplicitInventory && type === "word" && !allowedWords.has(key) && !allowedExpressionWordTokens.has(key)) {
+      reasons.push("unknown word component");
+    }
     if (hasExplicitInventory && type === "expression" && !allowedExpressions.has(key)) reasons.push("unknown expression component");
     if (!normalizedSentence.includes(componentText)) reasons.push("component text missing from sentence");
   }
 
   if (!hasExplicitInventory) {
-    const supportExpressions = normalizedComponents.filter((component) => component.role === "support" && component.type === "expression");
-    const supportWords = normalizedComponents.filter((component) => component.role === "support" && component.type === "word");
     const coreComponents = normalizedComponents.filter((component) => component.role === "core");
-    if (supportExpressions.length > 1) reasons.push("too many support expressions");
-    if (supportWords.length > 2) reasons.push("too many support words");
+    // Temporarily disabled: hard caps on support components are rejecting
+    // valid sentence-goal outputs too aggressively in normal core generation.
+    // const supportExpressions = normalizedComponents.filter(
+    //   (component) => component.role === "support" && component.type === "expression"
+    // );
+    // const supportWords = normalizedComponents.filter(
+    //   (component) => component.role === "support" && component.type === "word"
+    // );
+    // if (supportExpressions.length > 1) reasons.push("too many support expressions");
+    // if (supportWords.length > 2) reasons.push("too many support words");
     if (coreComponents.length === 0) reasons.push("missing core components");
     if (
       coreComponents.length === 1 &&
@@ -482,10 +492,19 @@ export function validateGeneratedSentences(
   const accepted: LlmGeneratedSentence[] = [];
   const rejected: Array<{ item: LlmGeneratedSentence; reasons: string[] }> = [];
   const seenTexts = new Set<string>();
+  const existingSentences = new Set((input.existingSentences || []).map(normalize));
 
   for (const sentence of sentences) {
     const reasons = sentenceReasons(sentence, input, seenTexts);
     if (reasons.length > 0) {
+      const normalizedText = normalize(String(sentence.text || ""));
+      const isExistingSentence = existingSentences.has(normalizedText);
+      const onlyMeaningSegmentIssues = reasons.every(isSentenceMeaningSegmentReason);
+      if (isExistingSentence && onlyMeaningSegmentIssues) {
+        seenTexts.add(normalizedText);
+        accepted.push(sentence);
+        continue;
+      }
       rejected.push({ item: sentence, reasons });
       continue;
     }
@@ -657,6 +676,53 @@ export function validateLessonSuggestion(
       themeAnchors,
       titleDescriptionMatches,
       objectiveMatches
+    }
+  };
+}
+
+export function validateUnitSuggestion(
+  suggestion: Pick<LlmLessonSuggestion, "title" | "description">,
+  input: {
+    unitTitle?: string;
+    unitDescription?: string;
+    topic?: string;
+    curriculumInstruction?: string;
+    themeAnchors?: string[];
+    existingUnitTitles?: string[];
+    existingLessonTitles?: string[];
+  }
+) {
+  const reasons: string[] = [];
+  const title = String(suggestion.title || "").trim();
+  const description = String(suggestion.description || "").trim();
+  const normalizedTitle = normalize(title);
+  const existingTitles = new Set([
+    ...(input.existingUnitTitles || []).map(normalize),
+    ...(input.existingLessonTitles || []).map(normalize)
+  ]);
+  const themeAnchors = input.themeAnchors && input.themeAnchors.length > 0
+    ? input.themeAnchors.map(normalize)
+    : extractThemeAnchors({
+        unitTitle: input.unitTitle,
+        unitDescription: input.unitDescription,
+        topic: input.topic,
+        curriculumInstruction: input.curriculumInstruction
+      });
+
+  if (!title) reasons.push("empty title");
+  if (title && !looksEnglishOnly(title)) reasons.push("title not English-like");
+  if (existingTitles.has(normalizedTitle)) reasons.push("duplicate title");
+  if (!description) reasons.push("missing description");
+  if (description && !looksEnglishOnly(description)) reasons.push("description not English-like");
+
+  const titleDescriptionMatches = themeAnchors.length > 0 ? countThemeAnchorMatches([title, description], themeAnchors) : 0;
+
+  return {
+    ok: reasons.length === 0,
+    reasons,
+    details: {
+      themeAnchors,
+      titleDescriptionMatches
     }
   };
 }

@@ -1,9 +1,10 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { LANGUAGE_VALUES } from "../../domain/entities/Lesson.js";
 
 const LearnerContentPerformanceSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    language: { type: String, enum: ["yoruba", "igbo", "hausa"], required: true, index: true },
+    language: { type: String, enum: [...LANGUAGE_VALUES], required: true, index: true },
     contentType: { type: String, enum: ["word", "expression", "sentence"], required: true },
     contentId: { type: Schema.Types.ObjectId, required: true },
     exposureCount: { type: Number, default: 0, min: 0 },

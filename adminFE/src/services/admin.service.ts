@@ -4,6 +4,7 @@ import {
   Chapter,
   Lesson,
   Unit,
+  UnitDeletedEntries,
   Expression,
   Word,
   Sentence,
@@ -198,7 +199,7 @@ export const unitService = {
   },
 
   async getDeletedEntries(id: string) {
-    const response = await api.get<{ lessons: Lesson[]; expressions: Expression[] }>(feAdminRoutes.unitDeletedEntries(id));
+    const response = await api.get<UnitDeletedEntries>(feAdminRoutes.unitDeletedEntries(id));
     return response.data;
   },
 
@@ -230,9 +231,24 @@ export const unitService = {
     return response.data.lesson;
   },
 
+  async restoreDeletedWord(unitId: string, wordId: string) {
+    const response = await api.post<{ word: Word }>(feAdminRoutes.restoreDeletedUnitWord(unitId, wordId));
+    return response.data.word;
+  },
+
   async restoreDeletedExpression(unitId: string, expressionId: string) {
     const response = await api.post<{ expression: Expression }>(feAdminRoutes.restoreDeletedUnitExpression(unitId, expressionId));
     return response.data.expression;
+  },
+
+  async restoreDeletedSentence(unitId: string, sentenceId: string) {
+    const response = await api.post<{ sentence: Sentence }>(feAdminRoutes.restoreDeletedUnitSentence(unitId, sentenceId));
+    return response.data.sentence;
+  },
+
+  async restoreDeletedProverb(unitId: string, proverbId: string) {
+    const response = await api.post<{ proverb: Proverb }>(feAdminRoutes.restoreDeletedUnitProverb(unitId, proverbId));
+    return response.data.proverb;
   },
 
   async finishUnit(id: string) {

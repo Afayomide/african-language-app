@@ -22,6 +22,7 @@ import {
   CURRICULUM_QUALITY_RULES,
   JSON_ONLY_RULES,
   PROVERB_GUARDRAILS,
+  SENTENCE_PROMPT_GUARDRAILS,
   getCulturalSituationRules,
   getLevelPedagogyRules,
   getPhrasePromptGuardrails,
@@ -35,6 +36,8 @@ type GoogleServiceAccountCredentials = {
   private_key?: string;
   project_id?: string;
 };
+
+
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-pro-preview";
@@ -143,12 +146,44 @@ function getErrorStatusCode(error: unknown): number | null {
   return null;
 }
 
+function collectErrorMessages(error: unknown, seen = new Set<unknown>()): string[] {
+  if (!error || seen.has(error)) return [];
+  seen.add(error);
+
+  if (error instanceof Error) {
+    const messages = [error.name, error.message].filter(Boolean);
+    const cause = (error as { cause?: unknown }).cause;
+    return [...messages, ...collectErrorMessages(cause, seen)];
+  }
+
+  if (typeof error === "object") {
+    const value = error as {
+      cause?: unknown;
+      code?: unknown;
+      errno?: unknown;
+      syscall?: unknown;
+      hostname?: unknown;
+      message?: unknown;
+    };
+    return [
+      typeof value.message === "string" ? value.message : "",
+      typeof value.code === "string" ? value.code : "",
+      typeof value.errno === "string" ? value.errno : "",
+      typeof value.syscall === "string" ? value.syscall : "",
+      typeof value.hostname === "string" ? value.hostname : "",
+      ...collectErrorMessages(value.cause, seen)
+    ].filter(Boolean);
+  }
+
+  return [String(error || "")].filter(Boolean);
+}
+
 function isRetryableGeminiError(error: unknown) {
   const statusCode = getErrorStatusCode(error);
   if (statusCode === 429 || statusCode === 500 || statusCode === 503 || statusCode === 504) return true;
 
-  const message = error instanceof Error ? error.message : String(error || "");
-  return /(429|RESOURCE_EXHAUSTED|UNAVAILABLE|DEADLINE_EXCEEDED|Too Many Requests|Service Unavailable)/i.test(message);
+  const message = collectErrorMessages(error).join(" ");
+  return /(429|RESOURCE_EXHAUSTED|UNAVAILABLE|DEADLINE_EXCEEDED|Too Many Requests|Service Unavailable|fetch failed|sending request|network error|socket hang up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|UND_ERR_|terminated|aborted)/i.test(message);
 }
 
 async function generateContentWithRetry(
@@ -174,7 +209,7 @@ async function generateContentWithRetry(
       const baseDelay = GEMINI_INITIAL_RETRY_DELAY_MS * 2 ** attempt;
       const jitter = Math.floor(Math.random() * Math.min(1000, Math.max(250, Math.floor(baseDelay * 0.25))));
       const delayMs = Math.min(baseDelay + jitter, 30000);
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = collectErrorMessages(error).join(" | ") || String(error);
       console.warn(`[GEMINI_RETRY] ${operation}`, {
         attempt: attempt + 1,
         delayMs,
@@ -277,6 +312,12 @@ function buildChaptersPrompt(input: GenerateChaptersInput) {
 }
 
 function buildSentencesPrompt(input: GenerateSentencesInput) {
+  const anchorSentences = input.anchorSentences?.length
+    ? input.anchorSentences
+        .slice(0, 8)
+        .map((item) => `${item.text} => ${item.translations.slice(0, 2).join(" / ")}`)
+        .join(" | ")
+    : "";
   const allowedExpressions = input.allowedExpressions?.length
     ? input.allowedExpressions
         .slice(0, 20)
@@ -308,23 +349,24 @@ function buildSentencesPrompt(input: GenerateSentencesInput) {
     ...getStandardLanguageRules(input.language).map((rule) => `- ${rule}`),
     ...getLevelPedagogyRules(input.level).map((rule) => `- ${rule}`),
     ...getCulturalSituationRules(input.language).map((rule) => `- ${rule}`),
+    ...SENTENCE_PROMPT_GUARDRAILS.map((rule) => `- ${rule}`),
     "- Use the target language for sentence text and component text.",
     "- translations, literalTranslation, usageNotes, and explanation must be in English.",
+    "- Do not use English contractions anywhere in English output. Write expanded forms such as \"that is\", \"do not\", \"I am\", and \"you are\".",
     "- components must appear in sentence order.",
     "- Every component must include its own English translation.",
     "- meaningSegments must be English teaching chunks that map the English meaning back to the sentence components.",
     "- Every meaning segment must include text and componentIndexes.",
-    "- meaningSegments must cover every component exactly once, in order. Group multiple components into one English chunk when needed.",
+    "- meaningSegments must be listed in natural English translation order and must cover every component exactly once. componentIndexes may point to source components in a different order when English word order differs from the target language. Group multiple components into one English chunk when needed.",
     "- Use natural but alignment-friendly English chunks such as \"is going\" for progressive markers plus verb, instead of forcing awkward one-word mappings.",
     "- Single-word reusable items should be returned as type=word.",
-    "- Multi-word components are allowed only when they are genuinely fixed formulas, idiomatic chunks, or socially taught units.",
+    "- Multi-word components are allowed only when they are genuinely fixed formulas, idiomatic chunks, or socially taught units. Mark those with fixed=true.",
     "- If a component has more than one token and it is a fixed chunk, return it as type=expression and set fixed=true.",
     "- If a multi-word chunk is transparently compositional, split it into separate word components instead of returning one combined component.",
-    "- Do not split fixed multi-word greeting formulas or respectful chunks into separate words. Keep chunks like respectful greetings as single expression components with fixed=true.",
     "- Possessive noun phrases or transparent verb-plus-direction combinations should usually be split into words, not stored as expressions.",
     "- Do not return a bare expression or greeting formula as a full sentence. Sentences should be fuller communicative utterances, not just a standalone chunk.",
     hasExplicitInventory && !allowDerivedComponents
-      ? "- Every component must exactly match one allowed word or allowed expression text."
+      ? "- Every component must exactly match one allowed word, one allowed expression, or one word inside an allowed expression when that expression is breakable."
       : "- Mark components as role=core if they represent the main lesson target, or role=support if they only help make the sentence natural.",
     allowDerivedComponents
       ? "- You may introduce at most 1 support expression or at most 2 support words per sentence."
@@ -332,6 +374,12 @@ function buildSentencesPrompt(input: GenerateSentencesInput) {
     "- For beginner level, keep sentences short, natural, and easy to read aloud.",
     "- Prioritize sentences built around real-life pressure points and practical daily needs before abstract demonstration sentences.",
     "- Prefer sentences that sound like things a learner would genuinely need to say in the target culture, such as power, transport, market, money, family, food, school, work, health, safety, or asking for help.",
+    anchorSentences
+      ? "- Treat the provided anchor sentences as the exact review territory. Generate bounded variants that stay close to those anchor meanings."
+      : "",
+    anchorSentences
+      ? "- Do not copy an anchor sentence exactly. Recombine or vary only with already allowed inventory."
+      : "",
     hasExplicitInventory && !allowDerivedComponents
       ? "- Prefer sentences that reinforce already introduced lesson content instead of adding new grammar."
       : "- Keep the sentence centered on the lesson's communicative goal, not isolated vocabulary drills.",
@@ -343,10 +391,13 @@ function buildSentencesPrompt(input: GenerateSentencesInput) {
     input.conversationGoal ? `Conversation goal: ${input.conversationGoal}` : "",
     situations ? `Situations: ${situations}` : "",
     sentenceGoals ? `Sentence goals: ${sentenceGoals}` : "",
+    anchorSentences ? `Anchor sentences: ${anchorSentences}` : "",
     allowedExpressions ? `Allowed expressions: ${allowedExpressions}` : "Allowed expressions: none",
     allowedWords ? `Allowed words: ${allowedWords}` : "Allowed words: none",
     input.extraInstructions ? `Extra generation instructions: ${input.extraInstructions}` : "",
-    existingSentences ? `Existing sentences to avoid: ${existingSentences}` : ""
+    existingSentences
+      ? `Existing sentences already available for reuse when they exactly fit the lesson goal: ${existingSentences}`
+      : ""
   ]
     .filter(Boolean)
     .join("\n");
@@ -393,7 +444,7 @@ function buildProverbsPrompt(input: {
     "Rules:",
     ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
     ...PROVERB_GUARDRAILS.map((rule) => `- ${rule}`),
-    ...getStandardLanguageRules(input.language as "yoruba" | "igbo" | "hausa").map((rule) => `- ${rule}`),
+    ...getStandardLanguageRules(input.language as "yoruba" | "igbo" | "hausa" | "pidgin").map((rule) => `- ${rule}`),
     ...getLevelPedagogyRules(input.level as "beginner" | "intermediate" | "advanced").map((rule) => `- ${rule}`),
     "- translation should be concise but complete.",
     "- contextNote is required for every proverb.",
@@ -442,7 +493,7 @@ function buildLessonSuggestPrompt(input: {
     ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
     ...getSuggestionGuardrails(
       input.level as "beginner" | "intermediate" | "advanced",
-      input.language as "yoruba" | "igbo" | "hausa"
+      input.language as "yoruba" | "igbo" | "hausa" | "pidgin"
     ).map((rule) => `- ${rule}`),
     "- Use the target language for seedExpressions only.",
     "- Titles, descriptions, objectives, and all planning metadata must be entirely in English.",
@@ -490,6 +541,8 @@ function buildUnitPlanPrompt(input: {
   topic?: string;
   curriculumInstruction?: string;
   extraInstructions?: string;
+  reviewMode?: boolean;
+  reviewInventorySummary?: string;
   themeAnchors?: string[];
   existingUnitTitles?: string[];
   existingLessonTitles?: string[];
@@ -513,12 +566,12 @@ function buildUnitPlanPrompt(input: {
   return [
     "You are planning a complete language-learning unit before any lesson content is generated.",
     "Return ONLY valid JSON with this shape:",
-    "{\"lessons\":[{\"title\":string,\"description\":string,\"objectives\":[string],\"conversationGoal\":string,\"situations\":[string],\"sentenceGoals\":[string],\"focusSummary\":string}]}",
+    "{\"lessons\":[{\"title\":string,\"description\":string,\"objectives\":[string],\"conversationGoal\":string,\"situations\":[string],\"sentenceGoals\":[string],\"focusSummary\":string,\"targetWords\":[{\"text\":string,\"translations\":[string]}],\"targetExpressions\":[{\"text\":string,\"translations\":[string]}]}]}",
     "Rules:",
     ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
     ...getSuggestionGuardrails(
       input.level as "beginner" | "intermediate" | "advanced",
-      input.language as "yoruba" | "igbo" | "hausa"
+      input.language as "yoruba" | "igbo" | "hausa" | "pidgin"
     ).map((rule) => `- ${rule}`),
     "- Plan the whole unit first, not one lesson at a time.",
     "- Return exactly the requested lesson count.",
@@ -529,15 +582,32 @@ function buildUnitPlanPrompt(input: {
     "- Do not reuse the same proverb, same main lesson intent, or the same sentence-pattern focus as if it were new content unless this is an explicit review lesson.",
     "- If extra instructions assign specific subtopics to specific lessons, follow that allocation exactly.",
     "- Titles, descriptions, objectives, and focusSummary must be in English only.",
+    "- If you mention a target-language word or phrase in English metadata, wrap it in simple ASCII quotes and keep the surrounding sentence fully English.",
     "- conversationGoal must be in English only and describe what the learner should be able to do in that lesson.",
     "- situations must be in English only and describe concrete scenes or uses for the lesson.",
     "- sentenceGoals must be in English only and describe the target sentence meanings the learner should reach in that lesson.",
+    "- Do not put target-language text inside sentenceGoals. Write English meanings only. Example: write \"How are you?\" not \"Báwo ni? (How are you?)\".",
     "- Return exactly 1 conversationGoal.",
     "- Return 2 to 4 situations.",
     "- Return 2 to 5 sentenceGoals.",
+    "- targetWords and targetExpressions are the exact teachable items for the lesson, not helper/context words.",
+    "- For each non-review core lesson, return 1 to 2 total targets across targetWords and targetExpressions.",
+    "- Put single-token teachable items in targetWords and multi-word phrase targets in targetExpressions. A target expression is not automatically a fixed component; break it into word components if the parts have standalone meaning.",
+    "- Do not put names, family members, pronouns, particles, or other context-only helper items in targetWords unless the lesson is specifically teaching that item.",
+    "- If extra instructions name exact targets for a lesson, copy those exact targets into targetWords/targetExpressions.",
     "- Plan each lesson around communicative sentences first, not isolated vocabulary first.",
     "- Do not restart from the same easiest cluster in every lesson.",
     "- Spread the requested coverage across the lesson sequence coherently.",
+    ...(input.reviewMode
+      ? [
+          "- This is a review unit plan.",
+          "- Review lesson conversationGoal, situations, and sentenceGoals must stay within the previously taught review inventory provided below.",
+          "- Do not propose new teachable meanings, new target vocabulary, or new communicative territory outside that review inventory.",
+          "- Fresh review practice is allowed only by recombining known words, known expressions, and already taught sentence patterns.",
+          "- Plan review lessons as anchored variation on previously taught sentences, not open-ended new sentence invention.",
+          "- For review unit plans, leave targetWords and targetExpressions empty unless the target is explicitly already known review practice."
+        ]
+      : []),
     `- ${buildThemeAlignmentInstruction({ unitTitle: input.unitTitle, unitDescription: input.unitDescription, topic: input.topic, themeAnchors: input.themeAnchors })}`,
     `Language: ${input.language}`,
     `Level: ${input.level}`,
@@ -547,6 +617,7 @@ function buildUnitPlanPrompt(input: {
     input.topic ? `Topic: ${input.topic}` : "",
     input.curriculumInstruction ? `Curriculum instruction: ${input.curriculumInstruction}` : "",
     input.extraInstructions ? `Extra instructions: ${input.extraInstructions}` : "",
+    input.reviewInventorySummary ? `Review inventory summary:\n${input.reviewInventorySummary}` : "",
     input.existingLessonsSummary ? `Curriculum memory and existing lesson summary:\n${input.existingLessonsSummary}` : "",
     existingUnitTitles ? `Existing unit titles (avoid overlap): ${existingUnitTitles}` : "",
     existingLessonTitles ? `Existing lesson titles (avoid overlap when adding new lessons): ${existingLessonTitles}` : "",
@@ -583,7 +654,7 @@ function buildUnitRefactorPrompt(input: {
     ...JSON_ONLY_RULES.map((rule) => `- ${rule}`),
     ...getSuggestionGuardrails(
       input.level as "beginner" | "intermediate" | "advanced",
-      input.language as "yoruba" | "igbo" | "hausa"
+      input.language as "yoruba" | "igbo" | "hausa" | "pidgin"
     ).map((rule) => `- ${rule}`),
     "- Use lessonIds exactly as provided in the lesson snapshot. Do not invent lessonIds.",
     "- Only use the allowed operation types.",
@@ -593,7 +664,7 @@ function buildUnitRefactorPrompt(input: {
     "- Use add_word_bundle, replace_word_bundle, or remove_word_bundle for standalone word targets.",
     "- Use add_sentence_bundle to add a new teaching sentence with its reusable component breakdown.",
     "- Use replace_sentence_bundle when a lesson should teach a different sentence instead.",
-    "- Multi-word sentence components are allowed only for genuinely fixed formulas or socially taught chunks. Mark those with fixed=true.",
+    "- Multi-word components are allowed only when they are genuinely fixed formulas, idiomatic chunks, or socially taught units.",
     "- If a multi-word chunk is transparently compositional, split it into separate word components instead of returning one combined component.",
     "- Use remove_sentence_bundle when a sentence should no longer be taught.",
     "- Use add_expression_bundle or replace_expression_bundle only for component-level fixes.",
@@ -706,7 +777,7 @@ export function createGeminiClient(): LlmClient {
       return parseJson<Partial<LlmGeneratedPhrase>>(text, "invalid_llm_json");
     },
     async generateProverbs(input: {
-      language: "yoruba" | "igbo" | "hausa";
+      language: "yoruba" | "igbo" | "hausa" | "pidgin";
       level: "beginner" | "intermediate" | "advanced";
       lessonTitle?: string;
       lessonDescription?: string;
@@ -747,6 +818,8 @@ export function createGeminiClient(): LlmClient {
       topic?: string;
       curriculumInstruction?: string;
       extraInstructions?: string;
+      reviewMode?: boolean;
+      reviewInventorySummary?: string;
       themeAnchors?: string[];
       existingUnitTitles?: string[];
       existingLessonTitles?: string[];

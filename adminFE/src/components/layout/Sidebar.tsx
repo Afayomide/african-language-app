@@ -3,13 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, BookOpen, MessageSquare, CircleHelp, Users, Settings, LogOut, MessageSquareQuote, FolderTree, LayoutGrid, Type, ScrollText, Sparkles } from "lucide-react"
+import { LayoutDashboard, BookOpen, MessageSquare, CircleHelp, Users, Settings, LogOut, MessageSquareQuote, FolderTree, LayoutGrid, Type, ScrollText, Sparkles, Languages } from "lucide-react"
 import { authService } from "@/services/auth"
 
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Chapters", href: "/chapters", icon: LayoutGrid },
   { name: "Curriculum Jobs", href: "/curriculum-jobs", icon: Sparkles },
+  { name: "Languages", href: "/languages", icon: Languages },
+  { name: "Languages", href: "/languages", icon: Languages },
   { name: "Units", href: "/units", icon: FolderTree },
   { name: "Lessons", href: "/lessons", icon: BookOpen },
   { name: "Words", href: "/words", icon: Type },

@@ -7,7 +7,7 @@ import ExerciseQuestionModel from "../models/ExerciseQuestion.js";
 import LessonProgressModel from "../models/learner/LessonProgress.js";
 import LearnerContentPerformanceModel from "../models/learner/LearnerContentPerformance.js";
 
-type Language = "yoruba" | "igbo" | "hausa";
+type Language = "yoruba" | "igbo" | "hausa" | "pidgin";
 type ContentType = "word" | "expression" | "sentence";
 type LessonKind = "core" | "review";
 

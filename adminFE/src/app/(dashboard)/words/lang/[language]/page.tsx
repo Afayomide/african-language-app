@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName, isLanguage } from "@/lib/languages";
+
 import { Suspense, use, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { aiService, lessonService, wordService } from "@/services";
@@ -37,16 +39,6 @@ import { Label } from "@/components/ui/label";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
-
-function isLanguage(value: string): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 function WordsByLanguageContent({ params }: { params: Promise<{ language: string }> }) {
   const { language: languageParam } = use(params);
@@ -306,8 +298,8 @@ function WordsByLanguageContent({ params }: { params: Promise<{ language: string
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{LANGUAGE_LABELS[language]} Words</h1>
-            <p className="font-medium text-muted-foreground">Manage words for {LANGUAGE_LABELS[language]}.</p>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{getLanguageName(language)} Words</h1>
+            <p className="font-medium text-muted-foreground">Manage words for {getLanguageName(language)}.</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">

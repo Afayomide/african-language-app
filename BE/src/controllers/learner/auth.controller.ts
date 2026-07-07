@@ -50,7 +50,7 @@ export async function signup(req: Request, res: Response) {
 
   try {
     const normalizedLanguage = language
-      ? (String(language) as "yoruba" | "igbo" | "hausa")
+      ? (String(language) as "yoruba" | "igbo" | "hausa" | "pidgin")
       : undefined;
 
     const result = await useCases.signup({
@@ -193,7 +193,7 @@ export async function updateProfile(req: AuthRequest, res: Response) {
       proficientLanguage: proficientLanguage !== undefined ? String(proficientLanguage) : undefined,
       countryOfOrigin: countryOfOrigin !== undefined ? String(countryOfOrigin) : undefined,
       currentLanguage:
-        currentLanguage !== undefined ? (String(currentLanguage) as "yoruba" | "igbo" | "hausa") : undefined,
+        currentLanguage !== undefined ? (String(currentLanguage) as "yoruba" | "igbo" | "hausa" | "pidgin") : undefined,
       dailyGoalMinutes: parsedDailyGoalMinutes
     });
 

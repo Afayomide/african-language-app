@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName, isLanguage } from "@/lib/languages";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -18,12 +20,7 @@ import { toast } from "sonner";
 import { DataTableControls } from "@/components/common/data-table-controls";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 const PAGE_OPTIONS = [10, 20, 50];
 
@@ -98,7 +95,7 @@ export default function UnitsPage() {
     if (qStatus === "draft" || qStatus === "finished" || qStatus === "published" || qStatus === "all") {
       setStatusFilter(qStatus);
     }
-    if (qLanguage === "yoruba" || qLanguage === "igbo" || qLanguage === "hausa") {
+    if (isLanguage(qLanguage)) {
       setLanguageFilter(qLanguage);
     }
     if (qChapterId) {
@@ -284,7 +281,7 @@ export default function UnitsPage() {
           <DialogHeader>
             <DialogTitle>AI Bulk Unit Generation</DialogTitle>
             <DialogDescription>
-              Generate multiple draft core units for {LANGUAGE_LABELS[languageFilter]}. A sentence-focused review unit will be auto-inserted after every two core units.
+              Generate multiple draft core units for {getLanguageName(languageFilter)}. A sentence-focused review unit will be auto-inserted after every two core units.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -350,9 +347,7 @@ export default function UnitsPage() {
             <Select value={languageFilter} onValueChange={(value) => setLanguageFilter(value as Language)}>
               <SelectTrigger className="h-10 w-[220px]"><SelectValue placeholder="Filter by language" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="yoruba">Yoruba</SelectItem>
-                <SelectItem value="igbo">Igbo</SelectItem>
-                <SelectItem value="hausa">Hausa</SelectItem>
+                <LanguageSelectItems />
               </SelectContent>
             </Select>
 

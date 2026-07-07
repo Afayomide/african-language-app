@@ -15,5 +15,7 @@ export {
   voiceArtistService,
   voiceAudioService
 } from "./admin.service";
+export { languageService } from "./language.service";
+export { adminLanguageService } from "./language-admin.service";
 export { aiService } from "./ai.service";
 export { authService } from "./auth";

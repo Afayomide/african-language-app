@@ -37,6 +37,11 @@ export function buildLetterOrderReviewData(input: {
 export function buildWordOrderReviewData(input: {
   phraseText: string;
   meaning: string;
+  meaningSegments?: Array<{
+    text: string;
+    sourceWordIndexes: number[];
+    sourceComponentIndexes?: number[];
+  }>;
 }) {
   const sentence = String(input.phraseText || "").trim();
   const words = splitWords(sentence);
@@ -46,6 +51,9 @@ export function buildWordOrderReviewData(input: {
     sentence,
     words,
     correctOrder: words.map((_, index) => index),
-    meaning: String(input.meaning || "").trim()
+    meaning: String(input.meaning || "").trim(),
+    ...(Array.isArray(input.meaningSegments) && input.meaningSegments.length > 0
+      ? { meaningSegments: input.meaningSegments }
+      : {})
   };
 }

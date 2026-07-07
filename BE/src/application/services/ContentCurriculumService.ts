@@ -20,48 +20,17 @@ export class ContentCurriculumService {
     private readonly unitContentItems: UnitContentItemRepository
   ) {}
 
-  private async buildLessonPositionMap(unit: UnitEntity) {
-    const unitsInScope = unit.chapterId
-      ? await this.units.listByChapterId(unit.chapterId)
-      : await this.units.listByLanguage(unit.language);
-    const scopedUnits = unitsInScope
-      .filter((item) => item.status !== "draft")
-      .sort((left, right) => left.orderIndex - right.orderIndex || left.createdAt.getTime() - right.createdAt.getTime());
-
-    const lessonMap = new Map<string, number>();
-    let cursor = 0;
-    for (const scopedUnit of scopedUnits) {
-      const lessons = await this.lessons.listByUnitId(scopedUnit.id);
-      const sortedLessons = lessons
-        .filter((lesson) => lesson.status !== "draft")
-        .sort((left, right) => left.orderIndex - right.orderIndex || left.createdAt.getTime() - right.createdAt.getTime());
-      for (const lesson of sortedLessons) {
-        lessonMap.set(lesson.id, cursor);
-        cursor += 1;
-      }
-    }
-    return lessonMap;
-  }
-
   async wasContentIntroducedBeforeLesson(input: {
     lesson: LessonEntity;
     contentType: ContentType;
     contentId: string;
   }) {
-    const unit = await this.units.findById(input.lesson.unitId);
-    if (!unit) return false;
-
     const priorIntroductions = await this.lessonContentItems.list({
       contentType: input.contentType,
       contentId: input.contentId,
       role: "introduce"
     });
-    if (priorIntroductions.length === 0) return false;
-
-    const lessonPositionMap = await this.buildLessonPositionMap(unit);
-    const currentPosition = lessonPositionMap.get(input.lesson.id) ?? Number.MAX_SAFE_INTEGER;
-
-    return priorIntroductions.some((item) => item.lessonId !== input.lesson.id && (lessonPositionMap.get(item.lessonId) ?? Number.MAX_SAFE_INTEGER) < currentPosition);
+    return priorIntroductions.some((item) => item.lessonId !== input.lesson.id);
   }
 
   async replaceLessonContentItems(input: {
@@ -143,6 +112,52 @@ export class ContentCurriculumService {
     }
 
     return this.unitContentItems.replaceForUnit(input.unitId, items);
+  }
+
+  async rebuildUnitContentItemsFromLessons(input: {
+    unitId: string;
+    createdBy: string;
+  }) {
+    const unitLessons = (await this.lessons.list({ unitId: input.unitId }))
+      .slice()
+      .sort((left, right) => left.orderIndex - right.orderIndex || left.createdAt.getTime() - right.createdAt.getTime());
+    const lessonOrderMap = new Map(unitLessons.map((lesson, index) => [lesson.id, index]));
+    const lessonItems = await this.lessonContentItems.list({ unitId: input.unitId });
+    const sortedItems = lessonItems
+      .slice()
+      .sort((left, right) => {
+        const lessonDiff = (lessonOrderMap.get(left.lessonId) ?? 0) - (lessonOrderMap.get(right.lessonId) ?? 0);
+        if (lessonDiff !== 0) return lessonDiff;
+        const stageDiff = (left.stageIndex ?? Number.MAX_SAFE_INTEGER) - (right.stageIndex ?? Number.MAX_SAFE_INTEGER);
+        if (stageDiff !== 0) return stageDiff;
+        return left.orderIndex - right.orderIndex;
+      });
+
+    const introduced: Array<{ contentType: ContentType; contentId: string }> = [];
+    const review: Array<{ contentType: ContentType; contentId: string; sourceUnitId?: string | null }> = [];
+    const introducedKeys = new Set<string>();
+    const reviewKeys = new Set<string>();
+
+    for (const item of sortedItems) {
+      const key = `${item.contentType}:${item.contentId}`;
+      if (item.role === "introduce" && !introducedKeys.has(key)) {
+        introduced.push({ contentType: item.contentType, contentId: item.contentId });
+        introducedKeys.add(key);
+        continue;
+      }
+
+      if ((item.role === "review" || item.role === "practice") && !reviewKeys.has(key)) {
+        review.push({ contentType: item.contentType, contentId: item.contentId, sourceUnitId: null });
+        reviewKeys.add(key);
+      }
+    }
+
+    return this.replaceUnitContentItems({
+      unitId: input.unitId,
+      createdBy: input.createdBy,
+      introduced,
+      review
+    });
   }
 
   extractIntroducedContentFromStages(stages: LessonStage[]) {

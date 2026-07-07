@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { useState, useEffect, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { expressionService, lessonService, aiService } from "@/services"
@@ -18,6 +20,7 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { ArrowLeft, Sparkles, Mic, Square } from "lucide-react"
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +37,7 @@ function NewExpressionContent() {
   const lessonIdParam = searchParams.get("lessonId")
   const languageParam = searchParams.get("language")
   const initialLanguage: Language | undefined =
-    languageParam === "yoruba" || languageParam === "igbo" || languageParam === "hausa"
+    isLanguage(languageParam)
       ? languageParam
       : undefined
 
@@ -317,9 +320,7 @@ function NewExpressionContent() {
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yoruba">Yoruba</SelectItem>
-                  <SelectItem value="igbo">Igbo</SelectItem>
-                  <SelectItem value="hausa">Hausa</SelectItem>
+                  <LanguageSelectItems />
                 </SelectContent>
               </Select>
             </div>

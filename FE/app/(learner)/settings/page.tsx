@@ -282,10 +282,10 @@ export default function SettingsPage() {
       </div>
       ) : (
       <div className="mx-auto max-w-3xl space-y-8">
-        <div className="text-center">
+        {/* <div className="text-center">
           <h1 className="font-display text-[2.4rem] font-extrabold tracking-[-0.05em] text-[#a94600]">Refine Your Ethos</h1>
           <p className="mt-2 text-sm font-medium text-[#66655a]">Manage your identity and security within the digital archive.</p>
-        </div>
+        </div> */}
 
         <section className="rounded-[2rem] bg-[#fdf9f1] p-8 shadow-[0_18px_40px_rgba(57,56,47,0.05)]">
           <div className="mb-8 flex items-center gap-3">

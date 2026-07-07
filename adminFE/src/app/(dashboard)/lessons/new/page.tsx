@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { aiService, chapterService, lessonService, unitService } from "@/services";
@@ -12,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Sparkles, ArrowLeft, Plus, Trash } from "lucide-react";
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 export default function NewLessonPage() {
   const searchParams = useSearchParams();
@@ -22,7 +25,7 @@ export default function NewLessonPage() {
   const initialUnitId = searchParams.get("unitId") || "";
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState<Language>(
-    initialLanguage === "igbo" || initialLanguage === "hausa" || initialLanguage === "yoruba"
+    isLanguage(initialLanguage)
       ? initialLanguage
       : "yoruba"
   );
@@ -178,9 +181,7 @@ export default function NewLessonPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yoruba">Yoruba</SelectItem>
-                    <SelectItem value="igbo">Igbo</SelectItem>
-                    <SelectItem value="hausa">Hausa</SelectItem>
+                    <LanguageSelectItems />
                   </SelectContent>
                 </Select>
               </div>

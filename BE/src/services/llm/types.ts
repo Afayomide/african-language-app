@@ -1,3 +1,5 @@
+import type { Language, Level } from "../../domain/entities/Lesson.js";
+
 export type LlmPhraseExample = {
   original: string;
   translation: string;
@@ -61,8 +63,8 @@ export type LlmGeneratedChapter = {
 export type LlmLessonSuggestion = {
   title: string;
   description?: string;
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   objectives: string[];
   seedExpressions: string[];
   proverbs?: Array<string | { text: string; translation?: string; contextNote?: string }>;
@@ -74,6 +76,11 @@ export type LlmGeneratedProverb = {
   contextNote?: string;
 };
 
+export type LlmUnitPlanTarget = {
+  text: string;
+  translations?: string[];
+};
+
 export type LlmUnitPlanLesson = {
   title: string;
   description?: string;
@@ -82,6 +89,8 @@ export type LlmUnitPlanLesson = {
   situations: string[];
   sentenceGoals: string[];
   focusSummary?: string;
+  targetWords?: LlmUnitPlanTarget[];
+  targetExpressions?: LlmUnitPlanTarget[];
 };
 
 export type LlmLessonRefactorOperation =
@@ -184,8 +193,8 @@ export type LlmUnitRefactorPlan = {
 
 export type GeneratePhrasesInput = {
   lessonId?: string;
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   lessonTitle?: string;
   lessonDescription?: string;
   seedWords?: string[];
@@ -197,8 +206,8 @@ export type GenerateExpressionsInput = GeneratePhrasesInput;
 
 export type GenerateWordsInput = {
   lessonId?: string;
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   lessonTitle?: string;
   lessonDescription?: string;
   seedWords?: string[];
@@ -208,13 +217,14 @@ export type GenerateWordsInput = {
 
 export type GenerateSentencesInput = {
   lessonId?: string;
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   lessonTitle?: string;
   lessonDescription?: string;
   conversationGoal?: string;
   situations?: string[];
   sentenceGoals?: string[];
+  anchorSentences?: Array<{ text: string; translations: string[] }>;
   allowedExpressions?: Array<{ text: string; translations: string[] }>;
   allowedWords?: Array<{ text: string; translations: string[] }>;
   maxSentences?: number;
@@ -224,8 +234,8 @@ export type GenerateSentencesInput = {
 };
 
 export type GenerateContextScenarioQuestionInput = {
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   lessonTitle?: string;
   lessonDescription?: string;
   conversationGoal?: string;
@@ -243,8 +253,8 @@ export type GenerateContextScenarioQuestionInput = {
 };
 
 export type GenerateChaptersInput = {
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
   count: number;
   topic?: string;
   extraInstructions?: string;
@@ -254,8 +264,8 @@ export type GenerateChaptersInput = {
 export type EnhancePhraseInput = {
   text: string;
   translations: string[];
-  language: "yoruba" | "igbo" | "hausa";
-  level: "beginner" | "intermediate" | "advanced";
+  language: Language;
+  level: Level;
 };
 
 export type EnhanceExpressionInput = EnhancePhraseInput;
@@ -270,8 +280,8 @@ export type LlmClient = {
   ) => Promise<LlmGeneratedContextScenarioQuestion | null>;
   generateChapters: (input: GenerateChaptersInput) => Promise<LlmGeneratedChapter[]>;
   generateProverbs: (input: {
-    language: "yoruba" | "igbo" | "hausa";
-    level: "beginner" | "intermediate" | "advanced";
+    language: Language;
+    level: Level;
     lessonTitle?: string;
     lessonDescription?: string;
     count?: number;
@@ -302,6 +312,8 @@ export type LlmClient = {
     topic?: string;
     curriculumInstruction?: string;
     extraInstructions?: string;
+    reviewMode?: boolean;
+    reviewInventorySummary?: string;
     themeAnchors?: string[];
     existingUnitTitles?: string[];
     existingLessonTitles?: string[];

@@ -32,7 +32,7 @@ export class VoiceArtistAudioUseCases {
     this.contentLookup = new ContentLookupService(words, expressions, sentences);
   }
 
-  private buildScopedLessonMaps(profileLanguage: "yoruba" | "igbo" | "hausa") {
+  private buildScopedLessonMaps(profileLanguage: "yoruba" | "igbo" | "hausa" | "pidgin") {
     return Promise.all([
       this.lessons.listByLanguage(profileLanguage),
       this.units.listByLanguage(profileLanguage),
@@ -41,7 +41,7 @@ export class VoiceArtistAudioUseCases {
   }
 
   private async loadScopedContentItems(
-    profileLanguage: "yoruba" | "igbo" | "hausa"
+    profileLanguage: "yoruba" | "igbo" | "hausa" | "pidgin"
   ): Promise<{
     lessons: Awaited<ReturnType<LessonRepository["listByLanguage"]>>;
     units: Awaited<ReturnType<UnitRepository["listByLanguage"]>>;

@@ -24,7 +24,7 @@ export class AdminVoiceAudioReviewUseCases {
     voiceArtistUserId?: string;
     contentType?: ContentType;
     contentId?: string;
-    language?: "yoruba" | "igbo" | "hausa";
+    language?: "yoruba" | "igbo" | "hausa" | "pidgin";
   }) {
     const submissions = await this.submissions.list(filter);
     const users = await this.users.findByIds(submissions.map((item) => item.voiceArtistUserId));

@@ -38,7 +38,8 @@ const questionUseCases = new TutorQuestionUseCases(
   new MongooseQuestionRepository(),
   new MongooseLessonRepository(),
   new MongooseExpressionRepository(),
-  new MongooseWordRepository()
+  new MongooseWordRepository(),
+  new MongooseSentenceRepository()
 );
 const expressionRepo = new MongooseExpressionRepository();
 const wordRepo = new MongooseWordRepository();
@@ -139,6 +140,7 @@ export async function createQuestion(req: AuthRequest, res: Response) {
 
   const {
     lessonId,
+    sourceType,
     sourceId,
     translationIndex,
     type,
@@ -155,6 +157,10 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   }
   if (!subtypeUsesMatching(String(subtype)) && (!sourceId || !mongoose.Types.ObjectId.isValid(String(sourceId)))) {
     return res.status(400).json({ error: "invalid source id" });
+  }
+  const targetSourceType = String(sourceType || "expression") as "word" | "expression" | "sentence";
+  if (!subtypeUsesMatching(String(subtype)) && sourceType !== undefined && !["word", "expression", "sentence"].includes(String(sourceType))) {
+    return res.status(400).json({ error: "invalid source type" });
   }
   if (!type || !isValidQuestionType(String(type))) {
     return res.status(400).json({ error: "invalid type" });
@@ -183,16 +189,22 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   let answerIndex = Number(correctIndex);
   let parsedReviewData: ReturnType<typeof parseQuestionReviewData> = null;
   let parsedInteractionData: Awaited<ReturnType<typeof buildMatchingInteractionData>> | null = null;
-  const targetExpression = !subtypeUsesMatching(String(subtype)) ? await expressionRepo.findById(String(sourceId)) : null;
-  if (!subtypeUsesMatching(String(subtype)) && !targetExpression) {
+  const targetSource = !subtypeUsesMatching(String(subtype)) ? await findSourceByType(targetSourceType, String(sourceId)) : null;
+  if (!subtypeUsesMatching(String(subtype)) && !targetSource) {
     return res.status(404).json({ error: "source not found" });
   }
-  if (targetExpression && parsedTranslationIndex >= targetExpression.translations.length) {
+  if (targetSource && parsedTranslationIndex >= targetSource.translations.length) {
     return res.status(400).json({ error: "invalid translation index" });
   }
-  if (subtypeRequiresReviewData(String(subtype)) && !subtypeUsesOrderArrangement(String(subtype))) {
+  if (reviewData !== undefined) {
     parsedReviewData = parseQuestionReviewData(reviewData);
-    if (!parsedReviewData) {
+    if (
+      !parsedReviewData &&
+      (
+        (subtypeRequiresReviewData(String(subtype)) && !subtypeUsesOrderArrangement(String(subtype))) ||
+        subtypeUsesOrderArrangement(String(subtype))
+      )
+    ) {
       return res.status(400).json({ error: "This question subtype requires valid sentence review data." });
     }
   }
@@ -221,8 +233,8 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     answerIndex = 0;
   } else if (String(subtype) === "fg-letter-order") {
     parsedReviewData = buildLetterOrderReviewData({
-      phraseText: String(targetExpression?.text || ""),
-      meaning: getSelectedTranslation(targetExpression?.translations || [], parsedTranslationIndex)
+      phraseText: String(targetSource?.text || ""),
+      meaning: getSelectedTranslation(targetSource?.translations || [], parsedTranslationIndex)
     });
     if (!parsedReviewData) {
       return res.status(400).json({ error: "This spelling question requires a content item with at least two letters." });
@@ -231,8 +243,9 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     answerIndex = 0;
   } else if (subtypeUsesOrderArrangement(String(subtype))) {
     parsedReviewData = buildWordOrderReviewData({
-      phraseText: String(targetExpression?.text || ""),
-      meaning: getSelectedTranslation(targetExpression?.translations || [], parsedTranslationIndex)
+      phraseText: String(targetSource?.text || ""),
+      meaning: getSelectedTranslation(targetSource?.translations || [], parsedTranslationIndex),
+      meaningSegments: parsedReviewData?.meaningSegments
     });
     if (!parsedReviewData) {
       return res.status(400).json({ error: "This word order question requires multi-word content. Use spelling order for single words." });
@@ -249,7 +262,7 @@ export async function createQuestion(req: AuthRequest, res: Response) {
     }
     if (String(subtype) === "mc-select-context-response") {
       const validationError = validateContextResponseQuestion({
-        sourceText: String(targetExpression?.text || ""),
+        sourceText: String(targetSource?.text || ""),
         options: parsedOptions,
         correctIndex: answerIndex
       });
@@ -264,8 +277,8 @@ export async function createQuestion(req: AuthRequest, res: Response) {
   const created = await questionUseCases.create(
     {
       lessonId: String(lessonId),
-      sourceType: parsedInteractionData?.sourceType || "expression",
-      sourceId: parsedInteractionData?.sourceId || String(targetExpression?.id || sourceId),
+      sourceType: parsedInteractionData?.sourceType || targetSourceType,
+      sourceId: parsedInteractionData?.sourceId || String(targetSource?.id || sourceId),
       relatedSourceRefs: parsedInteractionData?.relatedSourceRefs || [],
       translationIndex: parsedInteractionData ? parsedInteractionData.translationIndex : parsedTranslationIndex,
       type: String(type) as QuestionType,
@@ -472,12 +485,20 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
 
   let parsedReviewData: ReturnType<typeof parseQuestionReviewData> | undefined;
   let parsedInteractionData: Awaited<ReturnType<typeof buildMatchingInteractionData>> | null = null;
-  if (reviewData !== undefined && !subtypeUsesOrderArrangement(effectiveSubtype)) {
+  if (reviewData !== undefined) {
     parsedReviewData = parseQuestionReviewData(reviewData) ?? undefined;
-    if (!parsedReviewData) {
+    if (
+      !parsedReviewData &&
+      (
+        (!subtypeUsesOrderArrangement(effectiveSubtype) && subtypeRequiresReviewData(effectiveSubtype)) ||
+        subtypeUsesOrderArrangement(effectiveSubtype)
+      )
+    ) {
       return res.status(400).json({ error: "This question subtype requires valid sentence review data." });
     }
-    update.reviewData = parsedReviewData;
+    if (!subtypeUsesOrderArrangement(effectiveSubtype)) {
+      update.reviewData = parsedReviewData;
+    }
   }
   if (
     subtypeRequiresReviewData(effectiveSubtype) &&
@@ -540,13 +561,31 @@ export async function updateQuestion(req: AuthRequest, res: Response) {
     if (!targetSource) {
       return res.status(404).json({ error: "source not found" });
     }
-    const wordOrderReview = buildWordOrderReviewData({
-      phraseText: targetSource.text,
-      meaning: getSelectedTranslation(
-        targetSource.translations,
-        Number(update.translationIndex ?? question.translationIndex)
-      )
-    });
+    const submittedReviewData = parsedReviewData || question.reviewData;
+    const wordOrderReview = submittedReviewData
+      ? {
+          sentence: String(submittedReviewData.sentence || "").trim(),
+          words: Array.isArray(submittedReviewData.words) ? submittedReviewData.words.map(String).filter(Boolean) : [],
+          correctOrder: Array.isArray(submittedReviewData.correctOrder) ? submittedReviewData.correctOrder.map(Number) : [],
+          meaning: String(
+            submittedReviewData.meaning ||
+              getSelectedTranslation(
+                targetSource.translations,
+                Number(update.translationIndex ?? question.translationIndex)
+              )
+          ).trim(),
+          ...(Array.isArray(submittedReviewData.meaningSegments) && submittedReviewData.meaningSegments.length > 0
+            ? { meaningSegments: submittedReviewData.meaningSegments }
+            : {})
+        }
+      : buildWordOrderReviewData({
+          phraseText: targetSource.text,
+          meaning: getSelectedTranslation(
+            targetSource.translations,
+            Number(update.translationIndex ?? question.translationIndex)
+          ),
+          meaningSegments: parsedReviewData?.meaningSegments || question.reviewData?.meaningSegments
+        });
     if (!wordOrderReview) {
       return res.status(400).json({ error: "This word order question requires multi-word content. Use spelling order for single words." });
     }

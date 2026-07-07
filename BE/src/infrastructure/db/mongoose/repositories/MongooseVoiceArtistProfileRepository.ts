@@ -5,7 +5,7 @@ import type { VoiceArtistProfileRepository } from "../../../../domain/repositori
 function toEntity(doc: {
   _id: { toString(): string };
   userId: { toString(): string };
-  language: "yoruba" | "igbo" | "hausa";
+  language: "yoruba" | "igbo" | "hausa" | "pidgin";
   displayName: string;
   isActive: boolean;
   createdAt?: Date;
@@ -31,7 +31,7 @@ export class MongooseVoiceArtistProfileRepository implements VoiceArtistProfileR
 
   async create(input: {
     userId: string;
-    language: "yoruba" | "igbo" | "hausa";
+    language: "yoruba" | "igbo" | "hausa" | "pidgin";
     displayName: string;
     isActive: boolean;
   }): Promise<VoiceArtistProfileEntity> {

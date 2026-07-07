@@ -1,11 +1,12 @@
 import TutorProfileModel from "../../../../models/tutor/TutorProfile.js";
+import type { Language } from "../../../../domain/entities/Lesson.js";
 import type { TutorProfileEntity } from "../../../../domain/entities/TutorProfile.js";
 import type { TutorProfileRepository } from "../../../../domain/repositories/TutorProfileRepository.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
   userId: { toString(): string };
-  language: "yoruba" | "igbo" | "hausa";
+  language?: Language | null;
   displayName: string;
   isActive: boolean;
   createdAt?: Date;
@@ -15,7 +16,7 @@ function toEntity(doc: {
     id: doc._id.toString(),
     _id: doc._id.toString(),
     userId: doc.userId.toString(),
-    language: doc.language,
+    language: doc.language || null,
     displayName: doc.displayName,
     isActive: doc.isActive,
     createdAt: doc.createdAt,
@@ -43,6 +44,14 @@ export class MongooseTutorProfileRepository implements TutorProfileRepository {
     return profile ? toEntity(profile) : null;
   }
 
+  async updateByUserId(
+    userId: string,
+    update: { language?: Language | null; displayName?: string; isActive?: boolean }
+  ): Promise<TutorProfileEntity | null> {
+    const profile = await TutorProfileModel.findOneAndUpdate({ userId }, update, { new: true });
+    return profile ? toEntity(profile) : null;
+  }
+
   async deleteById(id: string): Promise<TutorProfileEntity | null> {
     const profile = await TutorProfileModel.findById(id);
     if (!profile) return null;
@@ -53,11 +62,11 @@ export class MongooseTutorProfileRepository implements TutorProfileRepository {
 
   async create(input: {
     userId: string;
-    language: "yoruba" | "igbo" | "hausa";
+    language?: Language | null;
     displayName: string;
     isActive: boolean;
   }): Promise<TutorProfileEntity> {
-    const created = await TutorProfileModel.create(input);
+    const created = await TutorProfileModel.create({ ...input, language: input.language ?? null });
     return toEntity(created);
   }
 }

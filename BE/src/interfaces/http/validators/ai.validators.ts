@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
-
-const LANGUAGE_VALUES = ["yoruba", "igbo", "hausa"] as const;
-const LEVEL_VALUES = ["beginner", "intermediate", "advanced"] as const;
+import { LANGUAGE_VALUES, LEVEL_VALUES } from "../../../domain/entities/Lesson.js";
 
 export function isValidLanguage(value: string) {
   return LANGUAGE_VALUES.includes(value as (typeof LANGUAGE_VALUES)[number]);

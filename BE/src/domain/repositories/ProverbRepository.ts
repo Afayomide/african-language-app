@@ -8,6 +8,13 @@ export type ProverbListFilter = {
   lessonIds?: string[];
 };
 
+export type ProverbDeletedListFilter = {
+  ids?: string[];
+  language?: ProverbEntity["language"];
+  languageId?: string | null;
+  lessonIds?: string[];
+};
+
 export type ProverbCreateInput = {
   lessonIds: string[];
   language: ProverbEntity["language"];
@@ -31,6 +38,7 @@ export type ProverbUpdateInput = Partial<{
 export interface ProverbRepository {
   create(input: ProverbCreateInput): Promise<ProverbEntity>;
   list(filter: ProverbListFilter): Promise<ProverbEntity[]>;
+  listDeleted(filter?: ProverbDeletedListFilter): Promise<ProverbEntity[]>;
   findById(id: string): Promise<ProverbEntity | null>;
   findByLessonId(lessonId: string): Promise<ProverbEntity[]>;
   findReusable(language: ProverbEntity["language"], text: string, languageId?: string | null): Promise<ProverbEntity | null>;

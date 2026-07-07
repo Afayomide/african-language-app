@@ -6,7 +6,7 @@ import LessonModel from "../models/Lesson.js";
 import LessonProgressModel from "../models/learner/LessonProgress.js";
 import LearnerLanguageStateModel from "../models/learner/LearnerLanguageState.js";
 
-type LanguageCode = "yoruba" | "igbo" | "hausa";
+type LanguageCode = "yoruba" | "igbo" | "hausa" | "pidgin";
 
 async function main() {
   const uri = process.env.MONGODB_URI;

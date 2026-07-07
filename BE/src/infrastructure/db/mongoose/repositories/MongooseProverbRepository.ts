@@ -2,6 +2,7 @@ import ProverbModel from "../../../../models/Proverb.js";
 import type { ProverbEntity } from "../../../../domain/entities/Proverb.js";
 import type {
   ProverbCreateInput,
+  ProverbDeletedListFilter,
   ProverbListFilter,
   ProverbRepository,
   ProverbUpdateInput
@@ -55,6 +56,23 @@ export class MongooseProverbRepository implements ProverbRepository {
     if (filter.lessonIds) query.lessonIds = { $in: filter.lessonIds };
 
     const proverbs = await ProverbModel.find(query).sort({ createdAt: -1 }).lean();
+    return proverbs.map(toEntity);
+  }
+
+  async listDeleted(filter?: ProverbDeletedListFilter): Promise<ProverbEntity[]> {
+    const query: Record<string, unknown> = { isDeleted: true };
+    if (filter?.languageId || filter?.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (Array.isArray(filter?.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
+    if (Array.isArray(filter?.lessonIds) && filter.lessonIds.length > 0) {
+      query.$or = [
+        { lessonIds: { $in: filter.lessonIds } },
+        { deletedLessonIds: { $in: filter.lessonIds } }
+      ];
+    }
+
+    const proverbs = await ProverbModel.find(query).sort({ updatedAt: -1, createdAt: -1 }).lean();
     return proverbs.map(toEntity);
   }
 

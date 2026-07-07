@@ -29,12 +29,6 @@
       ],
       "@lesson-player/*": [
         "../FE/shared/lesson-player/*"
-      ],
-      "@lesson-player/LessonPlayer": [
-        "./src/shared/lesson-player/LessonPlayer.tsx"
-      ],
-      "@lesson-player/types": [
-        "./src/shared/lesson-player/types.ts"
       ]
     }
   },

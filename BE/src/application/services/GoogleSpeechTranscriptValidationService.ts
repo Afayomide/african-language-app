@@ -250,6 +250,8 @@ function mapLanguageToLocale(language: Language) {
       return "ig-NG";
     case "hausa":
       return "ha-NG";
+    case "pidgin":
+      return "en-NG";
     default:
       return "en-US";
   }

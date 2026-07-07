@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { lessonService, wordService } from "@/services";
@@ -15,10 +17,6 @@ import { WordImageManager } from "@/components/words/word-image-manager";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle, Save, Volume2 } from "lucide-react";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
-
-function isLanguage(value: string | null): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
   const router = useRouter();
@@ -112,7 +110,7 @@ function WordFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }) {
         language: word.language,
         lessonIds: mode === "edit" ? word.lessonIds : undefined,
         text: word.text,
-        translations: translationsText.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
+        translations: translationsText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
         pronunciation: word.pronunciation || "",
         explanation: word.explanation || "",
         difficulty: Number(word.difficulty || 1),

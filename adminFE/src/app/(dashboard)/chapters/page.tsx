@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName } from "@/lib/languages";
+
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { chapterService } from "@/services";
@@ -17,12 +19,7 @@ import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
 import { CheckCircle, Edit, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 const LEVEL_LABELS: Record<Level, string> = {
   beginner: "Beginner",
@@ -211,9 +208,7 @@ export default function ChaptersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yoruba">Yoruba</SelectItem>
-                  <SelectItem value="igbo">Igbo</SelectItem>
-                  <SelectItem value="hausa">Hausa</SelectItem>
+                  <LanguageSelectItems />
                 </SelectContent>
               </Select>
             </div>
@@ -325,7 +320,7 @@ export default function ChaptersPage() {
             </div>
             <div className="space-y-2">
               <Label>Language</Label>
-              <Input value={LANGUAGE_LABELS[language]} disabled />
+              <Input value={getLanguageName(language)} disabled />
             </div>
             <div className="space-y-2">
               <Label>Level</Label>
@@ -363,7 +358,7 @@ export default function ChaptersPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Language</Label>
-              <Input value={LANGUAGE_LABELS[language]} disabled />
+              <Input value={getLanguageName(language)} disabled />
             </div>
             <div className="space-y-2">
               <Label>Level</Label>

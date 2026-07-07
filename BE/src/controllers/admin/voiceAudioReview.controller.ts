@@ -53,7 +53,7 @@ export async function listVoiceAudioSubmissions(req: AuthRequest, res: Response)
     voiceArtistUserId,
     contentType: (contentType || (req.query.expressionId ? "expression" : undefined)) as "word" | "expression" | "sentence" | undefined,
     contentId,
-    language: language as "yoruba" | "igbo" | "hausa" | undefined
+    language: language as "yoruba" | "igbo" | "hausa" | "pidgin" | undefined
   });
 
   const filtered = q

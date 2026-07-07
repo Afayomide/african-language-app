@@ -119,14 +119,22 @@ export default function NewUnitPage() {
   }
 
   async function handleAiSuggest() {
-    if (!title.trim()) {
-      toast.error("Enter a topic in the title field first.");
+    if (kind === "review") {
+      toast.error("AI suggest is only available for core units.");
+      return;
+    }
+    if (!chapterId) {
+      toast.error("Select a chapter first.");
       return;
     }
 
     try {
       setIsSuggesting(true);
-      const suggestion = await aiService.suggestLesson(title.trim(), tutorLanguage, level);
+      const suggestion = await aiService.suggestUnit({
+        level,
+        chapterId,
+        hintTopic: title.trim() || undefined
+      });
       if (suggestion.title && suggestion.title.trim()) {
         setTitle(suggestion.title.trim());
       }
@@ -163,7 +171,13 @@ export default function NewUnitPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="title">Title</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAiSuggest} disabled={isSuggesting}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAiSuggest}
+                  disabled={isSuggesting || !chapterId || kind === "review"}
+                >
                   <Sparkles className="mr-2 h-4 w-4" />
                   AI Suggest
                 </Button>

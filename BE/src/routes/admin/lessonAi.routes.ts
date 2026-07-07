@@ -4,6 +4,7 @@ import {
   generateChaptersBulk,
   generateLessonsBulk,
   generateProverbs,
+  suggestUnit,
   generateUnitContent,
   generateUnitsBulk,
   previewUnitContentPlan,
@@ -19,6 +20,7 @@ router.use(requireAuth, requireAdmin);
 router.post("/chapters/generate-bulk", generateChaptersBulk);
 router.post("/lessons/generate-bulk", generateLessonsBulk);
 router.post("/units/generate-bulk", generateUnitsBulk);
+router.post("/units/suggest", suggestUnit);
 router.post("/units/:unitId/generate-content/plan", previewUnitContentPlan);
 router.post("/units/:unitId/generate-content/apply", applyUnitContentPlan);
 router.post("/units/:unitId/generate-content", generateUnitContent);

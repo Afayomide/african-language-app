@@ -1,8 +1,23 @@
 import bcrypt from "bcryptjs";
+import type { Language } from "../../../domain/entities/Lesson.js";
 import type { TutorProfileRepository } from "../../../domain/repositories/TutorProfileRepository.js";
 import type { UserRepository } from "../../../domain/repositories/UserRepository.js";
 import { AuthTokenService } from "../../services/AuthTokenService.js";
 import { AuthError } from "./AuthErrors.js";
+
+function serializeTutor(tutor: {
+  id: string;
+  language?: Language | null;
+  displayName: string;
+  isActive: boolean;
+}) {
+  return {
+    id: tutor.id,
+    language: tutor.language || null,
+    displayName: tutor.displayName,
+    isActive: tutor.isActive
+  };
+}
 
 export class TutorAuthUseCases {
   constructor(
@@ -14,7 +29,6 @@ export class TutorAuthUseCases {
   async signup(input: {
     email: string;
     password: string;
-    language: "yoruba" | "igbo" | "hausa";
     displayName?: string;
   }) {
     const existing = await this.users.findByEmail(input.email);
@@ -48,7 +62,7 @@ export class TutorAuthUseCases {
     if (!tutor) {
       tutor = await this.tutorProfiles.create({
         userId: user.id,
-        language: input.language,
+        language: null,
         displayName: input.displayName?.trim() || "",
         isActive: false
       });
@@ -57,12 +71,8 @@ export class TutorAuthUseCases {
     return {
       message: "Signup successful. Your tutor account is pending admin activation.",
       user: { id: user.id, email: user.email, role: "tutor" as const, roles: user.roles },
-      tutor: {
-        id: tutor.id,
-        language: tutor.language,
-        displayName: tutor.displayName,
-        isActive: tutor.isActive
-      }
+      tutor: serializeTutor(tutor),
+      requiresOnboarding: !tutor.language
     };
   }
 
@@ -86,11 +96,8 @@ export class TutorAuthUseCases {
 
     return {
       user: { id: user.id, email: user.email, role: "tutor" as const, roles: user.roles },
-      tutor: {
-        id: tutor.id,
-        language: tutor.language,
-        displayName: tutor.displayName
-      },
+      tutor: serializeTutor(tutor),
+      requiresOnboarding: !tutor.language,
       token
     };
   }
@@ -107,12 +114,28 @@ export class TutorAuthUseCases {
         email: input.email,
         role: input.role
       },
-      tutor: {
-        id: tutor.id,
-        language: tutor.language,
-        displayName: tutor.displayName,
-        isActive: tutor.isActive
-      }
+      tutor: serializeTutor(tutor),
+      requiresOnboarding: !tutor.language
+    };
+  }
+
+  async completeOnboarding(input: { userId: string; language: Language }) {
+    const tutor = await this.tutorProfiles.findByUserId(input.userId);
+    if (!tutor) {
+      throw new AuthError(404, "Tutor profile was not found.");
+    }
+    if (!tutor.isActive) {
+      throw new AuthError(403, "Tutor account is pending activation.");
+    }
+
+    const updated = await this.tutorProfiles.updateByUserId(input.userId, { language: input.language });
+    if (!updated) {
+      throw new AuthError(500, "Failed to update tutor onboarding.");
+    }
+
+    return {
+      tutor: serializeTutor(updated),
+      requiresOnboarding: !updated.language
     };
   }
 }

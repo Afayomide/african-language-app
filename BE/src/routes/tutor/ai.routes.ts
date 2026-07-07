@@ -12,7 +12,8 @@ import {
   generateUnitContent,
   previewUnitContentPlan,
   reviseUnitContent,
-  suggestLesson
+  suggestLesson,
+  suggestUnit
 } from "../../controllers/tutor/ai.controller.js";
 import { requireAuth, requireTutor } from "../../utils/authMiddleware.js";
 
@@ -22,6 +23,7 @@ router.use(requireAuth, requireTutor);
 
 router.post("/chapters/generate-bulk", generateChaptersBulk);
 router.post("/units/generate-bulk", generateUnitsBulk);
+router.post("/units/suggest", suggestUnit);
 router.post("/lessons/suggest", suggestLesson);
 router.post("/lessons/:lessonId/refactor", refactorLessonContent);
 router.post("/units/:unitId/generate-content/plan", previewUnitContentPlan);

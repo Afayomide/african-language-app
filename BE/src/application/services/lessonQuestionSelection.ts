@@ -96,7 +96,7 @@ type LessonQuestionSelectionPlan<T> = {
   historyEntry: LessonQuestionSelectionHistoryEntry;
 };
 
-const STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
+const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   1: {
     stageLimit: 4,
     groupLimits: { target: 3, sentence: 1, lesson: 0 },
@@ -111,6 +111,24 @@ const STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
     stageLimit: 5,
     groupLimits: { target: 2, sentence: 3, lesson: 0 },
     perSourceLimits: { target: 1, sentence: 1, lesson: 0 }
+  }
+};
+
+const REVIEW_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
+  1: {
+    stageLimit: 2,
+    groupLimits: { target: 0, sentence: 2, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 1, lesson: 0 }
+  },
+  2: {
+    stageLimit: 3,
+    groupLimits: { target: 0, sentence: 3, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 2, lesson: 0 }
+  },
+  3: {
+    stageLimit: 5,
+    groupLimits: { target: 0, sentence: 5, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 3, lesson: 0 }
   }
 };
 
@@ -309,6 +327,18 @@ function getSentenceStage3Bucket(family: QuestionFamily) {
 
 function buildEmptyStageRequirements(): Record<1 | 2 | 3, ScheduledLessonRequirement[]> {
   return buildEmptyStageRecord<ScheduledLessonRequirement[]>(() => []);
+}
+
+function getStageSelectionConfig(stage: 1 | 2 | 3, lessonMode: "core" | "review") {
+  return lessonMode === "review" ? REVIEW_STAGE_SELECTION_CONFIG[stage] : CORE_STAGE_SELECTION_CONFIG[stage];
+}
+
+function getGlobalSourceLimit(
+  lessonMode: "core" | "review",
+  sourceGroup: LessonQuestionSourceGroup
+) {
+  if (lessonMode === "review" && sourceGroup === "sentence") return 2;
+  return Number.POSITIVE_INFINITY;
 }
 
 function getPreferredProfileForLesson(input: {
@@ -568,10 +598,13 @@ function canSelectCandidate<T>(
   stage: 1 | 2 | 3,
   stageConfig: StageSelectionConfig,
   stageState: SelectionStageState,
-  selectedSourceSubtypeKeys: Set<string>
+  selectedSourceSubtypeKeys: Set<string>,
+  globalSourceCounts: Map<string, number>,
+  lessonMode: "core" | "review"
 ) {
   if (stageState.groupCounts[candidate.sourceGroup] >= stageConfig.groupLimits[candidate.sourceGroup]) return false;
   if ((stageState.sourceCounts.get(candidate.sourceKey) || 0) >= stageConfig.perSourceLimits[candidate.sourceGroup]) return false;
+  if ((globalSourceCounts.get(candidate.sourceKey) || 0) >= getGlobalSourceLimit(lessonMode, candidate.sourceGroup)) return false;
   if (stageState.sourceFamilyKeys.has(`${candidate.sourceKey}:${candidate.family}`)) return false;
   if (selectedSourceSubtypeKeys.has(`${candidate.sourceKey}:${candidate.questionSubtype}`)) return false;
   if (stage >= 2 && (stageState.familyCounts.get(candidate.family) || 0) >= 2) return false;
@@ -844,9 +877,11 @@ export function selectLessonQuestionPlan<T>(
 
   const selectedByStage = buildEmptyStageRecord<DecoratedCandidate<T>[]>(() => []);
   const selectedSourceSubtypeKeys = new Set<string>();
+  const effectiveLessonMode = options.lessonMode || scheduledPlan?.lessonMode || "core";
+  const globalSourceCounts = new Map<string, number>();
 
   for (const stage of [1, 2, 3] as const) {
-    const stageConfig = STAGE_SELECTION_CONFIG[stage];
+    const stageConfig = getStageSelectionConfig(stage, effectiveLessonMode);
     const stageCandidates = decoratedCandidates.filter((candidate) => candidate.stage === stage);
     const stageState: SelectionStageState = {
       groupCounts: { target: 0, sentence: 0, lesson: 0 },
@@ -873,7 +908,7 @@ export function selectLessonQuestionPlan<T>(
 
       for (let index = 0; index < stageCandidates.length; index += 1) {
         const candidate = stageCandidates[index]!;
-        if (!canSelectCandidate(candidate, stage, stageConfig, stageState, selectedSourceSubtypeKeys)) continue;
+        if (!canSelectCandidate(candidate, stage, stageConfig, stageState, selectedSourceSubtypeKeys, globalSourceCounts, effectiveLessonMode)) continue;
         const requirementKey = buildRequirementKey(stage, candidate.sourceGroup, candidate.questionSubtype);
         const isPendingRequiredCandidate = pendingRequiredKeys.has(requirementKey);
         if (foundRequiredCandidate && !isPendingRequiredCandidate) {
@@ -897,6 +932,7 @@ export function selectLessonQuestionPlan<T>(
       pendingRequiredKeys.delete(buildRequirementKey(stage, chosen.sourceGroup, chosen.questionSubtype));
       stageState.groupCounts[chosen.sourceGroup] += 1;
       stageState.sourceCounts.set(chosen.sourceKey, (stageState.sourceCounts.get(chosen.sourceKey) || 0) + 1);
+      globalSourceCounts.set(chosen.sourceKey, (globalSourceCounts.get(chosen.sourceKey) || 0) + 1);
       stageState.sourceFamilyKeys.add(`${chosen.sourceKey}:${chosen.family}`);
       pushMapCount(stageState.familyCounts, chosen.family);
       stageState.lastFamily = chosen.family;

@@ -306,6 +306,7 @@ function normalizeWordSequence(value: string) {
 
 function SentenceGlossPanel({ component }: { component: LearningContentComponent }) {
   const translations = component.translations.filter(Boolean)
+  const nestedComponents = Array.isArray(component.components) ? component.components : []
 
   return (
     <div className="space-y-3">
@@ -327,6 +328,22 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
                 className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-foreground/75"
               >
                 {translation}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {nestedComponents.length > 0 ? (
+        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/40 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-foreground/45">Parts</p>
+          <div className="flex flex-wrap gap-2">
+            {nestedComponents.map((nestedComponent, index) => (
+              <span
+                key={`${nestedComponent.id}-${index}`}
+                className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-foreground/75"
+              >
+                {nestedComponent.text}
               </span>
             ))}
           </div>
@@ -511,6 +528,10 @@ function InlineGlossToken({
   label: string
   component: LearningContentComponent
 }) {
+  if (component.kind === 'expression' && Array.isArray(component.components) && component.components.length > 0) {
+    return <InlineGlossPhrase text={label} components={component.components} />
+  }
+
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -529,6 +550,32 @@ function InlineGlossToken({
         </div>
       ) : null}
     </span>
+  )
+}
+
+function InlineGlossPhrase({
+  text,
+  components,
+}: {
+  text: string
+  components: LearningContentComponent[]
+}) {
+  const parts = useMemo(() => buildSentenceRenderParts(text, components), [text, components])
+
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.type === 'text' ? (
+          <span key={`inline-text-${index}`} className="whitespace-pre-wrap text-primary">
+            {part.text}
+          </span>
+        ) : (
+          <SentenceGlossToken key={`inline-component-${part.component.id}-${index}`} component={part.component}>
+            {part.text}
+          </SentenceGlossToken>
+        ),
+      )}
+    </>
   )
 }
 
@@ -932,15 +979,20 @@ export function LessonPlayer({
     [exerciseData?._id, currentStageIndex, interactionWords, promptText],
   )
   const listeningAudioUrl = isListeningQuestion ? questionSource?.audio?.url : undefined
-  const questionSentenceText =
-    questionSource?.kind === 'sentence' ? questionSource.text || sentenceText : sentenceText || ''
-  const questionSentenceComponents =
-    questionSource?.kind === 'sentence' && Array.isArray(questionSource.components) ? questionSource.components : []
+  const questionContentText =
+    questionSource?.kind === 'sentence' || questionSource?.kind === 'expression'
+      ? questionSource.text || sentenceText
+      : sentenceText || ''
+  const questionContentComponents =
+    (questionSource?.kind === 'sentence' || questionSource?.kind === 'expression') && Array.isArray(questionSource.components)
+      ? questionSource.components
+      : []
+  const questionSentenceText = questionContentText
   const shouldShowMeaningSentenceCard =
     exerciseData?.subtype === 'fg-word-order' &&
     questionSource?.kind === 'sentence' &&
     Boolean(meaningText.trim()) &&
-    questionSentenceComponents.length > 0 &&
+    questionContentComponents.length > 0 &&
     /arrange the words to mean/i.test(promptText)
   const inlineSourceComponent =
     questionSource && questionSource.kind && questionSource.kind !== 'sentence'
@@ -954,6 +1006,7 @@ export function LessonPlayer({
           pronunciation: questionSource.pronunciation,
           explanation: questionSource.explanation,
           audio: questionSource.audio,
+          components: Array.isArray(questionSource.components) ? questionSource.components : undefined,
         }
       : null
   const renderedPromptParts =
@@ -1507,7 +1560,9 @@ export function LessonPlayer({
                     </div>
 
                     <div className="space-y-3 text-center">
-                      {currentBlock.data.kind === 'sentence' && Array.isArray(currentBlock.data.components) && currentBlock.data.components.length > 0 ? (
+                      {(currentBlock.data.kind === 'sentence' || currentBlock.data.kind === 'expression') &&
+                      Array.isArray(currentBlock.data.components) &&
+                      currentBlock.data.components.length > 0 ? (
                         <SentenceContentDisplay
                           text={currentBlock.data.text}
                           components={currentBlock.data.components}
@@ -1617,7 +1672,16 @@ export function LessonPlayer({
                           <span key={`prompt-part-${index}`}>
                             {part}
                             {index < renderedPromptParts.length - 1 ? (
-                              <InlineGlossToken label={sourceText} component={inlineSourceComponent} />
+                              inlineSourceComponent.kind === 'expression' &&
+                              Array.isArray(inlineSourceComponent.components) &&
+                              inlineSourceComponent.components.length > 0 ? (
+                                <InlineGlossPhrase
+                                  text={sourceText}
+                                  components={inlineSourceComponent.components}
+                                />
+                              ) : (
+                                <InlineGlossToken label={sourceText} component={inlineSourceComponent} />
+                              )
                             ) : null}
                           </span>
                         ))
@@ -1635,7 +1699,7 @@ export function LessonPlayer({
                       </div>
                     ) : null}
 
-                    {!isListeningQuestion && !isSpeakingQuestion && questionSentenceText ? (
+                    {!isListeningQuestion && !isSpeakingQuestion && questionContentText ? (
                       <div className={cx('rounded-3xl border border-primary/15 bg-primary/5', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
                         {shouldShowMeaningSentenceCard ? (
                           <SentenceMeaningDisplay
@@ -1643,19 +1707,19 @@ export function LessonPlayer({
                             audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
                             meaningSegments={exerciseData?.reviewData?.meaningSegments}
                             interactionWords={interactionWords}
-                            sourceComponents={questionSentenceComponents}
+                            sourceComponents={questionContentComponents}
                           />
-                        ) : questionSentenceComponents.length > 0 ? (
+                        ) : questionContentComponents.length > 0 ? (
                           <SentenceContentDisplay
-                            text={questionSentenceText}
-                            components={questionSentenceComponents}
-                            audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
+                            text={questionContentText}
+                            components={questionContentComponents}
+                            audioUrl={questionSource?.audio?.url}
                           />
                         ) : (
                           <div className="flex items-start justify-center gap-2">
                             <InlineAudioButton
-                              audioUrl={questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined}
-                              label={questionSentenceText}
+                              audioUrl={questionSource?.audio?.url}
+                              label={questionContentText}
                               className="mt-1 shrink-0 self-start"
                             />
                           <p
@@ -1664,7 +1728,7 @@ export function LessonPlayer({
                               isUltraShortViewport ? 'text-lg sm:text-xl' : isShortViewport ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl',
                             )}
                           >
-                            {questionSentenceText}
+                            {questionContentText}
                           </p>
                           </div>
                         )}
@@ -1777,10 +1841,10 @@ export function LessonPlayer({
                           </div>
 
                           <div className={cx('rounded-3xl border border-primary/15 bg-white/90', isUltraShortViewport ? 'p-3 sm:p-4' : isShortViewport ? 'p-4 sm:p-5' : 'p-5 sm:p-6')}>
-                            {questionSource?.kind === 'sentence' && questionSentenceComponents.length > 0 ? (
+                            {(questionSource?.kind === 'sentence' || questionSource?.kind === 'expression') && questionContentComponents.length > 0 ? (
                               <SentenceContentDisplay
-                                text={questionSentenceText}
-                                components={questionSentenceComponents}
+                                text={questionContentText}
+                                components={questionContentComponents}
                                 audioUrl={questionSource.audio?.url}
                               />
                             ) : (

@@ -30,12 +30,55 @@ function pickTranslation(translations: string[], preferredIndex?: number) {
   return translations[0]
 }
 
+async function loadMissingComponentSources(
+  expressions: Expression[],
+  sentences: Sentence[],
+  words: Word[],
+) {
+  const wordById = new Map(words.map((item) => [item._id, item] as const))
+  const expressionById = new Map(expressions.map((item) => [item._id, item] as const))
+  const missingWordIds = new Set<string>()
+  const missingExpressionIds = new Set<string>()
+
+  for (const item of [...expressions, ...sentences]) {
+    for (const component of item.components || []) {
+      if (component.type === 'word') {
+        if (!wordById.has(component.refId)) missingWordIds.add(component.refId)
+        continue
+      }
+      if (!expressionById.has(component.refId)) missingExpressionIds.add(component.refId)
+    }
+  }
+
+  const [fetchedWords, fetchedExpressions] = await Promise.all([
+    Promise.allSettled(Array.from(missingWordIds).map((componentId) => wordService.getWord(componentId))),
+    Promise.allSettled(Array.from(missingExpressionIds).map((componentId) => expressionService.getExpression(componentId))),
+  ])
+
+  return {
+    expressions: [
+      ...expressions,
+      ...fetchedExpressions
+        .filter((result): result is PromiseFulfilledResult<Expression> => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter((item, index, array) => array.findIndex((candidate) => candidate._id === item._id) === index),
+    ],
+    words: [
+      ...words,
+      ...fetchedWords
+        .filter((result): result is PromiseFulfilledResult<Word> => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter((item, index, array) => array.findIndex((candidate) => candidate._id === item._id) === index),
+    ],
+  }
+}
+
 export default function TutorLessonReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
 
   const loadFlow = useCallback(async (lessonId: string): Promise<LessonFlowData> => {
-    const [lessonData, expressions, words, sentences, proverbs, questions] = await Promise.all([
+    const [lessonData, rawExpressions, rawWords, sentences, proverbs, questions] = await Promise.all([
       lessonService.getLesson(lessonId),
       expressionService.listExpressions(lessonId),
       wordService.listWords(lessonId),
@@ -43,6 +86,7 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
       proverbService.listProverbs(lessonId),
       questionService.listQuestions({ lessonId }),
     ])
+    const { expressions, words } = await loadMissingComponentSources(rawExpressions, sentences, rawWords)
 
     const sortedStages = (lessonData.stages || []).slice().sort((left, right) => left.orderIndex - right.orderIndex)
     const expressionById = new Map(expressions.map((item) => [item._id, item] as const))
@@ -136,51 +180,17 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
       }
     }
 
-    const missingComponentWordIds = new Set<string>()
-    const missingComponentExpressionIds = new Set<string>()
+    const hydratedComponentSources = await loadMissingComponentSources(
+      Array.from(expressionById.values()),
+      Array.from(sentenceById.values()),
+      Array.from(wordById.values()),
+    )
 
-    for (const sentence of sentenceById.values()) {
-      for (const component of sentence.components || []) {
-        if (component.type === 'word') {
-          if (!wordById.has(component.refId)) {
-            missingComponentWordIds.add(component.refId)
-          }
-          continue
-        }
-        if (component.type === 'expression' && !expressionById.has(component.refId)) {
-          missingComponentExpressionIds.add(component.refId)
-        }
-      }
+    for (const word of hydratedComponentSources.words) {
+      wordById.set(word._id, word)
     }
-
-    if (missingComponentWordIds.size > 0 || missingComponentExpressionIds.size > 0) {
-      const [resolvedWords, resolvedExpressions] = await Promise.all([
-        Promise.all(
-          Array.from(missingComponentWordIds).map(async (wordId) => {
-            try {
-              return await wordService.getWord(wordId)
-            } catch {
-              return null
-            }
-          }),
-        ),
-        Promise.all(
-          Array.from(missingComponentExpressionIds).map(async (expressionId) => {
-            try {
-              return await expressionService.getExpression(expressionId)
-            } catch {
-              return null
-            }
-          }),
-        ),
-      ])
-
-      for (const word of resolvedWords) {
-        if (word) wordById.set(word._id, word)
-      }
-      for (const expression of resolvedExpressions) {
-        if (expression) expressionById.set(expression._id, expression)
-      }
+    for (const expression of hydratedComponentSources.expressions) {
+      expressionById.set(expression._id, expression)
     }
 
     const contentByKey = new Map<string, LearningContent>()
@@ -204,16 +214,16 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
         audio: audioUrl ? { url: audioUrl } : undefined,
       }
 
-      if (kind === 'sentence') {
-        const sentence = item as Sentence
+      if (kind === 'sentence' || kind === 'expression') {
+        const itemWithComponents = item as Sentence | Expression
         const hydratedComponents: LearningContentComponent[] = []
-        for (const component of sentence.components || []) {
+        for (const component of itemWithComponents.components || []) {
           const source = component.type === 'word' ? wordById.get(component.refId) : expressionById.get(component.refId)
           if (!source) continue
           hydratedComponents.push({
             id: source._id,
             kind: component.type,
-            text: source.text,
+            text: component.textSnapshot || source.text,
             translations: source.translations || [],
             selectedTranslationIndex: 0,
             selectedTranslation: pickTranslation(source.translations || [], 0),
@@ -296,6 +306,7 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
     return {
       lesson: {
         ...lessonData,
+        language: lessonData.language as Language,
         stages: sortedStages,
       },
       blocks: flattenedBlocks,
@@ -330,8 +341,6 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
       loadingMessage="Loading lesson review..."
       emptyMessage="Lesson preview not available."
       preview
-      allowStagePicker
-      continuousMode
     />
   )
 }

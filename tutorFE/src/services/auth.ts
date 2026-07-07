@@ -1,34 +1,51 @@
 import api from "@/lib/api";
 import { feTutorRoutes } from "@/lib/apiRoutes";
-import { AuthResponse } from "@/types";
+import type { AuthResponse, Language, TutorProfile } from "@/types";
+
+function storeTutorSession(response: AuthResponse) {
+  if (response.token) {
+    localStorage.setItem("tutorToken", response.token);
+    localStorage.setItem("tutorUser", JSON.stringify(response.user));
+    localStorage.setItem("tutorProfile", JSON.stringify(response.tutor));
+  }
+}
 
 export const authService = {
   async signup(input: {
     email: string;
     password: string;
-    language: "yoruba" | "igbo" | "hausa";
     displayName?: string;
   }) {
     const response = await api.post(feTutorRoutes.signup(), input);
     return response.data as {
       message: string;
       user: { id: string; email: string; role: "tutor" };
-      tutor: {
-        id: string;
-        language: "yoruba" | "igbo" | "hausa";
-        displayName: string;
-        isActive: boolean;
-      };
+      tutor: TutorProfile;
+      requiresOnboarding?: boolean;
     };
   },
 
   async login(email: string, password: string) {
     const response = await api.post<AuthResponse>(feTutorRoutes.login(), { email, password });
-    if (response.data.token) {
-      localStorage.setItem("tutorToken", response.data.token);
-      localStorage.setItem("tutorUser", JSON.stringify(response.data.user));
-      localStorage.setItem("tutorProfile", JSON.stringify(response.data.tutor));
-    }
+    storeTutorSession(response.data);
+    return response.data;
+  },
+
+  async completeOnboarding(language: Language) {
+    const response = await api.put<{ tutor: TutorProfile; requiresOnboarding?: boolean }>(
+      feTutorRoutes.completeOnboarding(),
+      { language }
+    );
+
+    const currentProfile = this.getTutorProfile() || { id: response.data.tutor.id, displayName: response.data.tutor.displayName };
+    localStorage.setItem(
+      "tutorProfile",
+      JSON.stringify({
+        ...currentProfile,
+        ...response.data.tutor
+      })
+    );
+
     return response.data;
   },
 
@@ -44,7 +61,7 @@ export const authService = {
     return user ? JSON.parse(user) : null;
   },
 
-  getTutorProfile() {
+  getTutorProfile(): TutorProfile | null {
     const tutor = localStorage.getItem("tutorProfile");
     return tutor ? JSON.parse(tutor) : null;
   },

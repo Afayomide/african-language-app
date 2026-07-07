@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName, isLanguage } from "@/lib/languages";
+
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -22,16 +24,6 @@ import { DataTableControls } from "@/components/common/data-table-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS, TABLE_BULK_BUTTON_CLASS } from "@/lib/tableActionStyles";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
-
-function isLanguage(value: string): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 export default function LessonsByLanguagePage({
   params
@@ -287,8 +279,8 @@ export default function LessonsByLanguagePage({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{LANGUAGE_LABELS[language]} Lessons</h1>
-            <p className="text-muted-foreground font-medium">Manage lessons inside the right chapter and unit for {LANGUAGE_LABELS[language]}.</p>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{getLanguageName(language)} Lessons</h1>
+            <p className="text-muted-foreground font-medium">Manage lessons inside the right chapter and unit for {getLanguageName(language)}.</p>
           </div>
         </div>
         <div className="flex gap-2">

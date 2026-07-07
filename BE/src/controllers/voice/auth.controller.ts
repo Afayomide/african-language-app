@@ -38,7 +38,7 @@ export async function signup(req: Request, res: Response) {
     const result = await useCases.signup({
       email: normalizeEmail(String(email)),
       password: String(password),
-      language: String(language) as "yoruba" | "igbo" | "hausa",
+      language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
       displayName: displayName ? String(displayName) : undefined
     });
 

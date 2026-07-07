@@ -319,7 +319,7 @@ export async function enhanceExpression(req: Request, res: Response) {
   try {
     const updated = await orchestrator.enhanceExpression({
       expression,
-      language: String(language) as "yoruba" | "igbo" | "hausa",
+      language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
       level: String(level) as "beginner" | "intermediate" | "advanced"
     });
 

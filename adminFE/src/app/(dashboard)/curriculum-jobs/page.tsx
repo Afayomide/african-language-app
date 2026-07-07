@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName } from "@/lib/languages";
+
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Sparkles } from "lucide-react";
@@ -16,12 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CurriculumJobDetails } from "@/components/curriculum/CurriculumJobDetails";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 const LEVEL_LABELS: Record<Level, string> = {
   beginner: "Beginner",
@@ -211,9 +208,7 @@ export default function CurriculumJobsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yoruba">Yoruba</SelectItem>
-                    <SelectItem value="igbo">Igbo</SelectItem>
-                    <SelectItem value="hausa">Hausa</SelectItem>
+                    <LanguageSelectItems />
                   </SelectContent>
                 </Select>
               </div>
@@ -297,7 +292,7 @@ export default function CurriculumJobsPage() {
                             void loadArtifacts(job._id);
                           }}
                         >
-                          <TableCell>{LANGUAGE_LABELS[job.language]}</TableCell>
+                          <TableCell>{getLanguageName(job.language)}</TableCell>
                           <TableCell>{LEVEL_LABELS[job.level]}</TableCell>
                           <TableCell>
                             <Badge className={statusBadgeClass(job.status)}>{STATUS_LABELS[job.status]}</Badge>

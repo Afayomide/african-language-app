@@ -32,6 +32,7 @@ import { toast } from "sonner"
 import { DataTableControls } from "@/components/common/data-table-controls"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { activeStatusBadgeClass } from "@/lib/status-badge"
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 type RoleFilter = "all" | UserRole
 
@@ -315,9 +316,7 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yoruba">Yoruba</SelectItem>
-                    <SelectItem value="igbo">Igbo</SelectItem>
-                    <SelectItem value="hausa">Hausa</SelectItem>
+                    <LanguageSelectItems />
                   </SelectContent>
                 </Select>
               </div>

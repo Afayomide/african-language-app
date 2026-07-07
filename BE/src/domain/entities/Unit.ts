@@ -31,6 +31,40 @@ export type UnitAiRunSummary = {
   lessons: UnitAiRunLessonSummary[];
 };
 
+export type UnitAiPreviewPlanLesson = {
+  title: string;
+  description?: string;
+  objectives: string[];
+  conversationGoal: string;
+  situations: string[];
+  sentenceGoals: string[];
+  focusSummary?: string;
+  targetWords?: Array<{ text: string; translations?: string[] }>;
+  targetExpressions?: Array<{ text: string; translations?: string[] }>;
+  lessonMode?: "core" | "review";
+  sourceCoreLessonIndexes?: number[];
+  reviewSourceLessonIds?: string[];
+  reviewAnchorSentenceIds?: string[];
+};
+
+export type UnitAiPreviewPlanSummary = {
+  mode: "generate" | "regenerate";
+  createdBy: string;
+  createdAt: Date;
+  requestedLessons: number;
+  actualLessonCount: number;
+  settings: {
+    lessonCount: number;
+    sentencesPerLesson: number;
+    reviewContentPerLesson?: number;
+    proverbsPerLesson: number;
+    topics?: string[];
+    extraInstructions?: string;
+  };
+  coreLessons: UnitAiPreviewPlanLesson[];
+  lessonSequence: UnitAiPreviewPlanLesson[];
+};
+
 export type UnitEntity = {
   id: string;
   _id?: string;
@@ -47,6 +81,7 @@ export type UnitEntity = {
   status: Status;
   createdBy: string;
   lastAiRun?: UnitAiRunSummary | null;
+  lastAiPreviewPlan?: UnitAiPreviewPlanSummary | null;
   publishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;

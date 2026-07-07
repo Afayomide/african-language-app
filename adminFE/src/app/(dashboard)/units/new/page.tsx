@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { aiService, chapterService, unitService } from "@/services";
@@ -13,6 +15,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 export default function NewUnitPage() {
   const searchParams = useSearchParams();
@@ -24,7 +27,7 @@ export default function NewUnitPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState<Language>(
-    initialLanguage === "igbo" || initialLanguage === "hausa" || initialLanguage === "yoruba"
+    isLanguage(initialLanguage)
       ? initialLanguage
       : "yoruba"
   );
@@ -125,14 +128,23 @@ export default function NewUnitPage() {
   }
 
   async function handleAiSuggest() {
-    if (!title.trim()) {
-      toast.error("Enter a topic in the title field first.");
+    if (kind === "review") {
+      toast.error("AI suggest is only available for core units.");
+      return;
+    }
+    if (!chapterId) {
+      toast.error("Select a chapter first.");
       return;
     }
 
     try {
       setIsSuggesting(true);
-      const suggestion = await aiService.suggestLesson(title.trim(), language, level);
+      const suggestion = await aiService.suggestUnit({
+        language,
+        level,
+        chapterId,
+        hintTopic: title.trim() || undefined
+      });
       if (suggestion.title && suggestion.title.trim()) {
         setTitle(suggestion.title.trim());
       }
@@ -169,7 +181,13 @@ export default function NewUnitPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="title">Title</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAiSuggest} disabled={isSuggesting}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAiSuggest}
+                  disabled={isSuggesting || !chapterId || kind === "review"}
+                >
                   <Sparkles className="mr-2 h-4 w-4" />
                   AI Suggest
                 </Button>
@@ -185,9 +203,7 @@ export default function NewUnitPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yoruba">Yoruba</SelectItem>
-                    <SelectItem value="igbo">Igbo</SelectItem>
-                    <SelectItem value="hausa">Hausa</SelectItem>
+                    <LanguageSelectItems />
                   </SelectContent>
                 </Select>
               </div>

@@ -1,6 +1,7 @@
 import type { QuestionEntity } from "../entities/Question.js";
 
 export type QuestionListFilter = {
+  ids?: string[];
   lessonId?: string;
   lessonIds?: string[];
   type?: QuestionEntity["type"];
@@ -44,6 +45,7 @@ export type QuestionUpdateInput = Partial<{
 export interface QuestionRepository {
   create(input: QuestionCreateInput): Promise<QuestionEntity>;
   list(filter: QuestionListFilter): Promise<QuestionEntity[]>;
+  listDeleted(filter: Pick<QuestionListFilter, "ids" | "lessonId" | "lessonIds">): Promise<QuestionEntity[]>;
   findById(id: string): Promise<QuestionEntity | null>;
   updateById(id: string, update: QuestionUpdateInput): Promise<QuestionEntity | null>;
   softDeleteById(id: string, now: Date): Promise<QuestionEntity | null>;

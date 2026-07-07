@@ -1,12 +1,22 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
 import { ContentComponentSchema, buildBaseContentFields, normalizeContentFields } from "./shared/contentFields.js";
 
+const SentenceMeaningSegmentSchema = new Schema(
+  {
+    text: { type: String, required: true, trim: true },
+    sourceWordIndexes: { type: [Number], default: [] },
+    sourceComponentIndexes: { type: [Number], default: [] }
+  },
+  { _id: false }
+);
+
 const SentenceSchema = new Schema(
   {
     ...buildBaseContentFields(),
     literalTranslation: { type: String, default: "" },
     usageNotes: { type: String, default: "" },
-    components: { type: [ContentComponentSchema], default: [] }
+    components: { type: [ContentComponentSchema], default: [] },
+    meaningSegments: { type: [SentenceMeaningSegmentSchema], default: [] }
   },
   { timestamps: true }
 );

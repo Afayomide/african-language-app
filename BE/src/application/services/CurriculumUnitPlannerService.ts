@@ -3,7 +3,7 @@ import type { CurriculumBuildJobUnitPlan } from "../../domain/entities/Curriculu
 import type { LessonRepository } from "../../domain/repositories/LessonRepository.js";
 import type { UnitRepository } from "../../domain/repositories/UnitRepository.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
-import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
+import { validateUnitSuggestion } from "../../services/llm/outputQuality.js";
 import type { LlmClient } from "../../services/llm/types.js";
 import { getCefrBandForLevel } from "./cefrMapping.js";
 
@@ -20,6 +20,7 @@ export type CurriculumUnitPlannerInput = {
 
 export type CurriculumUnitReplanInput = Omit<CurriculumUnitPlannerInput, "requestedUnitCount"> & {
   excludedUnitTitles?: string[];
+  excludedUnitIds?: string[];
   orderIndex: number;
 };
 
@@ -90,7 +91,10 @@ export class CurriculumUnitPlannerService {
 
   async replanUnitForChapter(input: CurriculumUnitReplanInput): Promise<CurriculumBuildJobUnitPlan> {
     const cefrTarget = input.cefrTarget || getCefrBandForLevel(input.chapter.level);
-    const existingUnitsInLanguage = await this.units.listByLanguage(input.chapter.language, input.languageId || undefined);
+    const excludedUnitIds = new Set((input.excludedUnitIds || []).map((item) => String(item)));
+    const existingUnitsInLanguage = (await this.units.listByLanguage(input.chapter.language, input.languageId || undefined)).filter(
+      (item) => !excludedUnitIds.has(item.id)
+    );
     const existingLessons = await this.lessons.list({
       language: input.chapter.language,
       languageId: input.languageId || undefined
@@ -174,7 +178,7 @@ export class CurriculumUnitPlannerService {
         existingUnitTitles: validationInput.existingUnitTitles,
         existingLessonTitles: validationInput.existingLessonTitles
       });
-      const validation = validateLessonSuggestion(candidate, validationInput);
+      const validation = validateUnitSuggestion(candidate, validationInput);
       if (validation.ok) {
         accepted = {
           title: String(candidate.title || "").trim(),

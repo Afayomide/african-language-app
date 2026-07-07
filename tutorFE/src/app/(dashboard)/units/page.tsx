@@ -40,6 +40,8 @@ export default function TutorUnitsPage() {
   const [draggingUnitId, setDraggingUnitId] = useState<string | null>(null);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
+  const [unitPendingDelete, setUnitPendingDelete] = useState<Unit | null>(null);
+  const [isDeletingUnit, setIsDeletingUnit] = useState(false);
   const [bulkTopic, setBulkTopic] = useState("");
   const [bulkLevel, setBulkLevel] = useState<Level>("beginner");
   const [bulkCount, setBulkCount] = useState(5);
@@ -137,14 +139,20 @@ export default function TutorUnitsPage() {
   const currentPage = Math.min(page, totalPages);
   const paginatedUnits = filteredUnits.slice((currentPage - 1) * limit, currentPage * limit);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this unit?")) return;
+  async function handleDelete() {
+    if (!unitPendingDelete) return;
+    const id = unitPendingDelete._id;
     try {
+      setIsDeletingUnit(true);
       await unitService.deleteUnit(id);
+      setUnits((current) => current.filter((unit) => unit._id !== id));
+      setUnitPendingDelete(null);
       toast.success("Unit deleted.");
       void fetchUnits();
     } catch (error) {
-      toast.error("Failed to delete unit.")
+      toast.error(error instanceof Error ? error.message : "Failed to delete unit.")
+    } finally {
+      setIsDeletingUnit(false);
     }
   }
 
@@ -325,6 +333,29 @@ export default function TutorUnitsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(unitPendingDelete)} onOpenChange={(open) => !open && setUnitPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Unit</DialogTitle>
+            <DialogDescription>
+              This will delete {unitPendingDelete?.title ? `"${unitPendingDelete.title}"` : "this unit"} and unlink its lesson content from the curriculum.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnitPendingDelete(null)} disabled={isDeletingUnit}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={isDeletingUnit}
+            >
+              {isDeletingUnit ? "Deleting..." : "Delete Unit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="overflow-hidden rounded-3xl border-2 border-primary/10 bg-card shadow-xl">
         <div className="px-6 pt-6">
           <DataTableControls
@@ -405,16 +436,22 @@ export default function TutorUnitsPage() {
               paginatedUnits.map((unit) => (
                 <TableRow
                   key={unit._id}
-                  draggable
-                  onDragStart={() => onDragStart(unit._id)}
-                  onDragEnd={onDragEnd}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => onDrop(unit._id)}
                   className={cn("group transition-colors hover:bg-secondary/30", draggingUnitId === unit._id ? "opacity-30 bg-primary/10" : "")}
                 >
                   <TableCell className="pl-8">
                     <div className="flex items-center gap-3">
-                      <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span
+                        draggable
+                        onDragStart={() => onDragStart(unit._id)}
+                        onDragEnd={onDragEnd}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex cursor-grab items-center active:cursor-grabbing"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                      </span>
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted font-bold text-muted-foreground">{unit.orderIndex + 1}</div>
                     </div>
                   </TableCell>
@@ -448,11 +485,29 @@ export default function TutorUnitsPage() {
                         </Link>
                       </Button>
                       {unit.status === "draft" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleFinish(unit._id)} title="Finish" className={TABLE_ACTION_ICON_CLASS.finish}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleFinish(unit._id);
+                          }}
+                          title="Finish"
+                          className={TABLE_ACTION_ICON_CLASS.finish}
+                        >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(unit._id)} title="Delete" className={TABLE_ACTION_ICON_CLASS.delete}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setUnitPendingDelete(unit);
+                        }}
+                        title="Delete"
+                        className={TABLE_ACTION_ICON_CLASS.delete}
+                      >
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>

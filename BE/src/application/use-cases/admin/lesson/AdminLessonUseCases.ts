@@ -8,6 +8,7 @@ import type { ProverbRepository } from "../../../../domain/repositories/ProverbR
 import type { QuestionRepository } from "../../../../domain/repositories/QuestionRepository.js";
 import type { SentenceRepository } from "../../../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../../../domain/repositories/WordRepository.js";
+import type { ContentCurriculumService } from "../../../services/ContentCurriculumService.js";
 
 export class AdminLessonUseCases {
   private readonly contentLookup: ContentLookupService;
@@ -19,7 +20,8 @@ export class AdminLessonUseCases {
     private readonly expressions: ExpressionRepository,
     private readonly sentences: SentenceRepository,
     private readonly proverbs: ProverbRepository,
-    private readonly questions: QuestionRepository
+    private readonly questions: QuestionRepository,
+    private readonly contentCurriculum: ContentCurriculumService
   ) {
     this.contentLookup = new ContentLookupService(words, expressions, sentences);
   }
@@ -142,6 +144,10 @@ export class AdminLessonUseCases {
     await this.proverbs.softDeleteByLessonId(lesson.id, now);
     await this.questions.softDeleteByLessonId(lesson.id, now);
     await this.lessons.compactOrderIndexesByUnit(lesson.unitId);
+    await this.contentCurriculum.rebuildUnitContentItemsFromLessons({
+      unitId: lesson.unitId,
+      createdBy: String(lesson.createdBy || "")
+    });
 
     return lesson;
   }

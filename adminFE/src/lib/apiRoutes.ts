@@ -1,5 +1,9 @@
 const BE_API_URL = process.env.BE_API_URL
 
+export const bePublicRoutes = {
+  languages: () => `${BE_API_URL}/languages`,
+};
+
 export const beAiRoutes = {
   generateExpressions: () => `${BE_API_URL}/ai/expressions/generate`,
   generateWords: () => `${BE_API_URL}/ai/words/generate`,
@@ -10,6 +14,8 @@ export const beAiRoutes = {
 
 export const beAdminRoutes = {
   login: () => `${BE_API_URL}/admin/auth/login`,
+  languages: () => `${BE_API_URL}/admin/languages`,
+  language: (id: string) => `${BE_API_URL}/admin/languages/${id}`,
   chapters: () => `${BE_API_URL}/admin/chapters`,
   reorderChapters: () => `${BE_API_URL}/admin/chapters/reorder`,
   chapter: (id: string) => `${BE_API_URL}/admin/chapters/${id}`,
@@ -20,7 +26,10 @@ export const beAdminRoutes = {
   unit: (id: string) => `${BE_API_URL}/admin/units/${id}`,
   unitDeletedEntries: (id: string) => `${BE_API_URL}/admin/units/${id}/deleted-entries`,
   restoreDeletedUnitLesson: (id: string, lessonId: string) => `${BE_API_URL}/admin/units/${id}/deleted-lessons/${lessonId}/restore`,
+  restoreDeletedUnitWord: (id: string, wordId: string) => `${BE_API_URL}/admin/units/${id}/deleted-words/${wordId}/restore`,
   restoreDeletedUnitExpression: (id: string, expressionId: string) => `${BE_API_URL}/admin/units/${id}/deleted-expressions/${expressionId}/restore`,
+  restoreDeletedUnitSentence: (id: string, sentenceId: string) => `${BE_API_URL}/admin/units/${id}/deleted-sentences/${sentenceId}/restore`,
+  restoreDeletedUnitProverb: (id: string, proverbId: string) => `${BE_API_URL}/admin/units/${id}/deleted-proverbs/${proverbId}/restore`,
   finishUnit: (id: string) => `${BE_API_URL}/admin/units/${id}/finish`,
   publishUnit: (id: string) => `${BE_API_URL}/admin/units/${id}/publish`,
   lessons: () => `${BE_API_URL}/admin/lessons`,
@@ -80,6 +89,7 @@ export const beAdminRoutes = {
   rejectVoiceAudioSubmission: (id: string) => `${BE_API_URL}/admin/voice-audio/submissions/${id}/reject`,
   generateBulkChapters: () => `${BE_API_URL}/admin/ai/chapters/generate-bulk`,
   generateBulkLessons: () => `${BE_API_URL}/admin/ai/lessons/generate-bulk`,
+  suggestUnit: () => `${BE_API_URL}/admin/ai/units/suggest`,
   refactorLessonContent: (lessonId: string) => `${BE_API_URL}/admin/ai/lessons/${lessonId}/refactor`,
   previewUnitContentPlan: (unitId: string) => `${BE_API_URL}/admin/ai/units/${unitId}/generate-content/plan`,
   applyUnitContentPlan: (unitId: string) => `${BE_API_URL}/admin/ai/units/${unitId}/generate-content/apply`,
@@ -101,8 +111,14 @@ export const feAiRoutes = {
   suggestLesson: () => "/api/ai/lessons/suggest",
 };
 
+export const fePublicRoutes = {
+  languages: () => "/api/languages",
+};
+
 export const feAdminRoutes = {
   login: () => "/api/admin/auth",
+  languages: () => "/api/admin/languages",
+  language: (id: string) => `/api/admin/languages/${id}`,
   chapters: () => "/api/admin/chapters",
   reorderChapters: () => "/api/admin/chapters/reorder",
   chapter: (id: string) => `/api/admin/chapters/${id}`,
@@ -113,7 +129,10 @@ export const feAdminRoutes = {
   unit: (id: string) => `/api/admin/units/${id}`,
   unitDeletedEntries: (id: string) => `/api/admin/units/${id}/deleted-entries`,
   restoreDeletedUnitLesson: (id: string, lessonId: string) => `/api/admin/units/${id}/deleted-lessons/${lessonId}/restore`,
+  restoreDeletedUnitWord: (id: string, wordId: string) => `/api/admin/units/${id}/deleted-words/${wordId}/restore`,
   restoreDeletedUnitExpression: (id: string, expressionId: string) => `/api/admin/units/${id}/deleted-expressions/${expressionId}/restore`,
+  restoreDeletedUnitSentence: (id: string, sentenceId: string) => `/api/admin/units/${id}/deleted-sentences/${sentenceId}/restore`,
+  restoreDeletedUnitProverb: (id: string, proverbId: string) => `/api/admin/units/${id}/deleted-proverbs/${proverbId}/restore`,
   finishUnit: (id: string) => `/api/admin/units/${id}/finish`,
   publishUnit: (id: string) => `/api/admin/units/${id}/publish`,
   lessons: () => "/api/admin/lessons",
@@ -173,6 +192,7 @@ export const feAdminRoutes = {
   rejectVoiceAudioSubmission: (id: string) => `/api/admin/voice-audio/submissions/${id}/reject`,
   generateBulkChapters: () => "/api/admin/ai/chapters/generate-bulk",
   generateBulkLessons: () => "/api/admin/ai/lessons/generate-bulk",
+  suggestUnit: () => "/api/admin/ai/units/suggest",
   refactorLessonContent: (lessonId: string) => `/api/admin/ai/lessons/${lessonId}/refactor`,
   previewUnitContentPlan: (unitId: string) => `/api/admin/ai/units/${unitId}/generate-content/plan`,
   applyUnitContentPlan: (unitId: string) => `/api/admin/ai/units/${unitId}/generate-content/apply`,

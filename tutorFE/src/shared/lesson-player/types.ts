@@ -1,4 +1,4 @@
-export type Language = "yoruba" | "igbo" | "hausa";
+export type Language = string;
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Status = "draft" | "finished" | "published";
 
@@ -49,6 +49,7 @@ export interface LearningContentComponent {
   audio?: {
     url?: string;
   };
+  components?: LearningContentComponent[];
 }
 
 export interface LearningContent {

@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { expressionService, lessonService, sentenceService, wordService } from "@/services";
@@ -14,10 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle, Plus, Save, Trash2, Volume2 } from "lucide-react";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
-
-function isLanguage(value: string | null): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 type ComponentOption = { id: string; text: string; type: "word" | "expression" };
 
@@ -161,7 +159,7 @@ function SentenceFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }
         language: sentence.language,
         lessonIds: mode === "edit" ? sentence.lessonIds : undefined,
         text: sentence.text,
-        translations: translationsText.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
+        translations: translationsText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
         pronunciation: sentence.pronunciation || "",
         explanation: sentence.explanation || "",
         difficulty: Number(sentence.difficulty || 1),

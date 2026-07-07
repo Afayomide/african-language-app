@@ -1,7 +1,8 @@
 import UnitModel from "../../../../models/Unit.js";
 import type { Language } from "../../../../domain/entities/Lesson.js";
-import type { UnitAiRunSummary, UnitEntity } from "../../../../domain/entities/Unit.js";
+import type { UnitAiPreviewPlanLesson, UnitAiPreviewPlanSummary, UnitAiRunSummary, UnitEntity } from "../../../../domain/entities/Unit.js";
 import type {
+  UnitAiPreviewPlanUpdateInput,
   UnitAiRunUpdateInput,
   UnitCreateInput,
   UnitListFilter,
@@ -71,6 +72,72 @@ function normalizeAiRun(value: unknown): UnitAiRunSummary | null {
   };
 }
 
+function normalizePreviewPlanLesson(value: unknown): UnitAiPreviewPlanLesson {
+  const input = (value || {}) as Record<string, unknown>;
+  const lessonMode = input.lessonMode === "core" || input.lessonMode === "review" ? input.lessonMode : undefined;
+  const normalizeTargets = (targets: unknown) =>
+    Array.isArray(targets)
+      ? targets
+          .map((target) => {
+            const row = (target || {}) as Record<string, unknown>;
+            const text = String(row.text || "").trim();
+            if (!text) return null;
+            return {
+              text,
+              translations: Array.isArray(row.translations)
+                ? row.translations.map(String).map((item) => item.trim()).filter(Boolean)
+                : []
+            };
+          })
+          .filter((target): target is { text: string; translations: string[] } => Boolean(target))
+      : [];
+  return {
+    title: String(input.title || ""),
+    description: input.description ? String(input.description) : undefined,
+    objectives: Array.isArray(input.objectives) ? input.objectives.map(String) : [],
+    conversationGoal: String(input.conversationGoal || ""),
+    situations: Array.isArray(input.situations) ? input.situations.map(String) : [],
+    sentenceGoals: Array.isArray(input.sentenceGoals) ? input.sentenceGoals.map(String) : [],
+    focusSummary: input.focusSummary ? String(input.focusSummary) : undefined,
+    targetWords: normalizeTargets(input.targetWords),
+    targetExpressions: normalizeTargets(input.targetExpressions),
+    lessonMode,
+    sourceCoreLessonIndexes: Array.isArray(input.sourceCoreLessonIndexes)
+      ? input.sourceCoreLessonIndexes.map(Number).filter((item) => Number.isInteger(item) && item >= 0)
+      : undefined,
+    reviewSourceLessonIds: Array.isArray(input.reviewSourceLessonIds)
+      ? input.reviewSourceLessonIds.map(String).filter(Boolean)
+      : undefined,
+    reviewAnchorSentenceIds: Array.isArray(input.reviewAnchorSentenceIds)
+      ? input.reviewAnchorSentenceIds.map(String).filter(Boolean)
+      : undefined
+  };
+}
+
+function normalizeAiPreviewPlan(value: unknown): UnitAiPreviewPlanSummary | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const settings = (input.settings || {}) as Record<string, unknown>;
+  const mode = input.mode === "regenerate" ? "regenerate" : "generate";
+  return {
+    mode,
+    createdBy: String(input.createdBy || ""),
+    createdAt: input.createdAt instanceof Date ? input.createdAt : new Date(String(input.createdAt || new Date().toISOString())),
+    requestedLessons: Number(input.requestedLessons || 0),
+    actualLessonCount: Number(input.actualLessonCount || 0),
+    settings: {
+      lessonCount: Number(settings.lessonCount || input.requestedLessons || 0),
+      sentencesPerLesson: Number(settings.sentencesPerLesson || 0),
+      reviewContentPerLesson: settings.reviewContentPerLesson == null ? undefined : Number(settings.reviewContentPerLesson),
+      proverbsPerLesson: Number(settings.proverbsPerLesson || 0),
+      topics: Array.isArray(settings.topics) ? settings.topics.map(String).filter(Boolean) : undefined,
+      extraInstructions: settings.extraInstructions ? String(settings.extraInstructions) : undefined
+    },
+    coreLessons: Array.isArray(input.coreLessons) ? input.coreLessons.map(normalizePreviewPlanLesson) : [],
+    lessonSequence: Array.isArray(input.lessonSequence) ? input.lessonSequence.map(normalizePreviewPlanLesson) : []
+  };
+}
+
 function toEntity(doc: {
   _id: { toString(): string };
   languageId?: { toString(): string } | string | null;
@@ -86,6 +153,7 @@ function toEntity(doc: {
   status: UnitEntity["status"];
   createdBy: { toString(): string };
   lastAiRun?: unknown;
+  lastAiPreviewPlan?: unknown;
   publishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -106,6 +174,7 @@ function toEntity(doc: {
     status: doc.status,
     createdBy: doc.createdBy.toString(),
     lastAiRun: normalizeAiRun(doc.lastAiRun),
+    lastAiPreviewPlan: normalizeAiPreviewPlan(doc.lastAiPreviewPlan),
     publishedAt: doc.publishedAt || null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
@@ -166,6 +235,15 @@ export class MongooseUnitRepository implements UnitRepository {
     const unit = await UnitModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
       { lastAiRun: update.lastAiRun },
+      { new: true }
+    );
+    return unit ? toEntity(unit) : null;
+  }
+
+  async updateLastAiPreviewPlan(id: string, update: UnitAiPreviewPlanUpdateInput): Promise<UnitEntity | null> {
+    const unit = await UnitModel.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      { lastAiPreviewPlan: update.lastAiPreviewPlan },
       { new: true }
     );
     return unit ? toEntity(unit) : null;

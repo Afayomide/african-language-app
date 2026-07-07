@@ -18,6 +18,8 @@ import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repo
 import { AiExpressionOrchestrator } from "../../application/services/AiExpressionOrchestrator.js";
 import { AiSentenceOrchestrator } from "../../application/services/AiSentenceOrchestrator.js";
 import { AiWordOrchestrator } from "../../application/services/AiWordOrchestrator.js";
+import { CurriculumMemoryService } from "../../application/services/CurriculumMemoryService.js";
+import { CurriculumUnitPlannerService } from "../../application/services/CurriculumUnitPlannerService.js";
 import { SentenceDraftPersistenceService } from "../../application/services/SentenceDraftPersistenceService.js";
 import { ChapterAiUseCases } from "../../application/use-cases/shared/ChapterAiUseCases.js";
 import { AdminUnitAiContentUseCases, AiPlanValidationError } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
@@ -34,6 +36,8 @@ import {
   buildAutoReviewUnitTitle,
   getTrailingCoreUnitsSinceLastReview
 } from "../../application/services/reviewUnitScheduling.js";
+import type { ChapterEntity } from "../../domain/entities/Chapter.js";
+import type { UnitEntity } from "../../domain/entities/Unit.js";
 
 const lessons = new MongooseLessonRepository();
 const expressions = new MongooseExpressionRepository();
@@ -65,6 +69,17 @@ const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   units,
   getLlmClient()
 );
+const curriculumMemory = new CurriculumMemoryService(
+  chapters,
+  units,
+  lessons,
+  lessonContentItems,
+  words,
+  expressions,
+  sentences,
+  proverbs
+);
+const curriculumUnitPlanner = new CurriculumUnitPlannerService(units, lessons, getLlmClient());
 
 function normalizeSeedWords(seedWords: unknown) {
   if (!Array.isArray(seedWords)) return undefined;
@@ -112,6 +127,47 @@ function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
   return /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(title);
+}
+
+function buildPlanningUnit(input: {
+  chapter: ChapterEntity;
+  level: Level;
+  userId: string;
+  orderIndex: number;
+  existingUnit?: UnitEntity | null;
+}): UnitEntity {
+  const now = new Date();
+  if (input.existingUnit) {
+    return {
+      ...input.existingUnit,
+      chapterId: input.chapter.id,
+      languageId: input.chapter.languageId || input.existingUnit.languageId || null,
+      language: input.chapter.language,
+      level: input.level,
+      orderIndex: input.orderIndex
+    };
+  }
+
+  return {
+    id: `suggest-unit:${input.chapter.id}:${input.orderIndex}`,
+    _id: `suggest-unit:${input.chapter.id}:${input.orderIndex}`,
+    languageId: input.chapter.languageId || null,
+    chapterId: input.chapter.id,
+    title: "",
+    description: "",
+    language: input.chapter.language,
+    level: input.level,
+    kind: "core",
+    reviewStyle: "none",
+    reviewSourceUnitIds: [],
+    orderIndex: input.orderIndex,
+    status: "draft",
+    createdBy: input.userId,
+    lastAiRun: null,
+    publishedAt: null,
+    createdAt: now,
+    updatedAt: now
+  };
 }
 
 export async function suggestLesson(req: AuthRequest, res: Response) {
@@ -195,6 +251,86 @@ export async function suggestLesson(req: AuthRequest, res: Response) {
     return res.status(200).json({ suggestion });
   } catch (error) {
     console.error("Tutor AI suggestLesson LLM error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
+}
+
+export async function suggestUnit(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { level, chapterId, hintTopic, excludeUnitId } = req.body ?? {};
+  if (!level || !isValidLevel(String(level))) {
+    return res.status(400).json({ error: "invalid level" });
+  }
+  if (!chapterId || !mongoose.Types.ObjectId.isValid(String(chapterId))) {
+    return res.status(400).json({ error: "invalid chapter id" });
+  }
+  if (hintTopic !== undefined && typeof hintTopic !== "string") {
+    return res.status(400).json({ error: "invalid hint topic" });
+  }
+  if (excludeUnitId !== undefined && excludeUnitId !== null && excludeUnitId !== "" && !mongoose.Types.ObjectId.isValid(String(excludeUnitId))) {
+    return res.status(400).json({ error: "invalid exclude unit id" });
+  }
+
+  const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
+  if (!tutorLanguage) {
+    return res.status(403).json({ error: "tutor language not configured" });
+  }
+
+  const selectedChapter = await chapters.findById(String(chapterId));
+  if (!selectedChapter || selectedChapter.language !== tutorLanguage) {
+    return res.status(400).json({ error: "chapter is invalid for this language" });
+  }
+
+  let existingUnit: UnitEntity | null = null;
+  if (excludeUnitId) {
+    existingUnit = await units.findById(String(excludeUnitId));
+    if (!existingUnit || existingUnit.language !== tutorLanguage) {
+      return res.status(400).json({ error: "exclude unit is invalid for this language" });
+    }
+  }
+
+  const chapterUnits = (await units.listByChapterId(selectedChapter.id)).filter((unit) => unit.id !== existingUnit?.id);
+  const nextOrderIndex = chapterUnits.reduce((max, unit) => Math.max(max, unit.orderIndex), -1) + 1;
+  const planningOrderIndex =
+    existingUnit && existingUnit.chapterId === selectedChapter.id ? existingUnit.orderIndex : nextOrderIndex;
+  const planningChapter: ChapterEntity = {
+    ...selectedChapter,
+    level: String(level) as Level
+  };
+  const planningUnit = buildPlanningUnit({
+    chapter: planningChapter,
+    level: String(level) as Level,
+    userId: req.user.id,
+    orderIndex: planningOrderIndex,
+    existingUnit
+  });
+  const memory = await curriculumMemory.buildUnitPlanningMemory({
+    unit: planningUnit,
+    chapter: planningChapter
+  });
+
+  try {
+    const suggestion = await curriculumUnitPlanner.replanUnitForChapter({
+      chapter: planningChapter,
+      languageId: planningChapter.languageId || null,
+      topic: typeof hintTopic === "string" && hintTopic.trim() ? hintTopic.trim() : undefined,
+      memorySummary: memory.summary,
+      excludedUnitTitles: existingUnit?.title ? [existingUnit.title] : undefined,
+      excludedUnitIds: existingUnit?.id ? [existingUnit.id] : undefined,
+      orderIndex: planningOrderIndex
+    });
+
+    return res.status(200).json({
+      suggestion: {
+        title: suggestion.title,
+        description: suggestion.description || ""
+      }
+    });
+  } catch (error) {
+    console.error("Tutor AI suggestUnit LLM error", error);
     return res.status(502).json({ error: "llm generation failed" });
   }
 }

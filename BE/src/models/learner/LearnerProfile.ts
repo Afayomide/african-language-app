@@ -1,4 +1,5 @@
 import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { LANGUAGE_VALUES } from "../../domain/entities/Lesson.js";
 
 const WeeklyActivitySchema = new Schema(
   {
@@ -19,7 +20,7 @@ const LearnerProfileSchema = new Schema(
     proficientLanguage: { type: String, default: "" },
     countryOfOrigin: { type: String, default: "" },
     onboardingCompleted: { type: Boolean, default: false },
-    currentLanguage: { type: String, enum: ["yoruba", "igbo", "hausa"], default: "yoruba" },
+    currentLanguage: { type: String, enum: [...LANGUAGE_VALUES], default: "yoruba" },
     dailyGoalMinutes: { type: Number, default: 10, min: 1, max: 120 },
     totalXp: { type: Number, default: 0, min: 0 },
     currentStreak: { type: Number, default: 0, min: 0 },

@@ -31,16 +31,6 @@ const lessonContentItems = new MongooseLessonContentItemRepository();
 const wordRepo = new MongooseWordRepository();
 const expressionRepo = new MongooseExpressionRepository();
 const sentenceRepo = new MongooseSentenceRepository();
-const lessonUseCases = new AdminLessonUseCases(
-  lessonRepo,
-  lessonContentItems,
-  wordRepo,
-  expressionRepo,
-  sentenceRepo,
-  new MongooseProverbRepository(),
-  questionRepo
-);
-
 const proverbRepo = new MongooseProverbRepository();
 const unitRepo = new MongooseUnitRepository();
 const contentCurriculum = new ContentCurriculumService(
@@ -48,6 +38,16 @@ const contentCurriculum = new ContentCurriculumService(
   unitRepo,
   lessonContentItems,
   new MongooseUnitContentItemRepository()
+);
+const lessonUseCases = new AdminLessonUseCases(
+  lessonRepo,
+  lessonContentItems,
+  wordRepo,
+  expressionRepo,
+  sentenceRepo,
+  proverbRepo,
+  questionRepo,
+  contentCurriculum
 );
 const lessonAuditService = new LessonAuditService(
   lessonRepo,

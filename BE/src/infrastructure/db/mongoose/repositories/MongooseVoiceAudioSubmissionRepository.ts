@@ -28,7 +28,7 @@ export class MongooseVoiceAudioSubmissionRepository implements VoiceAudioSubmiss
     contentId: string;
     voiceArtistUserId: string;
     voiceArtistProfileId: string;
-    language: "yoruba" | "igbo" | "hausa";
+    language: "yoruba" | "igbo" | "hausa" | "pidgin";
     audio: VoiceAudioSubmissionEntity["audio"];
   }): Promise<VoiceAudioSubmissionEntity> {
     const created = await VoiceAudioSubmissionModel.create(input);
@@ -40,7 +40,7 @@ export class MongooseVoiceAudioSubmissionRepository implements VoiceAudioSubmiss
     voiceArtistUserId?: string;
     contentType?: "word" | "expression" | "sentence";
     contentId?: string;
-    language?: "yoruba" | "igbo" | "hausa";
+    language?: "yoruba" | "igbo" | "hausa" | "pidgin";
   }): Promise<VoiceAudioSubmissionEntity[]> {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;

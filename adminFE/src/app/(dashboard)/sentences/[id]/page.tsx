@@ -1,5 +1,7 @@
 'use client'
 
+import { isLanguage } from "@/lib/languages";
+
 import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { expressionService, lessonService, sentenceService, wordService } from "@/services";
@@ -14,10 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle, Flag, Mic, Plus, Save, Sparkles, Square, Trash2, Volume2 } from "lucide-react";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
-
-function isLanguage(value: string | null): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
+import { LanguageSelectItems } from "@/components/common/language-select-items";
 
 type ComponentOption = { id: string; text: string; type: "word" | "expression" };
 
@@ -241,7 +240,7 @@ function SentenceFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }
         language: sentence.language,
         lessonIds: mode === "edit" ? sentence.lessonIds : undefined,
         text: sentence.text,
-        translations: translationsText.split(/\n|,/).map((item) => item.trim()).filter(Boolean),
+        translations: translationsText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
         pronunciation: sentence.pronunciation || "",
         explanation: sentence.explanation || "",
         difficulty: Number(sentence.difficulty || 1),
@@ -355,9 +354,7 @@ function SentenceFormContent({ mode, id }: { mode: "new" | "edit"; id?: string }
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="yoruba">Yoruba</SelectItem>
-                      <SelectItem value="igbo">Igbo</SelectItem>
-                      <SelectItem value="hausa">Hausa</SelectItem>
+                      <LanguageSelectItems />
                     </SelectContent>
                   </Select>
                 </div>

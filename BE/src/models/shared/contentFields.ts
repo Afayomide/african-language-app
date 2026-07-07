@@ -1,6 +1,7 @@
 import { Schema } from "mongoose";
+import { LANGUAGE_VALUES } from "../../domain/entities/Lesson.js";
 
-export const CONTENT_LANGUAGE_VALUES = ["yoruba", "igbo", "hausa"] as const;
+export const CONTENT_LANGUAGE_VALUES = LANGUAGE_VALUES;
 export const CONTENT_STATUS_VALUES = ["draft", "finished", "published"] as const;
 export const CONTENT_COMPONENT_TYPE_VALUES = ["word", "expression"] as const;
 export const CONTENT_AUDIO_REFERENCE_TYPE_VALUES = [

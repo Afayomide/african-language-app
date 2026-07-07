@@ -2,8 +2,8 @@
 
 import { use, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { lessonService, expressionService, questionService } from "@/services"
-import { ExerciseQuestion, Lesson, Expression, QuestionSubtype, QuestionType } from "@/types"
+import { lessonService, expressionService, questionService, wordService, sentenceService } from "@/services"
+import { ExerciseQuestion, Lesson, Expression, Word, Sentence, QuestionSubtype, QuestionType } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,19 +11,25 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
-type ExpressionOption = {
+type SourceOption = {
   _id: string
   text: string
   translations: string[]
   images?: Expression["images"]
+  components?: Sentence["components"]
 }
 
 type MatchingItemDraft = {
   sourceId: string
   translationIndex: number
+}
+
+type MeaningSegmentDraft = {
+  text: string
+  componentIndexesCsv: string
 }
 
 const SUBTYPE_TEMPLATES: Record<QuestionSubtype, string> = {
@@ -51,12 +57,74 @@ function getSourceId(question: ExerciseQuestion) {
   return ""
 }
 
+function splitSentenceWords(value: string) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function parseMeaningSegmentDrafts(
+  drafts: MeaningSegmentDraft[],
+  components: Sentence["components"]
+) {
+  const orderedComponents = [...components].sort((left, right) => left.orderIndex - right.orderIndex)
+  const wordIndexesByComponent = new Map<number, number[]>()
+  let wordCursor = 0
+  orderedComponents.forEach((component, index) => {
+    const tokenCount = Math.max(1, splitSentenceWords(component.textSnapshot || "").length)
+    wordIndexesByComponent.set(index, Array.from({ length: tokenCount }, (_, offset) => wordCursor + offset))
+    wordCursor += tokenCount
+  })
+
+  const normalized = drafts.map((draft, rowIndex) => {
+    const text = draft.text.trim()
+    const sourceComponentIndexes = Array.from(
+      new Set(
+        draft.componentIndexesCsv
+          .split(",")
+          .map((item) => Number(item.trim()))
+          .filter((item) => Number.isInteger(item))
+      )
+    )
+    if (!text) return { error: `Meaning segment ${rowIndex + 1} needs text.` as const }
+    if (sourceComponentIndexes.length === 0) return { error: `Meaning segment ${rowIndex + 1} needs component indexes.` as const }
+    if (sourceComponentIndexes.some((index) => index < 0 || index >= orderedComponents.length)) {
+      return { error: `Meaning segment ${rowIndex + 1} has an invalid component index.` as const }
+    }
+    return {
+      text,
+      sourceComponentIndexes,
+      sourceWordIndexes: sourceComponentIndexes.flatMap((index) => wordIndexesByComponent.get(index) || [])
+    }
+  })
+
+  const firstError = normalized.find((item) => "error" in item)
+  if (firstError && "error" in firstError) return { error: firstError.error }
+
+  const segments = normalized as Array<{
+    text: string
+    sourceComponentIndexes: number[]
+    sourceWordIndexes: number[]
+  }>
+  const flattened = segments.flatMap((segment) => segment.sourceComponentIndexes)
+  const expected = orderedComponents.map((_, index) => index)
+  if (flattened.length !== expected.length || flattened.some((value, index) => value !== expected[index])) {
+    return { error: "Meaning segments must cover every sentence component exactly once and in order." as const }
+  }
+
+  return { segments }
+}
+
 export default function EditQuestionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [question, setQuestion] = useState<ExerciseQuestion | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [expressions, setExpressions] = useState<ExpressionOption[]>([])
+  const [expressions, setExpressions] = useState<SourceOption[]>([])
+  const [words, setWords] = useState<SourceOption[]>([])
+  const [sentences, setSentences] = useState<SourceOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [optionsCsv, setOptionsCsv] = useState("")
@@ -64,15 +132,27 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const [reviewCorrectOrderCsv, setReviewCorrectOrderCsv] = useState("")
   const [reviewSentence, setReviewSentence] = useState("")
   const [reviewMeaning, setReviewMeaning] = useState("")
+  const [meaningSegments, setMeaningSegments] = useState<MeaningSegmentDraft[]>([])
   const [matchingItems, setMatchingItems] = useState<MatchingItemDraft[]>([])
 
   const isMatchingQuestion = question?.type === "matching"
   const isContextScenarioQuestion = question?.subtype === "mc-select-context-response"
   const requiresReviewData = question ? ["mc-select-missing-word", "fg-word-order", "fg-gap-fill", "ls-fg-word-order", "ls-fg-gap-fill"].includes(question.subtype) : false
   const usesChoiceOptions = question ? ["mc-select-translation", "mc-select-context-response", "mc-select-missing-word", "fg-gap-fill", "ls-mc-select-translation", "ls-mc-select-missing-word", "ls-fg-gap-fill"].includes(question.subtype) : false
-  const selectedExpressionText = question
-    ? expressions.find((expression) => expression._id === getSourceId(question))?.text || ""
+  const selectedSourceType = question?.sourceType || "expression"
+  const sourceOptions = selectedSourceType === "word" ? words : selectedSourceType === "sentence" ? sentences : expressions
+  const selectedSentence =
+    question && selectedSourceType === "sentence"
+      ? sentences.find((source) => source._id === getSourceId(question))
+      : undefined
+  const selectedSourceText = question
+    ? sourceOptions.find((source) => source._id === getSourceId(question))?.text || ""
     : ""
+  const supportsMeaningSegments = Boolean(
+    question &&
+    selectedSourceType === "sentence" &&
+    ["fg-word-order", "ls-fg-word-order"].includes(question.subtype)
+  )
 
   const subtypeOptions = useMemo(() => {
     if (!question) return []
@@ -114,13 +194,23 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
           questionService.getQuestion(id),
           lessonService.listLessons()
         ])
-        setQuestion(loadedQuestion)
+        setQuestion({ ...loadedQuestion, sourceType: loadedQuestion.sourceType || "expression" })
         setLessons(loadedLessons)
         setOptionsCsv((loadedQuestion.options || []).join(", "))
         setReviewSentence(loadedQuestion.reviewData?.sentence || "")
         setReviewWordsCsv((loadedQuestion.reviewData?.words || []).join(", "))
         setReviewCorrectOrderCsv((loadedQuestion.reviewData?.correctOrder || []).join(", "))
         setReviewMeaning(loadedQuestion.reviewData?.meaning || "")
+        setMeaningSegments(
+          Array.isArray(loadedQuestion.reviewData?.meaningSegments)
+            ? loadedQuestion.reviewData.meaningSegments.map((segment) => ({
+                text: segment.text,
+                componentIndexesCsv: Array.isArray(segment.sourceComponentIndexes)
+                  ? segment.sourceComponentIndexes.join(", ")
+                  : ""
+              }))
+            : []
+        )
         setMatchingItems(
           Array.isArray(loadedQuestion.interactionData?.matchingPairs)
             ? loadedQuestion.interactionData.matchingPairs.map((pair) => ({
@@ -132,7 +222,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
         const lessonId = loadedQuestion.lessonId
         if (lessonId) {
-          await loadExpressionsForLesson(lessonId)
+          await loadSourceOptionsForLesson(lessonId, loadedLessons)
         }
       } catch {
         toast.error("Failed to load question.")
@@ -144,20 +234,36 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     void load()
   }, [id, router])
 
-  async function loadExpressionsForLesson(lessonId: string) {
+  async function loadSourceOptionsForLesson(lessonId: string, availableLessons: Lesson[] = lessons) {
     try {
-      const lessonExpressions = await expressionService.listExpressions(lessonId)
-      setExpressions(
-        lessonExpressions.map((expression) => ({
-          _id: expression._id,
-          text: expression.text,
-          translations: expression.translations || [],
-          images: expression.images || []
-        }))
-      )
+      const lessonLanguage = availableLessons.find((lesson) => lesson._id === lessonId)?.language
+      const [loadedExpressions, loadedWords, loadedSentences] = await Promise.all([
+        expressionService.listExpressions(undefined, undefined, lessonLanguage),
+        wordService.listWords(undefined, undefined, lessonLanguage),
+        sentenceService.listSentences(undefined, undefined, lessonLanguage)
+      ])
+      setExpressions(loadedExpressions.map((expression: Expression) => ({
+        _id: expression._id,
+        text: expression.text,
+        translations: expression.translations || [],
+        images: expression.images || []
+      })))
+      setWords(loadedWords.map((word: Word) => ({
+        _id: word._id,
+        text: word.text,
+        translations: word.translations || []
+      })))
+      setSentences(loadedSentences.map((sentence: Sentence) => ({
+        _id: sentence._id,
+        text: sentence.text,
+        translations: sentence.translations || [],
+        components: sentence.components || []
+      })))
     } catch {
-      toast.error("Failed to load expressions.")
+      toast.error("Failed to load question sources.")
       setExpressions([])
+      setWords([])
+      setSentences([])
     }
   }
 
@@ -180,7 +286,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
     if (!question) return
 
     if (!isMatchingQuestion && !getSourceId(question)) {
-      toast.error("Select an expression.")
+      toast.error("Select a source.")
       return
     }
 
@@ -202,6 +308,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
     const payload: {
       lessonId: string
+      sourceType: "word" | "expression" | "sentence"
       sourceId: string
       translationIndex: number
       type: QuestionType
@@ -215,6 +322,11 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         words: string[]
         correctOrder: number[]
         meaning: string
+        meaningSegments?: Array<{
+          text: string
+          sourceWordIndexes: number[]
+          sourceComponentIndexes?: number[]
+        }>
       }
       relatedSourceRefs?: Array<{ type: "word" | "expression" | "sentence"; id: string }>
       interactionData?: {
@@ -226,6 +338,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
       }
     } = {
       lessonId: question.lessonId,
+      sourceType: isMatchingQuestion ? "expression" : (question.sourceType || "expression"),
       sourceId: isMatchingQuestion ? matchingItems[0]?.sourceId || "" : getSourceId(question),
       translationIndex: isMatchingQuestion ? matchingItems[0]?.translationIndex || 0 : question.translationIndex,
       type: question.type,
@@ -240,11 +353,25 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         .split(",")
         .map((item) => Number(item.trim()))
         .filter((item) => !Number.isNaN(item))
+      if (supportsMeaningSegments && meaningSegments.length === 0) {
+        toast.error("Add meaning segments for sentence word-order questions.")
+        return
+      }
+      const parsedMeaningSegments = supportsMeaningSegments
+        ? parseMeaningSegmentDrafts(meaningSegments, selectedSentence?.components || [])
+        : null
+      if (parsedMeaningSegments && "error" in parsedMeaningSegments) {
+        toast.error(parsedMeaningSegments.error)
+        return
+      }
       payload.reviewData = {
         sentence: reviewSentence.trim(),
         words,
         correctOrder,
-        meaning: reviewMeaning.trim()
+        meaning: reviewMeaning.trim(),
+        ...(parsedMeaningSegments && "segments" in parsedMeaningSegments && parsedMeaningSegments.segments.length > 0
+          ? { meaningSegments: parsedMeaningSegments.segments }
+          : {})
       }
       if (usesChoiceOptions) {
         payload.options = optionsCsv.split(",").map((item) => item.trim()).filter(Boolean)
@@ -259,8 +386,8 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
           return
         }
         const correctOption = String(payload.options[payload.correctIndex] || "").trim()
-        if (!selectedExpressionText || correctOption !== selectedExpressionText) {
-          toast.error("For context-response questions, the correct option must exactly match the selected expression text.")
+        if (!selectedSourceText || correctOption !== selectedSourceText) {
+          toast.error("For context-response questions, the correct option must exactly match the selected source text.")
           return
         }
       }
@@ -332,7 +459,8 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                       translationIndex: 0
                     } : current)
                     setMatchingItems([])
-                    await loadExpressionsForLesson(value)
+                    setMeaningSegments([])
+                    await loadSourceOptionsForLesson(value)
                   }}
                 >
                   <SelectTrigger><SelectValue placeholder="Select lesson" /></SelectTrigger>
@@ -346,16 +474,39 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
               {!isMatchingQuestion && (
                 <div className="space-y-2">
-                  <Label>Expression</Label>
+                  <Label>Source Type</Label>
+                  <Select
+                    value={question.sourceType || "expression"}
+                    onValueChange={(value) => {
+                      setQuestion({ ...question, sourceType: value as "word" | "expression" | "sentence", sourceId: "", translationIndex: 0 })
+                      setMeaningSegments([])
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="expression">Expression</SelectItem>
+                      <SelectItem value="word">Word</SelectItem>
+                      <SelectItem value="sentence">Sentence</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {!isMatchingQuestion && (
+                <div className="space-y-2">
+                  <Label>{selectedSourceType.charAt(0).toUpperCase() + selectedSourceType.slice(1)}</Label>
                   <Select
                     value={getSourceId(question)}
-                    onValueChange={(value) => setQuestion({ ...question, sourceId: value, translationIndex: 0 })}
+                    onValueChange={(value) => {
+                      setQuestion({ ...question, sourceId: value, translationIndex: 0 })
+                      if (selectedSourceType === "sentence") setMeaningSegments([])
+                    }}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select expression" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={`Select ${selectedSourceType}`} /></SelectTrigger>
                     <SelectContent>
-                      {expressions.map((expression) => (
-                        <SelectItem key={expression._id} value={expression._id}>
-                          {expression.text} ({expression.translations.join(" | ")})
+                      {sourceOptions.map((source) => (
+                        <SelectItem key={source._id} value={source._id}>
+                          {source.text} ({source.translations.join(" | ")})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -366,7 +517,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
               {isContextScenarioQuestion ? (
                 <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground/75">
                   <p className="font-semibold text-foreground">Context-response authoring</p>
-                  <p className="mt-1">Keep the prompt in English as a short real-life situation. Keep the options in the target language. The correct option must exactly match the selected expression, and the distractors should be contextually wrong, not spelling variants.</p>
+                  <p className="mt-1">Keep the prompt in English as a short real-life situation. Keep the options in the target language. The correct option must exactly match the selected source text, and the distractors should be contextually wrong, not spelling variants.</p>
                 </div>
               ) : null}
 
@@ -379,7 +530,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                   >
                     <SelectTrigger><SelectValue placeholder="Select translation index" /></SelectTrigger>
                     <SelectContent>
-                      {(expressions.find((expression) => expression._id === getSourceId(question))?.translations || []).map((item, index) => (
+                      {(sourceOptions.find((source) => source._id === getSourceId(question))?.translations || []).map((item, index) => (
                         <SelectItem key={`edit-translation-${index}`} value={String(index)}>
                           Index {index}: {item}
                         </SelectItem>
@@ -513,7 +664,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                   <Input value={optionsCsv} onChange={(event) => setOptionsCsv(event.target.value)} />
                   {isContextScenarioQuestion ? (
                     <p className="text-xs text-muted-foreground">
-                      Use 2 to 4 target-language responses. The correct option should be exactly: <span className="font-semibold text-foreground">{selectedExpressionText || "the selected expression"}</span>.
+                      Use 2 to 4 target-language responses. The correct option should be exactly: <span className="font-semibold text-foreground">{selectedSourceText || "the selected source"}</span>.
                     </p>
                   ) : null}
                 </div>
@@ -548,6 +699,86 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                   <Label>Meaning</Label>
                   <Input value={reviewMeaning} onChange={(event) => setReviewMeaning(event.target.value)} />
                 </div>
+
+                {supportsMeaningSegments ? (
+                  <div className="space-y-4 rounded-2xl border border-secondary/40 p-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label>Meaning Segments</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMeaningSegments((current) => [...current, { text: "", componentIndexesCsv: "" }])}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Segment
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Map each English chunk to the sentence component indexes below. Cover every component exactly once and in order.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedSentence?.components || [])
+                        .slice()
+                        .sort((left, right) => left.orderIndex - right.orderIndex)
+                        .map((component, index) => (
+                          <Badge key={`${component.refId}-${index}`} variant="outline">
+                            {index}: {component.textSnapshot || component.refId}
+                          </Badge>
+                        ))}
+                    </div>
+
+                    {meaningSegments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No meaning segments yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {meaningSegments.map((segment, index) => (
+                          <div key={`meaning-segment-${index}`} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+                            <div className="space-y-2">
+                              <Label>Segment Text</Label>
+                              <Input
+                                value={segment.text}
+                                onChange={(event) =>
+                                  setMeaningSegments((current) =>
+                                    current.map((item, rowIndex) =>
+                                      rowIndex === index ? { ...item, text: event.target.value } : item
+                                    )
+                                  )
+                                }
+                                placeholder="Good morning"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Component Indexes</Label>
+                              <Input
+                                value={segment.componentIndexesCsv}
+                                onChange={(event) =>
+                                  setMeaningSegments((current) =>
+                                    current.map((item, rowIndex) =>
+                                      rowIndex === index ? { ...item, componentIndexesCsv: event.target.value } : item
+                                    )
+                                  )
+                                }
+                                placeholder="0, 1"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMeaningSegments((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
 

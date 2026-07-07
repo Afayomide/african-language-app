@@ -116,6 +116,14 @@ export function getPhrasePromptGuardrails(input: GeneratePhrasesInput) {
   ];
 }
 
+
+export const SENTENCE_PROMPT_GUARDRAILS = [
+  "Do not introduce personal names, named addressees, or vocative add-ons unless explicitly requested.",
+  "Do not append a person's name to a greeting or routine phrase unless the lesson context explicitly requires addressing that named person.",
+  "If a sentence needs an addressee or social role, prefer unnamed roles such as elder, friend, customer, neighbour, or teacher instead of using a personal name.",
+  "For Yoruba sentences, do not add sentence-final emphasis or discourse particles such as o, oo, sha, jare, or na unless that particle is the explicit lesson target."
+];
+
 export function getSuggestionGuardrails(level: Level, language: Language) {
   return [
     ...CURRICULUM_QUALITY_RULES,

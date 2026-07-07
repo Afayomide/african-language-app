@@ -4,6 +4,8 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AdminLessonAiUseCases } from "../../application/use-cases/admin/lesson-ai/AdminLessonAiUseCases.js";
 import { AdminUnitAiContentUseCases, AiPlanValidationError } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
 import { ChapterAiUseCases } from "../../application/use-cases/shared/ChapterAiUseCases.js";
+import { CurriculumMemoryService } from "../../application/services/CurriculumMemoryService.js";
+import { CurriculumUnitPlannerService } from "../../application/services/CurriculumUnitPlannerService.js";
 import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
 import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
@@ -15,7 +17,10 @@ import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongo
 import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
 import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
+import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Level } from "../../domain/entities/Lesson.js";
+import type { ChapterEntity } from "../../domain/entities/Chapter.js";
+import type { UnitEntity } from "../../domain/entities/Unit.js";
 import {
   LESSON_GENERATION_LIMITS,
   clampNewTargetsPerLesson
@@ -31,36 +36,171 @@ import {
 const lessons = new MongooseLessonRepository();
 const lessonContentItems = new MongooseLessonContentItemRepository();
 const expressions = new MongooseExpressionRepository();
+const words = new MongooseWordRepository();
+const sentences = new MongooseSentenceRepository();
+const proverbs = new MongooseProverbRepository();
+const questions = new MongooseQuestionRepository();
 const units = new MongooseUnitRepository();
 const chapters = new MongooseChapterRepository();
 const useCases = new AdminLessonAiUseCases(
   lessons,
   lessonContentItems,
   expressions,
-  new MongooseProverbRepository(),
+  proverbs,
   units,
   getLlmClient()
 );
 const chapterAiUseCases = new ChapterAiUseCases(chapters, getLlmClient());
 const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   lessons,
-  new MongooseWordRepository(),
+  words,
   expressions,
-  new MongooseSentenceRepository(),
-  new MongooseChapterRepository(),
+  sentences,
+  chapters,
   lessonContentItems,
   new MongooseUnitContentItemRepository(),
-  new MongooseProverbRepository(),
-  new MongooseQuestionRepository(),
+  proverbs,
+  questions,
   units,
   getLlmClient()
 );
+const curriculumMemory = new CurriculumMemoryService(
+  chapters,
+  units,
+  lessons,
+  lessonContentItems,
+  words,
+  expressions,
+  sentences,
+  proverbs
+);
+const curriculumUnitPlanner = new CurriculumUnitPlannerService(units, lessons, getLlmClient());
 
 function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
   const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/;
   return latinPattern.test(title);
+}
+
+function buildPlanningUnit(input: {
+  chapter: ChapterEntity;
+  level: Level;
+  userId: string;
+  orderIndex: number;
+  existingUnit?: UnitEntity | null;
+}): UnitEntity {
+  const now = new Date();
+  if (input.existingUnit) {
+    return {
+      ...input.existingUnit,
+      chapterId: input.chapter.id,
+      languageId: input.chapter.languageId || input.existingUnit.languageId || null,
+      language: input.chapter.language,
+      level: input.level,
+      orderIndex: input.orderIndex
+    };
+  }
+
+  return {
+    id: `suggest-unit:${input.chapter.id}:${input.orderIndex}`,
+    _id: `suggest-unit:${input.chapter.id}:${input.orderIndex}`,
+    languageId: input.chapter.languageId || null,
+    chapterId: input.chapter.id,
+    title: "",
+    description: "",
+    language: input.chapter.language,
+    level: input.level,
+    kind: "core",
+    reviewStyle: "none",
+    reviewSourceUnitIds: [],
+    orderIndex: input.orderIndex,
+    status: "draft",
+    createdBy: input.userId,
+    lastAiRun: null,
+    publishedAt: null,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export async function suggestUnit(req: AuthRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+
+  const { language, level, chapterId, hintTopic, excludeUnitId } = req.body ?? {};
+
+  if (!language || !isValidLessonLanguage(String(language))) {
+    return res.status(400).json({ error: "Language is invalid." });
+  }
+  if (!level || !isValidLevel(String(level))) {
+    return res.status(400).json({ error: "Level is invalid." });
+  }
+  if (!chapterId || typeof chapterId !== "string") {
+    return res.status(400).json({ error: "Chapter id is required." });
+  }
+  if (hintTopic !== undefined && typeof hintTopic !== "string") {
+    return res.status(400).json({ error: "Hint topic is invalid." });
+  }
+  if (excludeUnitId !== undefined && excludeUnitId !== null && excludeUnitId !== "" && typeof excludeUnitId !== "string") {
+    return res.status(400).json({ error: "Exclude unit id is invalid." });
+  }
+
+  const selectedChapter = await chapters.findById(String(chapterId));
+  if (!selectedChapter || selectedChapter.language !== String(language)) {
+    return res.status(400).json({ error: "Chapter is invalid for this language." });
+  }
+
+  let existingUnit: UnitEntity | null = null;
+  if (excludeUnitId) {
+    existingUnit = await units.findById(String(excludeUnitId));
+    if (!existingUnit || existingUnit.language !== String(language)) {
+      return res.status(400).json({ error: "Exclude unit is invalid for this language." });
+    }
+  }
+
+  const chapterUnits = (await units.listByChapterId(selectedChapter.id)).filter((unit) => unit.id !== existingUnit?.id);
+  const nextOrderIndex = chapterUnits.reduce((max, unit) => Math.max(max, unit.orderIndex), -1) + 1;
+  const planningOrderIndex =
+    existingUnit && existingUnit.chapterId === selectedChapter.id ? existingUnit.orderIndex : nextOrderIndex;
+  const planningChapter: ChapterEntity = {
+    ...selectedChapter,
+    level: String(level) as Level
+  };
+  const planningUnit = buildPlanningUnit({
+    chapter: planningChapter,
+    level: String(level) as Level,
+    userId: req.user.id,
+    orderIndex: planningOrderIndex,
+    existingUnit
+  });
+  const memory = await curriculumMemory.buildUnitPlanningMemory({
+    unit: planningUnit,
+    chapter: planningChapter
+  });
+
+  try {
+    const suggestion = await curriculumUnitPlanner.replanUnitForChapter({
+      chapter: planningChapter,
+      languageId: planningChapter.languageId || null,
+      topic: typeof hintTopic === "string" && hintTopic.trim() ? hintTopic.trim() : undefined,
+      memorySummary: memory.summary,
+      excludedUnitTitles: existingUnit?.title ? [existingUnit.title] : undefined,
+      excludedUnitIds: existingUnit?.id ? [existingUnit.id] : undefined,
+      orderIndex: planningOrderIndex
+    });
+
+    return res.status(200).json({
+      suggestion: {
+        title: suggestion.title,
+        description: suggestion.description || ""
+      }
+    });
+  } catch (error) {
+    console.error("Admin AI suggestUnit LLM error", error);
+    return res.status(502).json({ error: "llm generation failed" });
+  }
 }
 
 export async function generateLessonsBulk(req: AuthRequest, res: Response) {
@@ -114,7 +254,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
 
   const { language, level, count, topic, chapterId } = req.body ?? {};
 
-  if (!language || !["yoruba", "igbo", "hausa"].includes(String(language))) {
+  if (!language || !isValidLessonLanguage(String(language))) {
     return res.status(400).json({ error: "Language is invalid." });
   }
   if (!level || !isValidLevel(String(level))) {
@@ -141,8 +281,8 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
   }
 
   const llm = getLlmClient();
-  const existingUnits = await units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa");
-  const existingLessons = await lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" });
+  const existingUnits = await units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa" | "pidgin");
+  const existingLessons = await lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin" });
   const existingUnitsInScope = selectedChapter
     ? existingUnits.filter((unit) => unit.chapterId === selectedChapter.id)
     : existingUnits;
@@ -173,7 +313,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
       chapterId: selectedChapter?.id || null,
       title: reviewTitle,
       description: buildAutoReviewUnitDescription(pendingCoreUnits),
-      language: String(language) as "yoruba" | "igbo" | "hausa",
+      language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
       level: String(level) as Level,
       kind: "review",
       reviewStyle: "star",
@@ -203,7 +343,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
 
     try {
       const validationInput = {
-        language: String(language) as "yoruba" | "igbo" | "hausa",
+        language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
         level: String(level) as Level,
         unitTitle: selectedChapter?.title,
         unitDescription: selectedChapter?.description,
@@ -276,7 +416,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
         chapterId: selectedChapter?.id || null,
         title: rawTitle,
         description: String(suggestion.description || "").trim(),
-        language: String(language) as "yoruba" | "igbo" | "hausa",
+        language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
         level: String(level) as Level,
         orderIndex: lastOrderIndex,
         status: "draft",
@@ -313,7 +453,7 @@ export async function generateChaptersBulk(req: AuthRequest, res: Response) {
   }
 
   const { language, level, count, topic, extraInstructions } = req.body ?? {};
-  if (!language || !["yoruba", "igbo", "hausa"].includes(String(language))) {
+  if (!language || !isValidLessonLanguage(String(language))) {
     return res.status(400).json({ error: "Language is invalid." });
   }
   if (!level || !isValidLevel(String(level))) {
@@ -332,7 +472,7 @@ export async function generateChaptersBulk(req: AuthRequest, res: Response) {
 
   try {
     const result = await chapterAiUseCases.generateBulk({
-      language: String(language) as "yoruba" | "igbo" | "hausa",
+      language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
       level: String(level) as Level,
       count: requestedCount,
       topic: typeof topic === "string" ? topic.trim() : undefined,

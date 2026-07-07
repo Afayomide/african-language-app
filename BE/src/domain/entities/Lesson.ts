@@ -1,6 +1,6 @@
 import type { ContentType } from "./Content.js";
 
-export const LANGUAGE_VALUES = ["yoruba", "igbo", "hausa"] as const;
+export const LANGUAGE_VALUES = ["yoruba", "igbo", "hausa", "pidgin"] as const;
 export const LEVEL_VALUES = ["beginner", "intermediate", "advanced"] as const;
 export const STATUS_VALUES = ["draft", "finished", "published"] as const;
 export const LESSON_KIND_VALUES = ["core", "review"] as const;

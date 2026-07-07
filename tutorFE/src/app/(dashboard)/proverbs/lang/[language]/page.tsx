@@ -1,5 +1,7 @@
 'use client'
 
+import { getLanguageName, isLanguage } from "@/lib/languages";
+
 import { use, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { proverbService, lessonService, aiService } from "@/services";
@@ -37,16 +39,6 @@ import { ArrowLeft, Edit, MessageSquareQuote, Send, Sparkles, Trash2 } from "luc
 import { toast } from "sonner";
 import { workflowStatusBadgeClass } from "@/lib/status-badge";
 import { TABLE_ACTION_ICON_CLASS } from "@/lib/tableActionStyles";
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  yoruba: "Yoruba",
-  igbo: "Igbo",
-  hausa: "Hausa"
-};
-
-function isLanguage(value: string): value is Language {
-  return value === "yoruba" || value === "igbo" || value === "hausa";
-}
 
 export default function TutorProverbsByLanguagePage({ params }: { params: Promise<{ language: string }> }) {
   const { language: languageParam } = use(params);
@@ -238,7 +230,7 @@ export default function TutorProverbsByLanguagePage({ params }: { params: Promis
           <Button variant="ghost" size="icon" onClick={() => router.push("/proverbs")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-semibold">{LANGUAGE_LABELS[language]} Proverbs</h1>
+          <h1 className="text-3xl font-semibold">{getLanguageName(language)} Proverbs</h1>
         </div>
         <div className="flex items-center gap-2">
           <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>

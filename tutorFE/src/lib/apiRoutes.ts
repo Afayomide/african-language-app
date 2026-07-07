@@ -12,6 +12,8 @@ export const beTutorRoutes = {
   signup: () => buildBePath("/tutor/auth/signup"),
   login: () => buildBePath("/tutor/auth/login"),
   me: () => buildBePath("/tutor/auth/me"),
+  completeOnboarding: () => buildBePath("/tutor/auth/onboarding"),
+  languages: () => buildBePath("/tutor/languages"),
   chapters: () => buildBePath("/tutor/chapters"),
   reorderChapters: () => buildBePath("/tutor/chapters/reorder"),
   chapter: (id: string) => buildBePath(`/tutor/chapters/${id}`),
@@ -21,7 +23,10 @@ export const beTutorRoutes = {
   unit: (id: string) => buildBePath(`/tutor/units/${id}`),
   unitDeletedEntries: (id: string) => buildBePath(`/tutor/units/${id}/deleted-entries`),
   restoreDeletedUnitLesson: (id: string, lessonId: string) => buildBePath(`/tutor/units/${id}/deleted-lessons/${lessonId}/restore`),
+  restoreDeletedUnitWord: (id: string, wordId: string) => buildBePath(`/tutor/units/${id}/deleted-words/${wordId}/restore`),
   restoreDeletedUnitExpression: (id: string, expressionId: string) => buildBePath(`/tutor/units/${id}/deleted-expressions/${expressionId}/restore`),
+  restoreDeletedUnitSentence: (id: string, sentenceId: string) => buildBePath(`/tutor/units/${id}/deleted-sentences/${sentenceId}/restore`),
+  restoreDeletedUnitProverb: (id: string, proverbId: string) => buildBePath(`/tutor/units/${id}/deleted-proverbs/${proverbId}/restore`),
   finishUnit: (id: string) => buildBePath(`/tutor/units/${id}/finish`),
   lessons: () => buildBePath("/tutor/lessons"),
   bulkDeleteLessons: () => buildBePath("/tutor/lessons/bulk-delete"),
@@ -63,9 +68,14 @@ export const beTutorRoutes = {
   rejectVoiceAudioSubmission: (id: string) => buildBePath(`/tutor/voice-audio/submissions/${id}/reject`)
 };
 
+export const bePublicRoutes = {
+  languages: () => buildBePath("/languages")
+};
+
 export const beTutorAiRoutes = {
   generateBulkChapters: () => buildBePath("/tutor/ai/chapters/generate-bulk"),
   generateBulkUnits: () => buildBePath("/tutor/ai/units/generate-bulk"),
+  suggestUnit: () => buildBePath("/tutor/ai/units/suggest"),
   suggestLesson: () => buildBePath("/tutor/ai/lessons/suggest"),
   refactorLessonContent: (lessonId: string) => buildBePath(`/tutor/ai/lessons/${lessonId}/refactor`),
   previewUnitContentPlan: (unitId: string) => buildBePath(`/tutor/ai/units/${unitId}/generate-content/plan`),
@@ -83,6 +93,8 @@ export const feTutorRoutes = {
   signup: () => "/api/tutor/auth/signup",
   login: () => "/api/tutor/auth",
   me: () => "/api/tutor/auth/me",
+  completeOnboarding: () => "/api/tutor/auth/onboarding",
+  languages: () => "/api/tutor/languages",
   chapters: () => "/api/tutor/chapters",
   reorderChapters: () => "/api/tutor/chapters/reorder",
   chapter: (id: string) => `/api/tutor/chapters/${id}`,
@@ -92,7 +104,10 @@ export const feTutorRoutes = {
   unit: (id: string) => `/api/tutor/units/${id}`,
   unitDeletedEntries: (id: string) => `/api/tutor/units/${id}/deleted-entries`,
   restoreDeletedUnitLesson: (id: string, lessonId: string) => `/api/tutor/units/${id}/deleted-lessons/${lessonId}/restore`,
+  restoreDeletedUnitWord: (id: string, wordId: string) => `/api/tutor/units/${id}/deleted-words/${wordId}/restore`,
   restoreDeletedUnitExpression: (id: string, expressionId: string) => `/api/tutor/units/${id}/deleted-expressions/${expressionId}/restore`,
+  restoreDeletedUnitSentence: (id: string, sentenceId: string) => `/api/tutor/units/${id}/deleted-sentences/${sentenceId}/restore`,
+  restoreDeletedUnitProverb: (id: string, proverbId: string) => `/api/tutor/units/${id}/deleted-proverbs/${proverbId}/restore`,
   finishUnit: (id: string) => `/api/tutor/units/${id}/finish`,
   lessons: () => "/api/tutor/lessons",
   bulkDeleteLessons: () => "/api/tutor/lessons/bulk-delete",
@@ -134,9 +149,14 @@ export const feTutorRoutes = {
   rejectVoiceAudioSubmission: (id: string) => `/api/tutor/voice-audio/submissions/${id}/reject`
 };
 
+export const fePublicRoutes = {
+  languages: () => "/api/languages"
+};
+
 export const feTutorAiRoutes = {
   generateBulkChapters: () => "/api/tutor/ai/chapters/generate-bulk",
   generateBulkUnits: () => "/api/tutor/ai/units/generate-bulk",
+  suggestUnit: () => "/api/tutor/ai/units/suggest",
   suggestLesson: () => "/api/tutor/ai/lessons/suggest",
   refactorLessonContent: (lessonId: string) => `/api/tutor/ai/lessons/${lessonId}/refactor`,
   previewUnitContentPlan: (unitId: string) => `/api/tutor/ai/units/${unitId}/generate-content/plan`,

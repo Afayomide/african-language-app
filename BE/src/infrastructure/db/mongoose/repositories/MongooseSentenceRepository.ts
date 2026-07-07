@@ -1,5 +1,5 @@
 import SentenceModel from "../../../../models/Sentence.js";
-import type { SentenceEntity } from "../../../../domain/entities/Sentence.js";
+import type { SentenceEntity, SentenceMeaningSegment } from "../../../../domain/entities/Sentence.js";
 import type { ContentComponentRef } from "../../../../domain/entities/Content.js";
 import type { Language } from "../../../../domain/entities/Lesson.js";
 import type {
@@ -19,6 +19,26 @@ function mapComponents(rows: Array<{ type?: string; refId?: { toString(): string
         orderIndex: Number.isInteger(row?.orderIndex) ? Number(row?.orderIndex) : index,
         textSnapshot: row?.textSnapshot ? String(row.textSnapshot) : undefined
       }))
+    : [];
+}
+
+function mapMeaningSegments(rows: Array<{
+  text?: string;
+  sourceWordIndexes?: unknown[];
+  sourceComponentIndexes?: unknown[];
+}> | null | undefined): SentenceMeaningSegment[] {
+  return Array.isArray(rows)
+    ? rows
+        .map((row) => ({
+          text: String(row?.text || "").trim(),
+          sourceWordIndexes: Array.isArray(row?.sourceWordIndexes)
+            ? row.sourceWordIndexes.map(Number).filter((value) => Number.isInteger(value) && value >= 0)
+            : [],
+          sourceComponentIndexes: Array.isArray(row?.sourceComponentIndexes)
+            ? row.sourceComponentIndexes.map(Number).filter((value) => Number.isInteger(value) && value >= 0)
+            : []
+        }))
+        .filter((row) => row.text && row.sourceWordIndexes.length > 0)
     : [];
 }
 
@@ -50,6 +70,7 @@ function toEntity(doc: any): SentenceEntity {
     literalTranslation: String(doc.literalTranslation || ""),
     usageNotes: String(doc.usageNotes || ""),
     components: mapComponents(doc.components),
+    meaningSegments: mapMeaningSegments(doc.meaningSegments),
     status: doc.status,
     deletedAt: doc.deletedAt || null,
     createdAt: doc.createdAt,
@@ -70,7 +91,18 @@ export class MongooseSentenceRepository implements SentenceRepository {
       Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
     }
     if (filter.status) query.status = filter.status;
+    if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const sentences = await SentenceModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
+    return sentences.map(toEntity);
+  }
+
+  async listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<SentenceEntity[]> {
+    const query: Record<string, unknown> = { isDeleted: true };
+    if (filter?.languageId || filter?.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (Array.isArray(filter?.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
+    const sentences = await SentenceModel.find(query).sort({ updatedAt: -1, createdAt: -1 }).lean();
     return sentences.map(toEntity);
   }
 
@@ -108,6 +140,15 @@ export class MongooseSentenceRepository implements SentenceRepository {
     const sentence = await SentenceModel.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true } },
       { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
+    return sentence ? toEntity(sentence) : null;
+  }
+
+  async restoreById(id: string): Promise<SentenceEntity | null> {
+    const sentence = await SentenceModel.findOneAndUpdate(
+      { _id: id, isDeleted: true },
+      { isDeleted: false, deletedAt: null },
       { new: true }
     );
     return sentence ? toEntity(sentence) : null;

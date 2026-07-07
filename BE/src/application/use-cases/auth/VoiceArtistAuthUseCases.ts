@@ -15,7 +15,7 @@ export class VoiceArtistAuthUseCases {
   async signup(input: {
     email: string;
     password: string;
-    language: "yoruba" | "igbo" | "hausa";
+    language: "yoruba" | "igbo" | "hausa" | "pidgin";
     displayName?: string;
   }) {
     const existing = await this.users.findByEmail(input.email);

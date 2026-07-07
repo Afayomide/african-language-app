@@ -9,7 +9,9 @@ import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/rep
 import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
 import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
 import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
+import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
 import { AdminLessonUseCases } from "../../application/use-cases/admin/lesson/AdminLessonUseCases.js";
+import { ContentCurriculumService } from "../../application/services/ContentCurriculumService.js";
 import { UnitDeletedEntriesService } from "../../application/services/UnitDeletedEntriesService.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import {
@@ -28,6 +30,12 @@ const expressionRepo = new MongooseExpressionRepository();
 const sentenceRepo = new MongooseSentenceRepository();
 const proverbRepo = new MongooseProverbRepository();
 const questionRepo = new MongooseQuestionRepository();
+const contentCurriculum = new ContentCurriculumService(
+  lessonRepo,
+  units,
+  lessonContentItems,
+  new MongooseUnitContentItemRepository()
+);
 const lessonUseCases = new AdminLessonUseCases(
   lessonRepo,
   lessonContentItems,
@@ -35,11 +43,14 @@ const lessonUseCases = new AdminLessonUseCases(
   expressionRepo,
   sentenceRepo,
   proverbRepo,
-  questionRepo
+  questionRepo,
+  contentCurriculum
 );
 const deletedEntries = new UnitDeletedEntriesService(
   lessonRepo,
+  wordRepo,
   expressionRepo,
+  sentenceRepo,
   proverbRepo,
   questionRepo
 );
@@ -138,7 +149,10 @@ export async function getDeletedEntries(req: Request, res: Response) {
   const result = await deletedEntries.list(unit.id);
   return res.status(200).json({
     lessons: result.lessons,
-    expressions: result.expressions
+    words: result.words,
+    expressions: result.expressions,
+    sentences: result.sentences,
+    proverbs: result.proverbs
   });
 }
 
@@ -248,6 +262,51 @@ export async function restoreDeletedExpression(req: Request, res: Response) {
   const expression = await deletedEntries.restoreExpression(unit.id, expressionId);
   if (!expression) return res.status(404).json({ error: "Deleted expression not found in this unit." });
   return res.status(200).json({ message: "Expression restored.", expression });
+}
+
+export async function restoreDeletedWord(req: Request, res: Response) {
+  const { id, wordId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!mongoose.Types.ObjectId.isValid(wordId)) {
+    return res.status(400).json({ error: "Word id is invalid." });
+  }
+
+  const unit = await units.findById(id);
+  if (!unit) return res.status(404).json({ error: "Unit not found." });
+
+  const word = await deletedEntries.restoreWord(unit.id, wordId);
+  if (!word) return res.status(404).json({ error: "Deleted word not found in this unit." });
+  return res.status(200).json({ message: "Word restored.", word });
+}
+
+export async function restoreDeletedSentence(req: Request, res: Response) {
+  const { id, sentenceId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!mongoose.Types.ObjectId.isValid(sentenceId)) {
+    return res.status(400).json({ error: "Sentence id is invalid." });
+  }
+
+  const unit = await units.findById(id);
+  if (!unit) return res.status(404).json({ error: "Unit not found." });
+
+  const sentence = await deletedEntries.restoreSentence(unit.id, sentenceId);
+  if (!sentence) return res.status(404).json({ error: "Deleted sentence not found in this unit." });
+  return res.status(200).json({ message: "Sentence restored.", sentence });
+}
+
+export async function restoreDeletedProverb(req: Request, res: Response) {
+  const { id, proverbId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!mongoose.Types.ObjectId.isValid(proverbId)) {
+    return res.status(400).json({ error: "Proverb id is invalid." });
+  }
+
+  const unit = await units.findById(id);
+  if (!unit) return res.status(404).json({ error: "Unit not found." });
+
+  const proverb = await deletedEntries.restoreProverb(unit.id, proverbId);
+  if (!proverb) return res.status(404).json({ error: "Deleted proverb not found in this unit." });
+  return res.status(200).json({ message: "Proverb restored.", proverb });
 }
 
 export async function finishUnit(req: Request, res: Response) {

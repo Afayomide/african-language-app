@@ -37,14 +37,14 @@ export async function suggestLesson(req: Request, res: Response) {
 
   try {
     const [existingUnits, existingLessons, existingExpressions, existingProverbs] = await Promise.all([
-      units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa"),
-      lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" }),
-      expressions.list({ language: String(language) as "yoruba" | "igbo" | "hausa" }),
-      proverbs.list({ language: String(language) as "yoruba" | "igbo" | "hausa" })
+      units.listByLanguage(String(language) as "yoruba" | "igbo" | "hausa" | "pidgin"),
+      lessons.list({ language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin" }),
+      expressions.list({ language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin" }),
+      proverbs.list({ language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin" })
     ]);
     const curriculumInstruction = "Continue the curriculum progressively. Prioritize conversational utility, repetition, and careful vocabulary load. Do not repeat older curriculum items with renamed titles.";
     const validationInput = {
-      language: String(language) as "yoruba" | "igbo" | "hausa",
+      language: String(language) as "yoruba" | "igbo" | "hausa" | "pidgin",
       level: String(level) as "beginner" | "intermediate" | "advanced",
       topic: topic ? String(topic) : undefined,
       curriculumInstruction,
