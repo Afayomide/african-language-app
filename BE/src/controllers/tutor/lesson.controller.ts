@@ -1,20 +1,19 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
-import LessonModel from "../../models/Lesson.js";
+import { isValidId } from "../../utils/ids.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorLessonUseCases } from "../../application/use-cases/tutor/lesson/TutorLessonUseCases.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
 import { ContentCurriculumService } from "../../application/services/ContentCurriculumService.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleUnitContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitContentItemRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
 import { LessonAuditService } from "../../application/services/LessonAuditService.js";
 import type { Language, Level, LessonBlock, LessonStage, Status } from "../../domain/entities/Lesson.js";
 import {
@@ -26,20 +25,20 @@ import {
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
 
-const questionRepo = new MongooseQuestionRepository();
-const lessonRepo = new MongooseLessonRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
-const wordRepo = new MongooseWordRepository();
-const expressionRepo = new MongooseExpressionRepository();
-const sentenceRepo = new MongooseSentenceRepository();
-const proverbRepo = new MongooseProverbRepository();
-const unitRepo = new MongooseUnitRepository();
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const questionRepo = new DrizzleQuestionRepository();
+const lessonRepo = new DrizzleLessonRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
+const wordRepo = new DrizzleWordRepository();
+const expressionRepo = new DrizzleExpressionRepository();
+const sentenceRepo = new DrizzleSentenceRepository();
+const proverbRepo = new DrizzleProverbRepository();
+const unitRepo = new DrizzleUnitRepository();
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
 const contentCurriculum = new ContentCurriculumService(
   lessonRepo,
   unitRepo,
   lessonContentItems,
-  new MongooseUnitContentItemRepository()
+  new DrizzleUnitContentItemRepository()
 );
 const lessonUseCases = new TutorLessonUseCases(
   lessonRepo,
@@ -120,7 +119,7 @@ function normalizeBlocks(blocks: unknown): LessonBlock[] {
         }
       }
       const refId = block.refId;
-      return typeof refId === "string" && mongoose.Types.ObjectId.isValid(refId);
+      return typeof refId === "string" && isValidId(refId);
     }) as LessonBlock[];
 }
 
@@ -218,7 +217,7 @@ export async function createLesson(req: AuthRequest, res: Response) {
   if (!title || String(title).trim().length === 0) {
     return res.status(400).json({ error: "title required" });
   }
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "unit id required" });
   }
   if (topics !== undefined && !Array.isArray(topics)) {
@@ -297,7 +296,7 @@ export async function listLessons(req: AuthRequest, res: Response) {
   if (status && !isValidLessonStatus(status)) {
     return res.status(400).json({ error: "invalid status" });
   }
-  if (unitId && !mongoose.Types.ObjectId.isValid(unitId)) {
+  if (unitId && !isValidId(unitId)) {
     return res.status(400).json({ error: "invalid unit id" });
   }
 
@@ -306,33 +305,16 @@ export async function listLessons(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: "tutor language not configured" });
   }
 
-  const query: Record<string, QueryValue> = {
-    isDeleted: { $ne: true },
-    language: tutorLanguage
-  };
-  if (status) query.status = status;
-  if (unitId) query.unitId = unitId;
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    query.$or = [
-      { title: regex },
-      { description: regex },
-      { status: regex },
-      { topics: regex },
-      { proverbs: regex }
-    ];
-  }
-
-  const total = await LessonModel.countDocuments(query);
+  const { items: lessons, total } = await lessonRepo.listPaged({
+    language: tutorLanguage,
+    unitId,
+    status: status as Status | undefined,
+    search: q || undefined,
+    page: paginationInput.page,
+    limit: paginationInput.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
   const page = Math.min(paginationInput.page, totalPages);
-  const skip = (page - 1) * paginationInput.limit;
-
-  const lessons = await LessonModel.find(query)
-    .sort({ orderIndex: 1, createdAt: 1 })
-    .skip(skip)
-    .limit(paginationInput.limit)
-    .lean();
 
   return res.status(200).json({
     total,
@@ -354,7 +336,7 @@ export async function getLessonById(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -381,7 +363,7 @@ export async function updateLesson(req: AuthRequest, res: Response) {
   let normalizedProverbs: Array<{ text: string; translation: string; contextNote: string }> = [];
   let normalizedStages: LessonStage[] = [];
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -451,7 +433,7 @@ export async function updateLesson(req: AuthRequest, res: Response) {
     update.description = String(description).trim();
   }
   if (unitId !== undefined) {
-    if (!mongoose.Types.ObjectId.isValid(String(unitId))) {
+    if (!isValidId(String(unitId))) {
       return res.status(400).json({ error: "invalid unit id" });
     }
     const unit = await unitRepo.findById(String(unitId));
@@ -499,7 +481,7 @@ export async function deleteLesson(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -525,7 +507,7 @@ export async function bulkDeleteLessons(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "lesson ids required" });
   }
   const normalizedIds = Array.from(new Set(ids.map(String)));
-  if (normalizedIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+  if (normalizedIds.some((id) => !isValidId(id))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -544,7 +526,7 @@ export async function reorderLessons(req: AuthRequest, res: Response) {
   }
 
   const { unitId, lessonIds } = req.body ?? {};
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "unit id required" });
   }
   if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
@@ -552,7 +534,7 @@ export async function reorderLessons(req: AuthRequest, res: Response) {
   }
 
   for (const id of lessonIds) {
-    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+    if (!isValidId(String(id))) {
       return res.status(400).json({ error: "invalid lesson id" });
     }
   }
@@ -580,7 +562,7 @@ export async function reorderLessons(req: AuthRequest, res: Response) {
 export async function finishLesson(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
@@ -598,7 +580,7 @@ export async function finishLesson(req: AuthRequest, res: Response) {
 export async function requestLessonAudio(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -618,7 +600,7 @@ export async function requestLessonAudio(req: AuthRequest, res: Response) {
 export async function auditLesson(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 

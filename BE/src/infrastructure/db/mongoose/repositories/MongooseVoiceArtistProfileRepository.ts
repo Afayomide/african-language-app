@@ -1,6 +1,7 @@
 import VoiceArtistProfileModel from "../../../../models/voice/VoiceArtistProfile.js";
 import type { VoiceArtistProfileEntity } from "../../../../domain/entities/VoiceArtistProfile.js";
 import type { VoiceArtistProfileRepository } from "../../../../domain/repositories/VoiceArtistProfileRepository.js";
+import type { Language } from "../../../../domain/entities/Lesson.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
@@ -37,6 +38,36 @@ export class MongooseVoiceArtistProfileRepository implements VoiceArtistProfileR
   }): Promise<VoiceArtistProfileEntity> {
     const created = await VoiceArtistProfileModel.create(input);
     return toEntity(created);
+  }
+
+  async listByUserIds(userIds: string[]): Promise<VoiceArtistProfileEntity[]> {
+    if (!userIds.length) return [];
+    const profiles = await VoiceArtistProfileModel.find({ userId: { $in: userIds } });
+    return profiles.map(toEntity);
+  }
+
+  async deleteByUserId(userId: string): Promise<void> {
+    await VoiceArtistProfileModel.deleteOne({ userId });
+  }
+
+  async upsertByUserId(
+    userId: string,
+    input: { language: Language; displayName: string; isActive: boolean }
+  ): Promise<VoiceArtistProfileEntity> {
+    const profile = await VoiceArtistProfileModel.findOneAndUpdate(
+      { userId },
+      { $set: { language: input.language, displayName: input.displayName, isActive: input.isActive } },
+      { upsert: true, new: true }
+    );
+    return toEntity(profile!);
+  }
+
+  async updateByUserId(
+    userId: string,
+    update: { language?: Language; displayName?: string; isActive?: boolean }
+  ): Promise<VoiceArtistProfileEntity | null> {
+    const profile = await VoiceArtistProfileModel.findOneAndUpdate({ userId }, update, { new: true });
+    return profile ? toEntity(profile) : null;
   }
 
   async list(filter?: { isActive?: boolean }): Promise<VoiceArtistProfileEntity[]> {

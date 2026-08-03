@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AdminVoiceArtistUseCases } from "../../application/use-cases/admin/voice-artist/AdminVoiceArtistUseCases.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
-import { MongooseVoiceArtistProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseVoiceArtistProfileRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
+import { DrizzleVoiceArtistProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceArtistProfileRepository.js";
 import {
   getSearchQuery,
   includesSearch,
@@ -11,8 +11,8 @@ import {
 } from "../../interfaces/http/utils/pagination.js";
 
 const useCases = new AdminVoiceArtistUseCases(
-  new MongooseVoiceArtistProfileRepository(),
-  new MongooseUserRepository()
+  new DrizzleVoiceArtistProfileRepository(),
+  new DrizzleUserRepository()
 );
 
 export async function listVoiceArtists(req: Request, res: Response) {
@@ -42,7 +42,7 @@ export async function listVoiceArtists(req: Request, res: Response) {
 
 export async function activateVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -56,7 +56,7 @@ export async function activateVoiceArtist(req: Request, res: Response) {
 
 export async function deactivateVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -70,7 +70,7 @@ export async function deactivateVoiceArtist(req: Request, res: Response) {
 
 export async function deleteVoiceArtist(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 

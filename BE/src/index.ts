@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
+import { pool } from "./infrastructure/db/drizzle/client.js";
 import healthRouter from "./routes/health.js";
 import languageRouter from "./routes/language.routes.js";
 import adminAuthRouter from "./routes/admin/auth.routes.js";
@@ -125,19 +125,21 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 4000;
-const mongoUri = process.env.MONGODB_URI || "";
+const databaseUrl = process.env.DATABASE_URL || "";
 
 async function start() {
-  if (!mongoUri) {
-    console.error("Missing MONGODB_URI");
+  if (!databaseUrl) {
+    console.error("Missing DATABASE_URL");
     process.exit(1);
   }
 
   try {
-    await mongoose.connect(mongoUri);
-    console.log("Connected to MongoDB");
+    // fail fast if Postgres is unreachable, rather than on the first request
+    const client = await pool.connect();
+    client.release();
+    console.log("Connected to PostgreSQL");
   } catch (error) {
-    console.error("Failed to connect to MongoDB", error);
+    console.error("Failed to connect to PostgreSQL", error);
     process.exit(1);
   }
 

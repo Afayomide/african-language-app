@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import { isValidId } from "../../../utils/ids.js";
 import { LANGUAGE_VALUES, LEVEL_VALUES } from "../../../domain/entities/Lesson.js";
 
 export function isValidLanguage(value: string) {
@@ -10,5 +10,5 @@ export function isValidLevel(value: string) {
 }
 
 export function validateLessonId(value: unknown) {
-  return Boolean(value && mongoose.Types.ObjectId.isValid(String(value)));
+  return Boolean(value && isValidId(String(value)));
 }

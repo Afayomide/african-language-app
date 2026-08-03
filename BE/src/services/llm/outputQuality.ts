@@ -82,7 +82,7 @@ function isSentenceMeaningSegmentReason(reason: string) {
 function looksEnglishOnly(value: string) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return false;
-  return /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(trimmed);
+  return /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/.test(trimmed);
 }
 
 const ENGLISH_MARKER_WORDS = new Set([
@@ -433,8 +433,10 @@ function sentenceReasons(
     }
   }
 
-  if (input.level === "beginner" && words.length > 8) reasons.push("beginner sentence too long");
-  if (input.level === "intermediate" && words.length > 12) reasons.push("intermediate sentence too long");
+  // Beginner cap raised 8 -> 12 to allow short compound sentences (two clauses joined by a
+  // comma) that the curriculum uses at A1. Intermediate raised 12 -> 16 to keep the gradient.
+  if (input.level === "beginner" && words.length > 12) reasons.push("beginner sentence too long");
+  if (input.level === "intermediate" && words.length > 16) reasons.push("intermediate sentence too long");
 
   for (const component of normalizedComponents) {
     const type = component.type;
@@ -445,8 +447,21 @@ function sentenceReasons(
       reasons.push("invalid component");
       continue;
     }
-    if (component.tokenCount > 1 && !component.hasFixedFlag) reasons.push("multi-word component missing fixed marker");
-    if (component.tokenCount > 1 && !component.fixed) {
+    // A multi-word chunk normally has to be marked fixed=true, otherwise it should have been
+    // split into its words. But the curriculum can register a multi-word item as a teachable
+    // target ("Níbo ni" = "where is", entered under Target Words), and then a component that
+    // matches it exactly is already an approved unit -- demanding the flag rejected sentences
+    // built from the lesson's own targets.
+    const isRegisteredMultiWordTarget =
+      component.tokenCount > 1 &&
+      (allowedWords.has(`word:${componentText}`) ||
+        allowedWords.has(`expression:${componentText}`) ||
+        allowedExpressions.has(`expression:${componentText}`) ||
+        allowedExpressions.has(`word:${componentText}`));
+    if (component.tokenCount > 1 && !component.hasFixedFlag && !isRegisteredMultiWordTarget) {
+      reasons.push("multi-word component missing fixed marker");
+    }
+    if (component.tokenCount > 1 && !component.fixed && !isRegisteredMultiWordTarget) {
       reasons.push("multi-word compositional component must be split into separate words unless fixed");
     }
     if (componentTranslations.length === 0) reasons.push("component missing translations");

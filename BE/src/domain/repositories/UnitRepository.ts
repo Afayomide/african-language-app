@@ -5,7 +5,7 @@ export type UnitListFilter = {
   chapterId?: string;
   language?: Language;
   languageId?: string | null;
-  status?: Status;
+  status?: Status | Status[];
   kind?: UnitEntity["kind"];
 };
 

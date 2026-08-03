@@ -6,6 +6,7 @@ export function StudyFooter({
   isCorrect,
   isExerciseBlock,
   isSpeakingQuestion,
+  speakingUnavailable,
   preview,
   answerStatusLabel,
   explanation,
@@ -25,6 +26,8 @@ export function StudyFooter({
   isCorrect: boolean
   isExerciseBlock: boolean
   isSpeakingQuestion: boolean
+  /** Speaking question with no reference audio: cannot be scored, so it is skippable. */
+  speakingUnavailable?: boolean
   preview?: boolean
   answerStatusLabel: string
   explanation?: string
@@ -40,7 +43,11 @@ export function StudyFooter({
   onCheckSpeaking?: () => void
   onNext: () => void
 }) {
-  const statusLabel = isSpeakingQuestion ? (isCorrect ? 'Passed.' : 'Not quite. Try again.') : answerStatusLabel
+  const statusLabel = speakingUnavailable
+    ? 'Audio practice unavailable for this item.'
+    : isSpeakingQuestion
+      ? (isCorrect ? 'Passed.' : 'Not quite. Try again.')
+      : answerStatusLabel
   const showStatus = isAnswered || Boolean(isCheckingSpeakingAnswer)
 
   return (
@@ -107,7 +114,7 @@ export function StudyFooter({
                   Continue
                   <ArrowRight className="h-5 w-5" />
                 </Button>
-              ) : isSpeakingQuestion ? (
+              ) : isSpeakingQuestion && !speakingUnavailable ? (
                 <Button
                   size="lg"
                   className={cx(

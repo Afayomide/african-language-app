@@ -62,7 +62,7 @@ export class MongooseChapterRepository implements ChapterRepository {
     if (filter.languageId || filter.language) {
       Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
     }
-    if (filter.status) query.status = filter.status;
+    if (filter.status) query.status = Array.isArray(filter.status) ? { $in: filter.status } : filter.status;
     const chapters = await ChapterModel.find(query).sort({ language: 1, orderIndex: 1, createdAt: 1 }).lean();
     return chapters.map(toEntity);
   }

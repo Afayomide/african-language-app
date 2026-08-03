@@ -1,35 +1,34 @@
 import type { Response } from "express";
 import crypto from "crypto";
-import mongoose from "mongoose";
-import WordModel from "../../models/Word.js";
+import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
 import { TutorWordUseCases } from "../../application/use-cases/tutor/word/TutorWordUseCases.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
 import { generatePhraseAudio } from "../../services/tts/index.js";
 import { uploadAudio } from "../../services/storage/s3.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
-import type { Language } from "../../domain/entities/Lesson.js";
+import type { Language, Status } from "../../domain/entities/Lesson.js";
 import type { WordEntity } from "../../domain/entities/Word.js";
 
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import { getSearchQuery, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
-const wordRepo = new MongooseWordRepository();
-const lessonRepo = new MongooseLessonRepository();
-const lessonContentRepo = new MongooseLessonContentItemRepository();
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
-const wordUseCases = new TutorWordUseCases(lessonRepo, wordRepo, lessonContentRepo, new MongooseQuestionRepository());
+const wordRepo = new DrizzleWordRepository();
+const lessonRepo = new DrizzleLessonRepository();
+const lessonContentRepo = new DrizzleLessonContentItemRepository();
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
+const wordUseCases = new TutorWordUseCases(lessonRepo, wordRepo, lessonContentRepo, new DrizzleQuestionRepository());
 const audioAnalysisService = new AudioAnalysisService();
 
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function hydrateWordPayloads<T extends { _id?: mongoose.Types.ObjectId | string; id?: string }>(words: T[]) {
+async function hydrateWordPayloads<T extends { _id?: string; id?: string }>(words: T[]) {
   const ids = words.map((item) => String(item.id || item._id || "")).filter(Boolean);
   const contentItems = await lessonContentRepo.listByContent("word", ids);
   const lessonIdsByWord = new Map<string, string[]>();
@@ -200,7 +199,7 @@ export async function listWords(req: AuthRequest, res: Response) {
   const paginationInput = parsePaginationQuery(req.query);
   const q = getSearchQuery(req.query);
   if (status && !isValidStatus(status)) return res.status(400).json({ error: "invalid status" });
-  if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (lessonId && !isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
 
   let scopedIds: string[] | null = null;
   if (lessonId) {
@@ -211,20 +210,16 @@ export async function listWords(req: AuthRequest, res: Response) {
     }
   }
 
-  const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-  query.language = tutorLanguage;
-  if (status) query.status = status;
-  if (scopedIds) query._id = { $in: scopedIds };
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    query.$or = [{ text: regex }, { translations: regex }, { pronunciation: regex }, { explanation: regex }, { lemma: regex }, { partOfSpeech: regex }];
-  }
-
-  const total = await WordModel.countDocuments(query);
+  const { items: words, total } = await wordRepo.listPaged({
+    language: tutorLanguage,
+    status: status as Status | undefined,
+    ids: scopedIds ?? undefined,
+    search: q || undefined,
+    page: paginationInput.page,
+    limit: paginationInput.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
   const page = Math.min(paginationInput.page, totalPages);
-  const skip = (page - 1) * paginationInput.limit;
-  const words = await WordModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(paginationInput.limit).lean();
   return res.status(200).json({
     total,
     words: await hydrateWordPayloads(words),
@@ -237,7 +232,7 @@ export async function getWordById(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const word = await wordUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!word) return res.status(404).json({ error: "word not found" });
   const [payload] = await hydrateWordPayloads([word]);
@@ -249,7 +244,7 @@ export async function updateWord(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const baseInput = buildCreateOrUpdateInput(req.body ?? {});
   if (baseInput === "invalid_lesson_ids") return res.status(400).json({ error: "invalid lesson id" });
   if (baseInput === "invalid_translations") return res.status(400).json({ error: "at least one translation required" });
@@ -274,7 +269,7 @@ export async function deleteWord(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const deleted = await wordUseCases.deleteInScope(id, tutorLanguage as Language);
   if (!deleted) return res.status(404).json({ error: "word not found" });
   return res.status(200).json({ message: "word_deleted" });
@@ -295,7 +290,7 @@ export async function finishWord(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const word = await wordUseCases.finishInScope(id, tutorLanguage as Language);
   if (!word) return res.status(404).json({ error: "word not found" });
   const [payload] = await hydrateWordPayloads([word]);
@@ -307,7 +302,7 @@ export async function generateWordAudioById(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const word = await wordUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!word) return res.status(404).json({ error: "word not found" });
   const contentItems = await lessonContentRepo.list({ contentType: "word", contentId: word.id });
@@ -332,7 +327,7 @@ export async function generateLessonWordsAudio(req: AuthRequest, res: Response) 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { lessonId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (!isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
   const lesson = await lessonRepo.findByIdAndLanguage(lessonId, tutorLanguage as Language);
   if (!lesson) return res.status(404).json({ error: "lesson not found or out of scope" });
   const contentItems = await lessonContentRepo.list({ lessonId, contentType: "word" });

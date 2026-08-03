@@ -2,10 +2,10 @@ import type { Request, Response } from "express";
 import { AdminAuthUseCases } from "../../application/use-cases/auth/AdminAuthUseCases.js";
 import { AuthError } from "../../application/use-cases/auth/AuthErrors.js";
 import { AuthTokenService } from "../../application/services/AuthTokenService.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
 import { normalizeEmail } from "../../interfaces/http/validators/auth.validators.js";
 
-const useCases = new AdminAuthUseCases(new MongooseUserRepository(), new AuthTokenService());
+const useCases = new AdminAuthUseCases(new DrizzleUserRepository(), new AuthTokenService());
 
 export async function login(req: Request, res: Response) {
   const { email, password } = req.body ?? {};

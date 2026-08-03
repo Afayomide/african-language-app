@@ -1,20 +1,20 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { Language, LessonEntity, Level } from "../../domain/entities/Lesson.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleUnitContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitContentItemRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
 import { AiExpressionOrchestrator } from "../../application/services/AiExpressionOrchestrator.js";
 import { AiSentenceOrchestrator } from "../../application/services/AiSentenceOrchestrator.js";
 import { AiWordOrchestrator } from "../../application/services/AiWordOrchestrator.js";
@@ -39,31 +39,31 @@ import {
 import type { ChapterEntity } from "../../domain/entities/Chapter.js";
 import type { UnitEntity } from "../../domain/entities/Unit.js";
 
-const lessons = new MongooseLessonRepository();
-const expressions = new MongooseExpressionRepository();
-const words = new MongooseWordRepository();
-const sentences = new MongooseSentenceRepository();
-const proverbs = new MongooseProverbRepository();
-const questions = new MongooseQuestionRepository();
-const units = new MongooseUnitRepository();
-const chapters = new MongooseChapterRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
+const lessons = new DrizzleLessonRepository();
+const expressions = new DrizzleExpressionRepository();
+const words = new DrizzleWordRepository();
+const sentences = new DrizzleSentenceRepository();
+const proverbs = new DrizzleProverbRepository();
+const questions = new DrizzleQuestionRepository();
+const units = new DrizzleUnitRepository();
+const chapters = new DrizzleChapterRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
 const sentenceDraftPersistence = new SentenceDraftPersistenceService(
   words,
   expressions,
   sentences,
   lessonContentItems
 );
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
 const chapterAiUseCases = new ChapterAiUseCases(chapters, getLlmClient());
 const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   lessons,
-  new MongooseWordRepository(),
+  new DrizzleWordRepository(),
   expressions,
-  new MongooseSentenceRepository(),
-  new MongooseChapterRepository(),
-  new MongooseLessonContentItemRepository(),
-  new MongooseUnitContentItemRepository(),
+  new DrizzleSentenceRepository(),
+  new DrizzleChapterRepository(),
+  new DrizzleLessonContentItemRepository(),
+  new DrizzleUnitContentItemRepository(),
   proverbs,
   questions,
   units,
@@ -126,7 +126,7 @@ function buildSyntheticLesson(language: Language, level: Level, title: string, d
 function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
-  return /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(title);
+  return /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/.test(title);
 }
 
 function buildPlanningUnit(input: {
@@ -264,13 +264,13 @@ export async function suggestUnit(req: AuthRequest, res: Response) {
   if (!level || !isValidLevel(String(level))) {
     return res.status(400).json({ error: "invalid level" });
   }
-  if (!chapterId || !mongoose.Types.ObjectId.isValid(String(chapterId))) {
+  if (!chapterId || !isValidId(String(chapterId))) {
     return res.status(400).json({ error: "invalid chapter id" });
   }
   if (hintTopic !== undefined && typeof hintTopic !== "string") {
     return res.status(400).json({ error: "invalid hint topic" });
   }
-  if (excludeUnitId !== undefined && excludeUnitId !== null && excludeUnitId !== "" && !mongoose.Types.ObjectId.isValid(String(excludeUnitId))) {
+  if (excludeUnitId !== undefined && excludeUnitId !== null && excludeUnitId !== "" && !isValidId(String(excludeUnitId))) {
     return res.status(400).json({ error: "invalid exclude unit id" });
   }
 
@@ -397,7 +397,7 @@ export async function generateUnitsBulk(req: AuthRequest, res: Response) {
   if (topic !== undefined && typeof topic !== "string") {
     return res.status(400).json({ error: "invalid topic" });
   }
-  if (chapterId !== undefined && chapterId !== null && chapterId !== "" && !mongoose.Types.ObjectId.isValid(String(chapterId))) {
+  if (chapterId !== undefined && chapterId !== null && chapterId !== "" && !isValidId(String(chapterId))) {
     return res.status(400).json({ error: "invalid chapter id" });
   }
 
@@ -809,7 +809,7 @@ export async function enhanceExpression(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -989,7 +989,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
     topics,
     extraInstructions
   } = req.body ?? {};
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
   if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
@@ -1082,7 +1082,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
     topics,
     extraInstructions
   } = req.body ?? {};
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
   if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
@@ -1180,7 +1180,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
     extraInstructions,
     planLessons
   } = req.body ?? {};
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
   if (mode !== undefined && mode !== "generate" && mode !== "regenerate") {
@@ -1284,7 +1284,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
     topics,
     extraInstructions
   } = req.body ?? {};
-  if (!unitId || !mongoose.Types.ObjectId.isValid(String(unitId))) {
+  if (!unitId || !isValidId(String(unitId))) {
     return res.status(400).json({ error: "invalid unit id" });
   }
   if (mode !== "refactor" && mode !== "regenerate") {

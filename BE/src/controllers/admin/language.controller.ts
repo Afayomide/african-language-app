@@ -2,9 +2,9 @@ import type { Request, Response } from "express";
 import { LANGUAGE_STATUS_VALUES } from "../../domain/entities/Language.js";
 import type { LanguageEntity } from "../../domain/entities/Language.js";
 import type { LanguageUpdateInput } from "../../domain/repositories/LanguageRepository.js";
-import { MongooseLanguageRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLanguageRepository.js";
+import { DrizzleLanguageRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLanguageRepository.js";
 
-const languages = new MongooseLanguageRepository();
+const languages = new DrizzleLanguageRepository();
 
 function isLanguageStatus(value: string): value is (typeof LANGUAGE_STATUS_VALUES)[number] {
   return LANGUAGE_STATUS_VALUES.includes(value as (typeof LANGUAGE_STATUS_VALUES)[number]);

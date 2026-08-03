@@ -4,7 +4,7 @@ import type { ChapterEntity } from "../entities/Chapter.js";
 export type ChapterListFilter = {
   language?: Language;
   languageId?: string | null;
-  status?: Status;
+  status?: Status | Status[];
 };
 
 export type ChapterCreateInput = {

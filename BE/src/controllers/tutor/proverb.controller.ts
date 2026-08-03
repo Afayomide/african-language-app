@@ -1,18 +1,18 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
 import { TutorProverbUseCases } from "../../application/use-cases/tutor/proverb/TutorProverbUseCases.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 
 const proverbUseCases = new TutorProverbUseCases(
-  new MongooseProverbRepository(),
-  new MongooseLessonRepository()
+  new DrizzleProverbRepository(),
+  new DrizzleLessonRepository()
 );
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
 
 export async function createProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
@@ -22,7 +22,7 @@ export async function createProverb(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "lesson ids required" });
   }
   const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
-  if (normalizedLessonIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+  if (normalizedLessonIds.some((id) => !isValidId(id))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!text || !String(text).trim()) {
@@ -54,7 +54,7 @@ export async function listProverbs(req: AuthRequest, res: Response) {
   const lessonId = req.query.lessonId ? String(req.query.lessonId) : undefined;
   const status = req.query.status ? String(req.query.status) : undefined;
 
-  if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) {
+  if (lessonId && !isValidId(lessonId)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (status && !["draft", "finished", "published"].includes(status)) {
@@ -81,7 +81,7 @@ export async function listProverbs(req: AuthRequest, res: Response) {
 export async function getProverbById(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -97,7 +97,7 @@ export async function updateProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
   const { lessonIds, text, translation, contextNote, aiMeta } = req.body ?? {};
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -107,7 +107,7 @@ export async function updateProverb(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: "lesson ids required" });
     }
     const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
-    if (normalizedLessonIds.some((lessonId) => !mongoose.Types.ObjectId.isValid(lessonId))) {
+    if (normalizedLessonIds.some((lessonId) => !isValidId(lessonId))) {
       return res.status(400).json({ error: "invalid lesson id" });
     }
     update.lessonIds = normalizedLessonIds;
@@ -136,7 +136,7 @@ export async function updateProverb(req: AuthRequest, res: Response) {
 export async function deleteProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -151,7 +151,7 @@ export async function deleteProverb(req: AuthRequest, res: Response) {
 export async function finishProverb(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 

@@ -1,12 +1,16 @@
 import UserModel from "../../../../models/User.js";
 import type { UserEntity, UserRole } from "../../../../domain/entities/User.js";
-import type { UserRepository } from "../../../../domain/repositories/UserRepository.js";
+import type { UserPageFilter, UserRepository } from "../../../../domain/repositories/UserRepository.js";
+import type { PagedResult } from "../../../../domain/repositories/pagination.js";
+import { searchRegex } from "../../../../utils/search.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
   email: string;
   passwordHash: string;
   roles?: UserRole[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }): UserEntity {
   const roles = (Array.isArray(doc.roles) && doc.roles.length > 0 ? doc.roles : ["learner"]) as UserRole[];
   return {
@@ -14,7 +18,9 @@ function toEntity(doc: {
     _id: doc._id.toString(),
     email: doc.email,
     passwordHash: doc.passwordHash,
-    roles
+    roles,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
   };
 }
 
@@ -32,6 +38,28 @@ export class MongooseUserRepository implements UserRepository {
   async findByIds(ids: string[]): Promise<UserEntity[]> {
     const users = await UserModel.find({ _id: { $in: ids } }).lean();
     return users.map(toEntity);
+  }
+
+  async listPaged(filter: UserPageFilter): Promise<PagedResult<UserEntity>> {
+    const query: Record<string, unknown> = {};
+    if (filter.role) query.roles = filter.role;
+    if (filter.search) query.email = searchRegex(filter.search);
+
+    const total = await UserModel.countDocuments(query);
+    const limit = Math.max(1, filter.limit);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(Math.max(1, filter.page), totalPages);
+    const rows = await UserModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { items: rows.map(toEntity), total };
+  }
+
+  async setRoles(userId: string, roles: UserRole[]): Promise<UserEntity | null> {
+    const updated = await UserModel.findByIdAndUpdate(userId, { roles }, { new: true }).lean();
+    return updated ? toEntity(updated) : null;
   }
 
   async create(input: { email: string; passwordHash: string; roles: UserRole[] }): Promise<UserEntity> {

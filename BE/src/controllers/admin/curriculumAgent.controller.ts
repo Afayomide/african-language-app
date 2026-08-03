@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { CurriculumBuildAgentService } from "../../application/services/CurriculumBuildAgentService.js";
 import { CurriculumArchitectService } from "../../application/services/CurriculumArchitectService.js";
 import { CurriculumCriticService } from "../../application/services/CurriculumCriticService.js";
@@ -9,36 +9,36 @@ import { CurriculumRefinerService } from "../../application/services/CurriculumR
 import { CurriculumUnitPlannerService } from "../../application/services/CurriculumUnitPlannerService.js";
 import { AdminUnitAiContentUseCases } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
 import type { Level, Language } from "../../domain/entities/Lesson.js";
-import { MongooseLanguageRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLanguageRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
-import { MongooseCurriculumBuildArtifactRepository } from "../../infrastructure/db/mongoose/repositories/MongooseCurriculumBuildArtifactRepository.js";
-import { MongooseCurriculumBuildJobRepository } from "../../infrastructure/db/mongoose/repositories/MongooseCurriculumBuildJobRepository.js";
+import { DrizzleLanguageRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLanguageRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleUnitContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitContentItemRepository.js";
+import { DrizzleCurriculumBuildArtifactRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleCurriculumBuildArtifactRepository.js";
+import { DrizzleCurriculumBuildJobRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleCurriculumBuildJobRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import { getCefrBandForLevel } from "../../application/services/cefrMapping.js";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 
-const chapters = new MongooseChapterRepository();
-const units = new MongooseUnitRepository();
-const lessons = new MongooseLessonRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
-const words = new MongooseWordRepository();
-const expressions = new MongooseExpressionRepository();
-const sentences = new MongooseSentenceRepository();
-const proverbs = new MongooseProverbRepository();
-const languages = new MongooseLanguageRepository();
-const jobs = new MongooseCurriculumBuildJobRepository();
-const buildArtifacts = new MongooseCurriculumBuildArtifactRepository();
+const chapters = new DrizzleChapterRepository();
+const units = new DrizzleUnitRepository();
+const lessons = new DrizzleLessonRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
+const words = new DrizzleWordRepository();
+const expressions = new DrizzleExpressionRepository();
+const sentences = new DrizzleSentenceRepository();
+const proverbs = new DrizzleProverbRepository();
+const languages = new DrizzleLanguageRepository();
+const jobs = new DrizzleCurriculumBuildJobRepository();
+const buildArtifacts = new DrizzleCurriculumBuildArtifactRepository();
 const curriculumMemory = new CurriculumMemoryService(
   chapters,
   units,
@@ -59,9 +59,9 @@ const unitContentGenerator = new AdminUnitAiContentUseCases(
   sentences,
   chapters,
   lessonContentItems,
-  new MongooseUnitContentItemRepository(),
+  new DrizzleUnitContentItemRepository(),
   proverbs,
-  new MongooseQuestionRepository(),
+  new DrizzleQuestionRepository(),
   units,
   getLlmClient()
 );
@@ -163,7 +163,7 @@ export async function listCurriculumBuildJobs(req: AuthRequest, res: Response) {
 export async function getCurriculumBuildJob(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Job id is invalid." });
   }
 
@@ -178,7 +178,7 @@ export async function getCurriculumBuildJob(req: AuthRequest, res: Response) {
 export async function listCurriculumBuildArtifacts(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Job id is invalid." });
   }
 
@@ -195,7 +195,7 @@ export async function listCurriculumBuildArtifacts(req: AuthRequest, res: Respon
 export async function resumeCurriculumBuildJob(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Job id is invalid." });
   }
 

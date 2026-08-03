@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
-import { MongooseLanguageRepository } from "../infrastructure/db/mongoose/repositories/MongooseLanguageRepository.js";
+import { DrizzleLanguageRepository } from "../infrastructure/db/drizzle/repositories/DrizzleLanguageRepository.js";
 
-const languages = new MongooseLanguageRepository();
+const languages = new DrizzleLanguageRepository();
 
-function serializeLanguage(language: Awaited<ReturnType<MongooseLanguageRepository["listActive"]>>[number]) {
+function serializeLanguage(language: Awaited<ReturnType<DrizzleLanguageRepository["listActive"]>>[number]) {
   return {
     id: language.id,
     code: language.code,

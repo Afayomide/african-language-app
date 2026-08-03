@@ -50,6 +50,8 @@ export interface LearningContentComponent {
   audio?: {
     url?: string;
   };
+  /** Word breakdown of a multi-word expression, so it can be glossed part by part. */
+  components?: LearningContentComponent[];
 }
 
 export interface LearningContent {

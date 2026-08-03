@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import { isValidId } from "../../../../utils/ids.js";
 import type { LessonEntity } from "../../../../domain/entities/Lesson.js";
 import type { ContentType } from "../../../../domain/entities/Content.js";
 import type { QuestionEntity } from "../../../../domain/entities/Question.js";
@@ -28,6 +28,7 @@ import {
   scoreAdaptiveReviewTarget
 } from "../../../services/adaptiveReviewPriority.js";
 import { ContentLookupService, type ResolvedContentEntity } from "../../../services/ContentLookupService.js";
+import { learnerVisibleStatuses, isLearnerVisibleStatus } from "../../../../config/learnerVisibility.js";
 import { derivePersistentAchievements } from "../../../services/learnerStats.js";
 
 export const LESSON_STEPS = [
@@ -93,6 +94,13 @@ type LessonDisplayComponent = {
     url: string;
     s3Key: string;
   };
+  /**
+   * Word breakdown of a multi-word expression component, so the learner glossing "Níbo ni"
+   * sees "where" + "is" rather than an opaque unit. Only genuinely idiomatic expressions
+   * should read as unbreakable, and that is decided by whether components exist -- not by
+   * the `fixed` flag, which is a generation-side signal. Absent for single-word components.
+   */
+  components?: LessonDisplayComponent[];
 };
 
 type StageQuestionResultInput = {
@@ -275,6 +283,86 @@ function contentSupportsDisplayComponents(entity: ResolvedContentEntity) {
   return entity.kind === "sentence" || entity.kind === "expression";
 }
 
+function buildDisplayComponents(
+  entity: ResolvedContentEntity,
+  resolvedContentMap: Map<string, ResolvedContentEntity>,
+  depth = 0
+): LessonDisplayComponent[] | undefined {
+  if (!contentSupportsDisplayComponents(entity)) return undefined;
+  return entity.components
+    .slice()
+    .sort((left, right) => left.orderIndex - right.orderIndex)
+    .reduce<LessonDisplayComponent[]>((acc, component) => {
+      const resolved = resolvedContentMap.get(`${component.type}:${component.refId}`);
+      if (!resolved || resolved.kind === "sentence") return acc;
+      acc.push({
+        id: resolved.id,
+        kind: resolved.kind,
+        text: component.textSnapshot || resolved.text,
+        translations: Array.isArray(resolved.translations) ? resolved.translations : [],
+        pronunciation: String(resolved.pronunciation || ""),
+        explanation: String(resolved.explanation || ""),
+        // The component's own gloss wins over the shared word row. One spelling can be two
+        // unrelated words -- `sí` is "to" in `Mo ń lọ sí ọjà` but the negative existential
+        // in `Bàbá ò sí ní ilé` -- and both resolve to the single `sí` row whose
+        // translations[0] is "to". Falls back to the word row when unset, which is every
+        // component that is not ambiguous.
+        selectedTranslation: component.gloss || getTranslationByIndex(resolved.translations, 0),
+        selectedTranslationIndex: 0,
+        audio: {
+          provider: String(resolved.audio?.provider || ""),
+          model: String(resolved.audio?.model || ""),
+          voice: String(resolved.audio?.voice || ""),
+          locale: String(resolved.audio?.locale || ""),
+          format: String(resolved.audio?.format || ""),
+          url: String(resolved.audio?.url || ""),
+          s3Key: String(resolved.audio?.s3Key || "")
+        },
+        // One level only: an expression breaks into words, and words do not break further.
+        // The ref resolution pass ahead of this resolves exactly that one extra level.
+        ...(depth === 0 && resolved.kind === "expression"
+          ? (() => {
+              const nested = buildDisplayComponents(resolved, resolvedContentMap, depth + 1);
+              return nested && nested.length > 0 ? { components: nested } : {};
+            })()
+          : {})
+      });
+      return acc;
+    }, []);
+}
+
+/**
+ * Resolve the components of entities that were themselves only just discovered. Component
+ * resolution is otherwise single-pass: it finds the expressions inside a sentence but never
+ * their words, so a multi-word expression reached the learner with no breakdown to gloss.
+ */
+async function resolveDeeperComponentRefs(
+  contentLookup: { findMany: (refs: Array<{ type: ContentType; id: string }>) => Promise<Map<string, ResolvedContentEntity>> },
+  resolvedContentMap: Map<string, ResolvedContentEntity>,
+  newlyResolved: Map<string, ResolvedContentEntity>
+) {
+  const deeperRefs = Array.from(
+    new Map(
+      Array.from(newlyResolved.values())
+        .filter((item): item is Extract<ResolvedContentEntity, { kind: "sentence" | "expression" }> =>
+          contentSupportsDisplayComponents(item)
+        )
+        .flatMap((item) =>
+          item.components.map(
+            (component) =>
+              [`${component.type}:${component.refId}`, { type: component.type, id: component.refId }] as const
+          )
+        )
+        .filter(([key]) => !resolvedContentMap.has(key))
+    ).values()
+  );
+  if (deeperRefs.length === 0) return;
+  const deeper = await contentLookup.findMany(deeperRefs);
+  for (const [key, value] of deeper.entries()) {
+    resolvedContentMap.set(key, value);
+  }
+}
+
 function toDisplayContent(
   entity: ResolvedContentEntity,
   selectedTranslationIndex: number,
@@ -284,33 +372,7 @@ function toDisplayContent(
   const selectedTranslation = getTranslationByIndex(translations, selectedTranslationIndex);
   const components =
     contentSupportsDisplayComponents(entity) && resolvedContentMap
-      ? entity.components
-          .slice()
-          .sort((left, right) => left.orderIndex - right.orderIndex)
-          .reduce<LessonDisplayComponent[]>((acc, component) => {
-            const resolved = resolvedContentMap.get(`${component.type}:${component.refId}`);
-            if (!resolved || resolved.kind === "sentence") return acc;
-            acc.push({
-              id: resolved.id,
-              kind: resolved.kind,
-              text: component.textSnapshot || resolved.text,
-              translations: Array.isArray(resolved.translations) ? resolved.translations : [],
-              pronunciation: String(resolved.pronunciation || ""),
-              explanation: String(resolved.explanation || ""),
-              selectedTranslation: getTranslationByIndex(resolved.translations, 0),
-              selectedTranslationIndex: 0,
-              audio: {
-                provider: String(resolved.audio?.provider || ""),
-                model: String(resolved.audio?.model || ""),
-                voice: String(resolved.audio?.voice || ""),
-                locale: String(resolved.audio?.locale || ""),
-                format: String(resolved.audio?.format || ""),
-                url: String(resolved.audio?.url || ""),
-                s3Key: String(resolved.audio?.s3Key || "")
-              }
-            });
-            return acc;
-          }, [])
+      ? buildDisplayComponents(entity, resolvedContentMap)
       : undefined;
   return {
     id: entity.id,
@@ -735,7 +797,7 @@ export class LearnerLessonUseCases {
     );
 
     const missedQuestionRows = input.questionResults
-      .filter((row) => typeof row.questionId === "string" && row.questionId && mongoose.Types.ObjectId.isValid(row.questionId))
+      .filter((row) => typeof row.questionId === "string" && row.questionId && isValidId(row.questionId))
       .map((row) => {
         const incorrectAttempts = clamp(Math.max(0, Math.round(Number(row.incorrectAttempts) || 0)), 0, Math.max(1, Math.round(Number(row.attempts) || 1)));
         if (incorrectAttempts <= 0 || !row.questionId || !row.questionType || !row.questionSubtype) return null;
@@ -761,7 +823,7 @@ export class LearnerLessonUseCases {
 
     const [unit, unitLessons] = await Promise.all([
       this.units.findById(lesson.unitId),
-      this.lessons.list({ unitId: lesson.unitId, status: "published" })
+      this.lessons.list({ unitId: lesson.unitId, status: learnerVisibleStatuses() })
     ]);
     if (!unit) return null;
 
@@ -854,6 +916,10 @@ export class LearnerLessonUseCases {
       for (const [key, value] of nestedComponentMap.entries()) {
         resolvedContentMap.set(key, value);
       }
+      // Second pass: the pass above DISCOVERS expressions inside a sentence, but the ref list
+      // was computed before they were in the map, so their own words were never fetched and
+      // the learner gloss had nothing to break down. Resolve one more level.
+      await resolveDeeperComponentRefs(this.contentLookup, resolvedContentMap, nestedComponentMap);
     }
 
     const candidateKeys = new Set(Array.from(resolvedContentMap.keys()));
@@ -888,7 +954,7 @@ export class LearnerLessonUseCases {
 
   async getAdaptiveReviewSuggestion(userId: string, afterLessonId: string): Promise<AdaptiveReviewSuggestion | null> {
     const lesson = await this.lessons.findById(afterLessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const state = await this.computeAdaptiveReviewState(userId, lesson);
     if (!state) return null;
@@ -919,7 +985,7 @@ export class LearnerLessonUseCases {
 
   async getAdaptiveReviewFlow(userId: string, afterLessonId: string) {
     const lesson = await this.lessons.findById(afterLessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const state = await this.computeAdaptiveReviewState(userId, lesson);
     if (!state || state.weakTargets.length === 0) return null;
@@ -1334,7 +1400,7 @@ export class LearnerLessonUseCases {
 
   async getLessonFlow(userId: string, lessonId: string) {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const progress = await this.ensureProgress(userId, lesson);
     const syncedProgress = syncStageProgress(lesson, progress);
@@ -1395,6 +1461,9 @@ export class LearnerLessonUseCases {
       for (const [key, value] of nestedComponents.entries()) {
         resolvedContentMap.set(key, value);
       }
+      // See the matching comment in the other resolution site: expressions found in this pass
+      // still need their own word components resolved.
+      await resolveDeeperComponentRefs(this.contentLookup, resolvedContentMap, nestedComponents);
     }
 
     // 5. Populate blocks with full data
@@ -1482,7 +1551,7 @@ export class LearnerLessonUseCases {
     let flowBlocks: LearnerPopulatedBlock[] = populatedBlocks;
 
     if (lesson.kind === "review") {
-      const unitLessons = await this.lessons.list({ unitId: lesson.unitId, status: "published" });
+      const unitLessons = await this.lessons.list({ unitId: lesson.unitId, status: learnerVisibleStatuses() });
       const orderedUnitLessons = unitLessons
         .slice()
         .sort((a, b) => {
@@ -1555,9 +1624,9 @@ export class LearnerLessonUseCases {
     if (!profile) return "profile_not_found" as const;
 
     const [chapters, units, lessons] = await Promise.all([
-      this.chapters.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
-      this.units.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
-      this.lessons.list({ status: "published", language: profile.currentLanguage, languageId: profile.activeLanguageId || null })
+      this.chapters.list({ status: learnerVisibleStatuses(), language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
+      this.units.list({ status: learnerVisibleStatuses(), language: profile.currentLanguage, languageId: profile.activeLanguageId || null }),
+      this.lessons.list({ status: learnerVisibleStatuses(), language: profile.currentLanguage, languageId: profile.activeLanguageId || null })
     ]);
     const orderedUnits = buildOrderedPublishedUnits(chapters, units);
     const orderedLessons = buildOrderedPublishedLessons(orderedUnits, lessons);
@@ -1574,7 +1643,7 @@ export class LearnerLessonUseCases {
 
   async getLessonOverview(userId: string, lessonId: string) {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const progress = await this.ensureProgress(userId, lesson);
     const syncedProgress = syncStageProgress(lesson, progress);
@@ -1586,9 +1655,9 @@ export class LearnerLessonUseCases {
       lesson.languageId ||
       (profile?.currentLanguage === lesson.language ? profile.activeLanguageId || null : null);
     const [chapters, units, allLanguageLessons] = await Promise.all([
-      this.chapters.list({ status: "published", language, languageId }),
-      this.units.list({ status: "published", language, languageId }),
-      this.lessons.list({ status: "published", language, languageId })
+      this.chapters.list({ status: learnerVisibleStatuses(), language, languageId }),
+      this.units.list({ status: learnerVisibleStatuses(), language, languageId }),
+      this.lessons.list({ status: learnerVisibleStatuses(), language, languageId })
     ]);
     const orderedUnits = buildOrderedPublishedUnits(chapters, units);
     const orderedLessons = buildOrderedPublishedLessons(orderedUnits, allLanguageLessons);
@@ -1612,7 +1681,7 @@ export class LearnerLessonUseCases {
 
   async getLessonSteps(userId: string, lessonId: string) {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const progress = await this.ensureProgress(userId, lesson);
     return { steps: toStepProgress(progress.stepProgress), progressPercent: progress.progressPercent };
@@ -1620,7 +1689,7 @@ export class LearnerLessonUseCases {
 
   async completeStep(input: { userId: string; lessonId: string; stepKey: string; score?: number }) {
     const lesson = await this.lessons.findById(input.lessonId);
-    if (!lesson || lesson.status !== "published") return "lesson_not_found" as const;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return "lesson_not_found" as const;
 
     if (!LESSON_STEPS.some((step) => step.key === input.stepKey)) {
       return "invalid_step_key" as const;
@@ -1672,7 +1741,7 @@ export class LearnerLessonUseCases {
     questionResults?: StageQuestionResultInput[];
   }) {
     const lesson = await this.lessons.findById(input.lessonId);
-    if (!lesson || lesson.status !== "published") return "lesson_not_found" as const;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return "lesson_not_found" as const;
 
     const stages = Array.isArray(lesson.stages) ? lesson.stages.slice().sort((a, b) => a.orderIndex - b.orderIndex) : [];
     if (input.stageIndex < 0 || input.stageIndex >= stages.length) {
@@ -1753,7 +1822,7 @@ export class LearnerLessonUseCases {
     minutesSpent?: number;
   }) {
     const lesson = await this.lessons.findById(input.lessonId);
-    if (!lesson || lesson.status !== "published") return "lesson_not_found" as const;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return "lesson_not_found" as const;
 
     const progress = await this.ensureProgress(input.userId, lesson);
     const wasCompleted = progress.status === "completed";
@@ -1853,7 +1922,7 @@ export class LearnerLessonUseCases {
 
   async getLessonExpressions(lessonId: string): Promise<LessonDisplayContent[] | null> {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const lessonBlocks = getLessonBlocks(lesson);
     const manualContentRefs = lessonBlocks
@@ -1922,12 +1991,12 @@ export class LearnerLessonUseCases {
 
   async getLessonQuestions(lessonId: string, type: QuestionEntity["type"]) {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const lessonBlocks = getLessonBlocks(lesson);
     const contentTranslationIndexMap = buildContentTranslationIndexMap(lessonBlocks);
     const questionOrderMap = buildQuestionOrderMap(lessonBlocks);
-    const questions = await this.questions.list({ lessonId, type, status: "published" });
+    const questions = await this.questions.list({ lessonId, type, status: learnerVisibleStatuses() });
     const contentRefs = questions
       .map((q) => getQuestionSourceRef(q))
       .filter((item): item is { type: ContentType; id: string } => Boolean(item));
@@ -1979,12 +2048,12 @@ export class LearnerLessonUseCases {
 
   async getLessonReviewExercises(lessonId: string) {
     const lesson = await this.lessons.findById(lessonId);
-    if (!lesson || lesson.status !== "published") return null;
+    if (!lesson || !isLearnerVisibleStatus(lesson.status)) return null;
 
     const lessonBlocks = getLessonBlocks(lesson);
     const contentTranslationIndexMap = buildContentTranslationIndexMap(lessonBlocks);
     const questionOrderMap = buildQuestionOrderMap(lessonBlocks);
-    const questions = await this.questions.list({ lessonId, type: "fill-in-the-gap", status: "published" });
+    const questions = await this.questions.list({ lessonId, type: "fill-in-the-gap", status: learnerVisibleStatuses() });
     const contentRefs = questions
       .map((q) => getQuestionSourceRef(q))
       .filter((item): item is { type: ContentType; id: string } => Boolean(item));

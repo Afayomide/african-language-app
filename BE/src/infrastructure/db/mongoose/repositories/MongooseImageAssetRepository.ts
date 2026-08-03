@@ -3,9 +3,12 @@ import type { ImageAssetEntity } from "../../../../domain/entities/ImageAsset.js
 import type {
   ImageAssetCreateInput,
   ImageAssetListFilter,
+  ImageAssetPageFilter,
   ImageAssetRepository,
   ImageAssetUpdateInput
 } from "../../../../domain/repositories/ImageAssetRepository.js";
+import type { PagedResult } from "../../../../domain/repositories/pagination.js";
+import { searchRegex } from "../../../../utils/search.js";
 
 function toEntity(doc: {
   _id: { toString(): string };
@@ -72,6 +75,34 @@ export class MongooseImageAssetRepository implements ImageAssetRepository {
     if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const assets = await ImageAssetModel.find(query).sort({ createdAt: -1 });
     return assets.map(toEntity);
+  }
+
+  async listPaged(filter: ImageAssetPageFilter): Promise<PagedResult<ImageAssetEntity>> {
+    const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    if (filter.status) query.status = filter.status;
+    if (filter.uploadedBy) query.uploadedBy = filter.uploadedBy;
+    if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
+    if (filter.search) {
+      const regex = searchRegex(filter.search);
+      query.$or = [
+        { description: regex },
+        { altText: regex },
+        { tags: regex },
+        { languageNeutralLabel: regex },
+        { mimeType: regex }
+      ];
+    }
+
+    const total = await ImageAssetModel.countDocuments(query);
+    const limit = Math.max(1, filter.limit);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(Math.max(1, filter.page), totalPages);
+    const rows = await ImageAssetModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { items: rows.map(toEntity), total };
   }
 
   async findById(id: string): Promise<ImageAssetEntity | null> {

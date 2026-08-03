@@ -1,4 +1,5 @@
 import type { Language, Status } from "../entities/Lesson.js";
+import type { PageRequest, PagedResult } from "./pagination.js";
 import type { SentenceEntity } from "../entities/Sentence.js";
 
 export type SentenceListFilter = {
@@ -8,12 +9,16 @@ export type SentenceListFilter = {
   ids?: string[];
 };
 
+/** Paginated + text-searched listing used by the admin/tutor list screens. */
+export type SentencePageFilter = SentenceListFilter & { search?: string } & PageRequest;
+
 export type SentenceCreateInput = Omit<SentenceEntity, "id" | "_id" | "createdAt" | "updatedAt" | "deletedAt" | "kind">;
 export type SentenceUpdateInput = Partial<SentenceCreateInput>;
 
 export interface SentenceRepository {
   create(input: SentenceCreateInput): Promise<SentenceEntity>;
   list(filter: SentenceListFilter): Promise<SentenceEntity[]>;
+  listPaged(filter: SentencePageFilter): Promise<PagedResult<SentenceEntity>>;
   listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<SentenceEntity[]>;
   findById(id: string): Promise<SentenceEntity | null>;
   findByIds(ids: string[]): Promise<SentenceEntity[]>;

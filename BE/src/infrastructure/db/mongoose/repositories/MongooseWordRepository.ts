@@ -4,9 +4,11 @@ import type { Language } from "../../../../domain/entities/Lesson.js";
 import type {
   WordCreateInput,
   WordListFilter,
+  WordPageFilter,
   WordRepository,
   WordUpdateInput
 } from "../../../../domain/repositories/WordRepository.js";
+import type { PagedResult } from "../../../../domain/repositories/pagination.js";
 import { mapContentAudio } from "./mapContentAudio.js";
 import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
@@ -68,6 +70,31 @@ export class MongooseWordRepository implements WordRepository {
     if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
     const words = await WordModel.find(query).sort({ language: 1, text: 1, createdAt: 1 }).lean();
     return words.map(toEntity);
+  }
+
+
+  async listPaged(filter: WordPageFilter): Promise<PagedResult<WordEntity>> {
+    const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (filter.status) query.status = filter.status;
+    if (Array.isArray(filter.ids) && filter.ids.length > 0) query._id = { $in: filter.ids };
+    if (filter.search) {
+      const regex = new RegExp(filter.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.$or = ["text", "translations", "pronunciation", "explanation", "lemma", "partOfSpeech"].map((field) => ({ [field]: regex }));
+    }
+
+    const total = await WordModel.countDocuments(query);
+    const limit = Math.max(1, filter.limit);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(Math.max(1, filter.page), totalPages);
+    const rows = await WordModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { items: rows.map(toEntity), total };
   }
 
   async listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<WordEntity[]> {

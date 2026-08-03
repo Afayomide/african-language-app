@@ -1,23 +1,23 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { getLlmClient } from "../../services/llm/index.js";
 import type { LessonEntity, Level, Language } from "../../domain/entities/Lesson.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
 import { AiExpressionOrchestrator } from "../../application/services/AiExpressionOrchestrator.js";
 import { AiWordOrchestrator } from "../../application/services/AiWordOrchestrator.js";
 import { AiSentenceOrchestrator } from "../../application/services/AiSentenceOrchestrator.js";
 import { SentenceDraftPersistenceService } from "../../application/services/SentenceDraftPersistenceService.js";
 import { isValidLanguage, isValidLevel, validateLessonId } from "../../interfaces/http/validators/ai.validators.js";
 
-const lessons = new MongooseLessonRepository();
-const expressions = new MongooseExpressionRepository();
-const words = new MongooseWordRepository();
-const sentences = new MongooseSentenceRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
+const lessons = new DrizzleLessonRepository();
+const expressions = new DrizzleExpressionRepository();
+const words = new DrizzleWordRepository();
+const sentences = new DrizzleSentenceRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
 const sentenceDraftPersistence = new SentenceDraftPersistenceService(
   words,
   expressions,
@@ -296,7 +296,7 @@ export async function enhanceExpression(req: Request, res: Response) {
   const { id } = req.params;
   const { language, level } = req.body ?? {};
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   if (!language || !isValidLanguage(String(language))) {

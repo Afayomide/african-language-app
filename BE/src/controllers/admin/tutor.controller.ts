@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AdminTutorUseCases } from "../../application/use-cases/admin/tutor/AdminTutorUseCases.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
 import {
   getSearchQuery,
   includesSearch,
@@ -11,8 +11,8 @@ import {
 } from "../../interfaces/http/utils/pagination.js";
 
 const tutorUseCases = new AdminTutorUseCases(
-  new MongooseTutorProfileRepository(),
-  new MongooseUserRepository()
+  new DrizzleTutorProfileRepository(),
+  new DrizzleUserRepository()
 );
 
 export async function listTutors(req: Request, res: Response) {
@@ -43,7 +43,7 @@ export async function listTutors(req: Request, res: Response) {
 
 export async function activateTutor(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -58,7 +58,7 @@ export async function activateTutor(req: Request, res: Response) {
 
 export async function deactivateTutor(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -73,7 +73,7 @@ export async function deactivateTutor(req: Request, res: Response) {
 
 export async function deleteTutor(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 

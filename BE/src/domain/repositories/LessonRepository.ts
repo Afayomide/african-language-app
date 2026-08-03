@@ -1,11 +1,15 @@
 import type { Language, LessonEntity, LessonStage, Status } from "../entities/Lesson.js";
+import type { PageRequest, PagedResult } from "./pagination.js";
 
 export type LessonListFilter = {
   language?: Language;
   languageId?: string | null;
   unitId?: string;
-  status?: Status;
+  status?: Status | Status[];
 };
+
+/** Paginated + text-searched listing for the admin/tutor lesson screens. */
+export type LessonPageFilter = LessonListFilter & { search?: string } & PageRequest;
 
 export type LessonCreateInput = {
   title: string;
@@ -52,6 +56,7 @@ export interface LessonRepository {
   findLastOrderIndex(unitId: string): Promise<number | null>;
   create(input: LessonCreateInput): Promise<LessonEntity>;
   list(filter: LessonListFilter): Promise<LessonEntity[]>;
+  listPaged(filter: LessonPageFilter): Promise<PagedResult<LessonEntity>>;
   listSummaries(filter: LessonListFilter): Promise<LessonSummaryEntity[]>;
   findById(id: string): Promise<LessonEntity | null>;
   findByIdAndLanguage(id: string, language: Language, languageId?: string | null): Promise<LessonEntity | null>;

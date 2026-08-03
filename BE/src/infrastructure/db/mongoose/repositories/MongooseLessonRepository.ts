@@ -4,9 +4,12 @@ import type {
   LessonCreateInput,
   LessonListFilter,
   LessonRepository,
+  LessonPageFilter,
   LessonSummaryEntity,
   LessonUpdateInput
 } from "../../../../domain/repositories/LessonRepository.js";
+import type { PagedResult } from "../../../../domain/repositories/pagination.js";
+import { searchRegex } from "../../../../utils/search.js";
 import { buildScopedLanguageQuery, findLanguageIdByCode } from "./languageRef.js";
 
 type LessonPersistenceDoc = {
@@ -181,12 +184,42 @@ export class MongooseLessonRepository implements LessonRepository {
       Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
     }
     if (filter.unitId) query.unitId = filter.unitId;
-    if (filter.status) query.status = filter.status;
+    if (filter.status) query.status = Array.isArray(filter.status) ? { $in: filter.status } : filter.status;
 
     const lessons = await LessonModel.find(query)
       .sort({ language: 1, orderIndex: 1, createdAt: 1 })
       .lean();
     return lessons.map(toEntity);
+  }
+
+  async listPaged(filter: LessonPageFilter): Promise<PagedResult<LessonEntity>> {
+    const query: Record<string, unknown> = { isDeleted: { $ne: true } };
+    if (filter.languageId || filter.language) {
+      Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
+    }
+    if (filter.unitId) query.unitId = filter.unitId;
+    if (filter.status) query.status = Array.isArray(filter.status) ? { $in: filter.status } : filter.status;
+    if (filter.search) {
+      const regex = searchRegex(filter.search);
+      query.$or = [
+        { title: regex },
+        { description: regex },
+        { status: regex },
+        { topics: regex },
+        { "proverbs.text": regex }
+      ];
+    }
+
+    const total = await LessonModel.countDocuments(query);
+    const limit = Math.max(1, filter.limit);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(Math.max(1, filter.page), totalPages);
+    const rows = await LessonModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { items: rows.map(toEntity), total };
   }
 
   async listSummaries(filter: LessonListFilter): Promise<LessonSummaryEntity[]> {
@@ -195,7 +228,7 @@ export class MongooseLessonRepository implements LessonRepository {
       Object.assign(query, await buildScopedLanguageQuery({ language: filter.language, languageId: filter.languageId }));
     }
     if (filter.unitId) query.unitId = filter.unitId;
-    if (filter.status) query.status = filter.status;
+    if (filter.status) query.status = Array.isArray(filter.status) ? { $in: filter.status } : filter.status;
 
     const lessons = await LessonModel.find(query)
       .select("_id languageId title unitId language level kind orderIndex description status createdBy publishedAt deletedAt createdAt updatedAt stages")

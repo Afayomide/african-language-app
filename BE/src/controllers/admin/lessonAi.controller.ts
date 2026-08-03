@@ -6,16 +6,16 @@ import { AdminUnitAiContentUseCases, AiPlanValidationError } from "../../applica
 import { ChapterAiUseCases } from "../../application/use-cases/shared/ChapterAiUseCases.js";
 import { CurriculumMemoryService } from "../../application/services/CurriculumMemoryService.js";
 import { CurriculumUnitPlannerService } from "../../application/services/CurriculumUnitPlannerService.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleUnitContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitContentItemRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
 import { isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Level } from "../../domain/entities/Lesson.js";
@@ -33,15 +33,15 @@ import {
   getTrailingCoreUnitsSinceLastReview
 } from "../../application/services/reviewUnitScheduling.js";
 
-const lessons = new MongooseLessonRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
-const expressions = new MongooseExpressionRepository();
-const words = new MongooseWordRepository();
-const sentences = new MongooseSentenceRepository();
-const proverbs = new MongooseProverbRepository();
-const questions = new MongooseQuestionRepository();
-const units = new MongooseUnitRepository();
-const chapters = new MongooseChapterRepository();
+const lessons = new DrizzleLessonRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
+const expressions = new DrizzleExpressionRepository();
+const words = new DrizzleWordRepository();
+const sentences = new DrizzleSentenceRepository();
+const proverbs = new DrizzleProverbRepository();
+const questions = new DrizzleQuestionRepository();
+const units = new DrizzleUnitRepository();
+const chapters = new DrizzleChapterRepository();
 const useCases = new AdminLessonAiUseCases(
   lessons,
   lessonContentItems,
@@ -58,7 +58,7 @@ const unitAiContentUseCases = new AdminUnitAiContentUseCases(
   sentences,
   chapters,
   lessonContentItems,
-  new MongooseUnitContentItemRepository(),
+  new DrizzleUnitContentItemRepository(),
   proverbs,
   questions,
   units,
@@ -79,7 +79,7 @@ const curriculumUnitPlanner = new CurriculumUnitPlannerService(units, lessons, g
 function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
-  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/;
+  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/;
   return latinPattern.test(title);
 }
 

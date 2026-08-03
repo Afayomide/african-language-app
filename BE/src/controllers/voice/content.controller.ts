@@ -1,32 +1,32 @@
 import crypto from "crypto";
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { VoiceArtistAudioUseCases } from "../../application/use-cases/voice/audio/VoiceArtistAudioUseCases.js";
 import type { AudioAnalysis, AudioPitchPoint, AudioSpectrogramFrame, ContentType } from "../../domain/entities/Content.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseVoiceArtistProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseVoiceArtistProfileRepository.js";
-import { MongooseVoiceAudioSubmissionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseVoiceAudioSubmissionRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleVoiceArtistProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceArtistProfileRepository.js";
+import { DrizzleVoiceAudioSubmissionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceAudioSubmissionRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import { uploadAudio } from "../../services/storage/s3.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { getSearchQuery, includesSearch, paginate, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
 const useCases = new VoiceArtistAudioUseCases(
-  new MongooseLessonRepository(),
-  new MongooseUnitRepository(),
-  new MongooseChapterRepository(),
-  new MongooseLessonContentItemRepository(),
-  new MongooseWordRepository(),
-  new MongooseExpressionRepository(),
-  new MongooseSentenceRepository(),
-  new MongooseVoiceArtistProfileRepository(),
-  new MongooseVoiceAudioSubmissionRepository()
+  new DrizzleLessonRepository(),
+  new DrizzleUnitRepository(),
+  new DrizzleChapterRepository(),
+  new DrizzleLessonContentItemRepository(),
+  new DrizzleWordRepository(),
+  new DrizzleExpressionRepository(),
+  new DrizzleSentenceRepository(),
+  new DrizzleVoiceArtistProfileRepository(),
+  new DrizzleVoiceAudioSubmissionRepository()
 );
 const audioAnalysisService = new AudioAnalysisService();
 
@@ -195,7 +195,7 @@ export async function createSubmission(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   const contentType = parseContentType(req.params.contentType) || "expression";
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid content id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid content id" });
 
   const parsed = parseAudioUpload(req.body?.audioUpload);
   if (parsed === "invalid_audio_upload") return res.status(400).json({ error: "invalid audio upload" });

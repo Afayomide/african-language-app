@@ -1,22 +1,22 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { LearnerDashboardUseCases } from "../../application/use-cases/learner/dashboard/LearnerDashboardUseCases.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
-import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerLanguageStateRepository.js";
-import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
-import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
+import { DrizzleLearnerLanguageStateRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerLanguageStateRepository.js";
+import { DrizzleLearnerProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerProfileRepository.js";
+import { DrizzleLessonProgressRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonProgressRepository.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 
 const useCases = new LearnerDashboardUseCases(
-  new MongooseLessonRepository(),
-  new MongooseUnitRepository(),
-  new MongooseChapterRepository(),
-  new MongooseLearnerProfileRepository(),
-  new MongooseLearnerLanguageStateRepository(),
-  new MongooseLessonProgressRepository()
+  new DrizzleLessonRepository(),
+  new DrizzleUnitRepository(),
+  new DrizzleChapterRepository(),
+  new DrizzleLearnerProfileRepository(),
+  new DrizzleLearnerLanguageStateRepository(),
+  new DrizzleLessonProgressRepository()
 );
 
 export async function getDashboardOverview(req: AuthRequest, res: Response) {

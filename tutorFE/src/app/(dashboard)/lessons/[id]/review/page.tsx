@@ -220,6 +220,29 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
         for (const component of itemWithComponents.components || []) {
           const source = component.type === 'word' ? wordById.get(component.refId) : expressionById.get(component.refId)
           if (!source) continue
+          // A multi-word expression inside a sentence carries its own word breakdown, so the
+          // reviewer can see that "Níbo ni" is "where" + "is" rather than an opaque unit.
+          // Only genuinely idiomatic expressions should read as unbreakable.
+          const nestedComponents: LearningContentComponent[] = []
+          if (component.type === 'expression') {
+            const nestedSource = expressionById.get(component.refId)
+            for (const nested of nestedSource?.components || []) {
+              const nestedItem =
+                nested.type === 'word' ? wordById.get(nested.refId) : expressionById.get(nested.refId)
+              if (!nestedItem) continue
+              nestedComponents.push({
+                id: nestedItem._id,
+                kind: nested.type,
+                text: nested.textSnapshot || nestedItem.text,
+                translations: nestedItem.translations || [],
+                selectedTranslationIndex: 0,
+                selectedTranslation: pickTranslation(nestedItem.translations || [], 0),
+                pronunciation: nestedItem.pronunciation || undefined,
+                explanation: nestedItem.explanation || undefined,
+                audio: nestedItem.audio?.url ? { url: nestedItem.audio.url } : undefined,
+              })
+            }
+          }
           hydratedComponents.push({
             id: source._id,
             kind: component.type,
@@ -230,6 +253,7 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
             pronunciation: source.pronunciation || undefined,
             explanation: source.explanation || undefined,
             audio: source.audio?.url ? { url: source.audio.url } : undefined,
+            ...(nestedComponents.length > 1 ? { components: nestedComponents } : {}),
           })
         }
         base.components = hydratedComponents

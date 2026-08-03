@@ -1,5 +1,6 @@
 import "dotenv/config";
 import mongoose from "mongoose";
+import { isValidId } from "../utils/ids.js";
 import LessonModel from "../models/Lesson.js";
 import UnitModel from "../models/Unit.js";
 
@@ -22,7 +23,7 @@ function parseArgs(argv: string[]): CliOptions {
   if (!unitId) {
     throw new Error("Missing --unitId=<unit_object_id>");
   }
-  if (!mongoose.Types.ObjectId.isValid(unitId)) {
+  if (!isValidId(unitId)) {
     throw new Error("Invalid --unitId value.");
   }
 

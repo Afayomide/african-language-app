@@ -55,6 +55,10 @@ import {
   type ContextScenarioQuestionDraft
 } from "../../../services/contextScenarioQuestions.js";
 import { LessonRefactorService } from "../../../services/LessonRefactorService.js";
+import {
+  isSentenceLikeExpressionText,
+  splitExpressionIntoWordTokens
+} from "../../../../services/content/expressionShape.js";
 
 type QuestionDraft = {
   type: QuestionType;
@@ -160,6 +164,11 @@ type LessonGenerationSummary = {
 
 const MIN_REVIEW_EXERCISES_PER_LESSON = 8;
 const MIN_SENTENCE_SOURCES_PER_LESSON = 3;
+// Absolute floor a lesson is allowed to ship with after DB top-up. When fewer than
+// MIN_SENTENCE_SOURCES_PER_LESSON fresh sentences assemble, we borrow on-target sentences
+// from the DB; if we still can't reach the target we allow the lesson down to this floor
+// (logged as underfilled) instead of failing the whole unit. Below the floor we still throw.
+const MIN_SENTENCE_SOURCES_FLOOR = 2;
 const REVIEW_ANCHOR_SENTENCES_PER_LESSON = 5;
 const REVIEW_VARIANT_SENTENCES_PER_LESSON = 3;
 
@@ -1145,16 +1154,21 @@ function normalize(value: string) {
   return String(value || "").trim().toLowerCase();
 }
 
-function splitExpressionIntoWordTokens(value: string) {
-  return String(value || "")
-    .split(/\s+/)
-    .map((item) => item.trim().replace(/^[.,!?;:\"'()\[\]{}]+|[.,!?;:\"'()\[\]{}]+$/g, ""))
-    .filter(Boolean);
-}
+// splitExpressionIntoWordTokens / isSentenceLikeExpressionText / MAX_FIXED_EXPRESSION_WORDS
+// now live in services/content/expressionShape.ts so this file and
+// SentenceDraftPersistenceService cannot drift apart on what counts as a real expression.
 
 function splitExpressionIntoNormalizedWordTokens(value: string) {
   return splitExpressionIntoWordTokens(value).map((item) => normalize(item)).filter(Boolean);
 }
+
+// A genuine fixed expression is a short reusable chunk: a greeting, idiom, or set phrase.
+// Weaker local models sometimes mark a whole generated SENTENCE as a fixed expression
+// component, which then gets persisted as an expression and pollutes the expression
+// inventory (e.g. "Mo fẹ́ rà, owó mi ni." or "Ọkùnrin kan ń bọ̀."). Detect the
+// sentence-shaped ones so we can decline to store them as expressions. The signals are
+// tuned to reject full sentences while keeping legitimately short set phrases such as
+// "Eló ni?" (trailing "?" is fine) and "Rárá, mi ò" (a short two-chunk phrase).
 
 function normalizePlanItems(values: unknown) {
   return Array.isArray(values) ? values.map((item) => String(item || "").trim()).filter(Boolean) : [];
@@ -1237,7 +1251,35 @@ function summarizeReviewSentenceExamples(sentences: SentenceEntity[], limit: num
     .join(" | ");
 }
 
+/**
+ * Route each plan target to the field its token count demands.
+ *
+ * The prompt asks for single-token items in targetWords and multi-word phrases in
+ * targetExpressions, and the models ignore it often enough to matter: a phrase parked in
+ * targetWords is later looked up as a word, so it never matches the expression inventory
+ * and the lesson silently loses its real target. Token count is not a matter of opinion,
+ * so it is settled here rather than asked for again.
+ */
+function routePlanTargetsByShape(
+  words: LlmUnitPlanTarget[],
+  expressions: LlmUnitPlanTarget[]
+): { targetWords: LlmUnitPlanTarget[]; targetExpressions: LlmUnitPlanTarget[] } {
+  const isMultiWord = (target: LlmUnitPlanTarget) =>
+    splitExpressionIntoWordTokens(target.text).length > 1;
+  const dedupe = (items: LlmUnitPlanTarget[]) =>
+    Array.from(new Map(items.map((item) => [normalize(item.text), item] as const)).values());
+
+  return {
+    targetWords: dedupe([...words.filter((t) => !isMultiWord(t)), ...expressions.filter((t) => !isMultiWord(t))]),
+    targetExpressions: dedupe([...expressions.filter(isMultiWord), ...words.filter(isMultiWord)])
+  };
+}
+
 function normalizeUnitPlanLesson(lesson: LlmUnitPlanLesson): LlmUnitPlanLesson {
+  const routed = routePlanTargetsByShape(
+    normalizePlanTargets((lesson as { targetWords?: unknown }).targetWords),
+    normalizePlanTargets((lesson as { targetExpressions?: unknown }).targetExpressions)
+  );
   return {
     title: String(lesson.title || "").trim(),
     description: String(lesson.description || "").trim() || undefined,
@@ -1246,8 +1288,8 @@ function normalizeUnitPlanLesson(lesson: LlmUnitPlanLesson): LlmUnitPlanLesson {
     situations: normalizePlanItems(lesson.situations),
     sentenceGoals: normalizePlanItems(lesson.sentenceGoals),
     focusSummary: String(lesson.focusSummary || "").trim() || undefined,
-    targetWords: normalizePlanTargets((lesson as { targetWords?: unknown }).targetWords),
-    targetExpressions: normalizePlanTargets((lesson as { targetExpressions?: unknown }).targetExpressions)
+    targetWords: routed.targetWords,
+    targetExpressions: routed.targetExpressions
   };
 }
 
@@ -1539,7 +1581,7 @@ function sentenceDraftUsesLockedTarget(
 
 function looksEnglishLikeText(value: string) {
   const trimmed = normalizeEnglishValidationText(value).trim();
-  return Boolean(trimmed) && /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(trimmed);
+  return Boolean(trimmed) && /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/.test(trimmed);
 }
 
 function normalizeEnglishValidationText(value: string) {
@@ -1550,14 +1592,118 @@ function normalizeEnglishValidationText(value: string) {
 }
 
 function stripQuotedTargetLanguageTerms(value: string) {
+  // The trailing lookahead must allow end-of-string as well as punctuation. Writing `$`
+  // inside the character class matches a literal dollar sign, which left a quoted term at
+  // the very end of a field unstripped and failed it on its diacritics.
   return normalizeEnglishValidationText(value)
-    .replace(/(^|[\s(])'[^'\n]+'(?=[$\s).,:;!?/-])/g, "$1TERM")
-    .replace(/(^|[\s(])\"[^\"\n]+\"(?=[$\s).,:;!?/-])/g, "$1TERM");
+    .replace(/(^|[\s(])'[^'\n]+'(?=$|[\s).,:;!?/-])/g, "$1TERM")
+    .replace(/(^|[\s(])\"[^\"\n]+\"(?=$|[\s).,:;!?/-])/g, "$1TERM");
 }
 
 function looksEnglishLikeMetadataText(value: string) {
   const trimmed = stripQuotedTargetLanguageTerms(value).trim();
-  return Boolean(trimmed) && /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(trimmed);
+  return Boolean(trimmed) && /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/.test(trimmed);
+}
+
+// Weaker local models write sentenceGoals as a gloss pair -- "<target sentence> (<English
+// meaning>)" -- roughly half the time no matter how the rule is phrased, and a unit needs
+// every goal clean at once, so regenerating the whole plan effectively never converges.
+// The English meaning is already sitting in the parentheses, so recover it instead of
+// spending another attempt. Only applied to goals that fail validation, so an already-valid
+// goal can never be altered.
+function repairSentenceGoal(value: string) {
+  const trimmed = normalizeEnglishValidationText(value).trim().replace(/^['"]+|['"]+$/g, "").trim();
+  if (!trimmed || looksEnglishLikeText(trimmed)) return trimmed;
+
+  const parentheticals = [...trimmed.matchAll(/\(([^()]+)\)/g)].map((match) => match[1].trim());
+  for (let index = parentheticals.length - 1; index >= 0; index -= 1) {
+    const candidate = parentheticals[index].replace(/^['"]+|['"]+$/g, "").trim();
+    if (candidate.length >= 8 && candidate.includes(" ") && looksEnglishLikeText(candidate)) {
+      return candidate;
+    }
+  }
+
+  return trimmed;
+}
+
+// The prompt asks for target-language forms in English metadata to be wrapped in ASCII
+// quotes, but models reach for parentheses just as readily -- "Greet the vendor (Ẹ káàárọ̀)".
+// Both are legitimate marking, so rewrite the parenthesised form into the quoted form the
+// validator already understands. English asides such as "(politely)" are left alone.
+function markParentheticalTargetTerms(value: string) {
+  return normalizeEnglishValidationText(value).replace(/\(([^()]+)\)/g, (match, inner: string) => {
+    const trimmed = inner.trim();
+    if (!trimmed || looksEnglishLikeText(trimmed)) return match;
+    return `'${trimmed}'`;
+  });
+}
+
+// The mirror image of markParentheticalTargetTerms: the model writes the target-language
+// form bare and puts the ENGLISH gloss in the parentheses -- "using the yìí (this) modifier"
+// or "Introduce Níbo ni (Where is)". The bare term is still identifiable because it carries
+// non-ASCII letters, so quote it the way the prompt asks for. Chunks that are already quoted
+// are left alone, and pure-ASCII words are never touched.
+function quoteBareTargetTerms(value: string) {
+  return normalizeEnglishValidationText(value).replace(/[^\s]+/g, (chunk) => {
+    const lead = chunk.match(/^[("']*/)?.[0] || "";
+    const tail = chunk.match(/[)"'.,:;!?]*$/)?.[0] || "";
+    const core = chunk.slice(lead.length, chunk.length - tail.length);
+    if (!core) return chunk;
+    // Already delimited, or plain ASCII -> nothing to do.
+    if (lead.includes("'") || lead.includes("\"") || tail.includes("'") || tail.includes("\"")) return chunk;
+    if (!/[^ -]/.test(core)) return chunk;
+    return `${lead}'${core}'${tail}`;
+  });
+}
+
+function repairMetadataText(value: string) {
+  const trimmed = normalizeEnglishValidationText(value).trim();
+  if (!trimmed || looksEnglishLikeMetadataText(trimmed)) return trimmed;
+  const marked = markParentheticalTargetTerms(trimmed).trim();
+  if (looksEnglishLikeMetadataText(marked)) return marked;
+  return quoteBareTargetTerms(marked).trim();
+}
+
+function repairUnitPlanLessons(lessons: LlmUnitPlanLesson[]): LlmUnitPlanLesson[] {
+  return lessons.map((lesson) => {
+    const source = lesson as {
+      title?: unknown;
+      description?: unknown;
+      focusSummary?: unknown;
+      objectives?: unknown;
+      sentenceGoals?: unknown;
+      situations?: unknown;
+      conversationGoal?: unknown;
+    };
+    const repaired: Record<string, unknown> = {};
+
+    if (Array.isArray(source.sentenceGoals)) {
+      repaired.sentenceGoals = source.sentenceGoals.map((goal) => repairSentenceGoal(String(goal || "")));
+    }
+    if (Array.isArray(source.objectives)) {
+      repaired.objectives = source.objectives.map((item) => repairMetadataText(String(item || "")));
+    }
+    if (Array.isArray(source.situations)) {
+      repaired.situations = source.situations.map((item) => repairMetadataText(String(item || "")));
+    }
+    if (typeof source.conversationGoal === "string") {
+      repaired.conversationGoal = repairMetadataText(source.conversationGoal);
+    }
+    // title/description/focusSummary are validated with the same English-like rule, so they
+    // need the same repair. Leaving description out is why "description not English-like"
+    // survived every retry while the other fields were being fixed.
+    if (typeof source.title === "string") {
+      repaired.title = repairMetadataText(source.title);
+    }
+    if (typeof source.description === "string") {
+      repaired.description = repairMetadataText(source.description);
+    }
+    if (typeof source.focusSummary === "string") {
+      repaired.focusSummary = repairMetadataText(source.focusSummary);
+    }
+
+    return { ...lesson, ...repaired };
+  });
 }
 
 function normalizeThemeToken(value: string) {
@@ -1611,7 +1757,11 @@ function buildUnitPlanRetryInstruction(input: {
     "Keep title, description, objectives, conversationGoal, situations, and focusSummary in English.",
     "If you mention target-language forms in English metadata, keep the surrounding sentence English and wrap the target-language form in simple ASCII quotes.",
     "sentenceGoals must be English meaning statements only. Do not include target-language text, gloss pairs, or parenthesized target-language examples in sentenceGoals.",
-    "Use plain ASCII apostrophes and punctuation in English metadata."
+    "Use plain ASCII apostrophes and punctuation in English metadata.",
+    // Naming only the outstanding failures makes weaker models narrow onto those fields and
+    // return the untouched ones empty, which trades one failure reason for two new ones.
+    "Return every field for every lesson, including the ones that were already correct. Do not leave conversationGoal, situations, sentenceGoals, focusSummary, objectives, or description empty on any lesson.",
+    "Fix only what is listed below. Keep everything else from the previous attempt unchanged."
   ];
 
   if (input.themeAnchors.length > 0) {
@@ -2969,13 +3119,21 @@ export class AdminUnitAiContentUseCases {
     lesson: LessonEntity;
     sentenceDrafts: LlmGeneratedSentence[];
     targetExpressions?: Array<{ text: string; translations: string[] }>;
+    targetWords?: Array<{ text: string; translations: string[] }>;
   }) {
     const coreWords = new Map<string, WordEntity>();
     const coreExpressions = new Map<string, ExpressionEntity>();
     const supportWords = new Map<string, WordEntity>();
     const supportExpressions = new Map<string, ExpressionEntity>();
     const targetExpressions = Array.isArray(input.targetExpressions) ? input.targetExpressions : [];
-    const targetExpressionKeys = new Set(targetExpressions.map((item) => normalize(item.text)).filter(Boolean));
+    // A multi-word target is often typed into Target Words rather than Target Expressions
+    // ("Níbo ni" = "where is"). Either list means the curriculum asked for it, so accept it
+    // from both; otherwise an explicitly planned target is rejected as not_a_planned_target.
+    const targetExpressionKeys = new Set(
+      [...targetExpressions, ...(input.targetWords || [])]
+        .map((item) => normalize(item.text))
+        .filter(Boolean)
+    );
     const sentenceExpressionTexts = input.sentenceDrafts.flatMap((draft) =>
       draft.components
         .filter((component) => component.type === "expression")
@@ -3001,7 +3159,29 @@ export class AdminUnitAiContentUseCases {
           continue;
         }
 
-        if (component.fixed === true) {
+        // An expression is created only when the unit plan asked for it. `fixed=true` is a
+        // weak model's snap judgement about a chunk mid-sentence, and no downstream text
+        // heuristic can reliably tell a set phrase from a literal clause, so inferring
+        // permanent inventory rows from it filled the table with sentences. Planned targets
+        // are a curriculum decision that can be reviewed; everything else splits into words.
+        // isSentenceLikeExpressionText still applies, in case a plan names a sentence.
+        // Reuse is always allowed; only CREATION is gated. An expression that already exists
+        // was approved when some earlier lesson introduced it, so a sentence using it should
+        // link to it. Gating reuse tore known expressions ("ń lọ", "ibi iṣẹ́") back into
+        // loose words. A brand-new expression is still only minted for a planned target.
+        const existingExpression =
+          component.fixed === true && !isSentenceLikeExpressionText(component.text)
+            ? await this.expressions.findByText(
+                input.lesson.language,
+                component.text,
+                input.lesson.languageId || null
+              )
+            : null;
+        if (
+          component.fixed === true &&
+          (existingExpression || targetExpressionKeys.has(normalizedText)) &&
+          !isSentenceLikeExpressionText(component.text)
+        ) {
           const expressionComponents = this.buildExpressionWordComponentRefs({
             expressionText: component.text,
             wordsByText: derivedWordsByText
@@ -3014,6 +3194,17 @@ export class AdminUnitAiContentUseCases {
           });
           (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
           continue;
+        }
+        if (component.fixed === true) {
+          console.warn("[EXPRESSION_SENTENCE_GUARD]", {
+            lessonId: input.lesson.id,
+            title: input.lesson.title,
+            text: component.text,
+            reason: targetExpressionKeys.has(normalizedText)
+              ? "sentence_like"
+              : "not_a_planned_target_and_does_not_exist",
+            note: "Component marked fixed=true was not stored as an expression; split into words instead."
+          });
         }
 
         const tokenTexts = tokenTextsByExpression.get(normalizedText) || [];
@@ -3030,6 +3221,19 @@ export class AdminUnitAiContentUseCases {
     for (const targetExpression of targetExpressions) {
       const normalizedText = normalize(targetExpression.text);
       if (!normalizedText) continue;
+      // This loop previously created every named target unconditionally, which is how the
+      // five-token "fún mi ni omi kan" became an expression despite the component-level
+      // guard rejecting that exact text.
+      if (isSentenceLikeExpressionText(targetExpression.text)) {
+        console.warn("[EXPRESSION_SENTENCE_GUARD]", {
+          lessonId: input.lesson.id,
+          title: input.lesson.title,
+          text: targetExpression.text,
+          reason: "planned_target_is_sentence_like",
+          note: "Planned target expression reads as a full sentence; not stored as an expression."
+        });
+        continue;
+      }
       const expressionComponents = this.buildExpressionWordComponentRefs({
         expressionText: targetExpression.text,
         wordsByText: derivedWordsByText
@@ -3068,11 +3272,14 @@ export class AdminUnitAiContentUseCases {
       [...existingLanguageSentences, ...input.currentLessonSentences].map((sentence) => [normalize(sentence.text), sentence] as const)
     );
     const createdOrReused: TeachingContent[] = [];
+    const dropDiagnostics: Array<Record<string, unknown>> = [];
+    const okDiagnostics: Array<Record<string, unknown>> = [];
 
     for (const draft of input.sentenceDrafts) {
       const existing = byText.get(normalize(draft.text));
       const existingMeaningSegments = Array.isArray(existing?.meaningSegments) ? existing.meaningSegments : [];
       let componentRefs: ContentComponentRef[] = existing?.components?.length ? existing.components : [];
+      let failedComponent: string | null = null;
 
       if (componentRefs.length === 0) {
         componentRefs = [];
@@ -3085,6 +3292,7 @@ export class AdminUnitAiContentUseCases {
             const content = input.componentIndex.words.get(key);
             if (!content) {
               isValid = false;
+              failedComponent = `word:${component.text}`;
               break;
             }
             componentRefs.push({
@@ -3097,10 +3305,18 @@ export class AdminUnitAiContentUseCases {
             continue;
           }
 
-          if (component.fixed === true) {
+          // Mirror the same sentence-like guard used when deriving/creating expressions
+          // (deriveContentFromSentenceDrafts). A fixed component that reads like a full
+          // sentence is deliberately NOT stored as an expression there, so it will not be
+          // in the expression index here. Rather than drop the whole sentence, fall through
+          // to the token-split path below and map it to the word entities that were created
+          // for its tokens -- the sentence survives, decomposed into words, with no
+          // full-sentence pollution in the expression inventory.
+          if (component.fixed === true && !isSentenceLikeExpressionText(component.text)) {
             const content = input.componentIndex.expressions.get(key);
             if (!content) {
               isValid = false;
+              failedComponent = `expression:${component.text}`;
               break;
             }
             componentRefs.push({
@@ -3118,6 +3334,7 @@ export class AdminUnitAiContentUseCases {
             const tokenWord = input.componentIndex.words.get(normalize(tokenText));
             if (!tokenWord) {
               isValid = false;
+              failedComponent = `token:${tokenText} (from "${component.text}")`;
               break;
             }
             componentRefs.push({
@@ -3134,7 +3351,20 @@ export class AdminUnitAiContentUseCases {
         if (!isValid) componentRefs = [];
       }
 
-      if (componentRefs.length === 0) continue;
+      if (componentRefs.length === 0) {
+        dropDiagnostics.push({
+          text: draft.text,
+          matchedExisting: Boolean(existing),
+          existingComponentCount: existing?.components?.length || 0,
+          draftComponentCount: draft.components.length,
+          failedComponent,
+          indexSizes: {
+            words: input.componentIndex.words.size,
+            expressions: input.componentIndex.expressions.size
+          }
+        });
+        continue;
+      }
 
       const generatedMeaningSegments = canUseGeneratedMeaningSegmentsForSentence({
         sentenceComponents: componentRefs,
@@ -3167,6 +3397,7 @@ export class AdminUnitAiContentUseCases {
           components: reused.components.length > 0 ? reused.components : componentRefs,
           meaningSegments: reused.meaningSegments?.length ? reused.meaningSegments : meaningSegmentsForReuse
         });
+        okDiagnostics.push({ text: draft.text, outcome: "reused", components: componentRefs.length });
         continue;
       }
 
@@ -3204,10 +3435,110 @@ export class AdminUnitAiContentUseCases {
         components: componentRefs,
         meaningSegments: generatedMeaningSegments
       });
+      okDiagnostics.push({ text: draft.text, outcome: "created", components: componentRefs.length });
       byText.set(normalize(created.text), created);
     }
 
+    if (okDiagnostics.length > 0) {
+      console.info("[SENTENCE_ASSEMBLY_OK]", {
+        lessonId: input.lesson.id,
+        draftsIn: input.sentenceDrafts.length,
+        assembled: okDiagnostics.length,
+        details: okDiagnostics
+      });
+    }
+
+    if (dropDiagnostics.length > 0) {
+      console.warn("[SENTENCE_ASSEMBLY_DROP]", {
+        lessonId: input.lesson.id,
+        draftsIn: input.sentenceDrafts.length,
+        assembled: createdOrReused.length,
+        dropped: dropDiagnostics.length,
+        details: dropDiagnostics.slice(0, 8)
+      });
+    }
+
     return createdOrReused;
+  }
+
+  // DB top-up: borrow existing same-language sentences that are on-target for this lesson
+  // (share at least one of the lesson's core word/expression targets) and already have
+  // resolvable components. Used only when too few fresh sentences assembled, so one short
+  // lesson doesn't fail the whole unit. Ranked by how many core targets each sentence covers.
+  private async topUpSentenceSourcesFromDb(input: {
+    lesson: LessonEntity;
+    current: TeachingContent[];
+    coreTargetIds: Set<string>;
+    needed: number;
+  }): Promise<TeachingContent[]> {
+    if (input.needed <= 0) return [];
+
+    const usedIds = new Set(input.current.map((item) => item.id));
+    const existing = await this.sentences.list({
+      language: input.lesson.language,
+      languageId: input.lesson.languageId || null
+    });
+    const candidates = existing
+      .filter((sentence) => !usedIds.has(sentence.id))
+      .filter((sentence) => Array.isArray(sentence.components) && sentence.components.length > 0);
+
+    const picked: TeachingContent[] = [];
+    const take = (list: Array<TeachingContent | undefined>) => {
+      for (const sentence of list) {
+        if (picked.length >= input.needed) return;
+        if (!sentence || usedIds.has(sentence.id)) continue;
+        usedIds.add(sentence.id);
+        picked.push(sentence);
+      }
+    };
+
+    // Tier 1: sentences that actually drill this lesson's core targets. Best match, so first.
+    take(
+      candidates
+        .map((sentence) => ({
+          sentence,
+          overlap: (sentence.components || []).reduce(
+            (count, component) => count + (input.coreTargetIds.has(component.refId) ? 1 : 0),
+            0
+          )
+        }))
+        .filter((entry) => entry.overlap > 0)
+        .sort((a, b) => b.overlap - a.overlap)
+        .map((entry) => entry.sentence as TeachingContent)
+    );
+    if (picked.length >= input.needed) return picked;
+
+    // Tier 2: sentences already taught by neighbouring lessons in the same unit, nearest
+    // lesson first. Same unit means same theme, so these stay on-topic. This tier is why the
+    // whole helper no longer bails when coreTargetIds is empty: a lesson with no explicit
+    // targets used to borrow nothing at all and ship underfilled.
+    const byId = new Map(candidates.map((sentence) => [sentence.id, sentence as TeachingContent] as const));
+    take(await this.listUnitSiblingSentenceIds(input.lesson).then((ids) => ids.map((id) => byId.get(id))));
+    if (picked.length >= input.needed) return picked;
+
+    // No tier 3. Borrowing any sentence in the language put "Bàbá mi ni ọ̀rẹ́ mi." into a
+    // street-kiosk unit and, worse, let a lesson report success while generation produced
+    // nothing. If the unit's own material cannot fill the lesson, it fails instead.
+    return picked;
+  }
+
+  /** Sentence ids taught by other lessons in this lesson's unit, nearest lesson first. */
+  private async listUnitSiblingSentenceIds(lesson: LessonEntity): Promise<string[]> {
+    if (!lesson.unitId) return [];
+    const siblings = (await this.lessons.listByUnitId(lesson.unitId))
+      .filter((item) => item.id !== lesson.id && !item.deletedAt)
+      .sort(
+        (a, b) =>
+          Math.abs((a.orderIndex || 0) - (lesson.orderIndex || 0)) -
+          Math.abs((b.orderIndex || 0) - (lesson.orderIndex || 0))
+      );
+
+    const ids: string[] = [];
+    for (const sibling of siblings) {
+      const items = await this.lessonContentItems.list({ lessonId: sibling.id, contentType: "sentence" });
+      for (const item of items) ids.push(item.contentId);
+    }
+    return ids;
   }
 
   private async ensureSupportingWordsFromExpressions(
@@ -3461,6 +3792,13 @@ export class AdminUnitAiContentUseCases {
     existingLessonsSummary?: string;
   }) {
     let retryInstruction = "";
+    // Each attempt regenerates the whole unit, so a lesson that validated on attempt 1 is
+    // thrown away when an unrelated lesson fails. Keep the first valid version of each slot
+    // and try the merged plan once every slot is filled.
+    const bestLessonBySlot: Array<LlmUnitPlanLesson | null> = Array.from(
+      { length: input.lessonCount },
+      () => null
+    );
     const attempts: Array<{
       attempt: number;
       status: "accepted" | "rejected";
@@ -3475,7 +3813,7 @@ export class AdminUnitAiContentUseCases {
     });
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const lessons = await this.llm.planUnitLessons({
+      const rawLessons = await this.llm.planUnitLessons({
         language: input.language,
         level: input.level,
         lessonCount: input.lessonCount,
@@ -3493,6 +3831,8 @@ export class AdminUnitAiContentUseCases {
         existingProverbTexts: input.existingProverbTexts,
         existingLessonsSummary: input.existingLessonsSummary
       });
+
+      const lessons = repairUnitPlanLessons(rawLessons);
 
       const validation = validateUnitPlanLessons(lessons, {
         language: input.language,
@@ -3543,6 +3883,53 @@ export class AdminUnitAiContentUseCases {
         reasons: validation.reasons,
         details: validation.details
       });
+
+      // Salvage the lessons this attempt got right, then see whether the accumulated
+      // best-of-all-attempts plan validates as a whole. It still has to pass the full check
+      // because duplicate-title and overlap rules are cross-lesson.
+      const invalidSlots = new Set(validation.details.invalidLessonIndexes);
+      lessons.forEach((lesson, index) => {
+        if (index < bestLessonBySlot.length && !invalidSlots.has(index) && !bestLessonBySlot[index]) {
+          bestLessonBySlot[index] = lesson;
+        }
+      });
+
+      if (bestLessonBySlot.every((lesson): lesson is LlmUnitPlanLesson => Boolean(lesson))) {
+        const mergedLessons = bestLessonBySlot.filter((lesson): lesson is LlmUnitPlanLesson =>
+          Boolean(lesson)
+        );
+        const mergedValidation = validateUnitPlanLessons(mergedLessons, {
+          language: input.language,
+          level: input.level,
+          lessonCount: input.lessonCount,
+          unitTitle: input.unitTitle,
+          unitDescription: input.unitDescription,
+          topic: input.topic,
+          curriculumInstruction: input.curriculumInstruction,
+          themeAnchors
+        });
+
+        if (mergedValidation.ok) {
+          attempts.push({
+            attempt,
+            status: "accepted",
+            plan: mergedLessons
+          });
+          await appendAiPlanLog({
+            loggedAt: new Date().toISOString(),
+            flow: input.flow,
+            planType: "unit-plan",
+            unitId: input.unitId,
+            unitTitle: input.unitTitle,
+            topic: input.topic,
+            lessonCount: input.lessonCount,
+            finalStatus: "accepted",
+            finalPlan: mergedLessons,
+            attempts
+          });
+          return mergedLessons;
+        }
+      }
 
       if (attempt < 3) {
         retryInstruction = buildUnitPlanRetryInstruction({
@@ -3892,8 +4279,16 @@ export class AdminUnitAiContentUseCases {
       : baseTargetSentenceCount;
     const targetReviewWords = Math.max(0, Math.floor(targetReviewContent / 2));
     const targetReviewExpressions = Math.max(0, targetReviewContent - targetReviewWords);
-    const planTargetWords = normalizePlanTargets((input.plan as { targetWords?: unknown }).targetWords);
-    const planTargetExpressions = normalizePlanTargets((input.plan as { targetExpressions?: unknown }).targetExpressions);
+    // Routed again here, not just in normalizeUnitPlanLesson: this is the point where a
+    // target actually becomes lesson content, and plans reach it from several callers
+    // (approved-plan apply, review decoration, refactor) that do not all pass through the
+    // same normalizer. Routing is idempotent, so running it twice costs nothing.
+    const routedPlanTargets = routePlanTargetsByShape(
+      normalizePlanTargets((input.plan as { targetWords?: unknown }).targetWords),
+      normalizePlanTargets((input.plan as { targetExpressions?: unknown }).targetExpressions)
+    );
+    const planTargetWords = routedPlanTargets.targetWords;
+    const planTargetExpressions = routedPlanTargets.targetExpressions;
     const wordTargetPlanTexts = [
       input.plan.focusSummary,
       conversationGoal,
@@ -4028,7 +4423,11 @@ export class AdminUnitAiContentUseCases {
           isSentenceOnlyReviewUnit ? "This is a sentence-focused review unit lesson." : "This is a review lesson.",
           "Do not invent brand-new lesson targets outside the allowed inventory.",
           "Generate close review variants from the provided anchor sentences and allowed inventory.",
-          "Do not repeat an anchor sentence exactly.",
+          // Must agree with buildSentencesPrompt: goals outrank anchors. This line used to
+          // read "Do not repeat an anchor sentence exactly", which contradicted the goal
+          // rule and, because extraInstructions land last in the prompt, quietly won --
+          // the model shipped "Who is THAT woman?" for the goal "Who is this woman?".
+          "Sentence goals outrank anchors: render a stated sentence goal exactly, reproducing the anchor verbatim when they say the same thing. Vary only the sentences beyond the goals.",
           "Keep every generated sentence inside the same taught meaning space as the anchor sentences.",
           lockedTargets.words.length > 0
             ? `Locked review words: ${lockedTargets.words.map((item) => `${item.text} = ${item.translations.join(" / ")}`).join(" | ")}`
@@ -4088,7 +4487,12 @@ export class AdminUnitAiContentUseCases {
         expressionLanguagePool: [...input.languagePool, ...input.repetitionPool]
       });
       const effectiveLockedTargets = hasExplicitCoreTargets ? explicitCoreTargets : lockedTargets;
-      expressionTargetsForContent = effectiveLockedTargets.expressions;
+      // Auto-selected locked targets still steer sentence generation below, but they must
+      // never create expression rows. hasExplicitCoreTargets is a combined word+expression
+      // check, so a plan naming only target words fell through to model-inferred targets and
+      // minted expressions ("owó mi ni", "mi ni") the plan never asked for. An expression is
+      // created only when the plan explicitly names it.
+      expressionTargetsForContent = explicitCoreTargets.expressions;
 
       sentenceDrafts = discoverySentenceDrafts;
       if (effectiveLockedTargets.words.length + effectiveLockedTargets.expressions.length > 0) {
@@ -4148,7 +4552,8 @@ export class AdminUnitAiContentUseCases {
     const derivedContent = await this.deriveContentFromSentenceDrafts({
       lesson: input.lesson,
       sentenceDrafts,
-      targetExpressions: expressionTargetsForContent
+      targetExpressions: expressionTargetsForContent,
+      targetWords: explicitCoreTargets.words
     });
     const words = derivedContent.coreWords;
     const expressions = derivedContent.coreExpressions;
@@ -4437,15 +4842,53 @@ export class AdminUnitAiContentUseCases {
       });
     }
 
-    const generatedSentences = await this.persistSentenceDrafts({
+    let generatedSentences = await this.persistSentenceDrafts({
       lesson: input.lesson,
       sentenceDrafts,
       currentLessonSentences,
       componentIndex: {
-        words: new Map([...focusedLessonWords, ...supportWords].map((item) => [normalize(item.text), item] as const)),
-        expressions: new Map([...focusedLessonExpressions, ...supportExpressions].map((item) => [normalize(item.text), item] as const))
+        // Resolve a sentence component against every word/expression the system already has
+        // in memory (derived this run + the live language pool + current lesson + reuse pool),
+        // not just this lesson's selected targets. Otherwise a fresh sentence is dropped when
+        // it uses a basic word like "Mo"/"ni" that exists in the DB but isn't a lesson target.
+        words: new Map(Array.from(wordById.values(), (item) => [normalize(item.text), item] as const)),
+        expressions: new Map(Array.from(expressionById.values(), (item) => [normalize(item.text), item] as const))
       }
     });
+
+    // When too few fresh sentences assembled, borrow on-target sentences from the DB (ones
+    // that share a core word/expression target) before falling back to shipping underfilled.
+    // Reassigning generatedSentences here means borrowed sentences flow through every
+    // downstream step (question drafts, stage blocks, stats) exactly like generated ones.
+    const assembledSentenceCount = generatedSentences.length;
+    if (assembledSentenceCount < MIN_SENTENCE_SOURCES_PER_LESSON) {
+      const coreTargetIds = new Set<string>([
+        ...words.map((item) => item.id),
+        ...expressions.map((item) => item.id)
+      ]);
+      const borrowedSentences = await this.topUpSentenceSourcesFromDb({
+        lesson: input.lesson,
+        current: generatedSentences,
+        coreTargetIds,
+        needed: MIN_SENTENCE_SOURCES_PER_LESSON - assembledSentenceCount
+      });
+      if (borrowedSentences.length > 0) {
+        generatedSentences = Array.from(
+          new Map(
+            [...generatedSentences, ...borrowedSentences].map((item) => [item.id, item] as const)
+          ).values()
+        );
+      }
+      console.info("[SENTENCE_TOPUP]", {
+        lessonId: input.lesson.id,
+        title: input.lesson.title,
+        assembled: assembledSentenceCount,
+        target: MIN_SENTENCE_SOURCES_PER_LESSON,
+        borrowedCount: borrowedSentences.length,
+        borrowed: borrowedSentences.map((item) => item.text),
+        finalCount: generatedSentences.length
+      });
+    }
     const reviewFallbackAnchorSentences = reviewAnchorSentences.filter(
       (sentence) => !generatedSentences.some((generated) => normalize(generated.text) === normalize(sentence.text))
     );
@@ -4458,10 +4901,19 @@ export class AdminUnitAiContentUseCases {
     const lessonSentenceSources = Array.from(
       new Map(reviewSentenceSources.map((sentence) => [sentence.id, sentence] as const)).values()
     );
-    if (lessonSentenceSources.length < MIN_SENTENCE_SOURCES_PER_LESSON) {
+    if (lessonSentenceSources.length < MIN_SENTENCE_SOURCES_FLOOR) {
       throw new Error(
-        `${isReviewExerciseLesson ? "Review lesson" : "Lesson"} requires at least ${MIN_SENTENCE_SOURCES_PER_LESSON} sentences, but only ${lessonSentenceSources.length} could be assembled.`
+        `${isReviewExerciseLesson ? "Review lesson" : "Lesson"} requires at least ${MIN_SENTENCE_SOURCES_FLOOR} sentences, but only ${lessonSentenceSources.length} could be assembled or borrowed.`
       );
+    }
+    if (lessonSentenceSources.length < MIN_SENTENCE_SOURCES_PER_LESSON) {
+      console.warn("[SENTENCE_UNDERFILLED]", {
+        lessonId: input.lesson.id,
+        title: input.lesson.title,
+        count: lessonSentenceSources.length,
+        target: MIN_SENTENCE_SOURCES_PER_LESSON,
+        note: "Allowed below target sentence count after DB top-up; consider admin review."
+      });
     }
     const sentenceQuestionPool: TeachingContent[] =
       reviewSentenceSources.length > 1
@@ -4778,6 +5230,82 @@ export class AdminUnitAiContentUseCases {
     });
   }
 
+
+  /**
+   * Undo a failed unit generation. A partially-generated unit is worse than none: half its
+   * lessons are empty shells, and the words/sentences it minted stay in the inventory and
+   * get borrowed into later units.
+   *
+   * Only content created DURING this run is removed, and only when nothing else still
+   * references it. Anything reused from earlier lessons is left alone -- reuse is normal and
+   * those rows belong to whichever lesson introduced them.
+   */
+  private async rollbackUnitGeneration(input: {
+    unitId: string;
+    language: LessonEntity["language"];
+    lessonIds: string[];
+    runStartedAt: Date;
+  }) {
+    const now = new Date();
+    const removed = { lessons: 0, words: 0, expressions: 0, sentences: 0, proverbs: 0, questions: 0 };
+
+    // Questions and proverbs hang off a lesson, so they go with it. Stages and blocks are
+    // FK-cascaded from the lesson row.
+    for (const lessonId of input.lessonIds) {
+      await this.questions.softDeleteByLessonId(lessonId, now).catch(() => undefined);
+      await this.proverbs.softDeleteByLessonId(lessonId, now).catch(() => undefined);
+      await this.lessonContentItems.deleteByLessonId(lessonId).catch(() => undefined);
+      const deleted = await this.lessons.softDeleteById(lessonId).catch(() => null);
+      if (deleted) removed.lessons += 1;
+    }
+
+    // Vocabulary is shared, so it can only go once the run's lessons have released it.
+    const startedAt = input.runStartedAt.getTime();
+    const createdInRun = <T extends { id: string; createdAt?: Date | string | null }>(items: T[]) =>
+      items.filter((item) => {
+        const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+        return created >= startedAt;
+      });
+
+    const stillReferenced = async (type: "word" | "expression" | "sentence", ids: string[]) => {
+      if (ids.length === 0) return new Set<string>();
+      const links = await this.lessonContentItems.listByContent(type, ids).catch(() => []);
+      return new Set(links.map((link) => link.contentId));
+    };
+
+    const [words, expressions, sentences] = await Promise.all([
+      this.words.list({ language: input.language }).catch(() => []),
+      this.expressions.list({ language: input.language }).catch(() => []),
+      this.sentences.list({ language: input.language }).catch(() => [])
+    ]);
+
+    const freshWords = createdInRun(words);
+    const freshExpressions = createdInRun(expressions);
+    const freshSentences = createdInRun(sentences);
+
+    const [keepWords, keepExpressions, keepSentences] = await Promise.all([
+      stillReferenced("word", freshWords.map((item) => item.id)),
+      stillReferenced("expression", freshExpressions.map((item) => item.id)),
+      stillReferenced("sentence", freshSentences.map((item) => item.id))
+    ]);
+
+    for (const word of freshWords) {
+      if (keepWords.has(word.id)) continue;
+      if (await this.words.softDeleteById(word.id).catch(() => null)) removed.words += 1;
+    }
+    for (const expression of freshExpressions) {
+      if (keepExpressions.has(expression.id)) continue;
+      if (await this.expressions.softDeleteById(expression.id).catch(() => null)) removed.expressions += 1;
+    }
+    for (const sentence of freshSentences) {
+      if (keepSentences.has(sentence.id)) continue;
+      if (await this.sentences.softDeleteById(sentence.id).catch(() => null)) removed.sentences += 1;
+    }
+
+    console.warn("[UNIT_AI_GENERATE] rolled_back", { unitId: input.unitId, ...removed });
+    return removed;
+  }
+
   private async executeGenerateFromPlan(input: {
     generateInput: GenerateUnitAiContentInput;
     unitKind: UnitEntity["kind"];
@@ -4883,18 +5411,24 @@ export class AdminUnitAiContentUseCases {
         languagePool = await this.expressions.list({ language: input.generateInput.language });
         wordLanguagePool = await this.words.list({ language: input.generateInput.language });
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to generate lesson content.";
         console.error("[UNIT_AI_GENERATE] lesson:error", {
           unitId: input.generateInput.unitId,
           lessonId: item.lesson.id,
           title: item.lesson.title,
           durationMs: Date.now() - lessonStartedAt,
-          error: error instanceof Error ? error.message : "Failed to generate lesson content."
+          error: message
         });
-        errors.push({
-          lessonId: item.lesson.id,
-          title: item.lesson.title,
-          error: error instanceof Error ? error.message : "Failed to generate lesson content."
+        // One failed lesson fails the unit. A partially generated unit leaves empty lessons
+        // in the sequence and its half-built vocabulary leaks into later units through
+        // borrowing, so unwind everything this run created before giving up.
+        await this.rollbackUnitGeneration({
+          unitId: input.generateInput.unitId,
+          language: input.generateInput.language,
+          lessonIds: lessonResult.created.map((entry) => entry.lesson.id),
+          runStartedAt: new Date(runStartedAt)
         });
+        throw new Error(`Unit generation failed on lesson "${item.lesson.title}": ${message}`);
       }
     }
     await this.rebuildUnitContentItems(input.generateInput.unitId, input.generateInput.createdBy);

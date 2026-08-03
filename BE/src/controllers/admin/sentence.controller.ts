@@ -1,36 +1,35 @@
 import type { Request, Response } from "express";
 import crypto from "crypto";
-import mongoose from "mongoose";
-import SentenceModel from "../../models/Sentence.js";
+import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { generatePhraseAudio } from "../../services/tts/index.js";
 import { uploadAudio } from "../../services/storage/s3.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
-import type { Language } from "../../domain/entities/Lesson.js";
+import type { Language, Status } from "../../domain/entities/Lesson.js";
 import type { ContentComponentRef } from "../../domain/entities/Content.js";
 import type { SentenceEntity } from "../../domain/entities/Sentence.js";
 import { AdminSentenceUseCases } from "../../application/use-cases/admin/sentence/AdminSentenceUseCases.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import { getSearchQuery, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
-const sentenceRepo = new MongooseSentenceRepository();
-const lessonRepo = new MongooseLessonRepository();
-const lessonContentRepo = new MongooseLessonContentItemRepository();
-const wordRepo = new MongooseWordRepository();
-const expressionRepo = new MongooseExpressionRepository();
-const sentenceUseCases = new AdminSentenceUseCases(lessonRepo, sentenceRepo, lessonContentRepo, new MongooseQuestionRepository(), wordRepo, expressionRepo);
+const sentenceRepo = new DrizzleSentenceRepository();
+const lessonRepo = new DrizzleLessonRepository();
+const lessonContentRepo = new DrizzleLessonContentItemRepository();
+const wordRepo = new DrizzleWordRepository();
+const expressionRepo = new DrizzleExpressionRepository();
+const sentenceUseCases = new AdminSentenceUseCases(lessonRepo, sentenceRepo, lessonContentRepo, new DrizzleQuestionRepository(), wordRepo, expressionRepo);
 const audioAnalysisService = new AudioAnalysisService();
 
 function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function hydrateSentencePayloads<T extends { _id?: mongoose.Types.ObjectId | string; id?: string }>(sentences: T[]) {
+async function hydrateSentencePayloads<T extends { _id?: string; id?: string }>(sentences: T[]) {
   const ids = sentences.map((item) => String(item.id || item._id || "")).filter(Boolean);
   const contentItems = await lessonContentRepo.listByContent("sentence", ids);
   const lessonIdsBySentence = new Map<string, string[]>();
@@ -195,7 +194,7 @@ export async function listSentences(req: Request, res: Response) {
   const paginationInput = parsePaginationQuery(req.query);
   const q = getSearchQuery(req.query);
   if (status && !isValidStatus(status)) return res.status(400).json({ error: "invalid status" });
-  if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (lessonId && !isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
   let scopedIds: string[] | null = null;
   if (lessonId) {
     const contentItems = await lessonContentRepo.list({ lessonId, contentType: "sentence" });
@@ -204,19 +203,16 @@ export async function listSentences(req: Request, res: Response) {
       return res.status(200).json({ total: 0, sentences: [], pagination: { page: 1, limit: paginationInput.limit, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false } });
     }
   }
-  const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-  if (language) query.language = language;
-  if (status) query.status = status;
-  if (scopedIds) query._id = { $in: scopedIds };
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    query.$or = [{ text: regex }, { translations: regex }, { pronunciation: regex }, { explanation: regex }, { literalTranslation: regex }, { usageNotes: regex }];
-  }
-  const total = await SentenceModel.countDocuments(query);
+  const { items: sentences, total } = await sentenceRepo.listPaged({
+    language: language as Language | undefined,
+    status: status as Status | undefined,
+    ids: scopedIds ?? undefined,
+    search: q || undefined,
+    page: paginationInput.page,
+    limit: paginationInput.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
   const page = Math.min(paginationInput.page, totalPages);
-  const skip = (page - 1) * paginationInput.limit;
-  const sentences = await SentenceModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(paginationInput.limit).lean();
   return res.status(200).json({
     total,
     sentences: await hydrateSentencePayloads(sentences),
@@ -226,7 +222,7 @@ export async function listSentences(req: Request, res: Response) {
 
 export async function getSentenceById(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const sentence = await sentenceUseCases.getById(id);
   if (!sentence) return res.status(404).json({ error: "sentence not found" });
   const [payload] = await hydrateSentencePayloads([sentence]);
@@ -235,7 +231,7 @@ export async function getSentenceById(req: Request, res: Response) {
 
 export async function updateSentence(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const baseInput = buildCreateOrUpdateInput(req.body ?? {});
   if (baseInput === "invalid_lesson_ids") return res.status(400).json({ error: "invalid lesson id" });
   if (baseInput === "invalid_translations") return res.status(400).json({ error: "at least one translation required" });
@@ -257,7 +253,7 @@ export async function updateSentence(req: AuthRequest, res: Response) {
 
 export async function deleteSentence(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const deleted = await sentenceUseCases.delete(id);
   if (!deleted) return res.status(404).json({ error: "sentence not found" });
   return res.status(200).json({ message: "sentence_deleted" });
@@ -272,7 +268,7 @@ export async function bulkDeleteSentences(req: AuthRequest, res: Response) {
 
 export async function publishSentence(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const sentence = await sentenceUseCases.publish(id);
   if (!sentence) return res.status(404).json({ error: "sentence not found or not finished" });
   const [payload] = await hydrateSentencePayloads([sentence]);
@@ -281,7 +277,7 @@ export async function publishSentence(req: AuthRequest, res: Response) {
 
 export async function finishSentence(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const sentence = await sentenceUseCases.finish(id);
   if (!sentence) return res.status(404).json({ error: "sentence not found or not draft" });
   const [payload] = await hydrateSentencePayloads([sentence]);
@@ -290,7 +286,7 @@ export async function finishSentence(req: AuthRequest, res: Response) {
 
 export async function generateSentenceAudioById(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const sentence = await sentenceRepo.findById(id);
   if (!sentence) return res.status(404).json({ error: "sentence not found" });
   const contentItems = await lessonContentRepo.list({ contentType: "sentence", contentId: sentence.id });
@@ -312,7 +308,7 @@ export async function generateSentenceAudioById(req: AuthRequest, res: Response)
 
 export async function generateLessonSentencesAudio(req: AuthRequest, res: Response) {
   const { lessonId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (!isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
   const lesson = await lessonRepo.findById(lessonId);
   if (!lesson) return res.status(404).json({ error: "lesson not found" });
   const contentItems = await lessonContentRepo.list({ lessonId, contentType: "sentence" });

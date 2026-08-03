@@ -1,18 +1,18 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { LearnerPronunciationUseCases } from "../../application/use-cases/learner/pronunciation/LearnerPronunciationUseCases.js";
 import type { ContentType } from "../../domain/entities/Content.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import { normalizeAudioAnalysis, parseAudioUpload } from "../../interfaces/http/utils/audioUpload.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 
 const useCases = new LearnerPronunciationUseCases(
-  new MongooseWordRepository(),
-  new MongooseExpressionRepository(),
-  new MongooseSentenceRepository()
+  new DrizzleWordRepository(),
+  new DrizzleExpressionRepository(),
+  new DrizzleSentenceRepository()
 );
 const audioAnalysis = new AudioAnalysisService();
 
@@ -31,7 +31,7 @@ export async function comparePronunciation(req: AuthRequest, res: Response) {
   if (!contentType) {
     return res.status(400).json({ error: "invalid content type" });
   }
-  if (!mongoose.Types.ObjectId.isValid(contentId)) {
+  if (!isValidId(contentId)) {
     return res.status(400).json({ error: "invalid content id" });
   }
 

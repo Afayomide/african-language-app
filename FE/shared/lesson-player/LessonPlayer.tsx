@@ -411,6 +411,10 @@ export function LessonPlayer({
         : null
   const hasSpeakingReference = Boolean(speakingTarget?.audioUrl)
   const canPracticeSpeaking = Boolean(onComparePronunciation && speakingTarget?.audioUrl)
+  // Without accepted tutor reference audio the backend refuses to score a recording (409
+  // reference_audio_missing), so the mic stays disabled and the learner cannot record, check
+  // or advance -- the lesson dead-ends. Let them move on instead of trapping them.
+  const speakingUnavailable = isSpeakingQuestion && !hasSpeakingReference
   const renderedPromptParts =
     inlineSourceComponent && promptText.includes('{phrase}')
       ? promptText.split('{phrase}').map((part) =>
@@ -465,12 +469,14 @@ export function LessonPlayer({
 
   const canCheck = useMemo(() => {
     if (!isExerciseBlock || isAnswered) return false
-    if (isSpeakingQuestion) return false
+    // Speaking questions are normally completed through the compare flow, not the Check
+    // button -- except when there is no reference audio to compare against.
+    if (isSpeakingQuestion) return speakingUnavailable
     if (isMatchingQuestion) {
       return matchingLeftItems.length > 1 && matchingLeftItems.every((item) => selectedMatches[item.id])
     }
     return selectedOption !== null || selectedWords.length > 0
-  }, [isAnswered, isExerciseBlock, isMatchingQuestion, isSpeakingQuestion, matchingLeftItems, selectedMatches, selectedOption, selectedWords.length])
+  }, [isAnswered, isExerciseBlock, isMatchingQuestion, isSpeakingQuestion, matchingLeftItems, selectedMatches, selectedOption, selectedWords.length, speakingUnavailable])
 
   const canCheckSpeaking = useMemo(() => {
     if (!isExerciseBlock || !isSpeakingQuestion || isAnswered) return false
@@ -657,6 +663,13 @@ export function LessonPlayer({
 
   const handleCheck = () => {
     if (!exerciseData) return
+
+    // Nothing was recorded and nothing could be scored, so pass it through rather than
+    // marking the learner wrong for missing content.
+    if (speakingUnavailable) {
+      registerExerciseEvaluation(true)
+      return
+    }
 
     let correct = false
     if (isMatchingQuestion) {
@@ -983,6 +996,7 @@ export function LessonPlayer({
         isCorrect={isCorrect}
         isExerciseBlock={isExerciseBlock}
         isSpeakingQuestion={isSpeakingQuestion}
+        speakingUnavailable={speakingUnavailable}
         preview={preview}
         answerStatusLabel={answerStatusLabel}
         explanation={exerciseData?.explanation}

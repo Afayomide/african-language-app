@@ -1,14 +1,14 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
-import ImageAssetModel from "../../models/ImageAsset.js";
-import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
-import { MongooseExpressionImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionImageLinkRepository.js";
+import type { ImageAssetStatus as ImageAssetListStatus } from "../../domain/entities/ImageAsset.js";
+import { isValidId } from "../../utils/ids.js";
+import { DrizzleImageAssetRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleImageAssetRepository.js";
+import { DrizzleExpressionImageLinkRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionImageLinkRepository.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { parseImageUpload, uploadImageFile } from "../shared/imageUpload.js";
 import { getSearchQuery, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
-const imageRepo = new MongooseImageAssetRepository();
-const phraseImageLinkRepo = new MongooseExpressionImageLinkRepository();
+const imageRepo = new DrizzleImageAssetRepository();
+const phraseImageLinkRepo = new DrizzleExpressionImageLinkRepository();
 
 function parseTags(tags: unknown) {
   if (!Array.isArray(tags)) return [];
@@ -78,24 +78,14 @@ export async function listImageAssets(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "invalid image status" });
   }
 
-  const query: Record<string, unknown> = { isDeleted: { $ne: true } };
-  if (status) query.status = status;
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    query.$or = [
-      { description: regex },
-      { altText: regex },
-      { tags: regex },
-      { languageNeutralLabel: regex },
-      { mimeType: regex }
-    ];
-  }
-
-  const total = await ImageAssetModel.countDocuments(query);
+  const { items: images, total } = await imageRepo.listPaged({
+    status: status as ImageAssetListStatus,
+    search: q || undefined,
+    page: pagination.page,
+    limit: pagination.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / pagination.limit));
   const page = Math.min(pagination.page, totalPages);
-  const skip = (page - 1) * pagination.limit;
-  const images = await ImageAssetModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(pagination.limit).lean();
 
   return res.status(200).json({
     total,
@@ -113,7 +103,7 @@ export async function listImageAssets(req: AuthRequest, res: Response) {
 
 export async function getImageAssetById(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid image id" });
   }
 
@@ -128,7 +118,7 @@ export async function updateImageAsset(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid image id" });
   }
 
@@ -175,7 +165,7 @@ export async function updateImageAsset(req: AuthRequest, res: Response) {
 
 export async function deleteImageAsset(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid image id" });
   }
 

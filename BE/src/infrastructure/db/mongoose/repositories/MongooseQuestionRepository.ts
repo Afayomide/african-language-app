@@ -101,7 +101,7 @@ export class MongooseQuestionRepository implements QuestionRepository {
     if (filter.lessonIds) query.lessonId = { $in: filter.lessonIds };
     if (filter.type) query.type = filter.type;
     if (filter.subtype) query.subtype = filter.subtype;
-    if (filter.status) query.status = filter.status;
+    if (filter.status) query.status = Array.isArray(filter.status) ? { $in: filter.status } : filter.status;
 
     const questions = await ExerciseQuestionModel.find(query).sort({ createdAt: -1 });
     return questions.map(toEntity);

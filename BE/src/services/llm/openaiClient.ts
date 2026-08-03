@@ -191,10 +191,15 @@ function buildSentencesPrompt(input: GenerateSentencesInput) {
     "- Prioritize sentences built around real-life pressure points and practical daily needs before abstract demonstration sentences.",
     "- Prefer sentences that sound like things a learner would genuinely need to say in the target culture, such as power, transport, market, money, family, food, school, work, health, safety, or asking for help.",
     anchorSentences
-      ? "- Treat the provided anchor sentences as the exact review territory. Generate bounded variants that stay close to those anchor meanings."
+      ? "- Treat the provided anchor sentences as the exact review territory. Stay close to those anchor meanings."
+      : "",
+    // Keep in step with buildSentencesPrompt in prompts.ts: goals beat anchors, because review
+    // goals are written from the same inventory the anchors come from.
+    anchorSentences
+      ? "- Sentence goals outrank anchor sentences. If a sentence goal states a meaning, render that exact meaning, even when an anchor sentence already says it. Reproduce the anchor verbatim in that case instead of altering a word to make it different."
       : "",
     anchorSentences
-      ? "- Do not copy an anchor sentence exactly. Recombine or vary only with already allowed inventory."
+      ? "- Only for sentences BEYOND the sentence goals: recombine the allowed inventory into genuinely different structures, and do not repeat an anchor that a sentence goal already covers."
       : "",
     hasExplicitInventory && !allowDerivedComponents
       ? "- Prefer sentences that reinforce already introduced lesson content instead of adding new grammar."

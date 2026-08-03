@@ -7,6 +7,7 @@ import type { UnitRepository } from "../../../../domain/repositories/UnitReposit
 import type { LlmClient } from "../../../../services/llm/types.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../../../services/llm/aiGenerationLogger.js";
 import { extractThemeAnchors } from "../../../../services/llm/unitTheme.js";
+import { indexToneVerdicts } from "../../../../services/llm/linguisticReview.js";
 import {
   validateGeneratedProverbs,
   validateLessonSuggestion
@@ -21,7 +22,7 @@ function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
   // Guardrail: keep lesson titles in English-like latin script to avoid target-language titles.
-  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/;
+  const latinPattern = /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/;
   return latinPattern.test(title);
 }
 
@@ -389,6 +390,69 @@ export class AdminLessonAiUseCases {
         }))
       });
     }
-    return validated.accepted;
+    return this.reviewProverbTonation(validated.accepted, input.language, context);
+  }
+
+  /**
+   * Second-opinion review of accepted proverbs. TONE MARKS ONLY -- the reviewer's translation
+   * verdict is deliberately ignored here, because a proverb's meaning is idiomatic rather than
+   * literal and the reviewer rejects all of them on that axis.
+   *
+   * Fails OPEN: no reviewer configured, a failed call, or no usable verdicts means everything
+   * is kept. Rejected proverbs are dropped rather than regenerated -- unlike sentences there
+   * is no retry loop here, and a lesson tolerates fewer proverbs.
+   */
+  private async reviewProverbTonation<T extends { text: string; translation: string }>(
+    proverbs: T[],
+    language: Language,
+    context: string
+  ): Promise<T[]> {
+    if (proverbs.length === 0 || typeof this.llm.reviewTonation !== "function") return proverbs;
+
+    let byIndex: Map<number, { tone?: string; translation?: string }>;
+    try {
+      const verdicts = await this.llm.reviewTonation({
+        language,
+        sentences: proverbs.map((item) => ({ text: item.text, translations: [item.translation] }))
+      });
+      byIndex = indexToneVerdicts(verdicts, proverbs.length);
+    } catch (error) {
+      console.warn("[PROVERB_REVIEW] reviewer call failed, keeping unreviewed", {
+        context,
+        reason: error instanceof Error ? error.message : String(error)
+      });
+      return proverbs;
+    }
+    if (byIndex.size === 0) return proverbs;
+
+    const kept: T[] = [];
+    const dropped: Array<{ text: string; issue: string }> = [];
+    proverbs.forEach((proverb, index) => {
+      const verdict = byIndex.get(index);
+      const toneBad = verdict?.tone === "missing" || verdict?.tone === "wrong";
+      // Tone only. The translation axis asks whether the text literally means the English,
+      // and a proverb is idiomatic by definition -- literally it does not. Measured: the
+      // reviewer marked every proverb "mismatch", including "Ọwọ́ ẹni ni ẹni ń fẹ́." which is
+      // a correct proverb correctly glossed. Judging idiomatic meaning needs its own prompt.
+      if (!toneBad) {
+        kept.push(proverb);
+        return;
+      }
+      dropped.push({ text: proverb.text, issue: `tone_${verdict?.tone}` });
+    });
+
+    if (dropped.length > 0) {
+      logAiValidation("proverb-review", {
+        context,
+        acceptedCount: kept.length,
+        rejectedCount: dropped.length,
+        sampleRejected: dropped.slice(0, 3).map((item) => ({
+          text: item.text,
+          translation: "",
+          reasons: [item.issue]
+        }))
+      });
+    }
+    return kept;
   }
 }

@@ -1,23 +1,23 @@
 import type { Request, Response } from "express";
 import { getLlmClient } from "../../services/llm/index.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
 import { isValidLanguage, isValidLevel } from "../../interfaces/http/validators/ai.validators.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
 import { extractThemeAnchors } from "../../services/llm/unitTheme.js";
 
-const lessons = new MongooseLessonRepository();
-const expressions = new MongooseExpressionRepository();
-const proverbs = new MongooseProverbRepository();
-const units = new MongooseUnitRepository();
+const lessons = new DrizzleLessonRepository();
+const expressions = new DrizzleExpressionRepository();
+const proverbs = new DrizzleProverbRepository();
+const units = new DrizzleUnitRepository();
 
 function isEnglishLikeTitle(value: string) {
   const title = String(value || "").trim();
   if (!title) return false;
-  return /^[A-Za-z0-9\s.,:;'"()!?&/-]+$/.test(title);
+  return /^[A-Za-z0-9\s.,:;'"()!?&/+-]+$/.test(title);
 }
 
 export async function suggestLesson(req: Request, res: Response) {

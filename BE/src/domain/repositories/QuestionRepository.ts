@@ -6,7 +6,7 @@ export type QuestionListFilter = {
   lessonIds?: string[];
   type?: QuestionEntity["type"];
   subtype?: QuestionEntity["subtype"];
-  status?: QuestionEntity["status"];
+  status?: QuestionEntity["status"] | QuestionEntity["status"][];
 };
 
 export type QuestionCreateInput = {

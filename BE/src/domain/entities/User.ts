@@ -6,4 +6,6 @@ export type UserEntity = {
   email: string;
   passwordHash: string;
   roles: UserRole[];
+  createdAt?: Date;
+  updatedAt?: Date;
 };

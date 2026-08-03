@@ -1,4 +1,5 @@
 import type { Language, Status } from "../entities/Lesson.js";
+import type { PageRequest, PagedResult } from "./pagination.js";
 import type { WordEntity } from "../entities/Word.js";
 
 export type WordListFilter = {
@@ -8,12 +9,16 @@ export type WordListFilter = {
   ids?: string[];
 };
 
+/** Paginated + text-searched listing used by the admin/tutor list screens. */
+export type WordPageFilter = WordListFilter & { search?: string } & PageRequest;
+
 export type WordCreateInput = Omit<WordEntity, "id" | "_id" | "createdAt" | "updatedAt" | "deletedAt" | "kind">;
 export type WordUpdateInput = Partial<WordCreateInput>;
 
 export interface WordRepository {
   create(input: WordCreateInput): Promise<WordEntity>;
   list(filter: WordListFilter): Promise<WordEntity[]>;
+  listPaged(filter: WordPageFilter): Promise<PagedResult<WordEntity>>;
   listDeleted(filter?: { ids?: string[]; language?: Language; languageId?: string | null }): Promise<WordEntity[]>;
   findById(id: string): Promise<WordEntity | null>;
   findByIds(ids: string[]): Promise<WordEntity[]>;

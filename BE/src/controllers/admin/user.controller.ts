@@ -1,13 +1,18 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
-import UserModel from "../../models/User.js";
-import TutorProfileModel from "../../models/tutor/TutorProfile.js";
-import VoiceArtistProfileModel from "../../models/voice/VoiceArtistProfile.js";
+import { isValidId } from "../../utils/ids.js";
+import type { Language } from "../../domain/entities/Lesson.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleVoiceArtistProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceArtistProfileRepository.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import {
   getSearchQuery,
   parsePaginationQuery
 } from "../../interfaces/http/utils/pagination.js";
+
+const userRepo = new DrizzleUserRepository();
+const tutorProfileRepo = new DrizzleTutorProfileRepository();
+const voiceArtistProfileRepo = new DrizzleVoiceArtistProfileRepository();
 
 type UserRole = "admin" | "learner" | "tutor" | "voice_artist";
 
@@ -45,26 +50,19 @@ export async function listUsers(req: Request, res: Response) {
     return res.status(400).json({ error: "Invalid role filter." });
   }
 
-  const query: Record<string, unknown> = {};
-  if (role !== "all") query.roles = role;
-  if (q) query.email = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-
-  const total = await UserModel.countDocuments(query);
+  const { items: users, total } = await userRepo.listPaged({
+    role: role === "all" ? undefined : role,
+    search: q || undefined,
+    page: paginationInput.page,
+    limit: paginationInput.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
   const page = Math.min(paginationInput.page, totalPages);
-  const skip = (page - 1) * paginationInput.limit;
 
-  const users = await UserModel.find(query)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(paginationInput.limit)
-    .select("_id email roles createdAt updatedAt")
-    .lean();
-
-  const userIds = users.map((user) => user._id);
+  const userIds = users.map((user) => user.id);
   const [tutorProfiles, voiceProfiles] = await Promise.all([
-    TutorProfileModel.find({ userId: { $in: userIds } }).select("userId language displayName isActive").lean(),
-    VoiceArtistProfileModel.find({ userId: { $in: userIds } }).select("userId language displayName isActive").lean()
+    tutorProfileRepo.listByUserIds(userIds),
+    voiceArtistProfileRepo.listByUserIds(userIds)
   ]);
 
   const tutorByUserId = new Map(tutorProfiles.map((profile) => [String(profile.userId), profile]));
@@ -72,18 +70,15 @@ export async function listUsers(req: Request, res: Response) {
 
   return res.status(200).json({
     total,
-    users: users.map((user) => {
-      const userId = String(user._id);
-      return {
-        id: userId,
-        email: user.email,
-        roles: user.roles || [],
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        tutorProfile: tutorByUserId.get(userId) || null,
-        voiceArtistProfile: voiceByUserId.get(userId) || null
-      };
-    }),
+    users: users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      roles: user.roles || [],
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tutorProfile: tutorByUserId.get(user.id) || null,
+      voiceArtistProfile: voiceByUserId.get(user.id) || null
+    })),
     pagination: {
       page,
       limit: paginationInput.limit,
@@ -97,7 +92,7 @@ export async function listUsers(req: Request, res: Response) {
 
 export async function updateUserRoles(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Invalid user id." });
   }
 
@@ -110,24 +105,22 @@ export async function updateUserRoles(req: Request, res: Response) {
   }
 
   const normalizedRoles = ensureLearnerRole(roles);
-  const user = await UserModel.findByIdAndUpdate(id, { roles: normalizedRoles }, { new: true })
-    .select("_id email roles createdAt updatedAt")
-    .lean();
+  const user = await userRepo.setRoles(id, normalizedRoles);
 
   if (!user) {
     return res.status(404).json({ error: "User not found." });
   }
 
   if (!normalizedRoles.includes("tutor")) {
-    await TutorProfileModel.deleteOne({ userId: id });
+    await tutorProfileRepo.deleteByUserId(id);
   }
   if (!normalizedRoles.includes("voice_artist")) {
-    await VoiceArtistProfileModel.deleteOne({ userId: id });
+    await voiceArtistProfileRepo.deleteByUserId(id);
   }
 
   return res.status(200).json({
     user: {
-      id: String(user._id),
+      id: user.id,
       email: user.email,
       roles: user.roles || [],
       createdAt: user.createdAt,
@@ -142,60 +135,47 @@ export async function assignUserRole(req: Request, res: Response) {
   const language = req.body?.language ? String(req.body.language) : undefined;
   const displayName = req.body?.displayName ? String(req.body.displayName) : "";
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Invalid user id." });
   }
   if (!isValidRole(role)) {
     return res.status(400).json({ error: "Invalid role." });
   }
 
-  const user = await UserModel.findById(id).select("_id email roles createdAt updatedAt");
+  const user = await userRepo.findById(id);
   if (!user) {
     return res.status(404).json({ error: "User not found." });
   }
 
   const nextRoles = ensureLearnerRole(Array.from(new Set([...(user.roles || []), role])) as UserRole[]);
-  user.roles = nextRoles;
-  await user.save();
+  await userRepo.setRoles(id, nextRoles);
 
   if (role === "tutor") {
-    const existingProfile = await TutorProfileModel.findOne({ userId: id }).lean();
+    const existingProfile = await tutorProfileRepo.findByUserId(id);
     const finalLanguage = language || existingProfile?.language;
     if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
       return res.status(400).json({ error: "A valid language is required for tutor or voice artist." });
     }
 
-    await TutorProfileModel.findOneAndUpdate(
-      { userId: id },
-      {
-        $set: {
-          language: finalLanguage,
-          displayName,
-          isActive: existingProfile?.isActive || false
-        }
-      },
-      { upsert: true, new: true }
-    );
+    await tutorProfileRepo.upsertByUserId(id, {
+      language: finalLanguage as Language,
+      displayName,
+      isActive: existingProfile?.isActive || false
+    });
   }
 
   if (role === "voice_artist") {
-    const existingProfile = await VoiceArtistProfileModel.findOne({ userId: id }).lean();
+    const existingProfile = await voiceArtistProfileRepo.findByUserId(id);
     const finalLanguage = language || existingProfile?.language;
     if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
       return res.status(400).json({ error: "A valid language is required for tutor or voice artist." });
     }
 
-    await VoiceArtistProfileModel.findOneAndUpdate(
-      { userId: id },
-      {
-        $set: {
-          language: finalLanguage,
-          displayName,
-          isActive: existingProfile?.isActive || false
-        }
-      },
-      { upsert: true, new: true }
-    );
+    await voiceArtistProfileRepo.upsertByUserId(id, {
+      language: finalLanguage as Language,
+      displayName,
+      isActive: existingProfile?.isActive || false
+    });
   }
 
   return res.status(200).json({ message: "Role assigned successfully." });
@@ -207,10 +187,10 @@ export async function activateUserRole(req: Request, res: Response) {
   const language = req.body?.language ? String(req.body.language) : undefined;
   const displayName = req.body?.displayName ? String(req.body.displayName) : "";
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Invalid user id." });
   }
-  const user = await UserModel.findById(id).select("_id email roles createdAt updatedAt");
+  const user = await userRepo.findById(id);
   if (!user) {
     return res.status(404).json({ error: "User not found." });
   }
@@ -224,14 +204,12 @@ export async function activateUserRole(req: Request, res: Response) {
 
   if (role === "admin" || role === "learner") {
     const nextRoles = ensureLearnerRole(Array.from(new Set([...(user.roles || []), role])) as UserRole[]);
-    user.roles = nextRoles;
-    await user.save();
+    await userRepo.setRoles(id, nextRoles);
     return res.status(200).json({ message: "Role activated successfully." });
   }
 
-  const existingTutor = role === "tutor" ? await TutorProfileModel.findOne({ userId: id }).lean() : null;
-  const existingVoice =
-    role === "voice_artist" ? await VoiceArtistProfileModel.findOne({ userId: id }).lean() : null;
+  const existingTutor = role === "tutor" ? await tutorProfileRepo.findByUserId(id) : null;
+  const existingVoice = role === "voice_artist" ? await voiceArtistProfileRepo.findByUserId(id) : null;
   const finalLanguage = language || existingTutor?.language || existingVoice?.language;
 
   if (!finalLanguage || !isValidLessonLanguage(finalLanguage)) {
@@ -239,35 +217,22 @@ export async function activateUserRole(req: Request, res: Response) {
   }
 
   const nextRoles = ensureLearnerRole(Array.from(new Set([...(user.roles || []), role])) as UserRole[]);
-  user.roles = nextRoles;
-  await user.save();
+  await userRepo.setRoles(id, nextRoles);
 
   if (role === "tutor") {
-    await TutorProfileModel.findOneAndUpdate(
-      { userId: id },
-      {
-        $set: {
-          language: finalLanguage,
-          displayName,
-          isActive: true
-        }
-      },
-      { upsert: true, new: true }
-    );
+    await tutorProfileRepo.upsertByUserId(id, {
+      language: finalLanguage as Language,
+      displayName,
+      isActive: true
+    });
   }
 
   if (role === "voice_artist") {
-    await VoiceArtistProfileModel.findOneAndUpdate(
-      { userId: id },
-      {
-        $set: {
-          language: finalLanguage,
-          displayName,
-          isActive: true
-        }
-      },
-      { upsert: true, new: true }
-    );
+    await voiceArtistProfileRepo.upsertByUserId(id, {
+      language: finalLanguage as Language,
+      displayName,
+      isActive: true
+    });
   }
 
   return res.status(200).json({ message: "Role activated successfully." });
@@ -277,10 +242,10 @@ export async function deactivateUserRole(req: Request, res: Response) {
   const { id } = req.params;
   const role = String(req.body?.role || "");
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Invalid user id." });
   }
-  const user = await UserModel.findById(id).select("_id roles");
+  const user = await userRepo.findById(id);
   if (!user) {
     return res.status(404).json({ error: "User not found." });
   }
@@ -295,22 +260,21 @@ export async function deactivateUserRole(req: Request, res: Response) {
       return res.status(400).json({ error: "A user must keep at least one role." });
     }
     const normalized = ensureLearnerRole(nextRoles as UserRole[]);
-    user.roles = normalized;
-    await user.save();
+    await userRepo.setRoles(id, normalized);
     if (!normalized.includes("tutor")) {
-      await TutorProfileModel.deleteOne({ userId: id });
+      await tutorProfileRepo.deleteByUserId(id);
     }
     if (!normalized.includes("voice_artist")) {
-      await VoiceArtistProfileModel.deleteOne({ userId: id });
+      await voiceArtistProfileRepo.deleteByUserId(id);
     }
     return res.status(200).json({ message: "Role deactivated successfully." });
   }
 
   if (role === "tutor") {
-    await TutorProfileModel.findOneAndUpdate({ userId: id }, { isActive: false });
+    await tutorProfileRepo.updateByUserId(id, { isActive: false });
   }
   if (role === "voice_artist") {
-    await VoiceArtistProfileModel.findOneAndUpdate({ userId: id }, { isActive: false });
+    await voiceArtistProfileRepo.updateByUserId(id, { isActive: false });
   }
 
   return res.status(200).json({ message: "Role deactivated successfully." });

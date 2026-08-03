@@ -1,4 +1,5 @@
 import type { Language, Level } from "../../domain/entities/Lesson.js";
+import type { ToneReviewVerdict } from "./linguisticReview.js";
 
 export type LlmPhraseExample = {
   original: string;
@@ -335,4 +336,18 @@ export type LlmClient = {
     existingLessonTitles?: string[];
   }) => Promise<LlmUnitRefactorPlan>;
   modelName: string;
+  /**
+   * Second-opinion review of already-generated sentences. Optional: present only when a
+   * reviewer model is configured (LLM_REVIEW_MODEL). Must be backed by a DIFFERENT model
+   * than the one that generated the content -- see services/llm/linguisticReview.ts.
+   */
+  /**
+   * Diacritics-only review of generated sentences. Optional: present only when a reviewer
+   * model is configured (LLM_REVIEW_MODEL), and it must be a DIFFERENT model than the one
+   * that generated the content. See services/llm/linguisticReview.ts.
+   */
+  reviewTonation?: (input: {
+    language: string;
+    sentences: Array<{ text: string; translations: string[] }>;
+  }) => Promise<ToneReviewVerdict[]>;
 };

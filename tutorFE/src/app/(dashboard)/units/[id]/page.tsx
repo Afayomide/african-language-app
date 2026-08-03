@@ -159,7 +159,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [bulkCount, setBulkCount] = useState(5);
   const [isGenerateContentDialogOpen, setIsGenerateContentDialogOpen] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
-  const [contentLessonCount, setContentLessonCount] = useState(3);
+  const [contentLessonCount, setContentLessonCount] = useState(4);
   const [contentNewTargetsPerLesson, setContentNewTargetsPerLesson] = useState(2);
   const [contentReviewContentPerLesson, setContentReviewContentPerLesson] = useState(2);
   const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(2);

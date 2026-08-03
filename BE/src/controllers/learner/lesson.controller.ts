@@ -1,36 +1,36 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { LearnerLessonUseCases } from "../../application/use-cases/learner/lesson/LearnerLessonUseCases.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerLanguageStateRepository.js";
-import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
-import { MongooseLessonProgressRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonProgressRepository.js";
-import { MongooseLearnerContentPerformanceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerContentPerformanceRepository.js";
-import { MongooseLearnerQuestionMissRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerQuestionMissRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleLearnerLanguageStateRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerLanguageStateRepository.js";
+import { DrizzleLearnerProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerProfileRepository.js";
+import { DrizzleLessonProgressRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonProgressRepository.js";
+import { DrizzleLearnerContentPerformanceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerContentPerformanceRepository.js";
+import { DrizzleLearnerQuestionMissRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerQuestionMissRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
 import type { QuestionSubtype, QuestionType } from "../../domain/entities/Question.js";
 
 const useCases = new LearnerLessonUseCases(
-  new MongooseLessonRepository(),
-  new MongooseUnitRepository(),
-  new MongooseChapterRepository(),
-  new MongooseWordRepository(),
-  new MongooseExpressionRepository(),
-  new MongooseSentenceRepository(),
-  new MongooseProverbRepository(),
-  new MongooseQuestionRepository(),
-  new MongooseLessonProgressRepository(),
-  new MongooseLearnerProfileRepository(),
-  new MongooseLearnerLanguageStateRepository(),
-  new MongooseLearnerContentPerformanceRepository(),
-  new MongooseLearnerQuestionMissRepository()
+  new DrizzleLessonRepository(),
+  new DrizzleUnitRepository(),
+  new DrizzleChapterRepository(),
+  new DrizzleWordRepository(),
+  new DrizzleExpressionRepository(),
+  new DrizzleSentenceRepository(),
+  new DrizzleProverbRepository(),
+  new DrizzleQuestionRepository(),
+  new DrizzleLessonProgressRepository(),
+  new DrizzleLearnerProfileRepository(),
+  new DrizzleLearnerLanguageStateRepository(),
+  new DrizzleLearnerContentPerformanceRepository(),
+  new DrizzleLearnerQuestionMissRepository()
 );
 
 export async function getLessonFlow(req: AuthRequest, res: Response) {
@@ -39,7 +39,7 @@ export async function getLessonFlow(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -82,7 +82,7 @@ export async function getLessonOverview(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -120,7 +120,7 @@ export async function getLessonSteps(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -138,7 +138,7 @@ export async function completeStage(req: AuthRequest, res: Response) {
   }
 
   const { id, stageIndex } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -205,7 +205,7 @@ export async function getAdaptiveReviewSuggestion(req: AuthRequest, res: Respons
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -219,7 +219,7 @@ export async function getAdaptiveReviewFlow(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -239,7 +239,7 @@ export async function completeStep(req: AuthRequest, res: Response) {
   const { id, stepKey } = req.params;
   const { score } = req.body ?? {};
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -271,7 +271,7 @@ export async function completeLesson(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { xpEarned, minutesSpent } = req.body ?? {};
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -295,7 +295,7 @@ export async function getLessonExpressions(req: AuthRequest, res: Response) {
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 
@@ -327,7 +327,7 @@ export async function getLessonQuestions(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   const { type } = req.query;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!type || !["multiple-choice", "fill-in-the-gap", "listening", "speaking"].includes(String(type))) {
@@ -354,7 +354,7 @@ export async function getLessonReviewExercises(req: AuthRequest, res: Response) 
   }
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
 

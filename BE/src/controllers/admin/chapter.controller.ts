@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
 import { isValidLessonLanguage, isValidLessonLevel, isValidLessonStatus } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language, Level } from "../../domain/entities/Lesson.js";
 
-const chapters = new MongooseChapterRepository();
+const chapters = new DrizzleChapterRepository();
 
 export async function createChapter(req: AuthRequest, res: Response) {
   const { title, description, language, level } = req.body ?? {};
@@ -50,7 +50,7 @@ export async function listChapters(req: Request, res: Response) {
 
 export async function getChapterById(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
   const chapter = await chapters.findById(id);
   if (!chapter) return res.status(404).json({ error: "Chapter not found." });
   return res.status(200).json({ chapter });
@@ -59,7 +59,7 @@ export async function getChapterById(req: Request, res: Response) {
 export async function updateChapter(req: Request, res: Response) {
   const { id } = req.params;
   const { title, description, language, level, orderIndex, status } = req.body ?? {};
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
 
   const payload: Record<string, unknown> = {};
   if (title !== undefined) {
@@ -92,7 +92,7 @@ export async function updateChapter(req: Request, res: Response) {
 
 export async function deleteChapter(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
   const chapter = await chapters.softDeleteById(id);
   if (!chapter) return res.status(404).json({ error: "Chapter not found." });
   return res.status(200).json({ message: "Chapter deleted." });
@@ -100,7 +100,7 @@ export async function deleteChapter(req: Request, res: Response) {
 
 export async function finishChapter(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
   const chapter = await chapters.updateById(id, { status: "finished" });
   if (!chapter) return res.status(404).json({ error: "Chapter not found." });
   return res.status(200).json({ chapter });
@@ -108,7 +108,7 @@ export async function finishChapter(req: Request, res: Response) {
 
 export async function publishChapter(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
   const chapter = await chapters.publishById(id, new Date());
   if (!chapter) return res.status(404).json({ error: "Chapter not found or not ready to publish." });
   return res.status(200).json({ chapter });
@@ -120,7 +120,7 @@ export async function reorderChapters(req: Request, res: Response) {
     return res.status(400).json({ error: "Chapter ids are required." });
   }
   for (const id of chapterIds) {
-    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+    if (!isValidId(String(id))) {
       return res.status(400).json({ error: "Chapter id is invalid." });
     }
   }

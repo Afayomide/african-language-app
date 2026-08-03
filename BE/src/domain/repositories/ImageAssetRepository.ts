@@ -1,4 +1,5 @@
 import type { ImageAssetEntity, ImageAssetStatus } from "../entities/ImageAsset.js";
+import type { PageRequest, PagedResult } from "./pagination.js";
 
 export type ImageAssetCreateInput = {
   url: string;
@@ -35,9 +36,12 @@ export type ImageAssetListFilter = {
   ids?: string[];
 };
 
+export type ImageAssetPageFilter = ImageAssetListFilter & { search?: string } & PageRequest;
+
 export interface ImageAssetRepository {
   create(input: ImageAssetCreateInput): Promise<ImageAssetEntity>;
   list(filter?: ImageAssetListFilter): Promise<ImageAssetEntity[]>;
+  listPaged(filter: ImageAssetPageFilter): Promise<PagedResult<ImageAssetEntity>>;
   findById(id: string): Promise<ImageAssetEntity | null>;
   findByIds(ids: string[]): Promise<ImageAssetEntity[]>;
   updateById(id: string, update: ImageAssetUpdateInput): Promise<ImageAssetEntity | null>;

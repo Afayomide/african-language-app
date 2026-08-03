@@ -1,0 +1,1 @@
+ALTER TABLE "sentence_components" ADD COLUMN "gloss" text;

@@ -2,9 +2,9 @@ import type { Request, Response } from "express";
 import { AuthError } from "../../application/use-cases/auth/AuthErrors.js";
 import { LearnerAuthUseCases } from "../../application/use-cases/auth/LearnerAuthUseCases.js";
 import { AuthTokenService } from "../../application/services/AuthTokenService.js";
-import { MongooseLearnerLanguageStateRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerLanguageStateRepository.js";
-import { MongooseLearnerProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLearnerProfileRepository.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
+import { DrizzleLearnerLanguageStateRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerLanguageStateRepository.js";
+import { DrizzleLearnerProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerProfileRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
 import {
   isValidHttpUrl,
   isValidPersonName,
@@ -19,9 +19,9 @@ import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.v
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 
 const useCases = new LearnerAuthUseCases(
-  new MongooseUserRepository(),
-  new MongooseLearnerProfileRepository(),
-  new MongooseLearnerLanguageStateRepository(),
+  new DrizzleUserRepository(),
+  new DrizzleLearnerProfileRepository(),
+  new DrizzleLearnerLanguageStateRepository(),
   new AuthTokenService()
 );
 

@@ -8,6 +8,10 @@ import type { ExpressionRepository } from "../../domain/repositories/ExpressionR
 import type { SentenceRepository } from "../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../domain/repositories/WordRepository.js";
 import type { LlmGeneratedSentence } from "../../services/llm/types.js";
+import {
+  isSentenceLikeExpressionText,
+  splitExpressionIntoWordTokens
+} from "../../services/content/expressionShape.js";
 
 function normalize(text: string) {
   return String(text || "").trim().toLowerCase();
@@ -15,13 +19,6 @@ function normalize(text: string) {
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((item) => String(item || "").trim()).filter(Boolean)));
-}
-
-function splitExpressionIntoWordTokens(value: string) {
-  return String(value || "")
-    .split(/\s+/)
-    .map((item) => item.trim().replace(/^[.,!?;:\"'()\[\]{}]+|[.,!?;:\"'()\[\]{}]+$/g, ""))
-    .filter(Boolean);
 }
 
 function resolveDifficulty(level: LessonEntity["level"]) {
@@ -138,11 +135,23 @@ export class SentenceDraftPersistenceService {
     lesson: LessonEntity;
     sentenceDrafts: LlmGeneratedSentence[];
     modelName: string;
+    targetExpressions?: Array<{ text: string; translations: string[] }>;
+    targetWords?: Array<{ text: string; translations: string[] }>;
   }) {
     const coreWords = new Map<string, WordEntity>();
     const coreExpressions = new Map<string, ExpressionEntity>();
     const supportWords = new Map<string, WordEntity>();
     const supportExpressions = new Map<string, ExpressionEntity>();
+    // Only planned targets become expressions. Callers with no plan (ad-hoc sentence
+    // drafting) pass nothing, so every component splits into words and no expression rows
+    // are invented. Mirrors AdminUnitAiContentUseCases.deriveContentFromSentenceDrafts.
+    // Multi-word targets are often typed into Target Words rather than Target Expressions
+    // ("Níbo ni"). Either list means the curriculum asked for it. Mirrors the use-case path.
+    const targetExpressionKeys = new Set(
+      [...(input.targetExpressions || []), ...(input.targetWords || [])]
+        .map((item) => normalize(item.text))
+        .filter(Boolean)
+    );
 
     for (const draft of input.sentenceDrafts) {
       for (const component of draft.components) {
@@ -160,7 +169,22 @@ export class SentenceDraftPersistenceService {
           continue;
         }
 
-        if (component.fixed === true) {
+        // An expression is created only when it was a planned target; `fixed=true` alone is
+        // not enough. See the matching comment in AdminUnitAiContentUseCases.
+        // Reuse is always allowed; only CREATION is gated. Mirrors the use-case path.
+        const existingExpression =
+          component.fixed === true && !isSentenceLikeExpressionText(component.text)
+            ? await this.expressions.findByText(
+                input.lesson.language,
+                component.text,
+                input.lesson.languageId || null
+              )
+            : null;
+        if (
+          component.fixed === true &&
+          (existingExpression || targetExpressionKeys.has(normalizedText)) &&
+          !isSentenceLikeExpressionText(component.text)
+        ) {
           const expression = await this.upsertExpressionFromSentenceComponent({
             lesson: input.lesson,
             modelName: input.modelName,
@@ -169,6 +193,17 @@ export class SentenceDraftPersistenceService {
           });
           (component.role === "support" ? supportExpressions : coreExpressions).set(normalizedText, expression);
           continue;
+        }
+        if (component.fixed === true) {
+          console.warn("[EXPRESSION_SENTENCE_GUARD]", {
+            lessonId: input.lesson.id,
+            title: input.lesson.title,
+            text: component.text,
+            reason: targetExpressionKeys.has(normalizedText)
+              ? "sentence_like"
+              : "not_a_planned_target_and_does_not_exist",
+            note: "Component marked fixed=true was not stored as an expression; split into words instead."
+          });
         }
 
         for (const tokenText of splitExpressionIntoWordTokens(component.text)) {
@@ -215,6 +250,11 @@ export class SentenceDraftPersistenceService {
       let orderIndex = 0;
       for (const component of draft.components) {
         const key = normalize(component.text);
+        // The model returns each component's meaning IN THIS SENTENCE. That gloss used to
+        // be unioned into the shared word row and the per-occurrence link thrown away --
+        // which is both why `ni` accumulated 56 translations and why `sí` shows "to"
+        // inside `Bàbá ò sí ní ilé`. Keep it on the component instead.
+        const contextualGloss = String(component.translations?.[0] || "").trim() || undefined;
         if (component.type === "word") {
           const content = input.componentIndex.words.get(key);
           if (!content) {
@@ -225,7 +265,8 @@ export class SentenceDraftPersistenceService {
             type: component.type,
             refId: content.id,
             orderIndex,
-            textSnapshot: content.text
+            textSnapshot: content.text,
+            gloss: contextualGloss
           });
           orderIndex += 1;
           continue;
@@ -241,12 +282,15 @@ export class SentenceDraftPersistenceService {
             type: "expression" as const,
             refId: content.id,
             orderIndex,
-            textSnapshot: content.text
+            textSnapshot: content.text,
+            gloss: contextualGloss
           });
           orderIndex += 1;
           continue;
         }
 
+        // A multi-word chunk being split into words: the model's gloss describes the whole
+        // chunk, not any single token, so it is not carried down to the pieces.
         for (const tokenText of splitExpressionIntoWordTokens(component.text)) {
           const content = input.componentIndex.words.get(normalize(tokenText));
           if (!content) {
@@ -368,11 +412,17 @@ export class SentenceDraftPersistenceService {
     currentLessonSentences?: SentenceEntity[];
     attachToLesson?: boolean;
     createdBy?: string;
+    /** Planned expression targets. Omit for ad-hoc drafting: no expressions are created. */
+    targetExpressions?: Array<{ text: string; translations: string[] }>;
+    /** Planned word targets; a multi-word one may legitimately become an expression. */
+    targetWords?: Array<{ text: string; translations: string[] }>;
   }): Promise<PersistedSentenceDraftBundle> {
     const derivedContent = await this.deriveContentFromSentenceDrafts({
       lesson: input.lesson,
       sentenceDrafts: input.sentenceDrafts,
-      modelName: input.modelName
+      modelName: input.modelName,
+      targetExpressions: input.targetExpressions,
+      targetWords: input.targetWords
     });
     const componentIndex = {
       words: new Map(

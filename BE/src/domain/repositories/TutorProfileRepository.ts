@@ -3,6 +3,9 @@ import type { TutorProfileEntity } from "../entities/TutorProfile.js";
 
 export interface TutorProfileRepository {
   findByUserId(userId: string): Promise<TutorProfileEntity | null>;
+  listByUserIds(userIds: string[]): Promise<TutorProfileEntity[]>;
+  deleteByUserId(userId: string): Promise<void>;
+  upsertByUserId(userId: string, input: { language: Language; displayName: string; isActive: boolean }): Promise<TutorProfileEntity>;
   list(filter?: { isActive?: boolean }): Promise<TutorProfileEntity[]>;
   updateActiveById(id: string, isActive: boolean): Promise<TutorProfileEntity | null>;
   updateByUserId(

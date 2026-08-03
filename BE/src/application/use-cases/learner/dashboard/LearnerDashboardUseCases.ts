@@ -1,4 +1,5 @@
 import type { LessonRepository } from "../../../../domain/repositories/LessonRepository.js";
+import { learnerVisibleStatuses } from "../../../../config/learnerVisibility.js";
 import type { LearnerLanguageStateEntity } from "../../../../domain/entities/LearnerLanguageState.js";
 import type { LearnerLanguageStateRepository } from "../../../../domain/repositories/LearnerLanguageStateRepository.js";
 import type { LearnerProfileRepository } from "../../../../domain/repositories/LearnerProfileRepository.js";
@@ -189,17 +190,17 @@ export class LearnerDashboardUseCases {
     const [learnerLanguageRows, publishedLessons, publishedChapters, publishedUnits] = await Promise.all([
       this.learnerLanguageStates.listByUser(userId),
       this.lessons.listSummaries({
-        status: "published",
+        status: learnerVisibleStatuses(),
         language,
         languageId: scopedLanguageId
       }),
       this.chapters.list({
-        status: "published",
+        status: learnerVisibleStatuses(),
         language,
         languageId: scopedLanguageId
       }),
       this.units.list({
-        status: "published",
+        status: learnerVisibleStatuses(),
         language,
         languageId: scopedLanguageId
       })
@@ -285,7 +286,7 @@ export class LearnerDashboardUseCases {
           const summaryScopedLanguageId =
             state.languageId || (profile.currentLanguage === state.languageCode ? profile.activeLanguageId || null : null);
           languageLessons = await this.lessons.listSummaries({
-            status: "published",
+            status: learnerVisibleStatuses(),
             language: state.languageCode,
             languageId: summaryScopedLanguageId
           });

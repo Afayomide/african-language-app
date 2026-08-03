@@ -84,6 +84,17 @@ export type ContentComponentRef = {
   refId: string;
   orderIndex: number;
   textSnapshot?: string;
+  /**
+   * What this component means HERE, when the shared word row cannot say it.
+   *
+   * `textSnapshot` already stores the spelling per occurrence; this does the same for
+   * meaning. Needed because a spelling can be two unrelated words: `sí` is "to/towards"
+   * in `Mo ń lọ sí ọjà` but the negative existential in `Bàbá ò sí ní ilé`, and both
+   * point at the one `sí` word row whose translations[0] is "to".
+   *
+   * Undefined means "use the word row's translation", which is every existing component.
+   */
+  gloss?: string;
 };
 
 export type ContentBaseEntity = {

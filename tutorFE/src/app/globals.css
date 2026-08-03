@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* The player uses tailwindcss-animate classes (animate-in, fade-in, slide-in-from-*,
+   zoom-in-*). FE loads that plugin via its v3 config; under v4 we register the same
+   already-installed plugin with @plugin so those animations exist here too. */
+@plugin "tailwindcss-animate";
+
+/* The lesson player is shared from FE (../FE/shared/lesson-player) rather than duplicated
+   here. Tailwind v4 only auto-scans files inside this project, so the player's class names
+   would go unseen and their utilities never get generated -- which is why it looked
+   half-styled. Register the external shared source explicitly so it's styled identically
+   to FE. Path is relative to this CSS file (tutorFE/src/app -> repo root -> FE/...). */
+@source "../../../FE/shared/lesson-player";
+
 @theme {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

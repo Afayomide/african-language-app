@@ -30,6 +30,28 @@ export class MongooseTutorProfileRepository implements TutorProfileRepository {
     return profile ? toEntity(profile) : null;
   }
 
+  async listByUserIds(userIds: string[]): Promise<TutorProfileEntity[]> {
+    if (!userIds.length) return [];
+    const profiles = await TutorProfileModel.find({ userId: { $in: userIds } });
+    return profiles.map(toEntity);
+  }
+
+  async deleteByUserId(userId: string): Promise<void> {
+    await TutorProfileModel.deleteOne({ userId });
+  }
+
+  async upsertByUserId(
+    userId: string,
+    input: { language: Language; displayName: string; isActive: boolean }
+  ): Promise<TutorProfileEntity> {
+    const profile = await TutorProfileModel.findOneAndUpdate(
+      { userId },
+      { $set: { language: input.language, displayName: input.displayName, isActive: input.isActive } },
+      { upsert: true, new: true }
+    );
+    return toEntity(profile!);
+  }
+
   async list(filter?: { isActive?: boolean }): Promise<TutorProfileEntity[]> {
     const query: Record<string, unknown> = {};
     if (filter?.isActive !== undefined) {

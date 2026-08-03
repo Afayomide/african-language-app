@@ -1,14 +1,14 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AdminProverbUseCases } from "../../application/use-cases/admin/proverb/AdminProverbUseCases.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 
 const proverbUseCases = new AdminProverbUseCases(
-  new MongooseProverbRepository(),
-  new MongooseLessonRepository()
+  new DrizzleProverbRepository(),
+  new DrizzleLessonRepository()
 );
 
 export async function createProverb(req: Request, res: Response) {
@@ -18,7 +18,7 @@ export async function createProverb(req: Request, res: Response) {
     return res.status(400).json({ error: "lesson ids required" });
   }
   const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
-  if (normalizedLessonIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+  if (normalizedLessonIds.some((id) => !isValidId(id))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!language || !isValidLessonLanguage(String(language))) {
@@ -52,7 +52,7 @@ export async function listProverbs(req: Request, res: Response) {
   const language = req.query.language ? String(req.query.language) : undefined;
   const status = req.query.status ? String(req.query.status) : undefined;
 
-  if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) {
+  if (lessonId && !isValidId(lessonId)) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (language && !isValidLessonLanguage(language)) {
@@ -73,7 +73,7 @@ export async function listProverbs(req: Request, res: Response) {
 
 export async function getProverbById(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   const proverb = await proverbUseCases.getById(id);
@@ -86,7 +86,7 @@ export async function getProverbById(req: Request, res: Response) {
 export async function updateProverb(req: Request, res: Response) {
   const { id } = req.params;
   const { lessonIds, language, text, translation, contextNote, aiMeta } = req.body ?? {};
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -96,7 +96,7 @@ export async function updateProverb(req: Request, res: Response) {
       return res.status(400).json({ error: "lesson ids required" });
     }
     const normalizedLessonIds = Array.from(new Set(lessonIds.map(String)));
-    if (normalizedLessonIds.some((lessonId) => !mongoose.Types.ObjectId.isValid(lessonId))) {
+    if (normalizedLessonIds.some((lessonId) => !isValidId(lessonId))) {
       return res.status(400).json({ error: "invalid lesson id" });
     }
     update.lessonIds = normalizedLessonIds;
@@ -130,7 +130,7 @@ export async function updateProverb(req: Request, res: Response) {
 
 export async function deleteProverb(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   const proverb = await proverbUseCases.delete(id);
@@ -142,7 +142,7 @@ export async function deleteProverb(req: Request, res: Response) {
 
 export async function finishProverb(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   const proverb = await proverbUseCases.finish(id);
@@ -154,7 +154,7 @@ export async function finishProverb(req: Request, res: Response) {
 
 export async function publishProverb(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
   const proverb = await proverbUseCases.publish(id);

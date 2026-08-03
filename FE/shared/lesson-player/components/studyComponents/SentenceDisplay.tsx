@@ -25,13 +25,23 @@ function buildSentenceRenderParts(text: string, components: LearningContentCompo
   const parts: SentenceRenderPart[] = []
   let cursor = 0
 
-  for (const component of components) {
+  // A multi-word expression that carries its own word breakdown is rendered as separate
+  // tappable words, so "Níbo ni" reads as [Níbo][ni] rather than one opaque chunk. An
+  // expression with no breakdown (a genuine idiom) stays whole, which is the point of the
+  // distinction. Ordering is preserved because the components are already in sentence order.
+  const expandedComponents = components.flatMap((component) =>
+    component.kind === 'expression' && component.components && component.components.length > 1
+      ? component.components
+      : [component],
+  )
+
+  for (const component of expandedComponents) {
     const componentText = String(component.text || '')
     if (!componentText) continue
 
     const matchIndex = lowerSentence.indexOf(componentText.toLocaleLowerCase(), cursor)
     if (matchIndex < 0) {
-      return components.flatMap((item, index) => {
+      return expandedComponents.flatMap((item, index) => {
         const rows: SentenceRenderPart[] = []
         if (index > 0) rows.push({ type: 'text', text: ' ' })
         rows.push({ type: 'component', text: item.text, component: item })
@@ -58,8 +68,24 @@ function buildSentenceRenderParts(text: string, components: LearningContentCompo
   return parts.filter((part) => part.type === 'component' || part.text.length > 0)
 }
 
+/** How many secondary meanings to show before collapsing into a "+N more" count. */
+const MAX_OTHER_MEANINGS = 6
+
 function SentenceGlossPanel({ component }: { component: LearningContentComponent }) {
   const translations = component.translations.filter(Boolean)
+  // What this word means HERE. The backend resolves it from the component's own gloss and
+  // falls back to the word's primary translation, so it is always the contextual reading:
+  // `ni` is "He is" in "Ọkùnrin ni." but "are the one" in "Ìwọ ni.", and `sí` is "present"
+  // in "Bàbá ò sí ní ilé." rather than the directional "to".
+  const inContext = component.selectedTranslation || translations[0] || ''
+  // The rest of the dictionary entry, minus whatever is already shown above. Capped
+  // because a grammatical particle can carry dozens of near-duplicate glosses -- `ni` has
+  // 54 -- and a wall of chips buries the meaning the learner actually needs.
+  const allOtherMeanings = translations.filter(
+    (item) => item.trim().toLowerCase() !== inContext.trim().toLowerCase()
+  )
+  const otherMeanings = allOtherMeanings.slice(0, MAX_OTHER_MEANINGS)
+  const hiddenMeaningCount = allOtherMeanings.length - otherMeanings.length
 
   return (
     <div className="space-y-3">
@@ -71,11 +97,18 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
         ) : null}
       </div>
 
-      {translations.length > 0 ? (
+      {inContext ? (
         <div className="space-y-1.5 rounded-2xl border border-[#efe4d8] bg-[#f7f3ea] p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Translations</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">In this sentence</p>
+          <p className="text-base font-black text-[#191713]">{inContext}</p>
+        </div>
+      ) : null}
+
+      {otherMeanings.length > 0 ? (
+        <div className="space-y-1.5 rounded-2xl border border-[#efe4d8] bg-white/60 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Also means</p>
           <div className="flex flex-wrap gap-2">
-            {translations.map((translation, index) => (
+            {otherMeanings.map((translation, index) => (
               <span
                 key={`${component.id}-${translation}-${index}`}
                 className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-[#5f5951]"
@@ -83,12 +116,44 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
                 {translation}
               </span>
             ))}
+            {hiddenMeaningCount > 0 ? (
+              <span className="px-1 py-1 text-sm font-semibold text-[#8a7d70]">
+                +{hiddenMeaningCount} more
+              </span>
+            ) : null}
           </div>
         </div>
       ) : null}
 
       {component.explanation ? (
         <p className="text-sm font-medium leading-relaxed text-[#66655a]">{component.explanation}</p>
+      ) : null}
+
+      {/* A multi-word expression is only opaque when it is genuinely idiomatic. When the
+          backend sends its word breakdown, show it so the learner can see that "Níbo ni"
+          is "where" + "is" rather than a single unanalysable chunk. */}
+      {component.components && component.components.length > 1 ? (
+        <div className="space-y-1.5 rounded-2xl border border-[#efe4d8] bg-white/60 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Breakdown</p>
+          <div className="space-y-1">
+            {component.components.map((part, index) => {
+              // Same rule as the panel above: the part's contextual gloss wins over its
+              // dictionary entry, so a breakdown row reads as it does in this sentence.
+              const partMeaning = part.selectedTranslation || part.translations.filter(Boolean)[0] || ''
+              return (
+                <div
+                  key={`${component.id}-part-${part.id}-${index}`}
+                  className="flex items-baseline justify-between gap-3"
+                >
+                  <span className="text-sm font-black text-[#191713]">{part.text}</span>
+                  {partMeaning ? (
+                    <span className="text-sm font-semibold text-[#66655a]">{partMeaning}</span>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       ) : null}
     </div>
   )

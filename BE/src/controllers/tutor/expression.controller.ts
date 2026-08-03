@@ -1,7 +1,6 @@
 import type { Response } from "express";
 import crypto from "crypto";
-import mongoose from "mongoose";
-import ExpressionModel from "../../models/Expression.js";
+import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { generatePhraseAudio } from "../../services/tts/index.js";
 import { uploadAudio } from "../../services/storage/s3.js";
@@ -9,30 +8,30 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
 import { ExpressionImageService } from "../../application/services/ExpressionImageService.js";
 import { TutorExpressionUseCases } from "../../application/use-cases/tutor/expression/TutorExpressionUseCases.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseImageAssetRepository } from "../../infrastructure/db/mongoose/repositories/MongooseImageAssetRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseExpressionImageLinkRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionImageLinkRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import type { Language } from "../../domain/entities/Lesson.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleImageAssetRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleImageAssetRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleExpressionImageLinkRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionImageLinkRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import type { Language, Status } from "../../domain/entities/Lesson.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
 import { isValidExpressionDifficulty, isValidExpressionStatus } from "../../interfaces/http/validators/expression.validators.js";
 import { getSearchQuery, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
-const expressionRepo = new MongooseExpressionRepository();
-const imageAssetRepo = new MongooseImageAssetRepository();
-const expressionImageLinkRepo = new MongooseExpressionImageLinkRepository();
+const expressionRepo = new DrizzleExpressionRepository();
+const imageAssetRepo = new DrizzleImageAssetRepository();
+const expressionImageLinkRepo = new DrizzleExpressionImageLinkRepository();
 const expressionImageService = new ExpressionImageService(expressionImageLinkRepo, imageAssetRepo);
-const lessonRepo = new MongooseLessonRepository();
-const lessonContentRepo = new MongooseLessonContentItemRepository();
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const lessonRepo = new DrizzleLessonRepository();
+const lessonContentRepo = new DrizzleLessonContentItemRepository();
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
 const expressionUseCases = new TutorExpressionUseCases(
   lessonRepo,
   expressionRepo,
   lessonContentRepo,
-  new MongooseQuestionRepository()
+  new DrizzleQuestionRepository()
 );
 const audioAnalysisService = new AudioAnalysisService();
 
@@ -40,7 +39,7 @@ function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function hydrateExpressionPayloads<T extends { _id?: mongoose.Types.ObjectId | string; id?: string }>(expressions: T[]) {
+async function hydrateExpressionPayloads<T extends { _id?: string; id?: string }>(expressions: T[]) {
   const ids = expressions.map((item) => String(item.id || item._id || "")).filter(Boolean);
   const contentItems = await lessonContentRepo.listByContent("expression", ids);
   const lessonIdsByExpression = new Map<string, string[]>();
@@ -227,7 +226,7 @@ export async function listExpressions(req: AuthRequest, res: Response) {
   const q = getSearchQuery(req.query);
 
   if (status && !isValidExpressionStatus(status)) return res.status(400).json({ error: "invalid status" });
-  if (lessonId && !mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (lessonId && !isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
 
   let scopedIds: string[] | null = null;
   if (lessonId) {
@@ -244,26 +243,16 @@ export async function listExpressions(req: AuthRequest, res: Response) {
     }
   }
 
-  const query: Record<string, unknown> = { isDeleted: { $ne: true }, language: tutorLanguage };
-  if (status) query.status = status;
-  if (scopedIds) query._id = { $in: scopedIds };
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    query.$or = [
-      { text: regex },
-      { translations: regex },
-      { pronunciation: regex },
-      { explanation: regex },
-      { status: regex },
-      { language: regex }
-    ];
-  }
-
-  const total = await ExpressionModel.countDocuments(query);
+  const { items: expressions, total } = await expressionRepo.listPaged({
+    language: tutorLanguage,
+    status: status as Status | undefined,
+    ids: scopedIds ?? undefined,
+    search: q || undefined,
+    page: paginationInput.page,
+    limit: paginationInput.limit
+  });
   const totalPages = Math.max(1, Math.ceil(total / paginationInput.limit));
   const page = Math.min(paginationInput.page, totalPages);
-  const skip = (page - 1) * paginationInput.limit;
-  const expressions = await ExpressionModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(paginationInput.limit).lean();
 
   return res.status(200).json({
     total,
@@ -277,7 +266,7 @@ export async function getExpressionById(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const expression = await expressionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!expression) return res.status(404).json({ error: "expression not found" });
   const [payload] = await hydrateExpressionPayloads([expression]);
@@ -289,7 +278,7 @@ export async function updateExpression(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
 
   const baseInput = buildCreateOrUpdateInput(req.body ?? {});
   if (baseInput === "invalid_lesson_ids") return res.status(400).json({ error: "invalid lesson id" });
@@ -320,7 +309,7 @@ export async function deleteExpression(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const deleted = await expressionUseCases.deleteInScope(id, tutorLanguage as Language);
   if (!deleted) return res.status(404).json({ error: "expression not found" });
   return res.status(200).json({ message: "expression_deleted" });
@@ -341,7 +330,7 @@ export async function finishExpression(req: AuthRequest, res: Response) {
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
   const expression = await expressionUseCases.finishInScope(id, tutorLanguage as Language);
   if (!expression) return res.status(404).json({ error: "expression not found" });
   const [payload] = await hydrateExpressionPayloads([expression]);
@@ -353,7 +342,7 @@ export async function generateExpressionAudioById(req: AuthRequest, res: Respons
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "invalid id" });
+  if (!isValidId(id)) return res.status(400).json({ error: "invalid id" });
 
   const expression = await expressionUseCases.getByIdInScope(id, tutorLanguage as Language);
   if (!expression) return res.status(404).json({ error: "expression not found" });
@@ -380,7 +369,7 @@ export async function generateLessonExpressionsAudio(req: AuthRequest, res: Resp
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "tutor language not configured" });
   const { lessonId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
+  if (!isValidId(lessonId)) return res.status(400).json({ error: "invalid lesson id" });
   const lesson = await lessonRepo.findByIdAndLanguage(lessonId, tutorLanguage as Language);
   if (!lesson) return res.status(404).json({ error: "lesson not found or out of scope" });
 
@@ -414,7 +403,7 @@ export async function listExpressionImages(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid expression id" });
   }
 
@@ -440,10 +429,10 @@ export async function linkExpressionImage(req: AuthRequest, res: Response) {
 
   const { id } = req.params;
   const { imageAssetId, translationIndex, isPrimary, notes } = req.body ?? {};
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid expression id" });
   }
-  if (!mongoose.Types.ObjectId.isValid(String(imageAssetId || ""))) {
+  if (!isValidId(String(imageAssetId || ""))) {
     return res.status(400).json({ error: "invalid image asset id" });
   }
 
@@ -494,10 +483,10 @@ export async function updateExpressionImageLink(req: AuthRequest, res: Response)
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { id, linkId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid expression id" });
   }
-  if (!mongoose.Types.ObjectId.isValid(linkId)) {
+  if (!isValidId(linkId)) {
     return res.status(400).json({ error: "invalid expression image link id" });
   }
 
@@ -524,7 +513,7 @@ export async function updateExpressionImageLink(req: AuthRequest, res: Response)
   } = {};
 
   if (imageAssetId !== undefined) {
-    if (!mongoose.Types.ObjectId.isValid(String(imageAssetId || ""))) {
+    if (!isValidId(String(imageAssetId || ""))) {
       return res.status(400).json({ error: "invalid image asset id" });
     }
     const image = await imageAssetRepo.findById(String(imageAssetId));
@@ -566,10 +555,10 @@ export async function deleteExpressionImageLink(req: AuthRequest, res: Response)
   if (!req.user) return res.status(401).json({ error: "unauthorized" });
 
   const { id, linkId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid expression id" });
   }
-  if (!mongoose.Types.ObjectId.isValid(linkId)) {
+  if (!isValidId(linkId)) {
     return res.status(400).json({ error: "invalid expression image link id" });
   }
 

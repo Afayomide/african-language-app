@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import { AdminQuestionUseCases } from "../../application/use-cases/admin/question/AdminQuestionUseCases.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import type { QuestionType, QuestionSubtype } from "../../domain/entities/Question.js";
 import {
   isManuallySupportedQuestionSubtype,
@@ -31,15 +31,15 @@ import { buildMatchingInteractionData } from "../shared/questionMatching.js";
 import { buildLetterOrderReviewData, buildWordOrderReviewData } from "../shared/spellingQuestion.js";
 
 const questionUseCases = new AdminQuestionUseCases(
-  new MongooseQuestionRepository(),
-  new MongooseLessonRepository(),
-  new MongooseExpressionRepository(),
-  new MongooseWordRepository(),
-  new MongooseSentenceRepository()
+  new DrizzleQuestionRepository(),
+  new DrizzleLessonRepository(),
+  new DrizzleExpressionRepository(),
+  new DrizzleWordRepository(),
+  new DrizzleSentenceRepository()
 );
-const expressionRepo = new MongooseExpressionRepository();
-const wordRepo = new MongooseWordRepository();
-const sentenceRepo = new MongooseSentenceRepository();
+const expressionRepo = new DrizzleExpressionRepository();
+const wordRepo = new DrizzleWordRepository();
+const sentenceRepo = new DrizzleSentenceRepository();
 
 type QuestionSourceEntity = {
   id: string;
@@ -146,7 +146,7 @@ export async function createQuestion(req: Request, res: Response) {
     interactionData
   } = req.body ?? {};
 
-  if (!lessonId || !mongoose.Types.ObjectId.isValid(String(lessonId))) {
+  if (!lessonId || !isValidId(String(lessonId))) {
     return res.status(400).json({ error: "invalid lesson id" });
   }
   if (!type || !isValidQuestionType(String(type))) {
@@ -161,7 +161,7 @@ export async function createQuestion(req: Request, res: Response) {
   if (!subtypeMatchesType(String(type), String(subtype))) {
     return res.status(400).json({ error: "Question type and subtype do not match." });
   }
-  if (!subtypeUsesMatching(String(subtype)) && (!sourceId || !mongoose.Types.ObjectId.isValid(String(sourceId)))) {
+  if (!subtypeUsesMatching(String(subtype)) && (!sourceId || !isValidId(String(sourceId)))) {
     return res.status(400).json({ error: "invalid source id" });
   }
   const targetSourceType = String(sourceType || "expression") as "word" | "expression" | "sentence";
@@ -310,7 +310,7 @@ export async function listQuestions(req: Request, res: Response) {
   const q = getSearchQuery(req.query);
 
   if (lessonId !== undefined) {
-    if (!mongoose.Types.ObjectId.isValid(String(lessonId))) {
+    if (!isValidId(String(lessonId))) {
       return res.status(400).json({ error: "invalid lesson id" });
     }
   }
@@ -393,7 +393,7 @@ export async function listQuestions(req: Request, res: Response) {
 
 export async function getQuestionById(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -408,7 +408,7 @@ export async function getQuestionById(req: Request, res: Response) {
 
 export async function updateQuestion(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -448,7 +448,7 @@ export async function updateQuestion(req: Request, res: Response) {
   let targetSourceId = currentQuestion.sourceId;
   let targetSourceType = (String(sourceType || currentQuestion.sourceType || "expression") as "word" | "expression" | "sentence");
   if (!subtypeUsesMatching(effectiveSubtype) && sourceId !== undefined) {
-    if (!mongoose.Types.ObjectId.isValid(String(sourceId))) {
+    if (!isValidId(String(sourceId))) {
       return res.status(400).json({ error: "invalid source id" });
     }
     if (sourceType !== undefined && !["word", "expression", "sentence"].includes(String(sourceType))) {
@@ -677,7 +677,7 @@ export async function updateQuestion(req: Request, res: Response) {
 
 export async function deleteQuestion(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -691,7 +691,7 @@ export async function deleteQuestion(req: Request, res: Response) {
 
 export async function publishQuestion(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 
@@ -710,7 +710,7 @@ export async function publishQuestion(req: Request, res: Response) {
 
 export async function sendBackToTutorQuestion(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "invalid id" });
   }
 

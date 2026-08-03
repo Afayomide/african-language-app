@@ -1,14 +1,14 @@
 import type { Response } from "express";
-import mongoose from "mongoose";
+import { isValidId } from "../../utils/ids.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { TutorScopeService } from "../../application/services/TutorScopeService.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
 import { isValidLessonLevel, isValidLessonStatus } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language, Level } from "../../domain/entities/Lesson.js";
 
-const chapters = new MongooseChapterRepository();
-const tutorScope = new TutorScopeService(new MongooseTutorProfileRepository());
+const chapters = new DrizzleChapterRepository();
+const tutorScope = new TutorScopeService(new DrizzleTutorProfileRepository());
 
 export async function createChapter(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
@@ -55,7 +55,7 @@ export async function listChapters(req: AuthRequest, res: Response) {
 export async function getChapterById(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
@@ -68,7 +68,7 @@ export async function getChapterById(req: AuthRequest, res: Response) {
 export async function updateChapter(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
@@ -105,7 +105,7 @@ export async function updateChapter(req: AuthRequest, res: Response) {
 export async function deleteChapter(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
@@ -120,7 +120,7 @@ export async function deleteChapter(req: AuthRequest, res: Response) {
 export async function finishChapter(req: AuthRequest, res: Response) {
   if (!req.user) return res.status(401).json({ error: "Unauthorized." });
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Chapter id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Chapter id is invalid." });
 
   const tutorLanguage = await tutorScope.getActiveLanguage(req.user.id);
   if (!tutorLanguage) return res.status(403).json({ error: "Tutor language is not configured." });
@@ -140,7 +140,7 @@ export async function reorderChapters(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Chapter ids are required." });
   }
   for (const id of chapterIds) {
-    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+    if (!isValidId(String(id))) {
       return res.status(400).json({ error: "Chapter id is invalid." });
     }
   }

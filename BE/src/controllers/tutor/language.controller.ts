@@ -1,10 +1,10 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
-import { MongooseLanguageRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLanguageRepository.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
+import { DrizzleLanguageRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLanguageRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
 
-const languages = new MongooseLanguageRepository();
-const tutorProfiles = new MongooseTutorProfileRepository();
+const languages = new DrizzleLanguageRepository();
+const tutorProfiles = new DrizzleTutorProfileRepository();
 
 export async function listTutorLanguages(req: AuthRequest, res: Response) {
   if (!req.user) {

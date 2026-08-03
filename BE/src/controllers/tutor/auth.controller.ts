@@ -3,8 +3,8 @@ import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { AuthError } from "../../application/use-cases/auth/AuthErrors.js";
 import { TutorAuthUseCases } from "../../application/use-cases/auth/TutorAuthUseCases.js";
 import { AuthTokenService } from "../../application/services/AuthTokenService.js";
-import { MongooseTutorProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseTutorProfileRepository.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
+import { DrizzleTutorProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleTutorProfileRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
 import {
   isStrongEnoughPassword,
   isValidEmail,
@@ -13,8 +13,8 @@ import {
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 
 const useCases = new TutorAuthUseCases(
-  new MongooseUserRepository(),
-  new MongooseTutorProfileRepository(),
+  new DrizzleUserRepository(),
+  new DrizzleTutorProfileRepository(),
   new AuthTokenService()
 );
 

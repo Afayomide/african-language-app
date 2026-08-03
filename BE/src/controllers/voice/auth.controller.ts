@@ -2,8 +2,8 @@ import type { Request, Response } from "express";
 import { AuthError } from "../../application/use-cases/auth/AuthErrors.js";
 import { VoiceArtistAuthUseCases } from "../../application/use-cases/auth/VoiceArtistAuthUseCases.js";
 import { AuthTokenService } from "../../application/services/AuthTokenService.js";
-import { MongooseUserRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUserRepository.js";
-import { MongooseVoiceArtistProfileRepository } from "../../infrastructure/db/mongoose/repositories/MongooseVoiceArtistProfileRepository.js";
+import { DrizzleUserRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUserRepository.js";
+import { DrizzleVoiceArtistProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceArtistProfileRepository.js";
 import {
   isStrongEnoughPassword,
   isValidEmail,
@@ -13,8 +13,8 @@ import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.v
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 
 const useCases = new VoiceArtistAuthUseCases(
-  new MongooseUserRepository(),
-  new MongooseVoiceArtistProfileRepository(),
+  new DrizzleUserRepository(),
+  new DrizzleVoiceArtistProfileRepository(),
   new AuthTokenService()
 );
 

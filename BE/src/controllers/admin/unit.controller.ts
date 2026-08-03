@@ -1,15 +1,15 @@
 import type { Request, Response } from "express";
-import mongoose from "mongoose";
-import { MongooseUnitRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitRepository.js";
-import { MongooseChapterRepository } from "../../infrastructure/db/mongoose/repositories/MongooseChapterRepository.js";
-import { MongooseLessonRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonRepository.js";
-import { MongooseLessonContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseLessonContentItemRepository.js";
-import { MongooseProverbRepository } from "../../infrastructure/db/mongoose/repositories/MongooseProverbRepository.js";
-import { MongooseQuestionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseQuestionRepository.js";
-import { MongooseWordRepository } from "../../infrastructure/db/mongoose/repositories/MongooseWordRepository.js";
-import { MongooseExpressionRepository } from "../../infrastructure/db/mongoose/repositories/MongooseExpressionRepository.js";
-import { MongooseSentenceRepository } from "../../infrastructure/db/mongoose/repositories/MongooseSentenceRepository.js";
-import { MongooseUnitContentItemRepository } from "../../infrastructure/db/mongoose/repositories/MongooseUnitContentItemRepository.js";
+import { isValidId } from "../../utils/ids.js";
+import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
+import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
+import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
+import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
+import { DrizzleProverbRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleProverbRepository.js";
+import { DrizzleQuestionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleQuestionRepository.js";
+import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
+import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
+import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
+import { DrizzleUnitContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitContentItemRepository.js";
 import { AdminLessonUseCases } from "../../application/use-cases/admin/lesson/AdminLessonUseCases.js";
 import { ContentCurriculumService } from "../../application/services/ContentCurriculumService.js";
 import { UnitDeletedEntriesService } from "../../application/services/UnitDeletedEntriesService.js";
@@ -21,20 +21,20 @@ import {
 } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language, Level } from "../../domain/entities/Lesson.js";
 
-const units = new MongooseUnitRepository();
-const chapters = new MongooseChapterRepository();
-const lessonRepo = new MongooseLessonRepository();
-const lessonContentItems = new MongooseLessonContentItemRepository();
-const wordRepo = new MongooseWordRepository();
-const expressionRepo = new MongooseExpressionRepository();
-const sentenceRepo = new MongooseSentenceRepository();
-const proverbRepo = new MongooseProverbRepository();
-const questionRepo = new MongooseQuestionRepository();
+const units = new DrizzleUnitRepository();
+const chapters = new DrizzleChapterRepository();
+const lessonRepo = new DrizzleLessonRepository();
+const lessonContentItems = new DrizzleLessonContentItemRepository();
+const wordRepo = new DrizzleWordRepository();
+const expressionRepo = new DrizzleExpressionRepository();
+const sentenceRepo = new DrizzleSentenceRepository();
+const proverbRepo = new DrizzleProverbRepository();
+const questionRepo = new DrizzleQuestionRepository();
 const contentCurriculum = new ContentCurriculumService(
   lessonRepo,
   units,
   lessonContentItems,
-  new MongooseUnitContentItemRepository()
+  new DrizzleUnitContentItemRepository()
 );
 const lessonUseCases = new AdminLessonUseCases(
   lessonRepo,
@@ -65,7 +65,7 @@ export async function createUnit(req: AuthRequest, res: Response) {
   if (!level || !isValidLessonLevel(String(level))) {
     return res.status(400).json({ error: "Level is invalid." });
   }
-  if (chapterId !== undefined && chapterId !== null && chapterId !== "" && !mongoose.Types.ObjectId.isValid(String(chapterId))) {
+  if (chapterId !== undefined && chapterId !== null && chapterId !== "" && !isValidId(String(chapterId))) {
     return res.status(400).json({ error: "Chapter id is invalid." });
   }
   if (kind !== undefined && !["core", "review"].includes(String(kind))) {
@@ -75,7 +75,7 @@ export async function createUnit(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Review style is invalid." });
   }
   const parsedReviewSourceUnitIds = Array.isArray(reviewSourceUnitIds) ? reviewSourceUnitIds.map(String) : [];
-  if (parsedReviewSourceUnitIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+  if (parsedReviewSourceUnitIds.some((id) => !isValidId(id))) {
     return res.status(400).json({ error: "Review source unit ids are invalid." });
   }
   if (chapterId) {
@@ -114,7 +114,7 @@ export async function listUnits(req: Request, res: Response) {
   if (status && !isValidLessonStatus(status)) {
     return res.status(400).json({ error: "Status is invalid." });
   }
-  if (chapterId && !mongoose.Types.ObjectId.isValid(chapterId)) {
+  if (chapterId && !isValidId(chapterId)) {
     return res.status(400).json({ error: "Chapter id is invalid." });
   }
   if (kind && !["core", "review"].includes(kind)) {
@@ -131,7 +131,7 @@ export async function listUnits(req: Request, res: Response) {
 
 export async function getUnitById(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
   const unit = await units.findById(id);
   if (!unit) return res.status(404).json({ error: "Unit not found." });
   return res.status(200).json({ unit });
@@ -139,7 +139,7 @@ export async function getUnitById(req: Request, res: Response) {
 
 export async function getDeletedEntries(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isValidId(id)) {
     return res.status(400).json({ error: "Unit id is invalid." });
   }
 
@@ -159,7 +159,7 @@ export async function getDeletedEntries(req: Request, res: Response) {
 export async function updateUnit(req: Request, res: Response) {
   const { id } = req.params;
   const { title, description, language, level, orderIndex, chapterId, kind, reviewStyle, reviewSourceUnitIds } = req.body ?? {};
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
 
   const payload: Record<string, unknown> = {};
   if (title !== undefined) {
@@ -176,7 +176,7 @@ export async function updateUnit(req: Request, res: Response) {
     payload.level = String(level);
   }
   if (chapterId !== undefined) {
-    if (chapterId !== null && chapterId !== "" && !mongoose.Types.ObjectId.isValid(String(chapterId))) {
+    if (chapterId !== null && chapterId !== "" && !isValidId(String(chapterId))) {
       return res.status(400).json({ error: "Chapter id is invalid." });
     }
     payload.chapterId = chapterId ? String(chapterId) : null;
@@ -192,7 +192,7 @@ export async function updateUnit(req: Request, res: Response) {
     payload.reviewStyle = String(reviewStyle);
   }
   if (reviewSourceUnitIds !== undefined) {
-    if (!Array.isArray(reviewSourceUnitIds) || reviewSourceUnitIds.some((value) => !mongoose.Types.ObjectId.isValid(String(value)))) {
+    if (!Array.isArray(reviewSourceUnitIds) || reviewSourceUnitIds.some((value) => !isValidId(String(value)))) {
       return res.status(400).json({ error: "Review source unit ids are invalid." });
     }
     payload.reviewSourceUnitIds = reviewSourceUnitIds.map(String);
@@ -221,7 +221,7 @@ export async function updateUnit(req: Request, res: Response) {
 
 export async function deleteUnit(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
   const unit = await units.findById(id);
   if (!unit) return res.status(404).json({ error: "Unit not found." });
 
@@ -236,8 +236,8 @@ export async function deleteUnit(req: Request, res: Response) {
 
 export async function restoreDeletedLesson(req: Request, res: Response) {
   const { id, lessonId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  if (!mongoose.Types.ObjectId.isValid(lessonId)) {
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(lessonId)) {
     return res.status(400).json({ error: "Lesson id is invalid." });
   }
 
@@ -251,8 +251,8 @@ export async function restoreDeletedLesson(req: Request, res: Response) {
 
 export async function restoreDeletedExpression(req: Request, res: Response) {
   const { id, expressionId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  if (!mongoose.Types.ObjectId.isValid(expressionId)) {
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(expressionId)) {
     return res.status(400).json({ error: "Expression id is invalid." });
   }
 
@@ -266,8 +266,8 @@ export async function restoreDeletedExpression(req: Request, res: Response) {
 
 export async function restoreDeletedWord(req: Request, res: Response) {
   const { id, wordId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  if (!mongoose.Types.ObjectId.isValid(wordId)) {
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(wordId)) {
     return res.status(400).json({ error: "Word id is invalid." });
   }
 
@@ -281,8 +281,8 @@ export async function restoreDeletedWord(req: Request, res: Response) {
 
 export async function restoreDeletedSentence(req: Request, res: Response) {
   const { id, sentenceId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  if (!mongoose.Types.ObjectId.isValid(sentenceId)) {
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(sentenceId)) {
     return res.status(400).json({ error: "Sentence id is invalid." });
   }
 
@@ -296,8 +296,8 @@ export async function restoreDeletedSentence(req: Request, res: Response) {
 
 export async function restoreDeletedProverb(req: Request, res: Response) {
   const { id, proverbId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
-  if (!mongoose.Types.ObjectId.isValid(proverbId)) {
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(proverbId)) {
     return res.status(400).json({ error: "Proverb id is invalid." });
   }
 
@@ -311,7 +311,7 @@ export async function restoreDeletedProverb(req: Request, res: Response) {
 
 export async function finishUnit(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
   const unit = await units.updateById(id, { status: "finished" });
   if (!unit) return res.status(404).json({ error: "Unit not found." });
   return res.status(200).json({ unit });
@@ -319,7 +319,7 @@ export async function finishUnit(req: Request, res: Response) {
 
 export async function publishUnit(req: Request, res: Response) {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Unit id is invalid." });
+  if (!isValidId(id)) return res.status(400).json({ error: "Unit id is invalid." });
   const unit = await units.publishById(id, new Date());
   if (!unit) return res.status(400).json({ error: "Unit must be finished before publishing." });
   return res.status(200).json({ unit });
@@ -334,7 +334,7 @@ export async function reorderUnits(req: Request, res: Response) {
     return res.status(400).json({ error: "Unit ids are required." });
   }
   for (const id of unitIds) {
-    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+    if (!isValidId(String(id))) {
       return res.status(400).json({ error: "Unit id is invalid." });
     }
   }
