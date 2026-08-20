@@ -1,4 +1,5 @@
 import type { GenerateSentencesInput, LlmClient } from "./types.js";
+import type { GlossRequest } from "./componentGloss.js";
 import { createGeminiClient } from "./geminiClient.js";
 import { createOllamaClient } from "./ollamaClient.js";
 
@@ -47,13 +48,21 @@ function createLlmClient(): LlmClient {
     });
     client = {
       ...base,
+      // Spreading `base` carries its modelName across, so provenance would name the bulk model
+      // for content this client never produced. Record the one that actually runs.
+      sentenceModelName: sentencesClient.modelName,
       generateSentences: (input: GenerateSentencesInput) => sentencesClient.generateSentences(input),
       // Proverbs ride the sentence model too. They are the same job as sentence generation --
       // free-form target-language prose that has to mean what its translation claims -- and
       // the bulk-task model was inventing them (a "proverb" glossed as "give me three pieces
       // of cloth" whose text said nothing of the sort).
       generateProverbs: (input: Parameters<LlmClient["generateProverbs"]>[0]) =>
-        sentencesClient.generateProverbs(input)
+        sentencesClient.generateProverbs(input),
+      // Glossing rides the sentence model for the same reason proverbs do: working out what
+      // one word contributes to a chunk is sentence decomposition, not a bulk task.
+      glossComponents: sentencesClient.glossComponents
+        ? (input: GlossRequest) => sentencesClient.glossComponents!(input)
+        : base.glossComponents
     };
   }
 

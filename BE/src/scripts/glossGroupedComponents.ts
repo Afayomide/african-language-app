@@ -34,7 +34,8 @@
 import "dotenv/config";
 import { Client } from "pg";
 import { writeFileSync, readFileSync, existsSync } from "fs";
-import { generateRawText } from "../services/llm/geminiClient.js";
+import { getLlmClient } from "../services/llm/index.js";
+import { GLOSS_MAX_CHARS } from "../services/llm/componentGloss.js";
 
 const APPLY = process.argv.includes("--apply");
 const CLEAR = process.argv.includes("--clear");
@@ -53,51 +54,11 @@ const WORD_FILTER = (() => {
 
 const PROPOSALS_PATH = "src/scripts/glossProposals.json";
 
-/** A gloss is a word's meaning, not a paraphrase of the sentence. */
-const GLOSS_MAX_CHARS = 40;
-
 type Component = { cid: string; index: number; text: string };
 type Proposal = { cid: string; index: number; text: string; gloss: string; sentence: string };
 
 function byIndexText(comps: Component[], index: number) {
   return comps.find((c) => c.index === index)?.text || "";
-}
-
-function buildPrompt(sentence: string, translation: string, components: Component[], targets: number[]) {
-  return [
-    "You are glossing an existing Yoruba sentence for a language-learning app.",
-    "",
-    `Yoruba sentence: ${sentence}`,
-    `English meaning: ${translation}`,
-    "",
-    "Its words, in order:",
-    ...components.map((c) => `  [${c.index}] ${c.text}`),
-    "",
-    `Give the meaning of ONLY these words, in this sentence: ${targets.join(", ")}`,
-    "",
-    "Rules:",
-    "- Return the meaning each word carries HERE, not its full dictionary entry.",
-    "- A grammatical particle gets a grammatical gloss, e.g. a continuous-aspect marker is",
-    "  \"(-ing)\" and a negator is \"not\". Do not invent a content word for it.",
-    "- Match the subject and tense of this sentence. If the subject is third person, a copula",
-    "  is \"is\", not \"am\" or \"are\".",
-    `- Keep each gloss under ${GLOSS_MAX_CHARS} characters. Never restate the whole sentence.`,
-    "- Do NOT change, correct, retype or comment on the Yoruba text. Copy each word exactly",
-    "  as given, including every tone mark and diacritic. You are only writing English.",
-    "",
-    "Respond with JSON only, no prose, no code fences:",
-    '{"glosses":[{"index":0,"word":"<the word copied exactly>","gloss":"<English meaning here>"}]}'
-  ].join("\n");
-}
-
-function parseResponse(raw: string): Array<{ index: number; word: string; gloss: string }> {
-  const cleaned = raw.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error(`no JSON object in response: ${raw.slice(0, 120)}`);
-  const parsed = JSON.parse(cleaned.slice(start, end + 1));
-  if (!Array.isArray(parsed?.glosses)) throw new Error("response has no glosses array");
-  return parsed.glosses;
 }
 
 async function main() {
@@ -170,6 +131,15 @@ async function main() {
   console.log(`sentences to process : ${selected.length}${jobs.length > selected.length ? ` of ${jobs.length}` : ""}`);
   console.log(`components to gloss  : ${totalTargets}\n`);
 
+  const llm = getLlmClient();
+  if (typeof llm.glossComponents !== "function") {
+    throw new Error(
+      `The configured provider (${llm.modelName}) does not implement glossComponents. ` +
+      `Set LLM_SENTENCES_PROVIDER / LLM_PROVIDER to one that does.`);
+  }
+  console.log(`model: ${llm.modelName}
+`);
+
   const proposals: Proposal[] = [];
   const rejected: string[] = [];
   let done = 0;
@@ -177,44 +147,24 @@ async function main() {
   for (const job of selected) {
     done += 1;
     const byIndex = new Map(job.comps.map((x) => [x.index, x] as const));
-    let glosses: Array<{ index: number; word: string; gloss: string }>;
-    try {
-      const raw = await generateRawText(
-        buildPrompt(job.sentence, job.translation, job.comps, job.targets),
-        `gloss:${job.sentence.slice(0, 24)}`
-      );
-      glosses = parseResponse(raw);
-    } catch (error) {
-      rejected.push(`"${job.sentence}" -- ${(error as Error).message}`);
+    // Through the routed client, so this pass uses whatever model the app is configured to
+    // generate with -- and applies the identical guards the runtime pass does.
+    const results = await llm.glossComponents!({
+      sentence: job.sentence,
+      translation: job.translation,
+      components: job.comps.map((x) => ({ index: x.index, text: x.text })),
+      targets: job.targets
+    });
+
+    if (!results.length) {
+      rejected.push(`"${job.sentence}" -- model returned nothing usable`);
       continue;
     }
 
-    const accepted: Proposal[] = [];
-    let sentenceRejected = "";
-    for (const g of glosses) {
-      const comp = byIndex.get(Number(g.index));
-      if (!comp) { sentenceRejected = `index ${g.index} out of range`; break; }
-      if (!job.targets.includes(Number(g.index))) continue; // not ours to fill
-      // The model echoing the word back is the check that it glossed the word we meant.
-      // A mismatch means it re-typed the Yoruba, so the whole sentence is discarded.
-      if (String(g.word || "").trim() !== comp.text) {
-        sentenceRejected = `word mismatch at ${g.index}: model said "${g.word}", stored is "${comp.text}"`;
-        break;
-      }
-      const gloss = String(g.gloss || "").trim();
-      if (!gloss) { sentenceRejected = `empty gloss at ${g.index}`; break; }
-      if (gloss.length > GLOSS_MAX_CHARS) { sentenceRejected = `gloss too long at ${g.index}: "${gloss}"`; break; }
-      if (gloss.toLowerCase() === job.translation.trim().toLowerCase()) {
-        sentenceRejected = `gloss at ${g.index} restates the sentence`;
-        break;
-      }
-      accepted.push({ cid: comp.cid, index: comp.index, text: comp.text, gloss, sentence: job.sentence });
-    }
-
-    if (sentenceRejected) {
-      rejected.push(`"${job.sentence}" -- ${sentenceRejected}`);
-      continue;
-    }
+    const accepted: Proposal[] = results.flatMap((r) => {
+      const comp = byIndex.get(r.index);
+      return comp ? [{ cid: comp.cid, index: comp.index, text: comp.text, gloss: r.gloss, sentence: job.sentence }] : [];
+    });
 
     proposals.push(...accepted);
     console.log(`[${done}/${selected.length}] "${job.sentence}"  (${job.translation})`);
