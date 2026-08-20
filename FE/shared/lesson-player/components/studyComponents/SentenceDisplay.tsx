@@ -73,17 +73,22 @@ const MAX_OTHER_MEANINGS = 6
 
 function SentenceGlossPanel({ component }: { component: LearningContentComponent }) {
   const translations = component.translations.filter(Boolean)
-  // What this word means HERE. The backend resolves it from the component's own gloss and
-  // falls back to the word's primary translation, so it is always the contextual reading:
-  // `ni` is "He is" in "Ọkùnrin ni." but "are the one" in "Ìwọ ni.", and `sí` is "present"
-  // in "Bàbá ò sí ní ilé." rather than the directional "to".
-  const inContext = component.selectedTranslation || translations[0] || ''
-  // The rest of the dictionary entry, minus whatever is already shown above. Capped
-  // because a grammatical particle can carry dozens of near-duplicate glosses -- `ni` has
-  // 54 -- and a wall of chips buries the meaning the learner actually needs.
-  const allOtherMeanings = translations.filter(
-    (item) => item.trim().toLowerCase() !== inContext.trim().toLowerCase()
-  )
+  // What this word means HERE -- empty unless the backend actually has a contextual gloss
+  // for this occurrence. `ni` is "He is" in "Ọkùnrin ni." but "are the one" in "Ìwọ ni.",
+  // and `sí` is "present" in "Bàbá ò sí ní ilé." rather than the directional "to".
+  //
+  // No fallback to translations[0] on purpose. This card is headed "in this sentence", so
+  // whatever sits in it reads as the answer; a shared dictionary default is not that. `ń`
+  // leads with "are" and would confidently mistranslate every non-plural subject. When
+  // there is no gloss the panel drops to the plain list below, which states nothing.
+  const inContext = component.selectedTranslation || ''
+  // The dictionary entry. Shown in full (up to the cap) when nothing contextual is known,
+  // otherwise trimmed to the alternatives not already shown above. Capped because a
+  // grammatical particle can carry dozens of near-duplicate glosses -- `ni` has 54 -- and a
+  // wall of chips buries the meaning the learner actually needs.
+  const allOtherMeanings = inContext
+    ? translations.filter((item) => item.trim().toLowerCase() !== inContext.trim().toLowerCase())
+    : translations
   const otherMeanings = allOtherMeanings.slice(0, MAX_OTHER_MEANINGS)
   const hiddenMeaningCount = allOtherMeanings.length - otherMeanings.length
 
@@ -106,7 +111,9 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
 
       {otherMeanings.length > 0 ? (
         <div className="space-y-1.5 rounded-2xl border border-[#efe4d8] bg-white/60 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Also means</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">
+            {inContext ? 'Also means' : 'Translations'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {otherMeanings.map((translation, index) => (
               <span
@@ -137,8 +144,11 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#8a7d70]">Breakdown</p>
           <div className="space-y-1">
             {component.components.map((part, index) => {
-              // Same rule as the panel above: the part's contextual gloss wins over its
-              // dictionary entry, so a breakdown row reads as it does in this sentence.
+              // Unlike the card above, this keeps the dictionary fallback. These rows are the
+              // words INSIDE an expression, and expression components have no gloss column to
+              // read from -- dropping the fallback would blank every breakdown row. A row here
+              // is also a decomposition aid rather than a claim about this sentence, so the
+              // shared entry is honest enough.
               const partMeaning = part.selectedTranslation || part.translations.filter(Boolean)[0] || ''
               return (
                 <div

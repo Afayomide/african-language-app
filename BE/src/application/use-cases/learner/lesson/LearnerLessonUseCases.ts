@@ -302,12 +302,18 @@ function buildDisplayComponents(
         translations: Array.isArray(resolved.translations) ? resolved.translations : [],
         pronunciation: String(resolved.pronunciation || ""),
         explanation: String(resolved.explanation || ""),
-        // The component's own gloss wins over the shared word row. One spelling can be two
-        // unrelated words -- `sí` is "to" in `Mo ń lọ sí ọjà` but the negative existential
-        // in `Bàbá ò sí ní ilé` -- and both resolve to the single `sí` row whose
-        // translations[0] is "to". Falls back to the word row when unset, which is every
-        // component that is not ambiguous.
-        selectedTranslation: component.gloss || getTranslationByIndex(resolved.translations, 0),
+        // What this word means HERE, and ONLY when that is actually known. One spelling can
+        // be two unrelated words -- `sí` is "to" in `Mo ń lọ sí ọjà` but the negative
+        // existential in `Bàbá ò sí ní ilé` -- and both resolve to the single `sí` row whose
+        // translations[0] is "to".
+        //
+        // Deliberately NOT falling back to the word row. A grammar particle only carries
+        // meaning in combination, so its first dictionary entry is arbitrary: `ń` leads with
+        // "are", which is wrong the moment the subject is not plural. The learner UI presents
+        // this field as "in this sentence", i.e. as a statement of fact, so an unbacked guess
+        // here reads as an answer rather than a suggestion. Empty means "no contextual gloss
+        // stored" and the UI falls back to showing the whole dictionary entry instead.
+        selectedTranslation: component.gloss || "",
         selectedTranslationIndex: 0,
         audio: {
           provider: String(resolved.audio?.provider || ""),

@@ -249,7 +249,12 @@ export default function TutorLessonReviewPage({ params }: { params: Promise<{ id
             text: component.textSnapshot || source.text,
             translations: source.translations || [],
             selectedTranslationIndex: 0,
-            selectedTranslation: pickTranslation(source.translations || [], 0),
+            // What this word means HERE, and only when that is actually recorded. The shared
+            // word row is not a substitute: a grammar particle's first entry is arbitrary --
+            // `ń` leads with "are" -- and the gloss panel presents this as "in this sentence",
+            // i.e. as fact. Empty makes the panel fall back to listing the whole entry, which
+            // asserts nothing. Matches the learner payload (LearnerLessonUseCases).
+            selectedTranslation: component.gloss || '',
             pronunciation: source.pronunciation || undefined,
             explanation: source.explanation || undefined,
             audio: source.audio?.url ? { url: source.audio.url } : undefined,

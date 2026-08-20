@@ -101,7 +101,12 @@ function parseComponents(value: unknown): ContentComponentRef[] | null {
     type: item?.type === "expression" ? "expression" : "word",
     refId: String(item?.refId || ""),
     orderIndex: Number.isInteger(item?.orderIndex) ? Number(item.orderIndex) : index,
-    textSnapshot: item?.textSnapshot ? String(item.textSnapshot) : undefined
+    textSnapshot: item?.textSnapshot ? String(item.textSnapshot) : undefined,
+    // Components are rewritten wholesale on every update, so anything missing here is
+    // destroyed. `gloss` is what a word means in THIS sentence and cannot be recovered from
+    // the shared word row -- dropping it silently reverted `ń` from "(-ing)" to the row
+    // default "are" on any unrelated edit to the sentence.
+    gloss: item?.gloss ? String(item.gloss) : undefined
   }));
 }
 
