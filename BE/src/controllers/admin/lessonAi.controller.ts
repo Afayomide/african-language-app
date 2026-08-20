@@ -557,7 +557,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
   const requestedReviewContentPerLesson =
     rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
-  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 1);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
@@ -654,7 +654,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
   const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
   const requestedReviewContentPerLesson =
     rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
-  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 1);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
@@ -759,7 +759,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
   const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
   const requestedReviewContentPerLesson =
     rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
-  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 1);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });
@@ -864,7 +864,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   const rawReviewContentPerLesson = reviewContentPerLesson ?? reviewPhrasesPerLesson;
   const requestedReviewContentPerLesson =
     rawReviewContentPerLesson === undefined ? undefined : Number(rawReviewContentPerLesson);
-  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 2);
+  const requestedProverbsPerLesson = Number(proverbsPerLesson ?? 1);
 
   if (Number.isNaN(requestedLessonCount) || requestedLessonCount < 1 || requestedLessonCount > 20) {
     return res.status(400).json({ error: "lessonCount must be between 1 and 20." });

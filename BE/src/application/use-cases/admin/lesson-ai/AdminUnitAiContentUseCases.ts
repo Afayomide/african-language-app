@@ -1998,6 +1998,51 @@ const REVIEW_REFACTOR_BLOCKED_OPERATION_TYPES = new Set<LlmLessonRefactorOperati
   "add_match_translation_block"
 ]);
 
+/**
+ * Fold several patches for the same lesson into one.
+ *
+ * The plan format allows one patch per lesson, and validation rejects the whole plan when a
+ * lesson appears twice. But a model given an EMPTY lesson has a lot to add, and reliably splits
+ * that work across two patch objects -- three attempts at "The Command" failed this way with
+ * every operation individually valid and nothing else wrong. Rejecting a plan whose only fault
+ * is how it was grouped wastes the generation and, for an empty lesson, blocks the one path
+ * that fixes it without regenerating the whole unit.
+ *
+ * Operations are concatenated in the order given. They address stages and blocks by index, so
+ * order carries meaning and must not be sorted or deduplicated.
+ */
+function mergeDuplicateLessonPatches(plan: LlmUnitRefactorPlan): LlmUnitRefactorPlan {
+  const patches = Array.isArray(plan.lessonPatches) ? plan.lessonPatches : [];
+  if (patches.length < 2) return plan;
+
+  const byLesson = new Map<string, LlmUnitRefactorPlan["lessonPatches"][number]>();
+  let merged = false;
+  for (const patch of patches) {
+    const lessonId = String(patch.lessonId || "").trim();
+    const existing = byLesson.get(lessonId);
+    if (!existing) {
+      byLesson.set(lessonId, patch);
+      continue;
+    }
+    merged = true;
+    byLesson.set(lessonId, {
+      ...existing,
+      operations: [
+        ...(Array.isArray(existing.operations) ? existing.operations : []),
+        ...(Array.isArray(patch.operations) ? patch.operations : [])
+      ]
+    });
+  }
+
+  if (!merged) return plan;
+  const lessonPatches = [...byLesson.values()];
+  console.info("[AI_PLAN_MERGE] folded duplicate lesson patches", {
+    before: patches.length,
+    after: lessonPatches.length
+  });
+  return { ...plan, lessonPatches };
+}
+
 function sanitizeReviewUnitRefactorPlan(input: {
   plan: LlmUnitRefactorPlan;
   reviewLessonIds: Set<string>;
@@ -2973,7 +3018,7 @@ export class AdminUnitAiContentUseCases {
       difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
       aiMeta: {
         generatedByAI: true,
-        model: this.llm.modelName,
+        model: this.contentModelName,
         reviewedByAdmin: false
       },
       audio: {
@@ -3020,7 +3065,7 @@ export class AdminUnitAiContentUseCases {
       difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
       aiMeta: {
         generatedByAI: true,
-        model: this.llm.modelName,
+        model: this.contentModelName,
         reviewedByAdmin: false
       },
       audio: {
@@ -3412,7 +3457,7 @@ export class AdminUnitAiContentUseCases {
         difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
         aiMeta: {
           generatedByAI: true,
-          model: this.llm.modelName,
+          model: this.contentModelName,
           reviewedByAdmin: false
         },
         audio: {
@@ -3572,7 +3617,7 @@ export class AdminUnitAiContentUseCases {
         difficulty: Number(expression.difficulty || 1),
         aiMeta: {
           generatedByAI: true,
-          model: this.llm.modelName,
+          model: this.contentModelName,
           reviewedByAdmin: false
         },
         audio: expression.audio || {
@@ -4006,13 +4051,16 @@ export class AdminUnitAiContentUseCases {
         existingLessonTitles: input.existingLessons.map((lesson) => lesson.title).filter(Boolean)
       });
 
+      // Grouping is not meaning: a plan split across two patches for one lesson says the same
+      // thing as one patch with both sets of operations. Fold before validating.
+      const groupedPlan = mergeDuplicateLessonPatches(plan);
       const effectivePlan = input.reviewLessonIds?.size
         ? sanitizeReviewUnitRefactorPlan({
-            plan,
+            plan: groupedPlan,
             reviewLessonIds: input.reviewLessonIds,
             existingLessons: input.existingLessons
           })
-        : plan;
+        : groupedPlan;
 
       const validation = validateUnitRefactorPlan({
         plan: effectivePlan,
@@ -5117,7 +5165,10 @@ export class AdminUnitAiContentUseCases {
     for (const question of reviewStage3ScenarioQuestions) {
       stage3Blocks.push({ type: "question", refId: question.id });
     }
-    for (const proverb of ensuredProverbs) {
+    // Last blocks in the last stage, so a lesson closes on the proverb. Capped at the
+    // configured count rather than showing everything the lesson has ever accumulated: a
+    // re-run over a lesson that already held proverbs would otherwise ignore the setting.
+    for (const proverb of ensuredProverbs.slice(0, input.proverbsPerLesson)) {
       stage3Blocks.push({ type: "proverb", refId: proverb.id });
     }
 
@@ -5184,6 +5235,17 @@ export class AdminUnitAiContentUseCases {
         stage2Blocks.length +
         stage3Blocks.length
     };
+  }
+
+
+  /**
+   * The model to stamp on generated content. Sentence work can be routed to a different model
+   * than the bulk tasks, and everything created here comes out of that path -- the sentences
+   * themselves, and the words and expressions decomposed from them. Reporting `modelName`
+   * would name the bulk model for content it never saw.
+   */
+  private get contentModelName(): string {
+    return this.llm.sentenceModelName || this.llm.modelName;
   }
 
   async generate(input: GenerateUnitAiContentInput) {

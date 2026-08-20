@@ -162,7 +162,10 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [contentLessonCount, setContentLessonCount] = useState(4);
   const [contentNewTargetsPerLesson, setContentNewTargetsPerLesson] = useState(2);
   const [contentReviewContentPerLesson, setContentReviewContentPerLesson] = useState(2);
-  const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(2);
+  // One proverb per lesson, shown last. Two meant the generator had to invent a second,
+  // and what came back was the unit's own vocabulary in proverb shape rather than
+  // anything a speaker would recognise.
+  const [contentProverbsPerLesson, setContentProverbsPerLesson] = useState(1);
   const [contentTopic, setContentTopic] = useState("");
   const [contentExtraInstructions, setContentExtraInstructions] = useState("");
   const [isPreviewingContentPlan, setIsPreviewingContentPlan] = useState(false);
