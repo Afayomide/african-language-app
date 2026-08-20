@@ -266,6 +266,35 @@ async function main() {
       [keep.id, wordSourced.map((q) => q.id)]);
   }
 
+  // A word is also taught directly: lessons and units hold a slot for it, and a lesson block
+  // can point straight at it. None of those carry the spelling, so nothing above reaches them,
+  // and they would go on teaching the retired duplicate instead of the surviving row.
+  console.log(`\n--- lesson and unit slots for the losing word row ---`);
+  for (const [table, scope] of [
+    ["lesson_content_items", "lesson_id"],
+    ["unit_content_items", "unit_id"]
+  ] as const) {
+    const dupes = APPLY
+      ? await c.query(
+          `DELETE FROM ${table} a WHERE a.content_id = $1
+             AND EXISTS (SELECT 1 FROM ${table} b
+                         WHERE b.content_id = $2 AND b.${scope} = a.${scope})
+           RETURNING a.id`, [drop.id, keep.id])
+      : { rowCount: 0 };
+    const moved = APPLY
+      ? await c.query(
+          `UPDATE ${table} SET content_id = $1 WHERE content_id = $2 RETURNING id`,
+          [keep.id, drop.id])
+      : await c.query(`SELECT id FROM ${table} WHERE content_id = $1`, [drop.id]);
+    console.log(`   ${table}: ${moved.rowCount} ${APPLY ? "moved" : "to move"}` +
+      `, ${dupes.rowCount} dropped as duplicate`);
+  }
+  const blocks = APPLY
+    ? await c.query(`UPDATE lesson_blocks SET ref_id = $1 WHERE ref_id = $2 RETURNING id`,
+        [keep.id, drop.id])
+    : await c.query(`SELECT id FROM lesson_blocks WHERE ref_id = $1`, [drop.id]);
+  console.log(`   lesson_blocks.ref_id: ${blocks.rowCount} ${APPLY ? "moved" : "to move"}`);
+
   console.log(`\n--- retiring the losing row ---`);
   if (collisions.length) {
     console.log(`   KEPT LIVE: ${collisions.length} sentence(s) still use the losing spelling.`);
