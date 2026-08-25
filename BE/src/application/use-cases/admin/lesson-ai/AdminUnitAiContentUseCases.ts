@@ -3446,6 +3446,11 @@ export class AdminUnitAiContentUseCases {
         continue;
       }
 
+      // Words inside a grouped meaning segment have no meaning of their own to show, and this
+      // path never set one -- every sentence a unit run created arrived blank. Filled here,
+      // where the segments are already aligned to componentRefs.
+      await this.fillGroupedComponentGlosses(draft, componentRefs, generatedMeaningSegments);
+
       const created = await this.sentences.create({
         language: input.lesson.language,
         text: draft.text,
@@ -5246,6 +5251,78 @@ export class AdminUnitAiContentUseCases {
    */
   private get contentModelName(): string {
     return this.llm.sentenceModelName || this.llm.modelName;
+  }
+
+  /**
+   * Give a meaning to components a grouped segment cannot explain.
+   *
+   * A segment covering one component IS that component's meaning; one covering several says
+   * nothing about any of them, and the word panel presents a per-word meaning as fact. Without
+   * this those words fall back to their dictionary entry -- honest but vague, and previously
+   * the source of `ń` being shown as "are".
+   *
+   * Best-effort by design. A gloss is a presentation detail and a lesson is not worth losing
+   * over one, so any failure leaves the glosses empty and generation continues.
+   */
+  private async fillGroupedComponentGlosses(
+    draft: LlmGeneratedSentence,
+    componentRefs: ContentComponentRef[],
+    meaningSegments: Array<{ sourceComponentIndexes?: number[] }> | undefined
+  ): Promise<void> {
+    if (!meaningSegments?.length) return;
+    const translation = String(draft.translations?.[0] || "").trim();
+    if (!translation) return; // nothing to gloss against
+
+    const targets = new Set<number>();
+    for (const segment of meaningSegments) {
+      const indexes = segment?.sourceComponentIndexes || [];
+      if (indexes.length < 2) continue; // a 1:1 segment already IS that word's meaning
+      for (const index of indexes) {
+        const ref = componentRefs[index];
+        if (ref && !ref.gloss) targets.add(index);
+      }
+    }
+    if (!targets.size) return;
+
+    // The class already holds the routed client; glossing rides the sentence model with it.
+    if (typeof this.llm.glossComponents !== "function") return;
+
+    // Caught, not propagated. The guards in componentGloss.ts reject a whole sentence when the
+    // model alters a word or overruns the gloss length, which is right for the gloss but wrong
+    // as a reason to fail generation: the sentence itself is already valid and every word still
+    // resolves through its dictionary entry. Losing a unit run over a presentation detail is
+    // the worse outcome, so a failure is logged and the glosses stay empty.
+    let results: Awaited<ReturnType<NonNullable<typeof this.llm.glossComponents>>>;
+    try {
+      results = await this.llm.glossComponents({
+        sentence: draft.text,
+        translation,
+        components: componentRefs.map((ref, index) => ({
+          index,
+          text: String(ref.textSnapshot || "")
+        })),
+        targets: [...targets].sort((a, b) => a - b)
+      });
+    } catch (error) {
+      console.warn("[GLOSS_COMPONENTS] skipped", {
+        sentence: draft.text.slice(0, 40),
+        of: targets.size,
+        reason: error instanceof Error ? error.message : String(error)
+      });
+      return;
+    }
+
+    for (const result of results) {
+      const ref = componentRefs[result.index];
+      if (ref && !ref.gloss) ref.gloss = result.gloss;
+    }
+    if (results.length) {
+      console.info("[GLOSS_COMPONENTS] filled", {
+        sentence: draft.text.slice(0, 40),
+        filled: results.length,
+        of: targets.size
+      });
+    }
   }
 
   async generate(input: GenerateUnitAiContentInput) {
