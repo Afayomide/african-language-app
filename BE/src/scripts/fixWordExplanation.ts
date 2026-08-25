@@ -28,74 +28,13 @@ type Fix = {
 
 const FIXES: Fix[] = [
   {
-    word: "àbúrò",
+    word: "Èmi",
     explanation:
-      "Means 'younger sibling' and does not carry gender on its own. Yoruba adds gender with a " +
-      "separate word placed after the noun: 'àbúrò ọkùnrin' is a younger brother, 'àbúrò " +
-      "obìnrin' a younger sister. Its counterpart is 'ẹ̀gbọ́n', an older sibling.",
-    examples: ["Àbúrò mi ń bọ̀.", "Àbúrò ọkùnrin ni."]
-  },
-  {
-    word: "a",
-    explanation:
-      "First-person plural subject pronoun, 'we'. Like other Yoruba subject pronouns it sits " +
-      "directly before the verb rather than after it.",
-    examples: ["A ń lọ ilé.", "Níbo ni a ń lọ?"]
-  },
-  {
-    word: "bọ̀",
-    explanation:
-      "A verb meaning to come, or to be on the way back. It usually follows the marker 'ń', " +
-      "which is what makes it 'is coming' rather than a bare 'come'.",
-    examples: ["Mo ń bọ̀.", "Ta ni ń bọ̀?"]
-  },
-  {
-    word: "jẹ",
-    explanation:
-      "A verb meaning to eat. It takes the thing eaten as its object, and can also stand on " +
-      "its own when what is being eaten is already understood.",
-    examples: ["Bàbá jẹ oúnjẹ.", "Àbúrò ń jẹ."]
-  },
-  {
-    word: "kan",
-    explanation:
-      "Means 'one'. It follows the noun it counts instead of coming before it, so 'omi kan' is " +
-      "'one water'. It often does the work of English 'a' when singling out one item.",
-    examples: ["Mo fẹ́ omi kan.", "Ọkùnrin kan ń bọ̀."]
-  },
-  {
-    word: "níbí",
-    explanation:
-      "Means 'here', or 'at this place'. It marks where something is or where it happens.",
-    examples: ["Obìnrin wà níbí."]
-  },
-  {
-    word: "ọkùnrin",
-    explanation:
-      "Means 'man' or 'male'. Placed after another noun it marks that noun as male, so 'àbúrò " +
-      "ọkùnrin' is a younger brother. Its counterpart is 'obìnrin' (female).",
-    examples: ["Ọkùnrin fẹ́ owó.", "Àbúrò ọkùnrin ni."]
-  },
-  {
-    word: "oúnjẹ",
-    explanation:
-      "The general word for food or a meal. It appears as the object of verbs such as 'jẹ' " +
-      "(eat) and 'rà' (buy).",
-    examples: ["Mo fẹ́ oúnjẹ.", "Bàbá jẹ oúnjẹ."]
-  },
-  {
-    word: "rà",
-    explanation:
-      "A verb meaning to buy. Its low tone is the only thing separating it from 'ra' (to rub " +
-      "or spread), so the mark is not optional here -- it is what picks out the word.",
-    examples: ["O fẹ́ rà omi.", "Kí ni o ń rà?"]
-  },
-  {
-    word: "wà",
-    explanation:
-      "A verb of being: it says that someone or something is present, is in a place, or is in " +
-      "a given state. It covers both where a person is and how they are doing.",
-    examples: ["Mo wà ní ilé.", "Ẹ wà dáadáa?"]
+      "Means 'I', but it is the emphatic form, not the everyday one. Yoruba has two sets of " +
+      "subject pronouns: the plain 'Mo' simply says who is acting, while 'Èmi' puts the weight " +
+      "on the person -- closer to 'I am the one who'. It is also the form that goes before 'ni' " +
+      "when identifying yourself, where 'Mo' cannot be used.",
+    examples: ["Èmi ni ẹ̀gbọ́n.", "Èmi ń lọ."]
   }
 ];
 

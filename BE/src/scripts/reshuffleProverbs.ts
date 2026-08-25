@@ -76,6 +76,13 @@ const MOVES: { toLesson: string; proverb: string; fromLesson: string }[] = [
     toLesson: "The Command",
     proverb: "Ọmọ tí ó bá sọkún ni ìyá rẹ̀ ń fún ní ọyàn.",
     fromLesson: "Demanding Items (Street Style)"
+  },
+  {
+    // Turns on `kò sí` -- being absent -- which is the negative existential this unit
+    // introduces as `ò sí`, so the closing line uses the grammar just taught.
+    toLesson: "Review: Stepping Inside + Stepping Outside",
+    proverb: "Bí bàbá kò sí, ẹ̀gbọ́n ni bàbá.",
+    fromLesson: "Review: Older And Younger Siblings + Respectful Identity"
   }
 ];
 
