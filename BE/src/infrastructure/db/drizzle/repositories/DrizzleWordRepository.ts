@@ -203,7 +203,7 @@ export class DrizzleWordRepository implements WordRepository {
     const rows = await db
       .select()
       .from(words)
-      .where(and(scoped, eq(words.textNormalized, text.trim().toLowerCase()), notDeleted()))
+      .where(and(scoped, eq(words.textNormalized, normalizeContentText(text).textNormalized), notDeleted()))
       .limit(1);
 
     return rows[0] ? toEntity(rows[0]) : null;

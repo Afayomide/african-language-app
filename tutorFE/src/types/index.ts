@@ -293,6 +293,8 @@ export interface SentenceComponentRef {
   refId: string;
   orderIndex: number;
   textSnapshot?: string;
+  /** What this component means in THIS sentence, when that differs from the shared word row. */
+  gloss?: string;
 }
 
 export interface Sentence {

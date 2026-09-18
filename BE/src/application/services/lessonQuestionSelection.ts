@@ -1017,3 +1017,71 @@ export function selectBundleQuestionDrafts<T extends { stage: 1 | 2 | 3; type: s
     }
   );
 }
+
+/** Exercises a review lesson aims for when it has a normal pool behind it. */
+export const MIN_REVIEW_EXERCISES_PER_LESSON = 8;
+
+/**
+ * A review lesson has three stages and must put something in each, plus one. Below this the
+ * lesson is not a review, and that is worth failing the unit over. Everything between this and
+ * the target is a thin-but-usable review, which is worth a warning and nothing more.
+ */
+export const MIN_VIABLE_REVIEW_EXERCISES = 4;
+
+/**
+ * The most exercises the selector could possibly choose from these candidates, computed from
+ * the selector's OWN limits rather than estimated.
+ *
+ * This exists because the required minimum used to be a flat 8 while the ceiling for a review
+ * lesson is `min(stage capacity, sources x 2)` -- and with the usual four source sentences that
+ * ceiling is exactly 8. The floor equalled the maximum, so the diversity rules that stop a
+ * lesson repeating one exercise shape only had to skip a single candidate for the whole unit to
+ * fail and roll back.
+ *
+ * It is an upper bound: it takes the smaller of what the stages can hold and what the
+ * per-source limits allow, without modelling the family and profile rules that make the real
+ * number lower still. That is the point -- it is used to scale a warning, never to demand a
+ * number the selector cannot reach.
+ */
+export function computeReviewSelectionCeiling<T>(
+  candidates: LessonQuestionCandidate<T>[],
+  lessonMode: "core" | "review" = "review"
+): number {
+  const bySourceTotal = new Map<string, number>();
+  let stageCapacity = 0;
+
+  for (const stage of [1, 2, 3] as const) {
+    const config = getStageSelectionConfig(stage, lessonMode);
+    const stageCandidates = candidates.filter((candidate) => candidate.stage === stage);
+    const perSourceAtStage = new Map<string, number>();
+
+    for (const candidate of stageCandidates) {
+      const perSourceLimit = config.perSourceLimits[candidate.sourceGroup] ?? 0;
+      const used = perSourceAtStage.get(candidate.sourceKey) || 0;
+      if (used >= perSourceLimit) continue;
+      perSourceAtStage.set(candidate.sourceKey, used + 1);
+      bySourceTotal.set(candidate.sourceKey, (bySourceTotal.get(candidate.sourceKey) || 0) + 1);
+    }
+
+    const availableAtStage = Array.from(perSourceAtStage.values()).reduce((sum, count) => sum + count, 0);
+    stageCapacity += Math.min(config.stageLimit, availableAtStage);
+  }
+
+  let sourceCapacity = 0;
+  for (const [sourceKey, total] of bySourceTotal) {
+    const group = candidates.find((candidate) => candidate.sourceKey === sourceKey)?.sourceGroup || "sentence";
+    sourceCapacity += Math.min(getGlobalSourceLimit(lessonMode, group), total);
+  }
+
+  return Math.min(stageCapacity, sourceCapacity);
+}
+
+/**
+ * How many exercises a review lesson is expected to produce: the target, or the selector's own
+ * ceiling when that is lower. Falling short of this is a warning, not a failure -- see
+ * MIN_VIABLE_REVIEW_EXERCISES for the line that is worth failing on.
+ */
+export function computeReviewExerciseFloor(selectionCeiling: number): number {
+  const ceiling = Math.max(0, Math.floor(selectionCeiling) || 0);
+  return Math.min(MIN_REVIEW_EXERCISES_PER_LESSON, ceiling);
+}

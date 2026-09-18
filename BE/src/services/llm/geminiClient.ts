@@ -1,3 +1,11 @@
+import {
+  buildGlossPrompt,
+  GLOSS_SCHEMA,
+  parseGlossResponse,
+  validateGlosses,
+  type GlossRequest,
+  type GlossResult
+} from "./componentGloss.js";
 import { GoogleGenAI } from "@google/genai/node";
 import type {
   EnhancePhraseInput,
@@ -206,8 +214,41 @@ async function generateContentWithRetry(
   throw lastError instanceof Error ? lastError : new Error("Gemini request failed");
 }
 
+let rawClient: ReturnType<typeof getClient> | null = null;
+
+/**
+ * Single-prompt access to the configured model, reusing this module's Vertex auth and retry
+ * policy. For maintenance scripts (one-off backfills over existing content) that need the
+ * model but match none of the LlmClient task methods. Not used by the generation flow.
+ */
+export async function generateRawText(prompt: string, operation = "generateRawText"): Promise<string> {
+  if (!rawClient) rawClient = getClient();
+  const response = await generateContentWithRetry(rawClient, prompt, operation);
+  return response.text?.trim() || "";
+}
+
 export function createGeminiClient(options?: { asReviewer?: boolean }): LlmClient {
   const client = getClient();
+
+  /**
+   * English glosses for words a grouped meaning segment cannot explain. Never throws: a
+   * failed reply leaves the glosses empty, which shows the dictionary entry instead of a
+   * wrong claim. Aborting a lesson over this would be the worse trade.
+   */
+  async function glossComponents(input: GlossRequest): Promise<GlossResult[]> {
+    if (!input.targets.length) return [];
+    try {
+      const response = await generateContentWithRetry(client, buildGlossPrompt(input), "glossComponents");
+      return validateGlosses(input, parseGlossResponse(response.text?.trim() || ""));
+    } catch (error) {
+      console.warn("[GLOSS_COMPONENTS] discarded", {
+        sentence: input.sentence.slice(0, 40),
+        reason: (error as Error).message
+      });
+      return [];
+    }
+  }
+
   const credentials = GEMINI_USE_VERTEX ? parseServiceAccountCredentials() : null;
   const activeProject = GEMINI_USE_VERTEX ? (GOOGLE_CLOUD_PROJECT || credentials?.project_id || "") : "";
 
@@ -229,6 +270,7 @@ export function createGeminiClient(options?: { asReviewer?: boolean }): LlmClien
 
   return {
     modelName: GEMINI_MODEL,
+    glossComponents,
     async generateChapters(input: GenerateChaptersInput): Promise<LlmGeneratedChapter[]> {
       const response = await generateContentWithRetry(client, buildChaptersPrompt(input), "generateChapters");
 

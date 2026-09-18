@@ -1,3 +1,4 @@
+import { contentTextKey } from "../../../../services/content/contentTextKey.js";
 import type {
   AudioAnalysis,
   ContentAiMeta,
@@ -16,9 +17,21 @@ import type { ContentImage } from "../jsonTypes.js";
  */
 
 /** Replaces the Mongoose `pre("validate")` normalizeContentFields hook. */
+/**
+ * `textNormalized` is the dedupe key behind the `(language, text_normalized)` unique index
+ * and every `findByText` lookup. It drops a trailing full stop, so "Ụtụtụ ọma." and
+ * "Ụtụtụ ọma" are one sentence rather than two: a unit generated the bare greeting, a later
+ * unit generated it again with a period, and both rows went live and got taught separately.
+ *
+ * Only "." is stripped, and only at the end. "?" and "!" stay, because they change the
+ * utterance -- "Ọ dị mma." and "Ọ dị mma?" are a statement and a question, not one row.
+ * Nothing inside the text is touched: the comma in "Ndewo, ụtụtụ ọma" is part of the phrase.
+ *
+ * `text` keeps its punctuation exactly as authored -- this only affects the key.
+ */
 export function normalizeContentText(value: string): { text: string; textNormalized: string } {
   const text = String(value || "").trim();
-  return { text, textNormalized: text.toLowerCase() };
+  return { text, textNormalized: contentTextKey(text) };
 }
 
 /**

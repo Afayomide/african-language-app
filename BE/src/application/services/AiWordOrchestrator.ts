@@ -4,9 +4,11 @@ import type { WordRepository } from "../../domain/repositories/WordRepository.js
 import type { GenerateWordsInput, LlmClient, LlmGeneratedWord } from "../../services/llm/types.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import { validateGeneratedWords } from "../../services/llm/outputQuality.js";
+import { contentTextKey } from "../../services/content/contentTextKey.js";
 
+/** Content identity goes through the one shared rule -- see contentTextKey.ts. */
 function normalizeText(text: string) {
-  return text.trim().toLowerCase();
+  return contentTextKey(text);
 }
 
 function sanitizeGeneratedWord(word: LlmGeneratedWord): LlmGeneratedWord | null {

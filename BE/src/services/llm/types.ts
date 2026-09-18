@@ -1,3 +1,4 @@
+import type { GlossRequest, GlossResult } from "./componentGloss.js";
 import type { Language, Level } from "../../domain/entities/Lesson.js";
 import type { ToneReviewVerdict } from "./linguisticReview.js";
 
@@ -272,6 +273,35 @@ export type EnhancePhraseInput = {
 export type EnhanceExpressionInput = EnhancePhraseInput;
 
 export type LlmClient = {
+  /**
+   * The model that actually handles sentence work, which is not always `modelName`.
+   * `generateSentences` and `generateProverbs` can be routed to a different, stronger model
+   * than the bulk tasks; without this the composed client still reports the BULK model, and
+   * every sentence gets stamped with a model that never saw it.
+   *
+   * Undefined when nothing is routed away, in which case `modelName` is the truth.
+   */
+  sentenceModelName?: string;
+  /**
+   * The model that actually writes teaching metadata -- `enhanceExpression` and
+   * `enhancePhrase` -- when it is routed away from the bulk model. Same reason
+   * `sentenceModelName` exists: without it the composed client reports the bulk model for
+   * prose it never wrote.
+   *
+   * Undefined when nothing is routed away, in which case `modelName` is the truth.
+   */
+  explanationModelName?: string;
+  /**
+   * Per-word meanings for components whose meaning segment covers several words at once, so
+   * no per-word meaning can be derived from it. English only -- see componentGloss.ts.
+   * Returns [] rather than throwing when the reply fails validation: a sentence with empty
+   * glosses falls back to the dictionary entry, which is honest, whereas failing the call
+   * would abort a lesson over a presentation detail.
+   *
+   * Optional, like reviewTonation: a provider that does not implement it simply leaves the
+   * glosses empty, and the panel shows the dictionary entry. Callers must feature-check.
+   */
+  glossComponents?: (input: GlossRequest) => Promise<GlossResult[]>;
   generateWords: (input: GenerateWordsInput) => Promise<LlmGeneratedWord[]>;
   generateExpressions: (input: GenerateExpressionsInput) => Promise<LlmGeneratedPhrase[]>;
   generatePhrases: (input: GeneratePhrasesInput) => Promise<LlmGeneratedPhrase[]>;

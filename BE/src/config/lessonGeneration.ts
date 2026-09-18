@@ -35,3 +35,28 @@ export function clampReviewContentPerLesson(value: number, newTargetsPerLesson: 
     Math.max(0, Math.floor(value))
   );
 }
+
+/** Fallback when MIN_SENTENCE_WORDS is unset or unusable -- the long-standing behaviour. */
+export const DEFAULT_MIN_SENTENCE_WORDS = 2;
+
+/**
+ * Fewest words a generated sentence may have before it is rejected as "sentence too short".
+ *
+ * Env: MIN_SENTENCE_WORDS. Set it to 1 to allow single-word sentences, which a unit built
+ * around atomic vocabulary needs -- a lesson teaching one word has a one-word utterance to
+ * teach, and rejecting it leaves the lesson with nothing to drill.
+ *
+ * Read on every call rather than captured at module load, so it cannot depend on whether this
+ * module was imported before or after `dotenv/config`. Values below 1 and unparseable values
+ * fall back to the default rather than disabling the check: a zero-word sentence is empty, and
+ * `empty text` is a different rejection reason.
+ */
+export function getMinSentenceWords(): number {
+  const raw = String(process.env.MIN_SENTENCE_WORDS ?? "").trim();
+  // The whole value must be digits. Number.parseInt reads "1.9" and "1abc" as 1 and would
+  // silently apply a limit nobody wrote, so a malformed value falls back to the default
+  // instead of taking its leading digits.
+  if (!/^\d+$/.test(raw)) return DEFAULT_MIN_SENTENCE_WORDS;
+  const parsed = Number.parseInt(raw, 10);
+  return parsed >= 1 ? parsed : DEFAULT_MIN_SENTENCE_WORDS;
+}

@@ -2,6 +2,7 @@ import type { LessonEntity } from "../../domain/entities/Lesson.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
 import type { SentenceEntity } from "../../domain/entities/Sentence.js";
 import type { WordEntity } from "../../domain/entities/Word.js";
+import { contentTextKey } from "../../services/content/contentTextKey.js";
 import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
 import type { SentenceRepository } from "../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../domain/repositories/WordRepository.js";
@@ -23,8 +24,13 @@ import {
   indexToneVerdicts
 } from "../../services/llm/linguisticReview.js";
 
+/**
+ * Content identity goes through the one shared rule, so the reuse map, `findByText` and the
+ * `(language, text_normalized)` unique index all agree. A local trim-and-lowercase let
+ * "Ọ dị." miss the existing "Ọ dị" in the map and then collide on insert.
+ */
 function normalizeText(text: string) {
-  return text.trim().toLowerCase();
+  return contentTextKey(text);
 }
 
 function splitWords(value: string) {

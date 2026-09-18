@@ -4,6 +4,7 @@ import type { ExpressionRepository } from "../../domain/repositories/ExpressionR
 import type { LlmClient, LlmGeneratedPhrase } from "../../services/llm/types.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import { validateGeneratedPhrases } from "../../services/llm/outputQuality.js";
+import { contentTextKey } from "../../services/content/contentTextKey.js";
 
 function isValidExamples(examples: unknown) {
   if (!Array.isArray(examples)) return false;
@@ -51,8 +52,9 @@ function sanitizeGeneratedExpression(phrase: LlmGeneratedPhrase): LlmGeneratedPh
   return result;
 }
 
+/** Content identity goes through the one shared rule -- see contentTextKey.ts. */
 function normalizeText(text: string) {
-  return text.trim().toLowerCase();
+  return contentTextKey(text);
 }
 
 export class AiExpressionOrchestrator {

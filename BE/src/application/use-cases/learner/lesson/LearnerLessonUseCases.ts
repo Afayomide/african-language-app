@@ -302,12 +302,18 @@ function buildDisplayComponents(
         translations: Array.isArray(resolved.translations) ? resolved.translations : [],
         pronunciation: String(resolved.pronunciation || ""),
         explanation: String(resolved.explanation || ""),
-        // The component's own gloss wins over the shared word row. One spelling can be two
-        // unrelated words -- `sí` is "to" in `Mo ń lọ sí ọjà` but the negative existential
-        // in `Bàbá ò sí ní ilé` -- and both resolve to the single `sí` row whose
-        // translations[0] is "to". Falls back to the word row when unset, which is every
-        // component that is not ambiguous.
-        selectedTranslation: component.gloss || getTranslationByIndex(resolved.translations, 0),
+        // What this word means HERE, and ONLY when that is actually known. One spelling can
+        // be two unrelated words -- `sí` is "to" in `Mo ń lọ sí ọjà` but the negative
+        // existential in `Bàbá ò sí ní ilé` -- and both resolve to the single `sí` row whose
+        // translations[0] is "to".
+        //
+        // Deliberately NOT falling back to the word row. A grammar particle only carries
+        // meaning in combination, so its first dictionary entry is arbitrary: `ń` leads with
+        // "are", which is wrong the moment the subject is not plural. The learner UI presents
+        // this field as "in this sentence", i.e. as a statement of fact, so an unbacked guess
+        // here reads as an answer rather than a suggestion. Empty means "no contextual gloss
+        // stored" and the UI falls back to showing the whole dictionary entry instead.
+        selectedTranslation: component.gloss || "",
         selectedTranslationIndex: 0,
         audio: {
           provider: String(resolved.audio?.provider || ""),
@@ -1021,10 +1027,9 @@ export class LearnerLessonUseCases {
           .filter((candidate) => candidate.id !== item.id)
           .flatMap((candidate) => candidate.translations)
       ).filter((candidate: string) => candidate.toLowerCase() !== correct.toLowerCase());
+      // Never pad to four with "Option N": a placeholder reads as a real choice and is never
+      // the answer. A thin pool yields three real options, or two, and that is the honest set.
       const options = shuffleMatchingItems([correct, ...distractors.slice(0, 3)]);
-      while (options.length < 4) {
-        options.push(`Option ${options.length + 1}`);
-      }
       const correctIndex = options.findIndex((value) => value.toLowerCase() === correct.toLowerCase());
       return { options, correctIndex: correctIndex >= 0 ? correctIndex : 0, correct };
     };

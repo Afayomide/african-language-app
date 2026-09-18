@@ -1,3 +1,4 @@
+import { contentTextKey } from "../../services/content/contentTextKey.js";
 import type { LessonEntity } from "../../domain/entities/Lesson.js";
 import type { ContentComponentRef } from "../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
@@ -8,6 +9,7 @@ import type { ExpressionRepository } from "../../domain/repositories/ExpressionR
 import type { SentenceRepository } from "../../domain/repositories/SentenceRepository.js";
 import type { WordRepository } from "../../domain/repositories/WordRepository.js";
 import type { LlmGeneratedSentence } from "../../services/llm/types.js";
+import { getLlmClient } from "../../services/llm/index.js";
 import {
   isSentenceLikeExpressionText,
   splitExpressionIntoWordTokens
@@ -241,12 +243,16 @@ export class SentenceDraftPersistenceService {
       languageId: input.lesson.languageId || null
     });
     const byText = new Map(
-      [...existingLanguageSentences, ...(input.currentLessonSentences || [])].map((sentence) => [normalize(sentence.text), sentence] as const)
+      [...existingLanguageSentences, ...(input.currentLessonSentences || [])].map(
+        (sentence) => [contentTextKey(sentence.text), sentence] as const
+      )
     );
     const createdOrReused: SentenceEntity[] = [];
 
     for (const draft of input.sentenceDrafts) {
       const componentRefs: ContentComponentRef[] = [];
+      /** Order indexes left without a meaning because their chunk covered several words. */
+      const needsGloss: number[] = [];
       let orderIndex = 0;
       for (const component of draft.components) {
         const key = normalize(component.text);
@@ -290,13 +296,16 @@ export class SentenceDraftPersistenceService {
         }
 
         // A multi-word chunk being split into words: the model's gloss describes the whole
-        // chunk, not any single token, so it is not carried down to the pieces.
+        // chunk, not any single token, so it is not carried down to the pieces. That leaves
+        // these components with no meaning of their own -- the one case the word panel
+        // cannot answer from any stored source -- so they are collected and glossed below.
         for (const tokenText of splitExpressionIntoWordTokens(component.text)) {
           const content = input.componentIndex.words.get(normalize(tokenText));
           if (!content) {
             componentRefs.length = 0;
             break;
           }
+          needsGloss.push(orderIndex);
           componentRefs.push({
             type: "word" as const,
             refId: content.id,
@@ -310,7 +319,9 @@ export class SentenceDraftPersistenceService {
 
       if (componentRefs.length === 0) continue;
 
-      const existing = byText.get(normalize(draft.text));
+      await this.fillChunkGlosses(draft, componentRefs, needsGloss);
+
+      const existing = byText.get(contentTextKey(draft.text));
       if (existing) {
         const mergedTranslations = uniqueStrings([...existing.translations, ...draft.translations]);
         const updated = await this.sentences.updateById(existing.id, {
@@ -327,7 +338,7 @@ export class SentenceDraftPersistenceService {
       const created = await this.sentences.create({
         language: input.lesson.language,
         text: draft.text,
-        textNormalized: normalize(draft.text),
+        textNormalized: contentTextKey(draft.text),
         translations: uniqueStrings(draft.translations),
         pronunciation: "",
         explanation: draft.explanation || "",
@@ -353,7 +364,7 @@ export class SentenceDraftPersistenceService {
         status: "draft"
       });
       createdOrReused.push(created);
-      byText.set(normalize(created.text), created);
+      byText.set(contentTextKey(created.text), created);
     }
 
     return createdOrReused;
@@ -402,6 +413,75 @@ export class SentenceDraftPersistenceService {
     }
     for (const sentence of input.sentences) {
       await createIfMissing("sentence", sentence.id, "practice", 2);
+    }
+  }
+
+
+  /**
+   * Give a meaning to the components a grouped chunk left blank.
+   *
+   * The model already told us what "wà ní ilé" means as a phrase; it did not say which part
+   * of "is at home" belongs to `wà`. The word panel presents a per-word meaning as fact, so
+   * without this those words fall back to their dictionary entry -- honest, but vague, and
+   * previously the source of `ń` being presented as "are".
+   *
+   * Deliberately best-effort. A gloss is a presentation detail; a lesson is not worth losing
+   * over one. Any failure -- provider without the capability, bad JSON, a model that retyped
+   * the Yoruba -- leaves the glosses empty and generation continues.
+   */
+  private async fillChunkGlosses(
+    draft: LlmGeneratedSentence,
+    componentRefs: ContentComponentRef[],
+    needsGloss: number[]
+  ): Promise<void> {
+    const translation = String(draft.translations?.[0] || "").trim();
+    if (!translation) return; // nothing to gloss against
+
+    // The main source of blanks is not a split component, it is the meaning map: the model
+    // returns plain word components AND a separate segment list that groups them, so
+    // "wà ní ilé" -> "is at home" arrives as three ordinary words with one shared meaning.
+    // Those indexes address the DRAFT's component list, which only lines up with the refs
+    // when nothing was split -- so the segments are trusted only in that case.
+    const targets = new Set(needsGloss);
+    const segments = draft.meaningSegments || [];
+    if (segments.length && componentRefs.length === draft.components.length) {
+      for (const segment of segments) {
+        const indexes = segment?.componentIndexes || [];
+        if (indexes.length < 2) continue; // a 1:1 segment IS that word's meaning
+        for (const index of indexes) {
+          const ref = componentRefs[index];
+          if (ref && !ref.gloss) targets.add(ref.orderIndex);
+        }
+      }
+    }
+    if (!targets.size) return;
+
+    const client = getLlmClient();
+    if (typeof client.glossComponents !== "function") return;
+
+    const byOrder = new Map(componentRefs.map((ref) => [ref.orderIndex, ref] as const));
+    const results = await client.glossComponents({
+      sentence: draft.text,
+      translation,
+      components: componentRefs.map((ref) => ({
+        index: ref.orderIndex,
+        text: String(ref.textSnapshot || "")
+      })),
+      targets: [...targets].sort((a, b) => a - b)
+    });
+
+    for (const result of results) {
+      const ref = byOrder.get(result.index);
+      // Never overwrite a meaning the model gave directly for a one-to-one chunk.
+      if (ref && !ref.gloss) ref.gloss = result.gloss;
+    }
+
+    if (results.length) {
+      console.info("[GLOSS_COMPONENTS] filled", {
+        sentence: draft.text.slice(0, 40),
+        filled: results.length,
+        of: targets.size
+      });
     }
   }
 

@@ -273,7 +273,8 @@ export async function generateSentences(req: Request, res: Response) {
     const persisted = await sentenceDraftPersistence.persist({
       lesson,
       sentenceDrafts,
-      modelName: llm.modelName,
+      // The sentence model, which may differ from the client's bulk model.
+      modelName: llm.sentenceModelName || llm.modelName,
       attachToLesson,
       createdBy: attachToLesson ? lesson.createdBy : undefined
     });

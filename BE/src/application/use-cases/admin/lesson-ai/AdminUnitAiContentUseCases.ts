@@ -1,3 +1,4 @@
+import { contentTextKey } from "../../../../services/content/contentTextKey.js";
 import type { LessonBlock, LessonEntity, LessonStage } from "../../../../domain/entities/Lesson.js";
 import type { ContentComponentRef, ContentType } from "../../../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../../../domain/entities/Expression.js";
@@ -44,7 +45,10 @@ import { buildLetterOrderReviewData } from "../../../../controllers/shared/spell
 import { ContentCurriculumService } from "../../../services/ContentCurriculumService.js";
 import { CurriculumMemoryService, type CurriculumMemoryResult } from "../../../services/CurriculumMemoryService.js";
 import {
+  computeReviewExerciseFloor,
+  computeReviewSelectionCeiling,
   createLessonQuestionSelectionState,
+  MIN_VIABLE_REVIEW_EXERCISES,
   recordLessonQuestionSelection,
   selectLessonQuestionPlan,
   type LessonQuestionSelectionState
@@ -162,7 +166,6 @@ type LessonGenerationSummary = {
   blocksGenerated: number;
 };
 
-const MIN_REVIEW_EXERCISES_PER_LESSON = 8;
 const MIN_SENTENCE_SOURCES_PER_LESSON = 3;
 // Absolute floor a lesson is allowed to ship with after DB top-up. When fewer than
 // MIN_SENTENCE_SOURCES_PER_LESSON fresh sentences assemble, we borrow on-target sentences
@@ -455,11 +458,10 @@ function buildGapFillQuestion(
   const uniqueDistractors = makeUniqueOptions(distractorPool).filter(
     (item) => item.toLowerCase() !== answer.toLowerCase()
   );
+  // No padding. A thin corpus -- a language's first units, where the distractor pool is a
+  // handful of words -- used to be filled out with "Option 3"/"Option 4", which reads as a
+  // real choice and is never the answer. Three real options, or two, beat four with a fake.
   const options = shuffle(makeUniqueOptions([answer, ...uniqueDistractors.slice(0, 3)])).slice(0, 4);
-  while (options.length < 4) {
-    const fallback = `Option ${options.length + 1}`;
-    if (!options.includes(fallback)) options.push(fallback);
-  }
 
   const correctIndex = options.findIndex((item) => item.toLowerCase() === answer.toLowerCase());
   return {
@@ -521,11 +523,8 @@ function buildMissingWordOptions(
     (item) => item.toLowerCase() !== String(phraseWord).toLowerCase()
   );
   const selectedDistractors = uniqueDistractors.slice(0, 3);
+  // See buildGapFillOptions: never pad the list out with placeholder words.
   const options = shuffle(makeUniqueOptions([String(phraseWord), ...selectedDistractors])).slice(0, 4);
-  while (options.length < 4) {
-    const fallback = `Word ${options.length + 1}`;
-    if (!options.includes(fallback)) options.push(fallback);
-  }
   const correctIndex = options.findIndex((item) => item.toLowerCase() === String(phraseWord).toLowerCase());
   return { options, correctIndex: correctIndex >= 0 ? correctIndex : 0 };
 }
@@ -1169,6 +1168,18 @@ function splitExpressionIntoNormalizedWordTokens(value: string) {
 // sentence-shaped ones so we can decline to store them as expressions. The signals are
 // tuned to reject full sentences while keeping legitimately short set phrases such as
 // "Eló ni?" (trailing "?" is fine) and "Rárá, mi ò" (a short two-chunk phrase).
+
+/**
+ * An "explanation" that is the item itself or one of its own translations echoed back teaches
+ * nothing while reading on screen as a real teaching note, and the canned fallback the player
+ * shows in its place is no worse. Reject those, and anything too short to be a sentence.
+ */
+function isUsableTeachingExplanation(explanation: string, text: string, translations: string[]) {
+  const trimmed = String(explanation || "").trim();
+  if (trimmed.length < 12) return false;
+  if (trimmed.toLowerCase() === String(text || "").trim().toLowerCase()) return false;
+  return !translations.some((item) => String(item || "").trim().toLowerCase() === trimmed.toLowerCase());
+}
 
 function normalizePlanItems(values: unknown) {
   return Array.isArray(values) ? values.map((item) => String(item || "").trim()).filter(Boolean) : [];
@@ -1834,11 +1845,24 @@ function validateUnitPlanLessons(
     if (situations.some((item) => !looksEnglishLikeMetadataText(item) || item.length < 6)) {
       customReasons.push("situations must be English-like");
     }
-    if (sentenceGoals.length < 2 || sentenceGoals.length > 5) {
+    // Floor is 1, not 2. A lesson whose whole content is one greeting has exactly one meaning
+    // to reach, and the old floor of 2 left it unsatisfiable: every goal it could add to reach
+    // two was either a repeat or a fragment the length rule below then rejected.
+    if (sentenceGoals.length < 1 || sentenceGoals.length > 5) {
       customReasons.push("invalid sentence goal count");
     }
-    if (sentenceGoals.some((item) => item.length < 8 || !looksEnglishLikeText(item))) {
+    // Length and English-likeness are reported separately. Folded together they told the model
+    // that "Morning" was not English, so it stripped target-language text that was never there
+    // and deleted the short goals instead of lengthening them, trading this reason for the
+    // count reason above and never converging.
+    if (sentenceGoals.some((item) => !looksEnglishLikeText(item))) {
       customReasons.push("sentence goals must be English-like");
+    }
+    // Two characters, not four: a lesson's goal can legitimately be a single short word when
+    // that word is the whole lesson target. The floor exists only to reject a stray fragment,
+    // not to have an opinion about how much English a goal should be.
+    if (sentenceGoals.some((item) => item.length < 2)) {
+      customReasons.push("sentence goal too short, write the full English meaning");
     }
     const metadataThemeMatches = countThemeMatches(
       [String(lesson.title || ""), String(lesson.description || ""), focusSummary, ...objectives],
@@ -1997,6 +2021,51 @@ const REVIEW_REFACTOR_BLOCKED_OPERATION_TYPES = new Set<LlmLessonRefactorOperati
   "replace_sentence_bundle",
   "add_match_translation_block"
 ]);
+
+/**
+ * Fold several patches for the same lesson into one.
+ *
+ * The plan format allows one patch per lesson, and validation rejects the whole plan when a
+ * lesson appears twice. But a model given an EMPTY lesson has a lot to add, and reliably splits
+ * that work across two patch objects -- three attempts at "The Command" failed this way with
+ * every operation individually valid and nothing else wrong. Rejecting a plan whose only fault
+ * is how it was grouped wastes the generation and, for an empty lesson, blocks the one path
+ * that fixes it without regenerating the whole unit.
+ *
+ * Operations are concatenated in the order given. They address stages and blocks by index, so
+ * order carries meaning and must not be sorted or deduplicated.
+ */
+function mergeDuplicateLessonPatches(plan: LlmUnitRefactorPlan): LlmUnitRefactorPlan {
+  const patches = Array.isArray(plan.lessonPatches) ? plan.lessonPatches : [];
+  if (patches.length < 2) return plan;
+
+  const byLesson = new Map<string, LlmUnitRefactorPlan["lessonPatches"][number]>();
+  let merged = false;
+  for (const patch of patches) {
+    const lessonId = String(patch.lessonId || "").trim();
+    const existing = byLesson.get(lessonId);
+    if (!existing) {
+      byLesson.set(lessonId, patch);
+      continue;
+    }
+    merged = true;
+    byLesson.set(lessonId, {
+      ...existing,
+      operations: [
+        ...(Array.isArray(existing.operations) ? existing.operations : []),
+        ...(Array.isArray(patch.operations) ? patch.operations : [])
+      ]
+    });
+  }
+
+  if (!merged) return plan;
+  const lessonPatches = [...byLesson.values()];
+  console.info("[AI_PLAN_MERGE] folded duplicate lesson patches", {
+    before: patches.length,
+    after: lessonPatches.length
+  });
+  return { ...plan, lessonPatches };
+}
 
 function sanitizeReviewUnitRefactorPlan(input: {
   plan: LlmUnitRefactorPlan;
@@ -2973,7 +3042,7 @@ export class AdminUnitAiContentUseCases {
       difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
       aiMeta: {
         generatedByAI: true,
-        model: this.llm.modelName,
+        model: this.contentModelName,
         reviewedByAdmin: false
       },
       audio: {
@@ -3020,7 +3089,7 @@ export class AdminUnitAiContentUseCases {
       difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
       aiMeta: {
         generatedByAI: true,
-        model: this.llm.modelName,
+        model: this.contentModelName,
         reviewedByAdmin: false
       },
       audio: {
@@ -3247,12 +3316,134 @@ export class AdminUnitAiContentUseCases {
       coreExpressions.set(normalize(expression.text), expression);
     }
 
+    await this.fillMissingExpressionExplanations(input.lesson, [
+      ...coreExpressions.values(),
+      ...supportExpressions.values()
+    ]);
+    await this.fillMissingWordExplanations(input.lesson, [...coreWords.values(), ...supportWords.values()]);
+
     return {
       coreWords: Array.from(coreWords.values()),
       coreExpressions: Array.from(coreExpressions.values()),
       supportWords: Array.from(supportWords.values()),
       supportExpressions: Array.from(supportExpressions.values())
     };
+  }
+
+  /**
+   * Give expressions the teaching metadata their creation path cannot supply.
+   *
+   * Expressions are built out of SENTENCE COMPONENTS, and the component schema the sentence
+   * model answers with is `{type, text, translations, fixed, role}`. There is no explanation
+   * field, so `upsertExpressionFromSentenceComponent` has nothing to write and stores "".
+   * That is why every expression in the corpus was empty: not a failure, a route that never
+   * carried the field. The two paths that do -- AiExpressionOrchestrator and
+   * LessonRefactorService -- are not on the unit generation route.
+   *
+   * Nothing looked broken because the learner never saw a blank. With no explanation the
+   * player substitutes a canned per-language line, and the Yoruba one asserts "Used in daily
+   * greetings after sunrise and in relaxed first encounters" on every expression -- including
+   * `Bàbá àgbà` (grandfather) and `ń lọ` (is going).
+   *
+   * `enhanceExpression` is the same call `backfillExpressionExplanations.ts` makes, so a row
+   * written here and a row written by the backfill come from one prompt instead of two that
+   * drift apart.
+   *
+   * Best-effort by design, like fillGroupedComponentGlosses. An explanation is a presentation
+   * detail and a unit is not worth losing over one, so a failure is logged and the row keeps
+   * its empty string; the next lesson to touch that expression tries again.
+   *
+   * Only empty rows are sent, so an explanation written once is never rewritten, and reused
+   * expressions from earlier units get filled in passing. `pronunciation` is deliberately not
+   * written: each call is independent, so the same word comes back respelled differently in
+   * every expression that contains it, and the word row already carries one respelling.
+   */
+  /**
+   * The word half of fillMissingExpressionExplanations, and empty for the same reason:
+   * `upsertWordFromSentenceComponent` builds a word out of a sentence component, and a
+   * component carries only {type, text, translations, fixed, role}. A word that is a PLANNED
+   * TARGET goes through the word prompt instead and arrives with an explanation already --
+   * which is why the first five Igbo words have one and `kedu`, minted from a component,
+   * does not. Support words are the same story: all 25 Yoruba words with no explanation are
+   * `part_of_speech = 'unknown'`, the signature of the component path.
+   *
+   * `enhancePhrase` shares `buildEnhancePrompt` with `enhanceExpression`, so both follow the
+   * same LLM_EXPLANATION_PROVIDER routing and a word and an expression are never explained by
+   * two different models.
+   *
+   * Support words are included, not just the lesson's targets: tapping any word in a sentence
+   * opens its panel, so a support word's explanation is read by learners too.
+   */
+  private async fillMissingWordExplanations(lesson: LessonEntity, words: WordEntity[]) {
+    const pending = Array.from(new Map(words.map((item) => [item.id, item] as const)).values()).filter(
+      (item) => !String(item.explanation || "").trim()
+    );
+    if (pending.length === 0) return;
+
+    let filled = 0;
+    for (const word of pending) {
+      try {
+        const result = await this.llm.enhancePhrase({
+          text: word.text,
+          translations: word.translations,
+          language: lesson.language,
+          level: lesson.level
+        });
+
+        const explanation = String(result?.explanation || "").trim();
+        if (!isUsableTeachingExplanation(explanation, word.text, word.translations)) continue;
+
+        await this.words.updateById(word.id, { explanation });
+        word.explanation = explanation;
+        filled += 1;
+      } catch (error) {
+        console.warn("[WORD_EXPLANATION] skipped", {
+          lessonId: lesson.id,
+          word: word.text,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
+    if (filled > 0) {
+      console.info("[WORD_EXPLANATION] filled", { lessonId: lesson.id, filled, of: pending.length });
+    }
+  }
+
+  private async fillMissingExpressionExplanations(lesson: LessonEntity, expressions: ExpressionEntity[]) {
+    const pending = Array.from(new Map(expressions.map((item) => [item.id, item] as const)).values()).filter(
+      (item) => !String(item.explanation || "").trim()
+    );
+    if (pending.length === 0) return;
+
+    let filled = 0;
+    for (const expression of pending) {
+      try {
+        const result = await this.llm.enhanceExpression({
+          text: expression.text,
+          translations: expression.translations,
+          language: lesson.language,
+          level: lesson.level
+        });
+
+        const explanation = String(result?.explanation || "").trim();
+        if (!isUsableTeachingExplanation(explanation, expression.text, expression.translations)) continue;
+
+        await this.expressions.updateById(expression.id, { explanation });
+        expression.explanation = explanation;
+        filled += 1;
+      } catch (error) {
+        console.warn("[EXPRESSION_EXPLANATION] skipped", {
+          lessonId: lesson.id,
+          expression: expression.text,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
+    if (filled > 0) {
+      console.info("[EXPRESSION_EXPLANATION] filled", { lessonId: lesson.id, filled, of: pending.length });
+    }
   }
 
   private async persistSentenceDrafts(input: {
@@ -3269,14 +3460,16 @@ export class AdminUnitAiContentUseCases {
       languageId: input.lesson.languageId || null
     });
     const byText = new Map(
-      [...existingLanguageSentences, ...input.currentLessonSentences].map((sentence) => [normalize(sentence.text), sentence] as const)
+      [...existingLanguageSentences, ...input.currentLessonSentences].map(
+        (sentence) => [contentTextKey(sentence.text), sentence] as const
+      )
     );
     const createdOrReused: TeachingContent[] = [];
     const dropDiagnostics: Array<Record<string, unknown>> = [];
     const okDiagnostics: Array<Record<string, unknown>> = [];
 
     for (const draft of input.sentenceDrafts) {
-      const existing = byText.get(normalize(draft.text));
+      const existing = byText.get(contentTextKey(draft.text));
       const existingMeaningSegments = Array.isArray(existing?.meaningSegments) ? existing.meaningSegments : [];
       let componentRefs: ContentComponentRef[] = existing?.components?.length ? existing.components : [];
       let failedComponent: string | null = null;
@@ -3401,10 +3594,15 @@ export class AdminUnitAiContentUseCases {
         continue;
       }
 
+      // Words inside a grouped meaning segment have no meaning of their own to show, and this
+      // path never set one -- every sentence a unit run created arrived blank. Filled here,
+      // where the segments are already aligned to componentRefs.
+      await this.fillGroupedComponentGlosses(draft, componentRefs, generatedMeaningSegments);
+
       const created = await this.sentences.create({
         language: input.lesson.language,
         text: draft.text,
-        textNormalized: normalize(draft.text),
+        textNormalized: contentTextKey(draft.text),
         translations: draft.translations,
         pronunciation: "",
         explanation: draft.explanation || "",
@@ -3412,7 +3610,7 @@ export class AdminUnitAiContentUseCases {
         difficulty: Math.max(1, Math.min(5, input.lesson.level === "beginner" ? 1 : input.lesson.level === "intermediate" ? 2 : 3)),
         aiMeta: {
           generatedByAI: true,
-          model: this.llm.modelName,
+          model: this.contentModelName,
           reviewedByAdmin: false
         },
         audio: {
@@ -3436,7 +3634,7 @@ export class AdminUnitAiContentUseCases {
         meaningSegments: generatedMeaningSegments
       });
       okDiagnostics.push({ text: draft.text, outcome: "created", components: componentRefs.length });
-      byText.set(normalize(created.text), created);
+      byText.set(contentTextKey(created.text), created);
     }
 
     if (okDiagnostics.length > 0) {
@@ -3572,7 +3770,7 @@ export class AdminUnitAiContentUseCases {
         difficulty: Number(expression.difficulty || 1),
         aiMeta: {
           generatedByAI: true,
-          model: this.llm.modelName,
+          model: this.contentModelName,
           reviewedByAdmin: false
         },
         audio: expression.audio || {
@@ -4006,13 +4204,16 @@ export class AdminUnitAiContentUseCases {
         existingLessonTitles: input.existingLessons.map((lesson) => lesson.title).filter(Boolean)
       });
 
+      // Grouping is not meaning: a plan split across two patches for one lesson says the same
+      // thing as one patch with both sets of operations. Fold before validating.
+      const groupedPlan = mergeDuplicateLessonPatches(plan);
       const effectivePlan = input.reviewLessonIds?.size
         ? sanitizeReviewUnitRefactorPlan({
-            plan,
+            plan: groupedPlan,
             reviewLessonIds: input.reviewLessonIds,
             existingLessons: input.existingLessons
           })
-        : plan;
+        : groupedPlan;
 
       const validation = validateUnitRefactorPlan({
         plan: effectivePlan,
@@ -4979,10 +5180,45 @@ export class AdminUnitAiContentUseCases {
       : [];
     const plannedReviewExerciseCount = selectedQuestionCreates.length + generatedReviewScenarioDrafts.length;
 
-    if (isReviewExerciseLesson && plannedReviewExerciseCount < MIN_REVIEW_EXERCISES_PER_LESSON) {
+    // The selector's own ceiling, from its own stage and per-source limits, plus the scenario
+    // drafts which are added outside selection.
+    //
+    // This replaced a flat requirement of 8, which for a review lesson was not a floor at all:
+    // the per-source limit allows 2 questions per source sentence, so four sentences cap out at
+    // exactly 8. Requiring 8 meant requiring perfection from a selector whose diversity rules
+    // exist precisely to skip candidates, and one skip rolled back the entire unit.
+    const reviewSelectionCeiling =
+      computeReviewSelectionCeiling(
+        pendingQuestionCreates.map((pending) => ({
+          stage: pending.stage,
+          sourceGroup: pending.sourceGroup,
+          sourceKey: pending.sourceKey,
+          questionType: pending.questionType,
+          questionSubtype: pending.questionSubtype,
+          payload: pending
+        })),
+        "review"
+      ) + generatedReviewScenarioDrafts.length;
+    const reviewExerciseTarget = computeReviewExerciseFloor(reviewSelectionCeiling);
+
+    // Only a lesson too small to be a review at all fails the unit. Anything above that is
+    // shipped and reported: an under-target review is a curriculum observation, and failing the
+    // whole unit over it destroys five good lessons to punish the sixth.
+    if (isReviewExerciseLesson && plannedReviewExerciseCount < MIN_VIABLE_REVIEW_EXERCISES) {
       throw new Error(
-        `Review lesson requires at least ${MIN_REVIEW_EXERCISES_PER_LESSON} exercises, but only ${plannedReviewExerciseCount} could be assembled from the available sentence pool.`
+        `Review lesson needs at least ${MIN_VIABLE_REVIEW_EXERCISES} exercises to be a review, but only ${plannedReviewExerciseCount} could be assembled (selector ceiling ${reviewSelectionCeiling}, from ${lessonSentenceSources.length} source sentence(s)).`
       );
+    }
+
+    if (isReviewExerciseLesson && plannedReviewExerciseCount < reviewExerciseTarget) {
+      console.warn("[REVIEW_UNDERFILLED]", {
+        lessonId: input.lesson.id,
+        title: input.lesson.title,
+        sourceSentences: lessonSentenceSources.length,
+        selectionCeiling: reviewSelectionCeiling,
+        target: reviewExerciseTarget,
+        plannedExercises: plannedReviewExerciseCount
+      });
     }
 
     const stage2OrderedQuestions: QuestionEntity[] = [];
@@ -5117,7 +5353,10 @@ export class AdminUnitAiContentUseCases {
     for (const question of reviewStage3ScenarioQuestions) {
       stage3Blocks.push({ type: "question", refId: question.id });
     }
-    for (const proverb of ensuredProverbs) {
+    // Last blocks in the last stage, so a lesson closes on the proverb. Capped at the
+    // configured count rather than showing everything the lesson has ever accumulated: a
+    // re-run over a lesson that already held proverbs would otherwise ignore the setting.
+    for (const proverb of ensuredProverbs.slice(0, input.proverbsPerLesson)) {
       stage3Blocks.push({ type: "proverb", refId: proverb.id });
     }
 
@@ -5184,6 +5423,89 @@ export class AdminUnitAiContentUseCases {
         stage2Blocks.length +
         stage3Blocks.length
     };
+  }
+
+
+  /**
+   * The model to stamp on generated content. Sentence work can be routed to a different model
+   * than the bulk tasks, and everything created here comes out of that path -- the sentences
+   * themselves, and the words and expressions decomposed from them. Reporting `modelName`
+   * would name the bulk model for content it never saw.
+   */
+  private get contentModelName(): string {
+    return this.llm.sentenceModelName || this.llm.modelName;
+  }
+
+  /**
+   * Give a meaning to components a grouped segment cannot explain.
+   *
+   * A segment covering one component IS that component's meaning; one covering several says
+   * nothing about any of them, and the word panel presents a per-word meaning as fact. Without
+   * this those words fall back to their dictionary entry -- honest but vague, and previously
+   * the source of `ń` being shown as "are".
+   *
+   * Best-effort by design. A gloss is a presentation detail and a lesson is not worth losing
+   * over one, so any failure leaves the glosses empty and generation continues.
+   */
+  private async fillGroupedComponentGlosses(
+    draft: LlmGeneratedSentence,
+    componentRefs: ContentComponentRef[],
+    meaningSegments: Array<{ sourceComponentIndexes?: number[] }> | undefined
+  ): Promise<void> {
+    if (!meaningSegments?.length) return;
+    const translation = String(draft.translations?.[0] || "").trim();
+    if (!translation) return; // nothing to gloss against
+
+    const targets = new Set<number>();
+    for (const segment of meaningSegments) {
+      const indexes = segment?.sourceComponentIndexes || [];
+      if (indexes.length < 2) continue; // a 1:1 segment already IS that word's meaning
+      for (const index of indexes) {
+        const ref = componentRefs[index];
+        if (ref && !ref.gloss) targets.add(index);
+      }
+    }
+    if (!targets.size) return;
+
+    // The class already holds the routed client; glossing rides the sentence model with it.
+    if (typeof this.llm.glossComponents !== "function") return;
+
+    // Caught, not propagated. The guards in componentGloss.ts reject a whole sentence when the
+    // model alters a word or overruns the gloss length, which is right for the gloss but wrong
+    // as a reason to fail generation: the sentence itself is already valid and every word still
+    // resolves through its dictionary entry. Losing a unit run over a presentation detail is
+    // the worse outcome, so a failure is logged and the glosses stay empty.
+    let results: Awaited<ReturnType<NonNullable<typeof this.llm.glossComponents>>>;
+    try {
+      results = await this.llm.glossComponents({
+        sentence: draft.text,
+        translation,
+        components: componentRefs.map((ref, index) => ({
+          index,
+          text: String(ref.textSnapshot || "")
+        })),
+        targets: [...targets].sort((a, b) => a - b)
+      });
+    } catch (error) {
+      console.warn("[GLOSS_COMPONENTS] skipped", {
+        sentence: draft.text.slice(0, 40),
+        of: targets.size,
+        reason: error instanceof Error ? error.message : String(error)
+      });
+      return;
+    }
+
+    for (const result of results) {
+      const ref = componentRefs[result.index];
+      if (ref && !ref.gloss) ref.gloss = result.gloss;
+    }
+    if (results.length) {
+      console.info("[GLOSS_COMPONENTS] filled", {
+        sentence: draft.text.slice(0, 40),
+        filled: results.length,
+        of: targets.size
+      });
+    }
   }
 
   async generate(input: GenerateUnitAiContentInput) {

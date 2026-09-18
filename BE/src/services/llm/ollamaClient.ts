@@ -1,3 +1,11 @@
+import {
+  buildGlossPrompt,
+  GLOSS_SCHEMA,
+  parseGlossResponse,
+  validateGlosses,
+  type GlossRequest,
+  type GlossResult
+} from "./componentGloss.js";
 import type {
   EnhancePhraseInput,
   GenerateContextScenarioQuestionInput,
@@ -370,6 +378,29 @@ export function createOllamaClient(options?: { model?: string; asReviewer?: bool
   return {
     modelName: model,
     ...reviewerMethods,
+    /**
+     * English glosses for words a grouped meaning segment cannot explain. Never throws: a
+     * failed reply leaves the glosses empty, which shows the dictionary entry instead of a
+     * wrong claim. Aborting a lesson over this would be the worse trade.
+     */
+    async glossComponents(input: GlossRequest): Promise<GlossResult[]> {
+      if (!input.targets.length) return [];
+      try {
+        const text = await generate(
+          buildGlossPrompt(input),
+          "glossComponents",
+          GLOSS_SCHEMA as unknown as object
+        );
+        return validateGlosses(input, parseGlossResponse(text));
+      } catch (error) {
+        console.warn("[GLOSS_COMPONENTS] discarded", {
+          model,
+          sentence: input.sentence.slice(0, 40),
+          reason: (error as Error).message
+        });
+        return [];
+      }
+    },
     async generateChapters(input: GenerateChaptersInput): Promise<LlmGeneratedChapter[]> {
       const text = await generate(buildChaptersPrompt(input), "generateChapters");
       const payload = parseJsonLogged<{ chapters: LlmGeneratedChapter[] }>(text, "invalid_llm_json");

@@ -1,4 +1,5 @@
 import type { GenerateSentencesInput, LlmClient } from "./types.js";
+import type { GlossRequest } from "./componentGloss.js";
 import { createGeminiClient } from "./geminiClient.js";
 import { createOllamaClient } from "./ollamaClient.js";
 
@@ -47,13 +48,57 @@ function createLlmClient(): LlmClient {
     });
     client = {
       ...base,
+      // Spreading `base` carries its modelName across, so provenance would name the bulk model
+      // for content this client never produced. Record the one that actually runs.
+      sentenceModelName: sentencesClient.modelName,
       generateSentences: (input: GenerateSentencesInput) => sentencesClient.generateSentences(input),
       // Proverbs ride the sentence model too. They are the same job as sentence generation --
       // free-form target-language prose that has to mean what its translation claims -- and
       // the bulk-task model was inventing them (a "proverb" glossed as "give me three pieces
       // of cloth" whose text said nothing of the sort).
       generateProverbs: (input: Parameters<LlmClient["generateProverbs"]>[0]) =>
-        sentencesClient.generateProverbs(input)
+        sentencesClient.generateProverbs(input),
+      // Glossing rides the sentence model for the same reason proverbs do: working out what
+      // one word contributes to a chunk is sentence decomposition, not a bulk task.
+      glossComponents: sentencesClient.glossComponents
+        ? (input: GlossRequest) => sentencesClient.glossComponents!(input)
+        : base.glossComponents
+    };
+  }
+
+  // Optional per-task override for teaching metadata, routed exactly like sentences and
+  // proverbs so the model can be chosen per job. `enhanceExpression` and `enhancePhrase`
+  // share one prompt and write the explanation a learner reads on a content card -- short
+  // prose whose whole value is being specific about WHEN a phrase is used. The bulk model
+  // tends to restate the translation and pad with register claims it cannot support
+  // ("appropriate for both formal and informal settings"), which reads as fact on screen.
+  //
+  //   LLM_EXPLANATION_PROVIDER  - different provider, e.g. gemini while the rest runs ollama
+  //   OLLAMA_EXPLANATION_MODEL  - different ollama model, when the provider is unchanged
+  const explanationProvider = (process.env.LLM_EXPLANATION_PROVIDER || provider).trim().toLowerCase();
+  const explanationModel = (process.env.OLLAMA_EXPLANATION_MODEL || "").trim();
+  const explanationProviderDiffers = explanationProvider !== provider;
+  const explanationModelDiffers = explanationProvider === "ollama" && Boolean(explanationModel);
+
+  if (explanationProviderDiffers || explanationModelDiffers) {
+    const explanationClient = buildProvider(
+      explanationProvider,
+      explanationModelDiffers ? { model: explanationModel } : undefined
+    );
+    console.info("[LLM] Routing expression explanations to a dedicated client", {
+      baseProvider: provider,
+      baseModel: base.modelName,
+      explanationProvider,
+      explanationModel: explanationClient.modelName
+    });
+    client = {
+      ...client,
+      // Provenance, same as sentenceModelName: the composed client would otherwise name the
+      // bulk model for prose a different model wrote.
+      explanationModelName: explanationClient.modelName,
+      enhanceExpression: (input: Parameters<LlmClient["enhanceExpression"]>[0]) =>
+        explanationClient.enhanceExpression(input),
+      enhancePhrase: (input: Parameters<LlmClient["enhancePhrase"]>[0]) => explanationClient.enhancePhrase(input)
     };
   }
 

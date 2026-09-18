@@ -210,7 +210,7 @@ export class DrizzleExpressionRepository implements ExpressionRepository {
     const rows = await db
       .select()
       .from(expressions)
-      .where(and(scoped, eq(expressions.textNormalized, text.trim().toLowerCase()), notDeleted()))
+      .where(and(scoped, eq(expressions.textNormalized, normalizeContentText(text).textNormalized), notDeleted()))
       .limit(1);
     return hydrateOne(rows[0]);
   }
