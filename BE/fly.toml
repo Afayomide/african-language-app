@@ -8,6 +8,13 @@ primary_region = 'iad'
 
 [build]
 
+[env]
+  # The server reads PORT (default 4000); it must match internal_port below.
+  PORT = "3000"
+  # The default LLM provider is Gemini on Vertex, whose client is built at startup and
+  # throws without Google credentials. Generation runs locally, never on Fly.
+  LLM_PROVIDER = "ollama"
+
 [http_service]
   internal_port = 3000
   force_https = true
