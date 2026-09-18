@@ -30,3 +30,6 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+
+# database dumps contain user data
+backups/
