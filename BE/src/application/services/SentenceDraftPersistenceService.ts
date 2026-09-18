@@ -1,3 +1,4 @@
+import { contentTextKey } from "../../services/content/contentTextKey.js";
 import type { LessonEntity } from "../../domain/entities/Lesson.js";
 import type { ContentComponentRef } from "../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
@@ -242,7 +243,9 @@ export class SentenceDraftPersistenceService {
       languageId: input.lesson.languageId || null
     });
     const byText = new Map(
-      [...existingLanguageSentences, ...(input.currentLessonSentences || [])].map((sentence) => [normalize(sentence.text), sentence] as const)
+      [...existingLanguageSentences, ...(input.currentLessonSentences || [])].map(
+        (sentence) => [contentTextKey(sentence.text), sentence] as const
+      )
     );
     const createdOrReused: SentenceEntity[] = [];
 
@@ -318,7 +321,7 @@ export class SentenceDraftPersistenceService {
 
       await this.fillChunkGlosses(draft, componentRefs, needsGloss);
 
-      const existing = byText.get(normalize(draft.text));
+      const existing = byText.get(contentTextKey(draft.text));
       if (existing) {
         const mergedTranslations = uniqueStrings([...existing.translations, ...draft.translations]);
         const updated = await this.sentences.updateById(existing.id, {
@@ -335,7 +338,7 @@ export class SentenceDraftPersistenceService {
       const created = await this.sentences.create({
         language: input.lesson.language,
         text: draft.text,
-        textNormalized: normalize(draft.text),
+        textNormalized: contentTextKey(draft.text),
         translations: uniqueStrings(draft.translations),
         pronunciation: "",
         explanation: draft.explanation || "",
@@ -361,7 +364,7 @@ export class SentenceDraftPersistenceService {
         status: "draft"
       });
       createdOrReused.push(created);
-      byText.set(normalize(created.text), created);
+      byText.set(contentTextKey(created.text), created);
     }
 
     return createdOrReused;

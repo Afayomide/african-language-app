@@ -66,6 +66,42 @@ function createLlmClient(): LlmClient {
     };
   }
 
+  // Optional per-task override for teaching metadata, routed exactly like sentences and
+  // proverbs so the model can be chosen per job. `enhanceExpression` and `enhancePhrase`
+  // share one prompt and write the explanation a learner reads on a content card -- short
+  // prose whose whole value is being specific about WHEN a phrase is used. The bulk model
+  // tends to restate the translation and pad with register claims it cannot support
+  // ("appropriate for both formal and informal settings"), which reads as fact on screen.
+  //
+  //   LLM_EXPLANATION_PROVIDER  - different provider, e.g. gemini while the rest runs ollama
+  //   OLLAMA_EXPLANATION_MODEL  - different ollama model, when the provider is unchanged
+  const explanationProvider = (process.env.LLM_EXPLANATION_PROVIDER || provider).trim().toLowerCase();
+  const explanationModel = (process.env.OLLAMA_EXPLANATION_MODEL || "").trim();
+  const explanationProviderDiffers = explanationProvider !== provider;
+  const explanationModelDiffers = explanationProvider === "ollama" && Boolean(explanationModel);
+
+  if (explanationProviderDiffers || explanationModelDiffers) {
+    const explanationClient = buildProvider(
+      explanationProvider,
+      explanationModelDiffers ? { model: explanationModel } : undefined
+    );
+    console.info("[LLM] Routing expression explanations to a dedicated client", {
+      baseProvider: provider,
+      baseModel: base.modelName,
+      explanationProvider,
+      explanationModel: explanationClient.modelName
+    });
+    client = {
+      ...client,
+      // Provenance, same as sentenceModelName: the composed client would otherwise name the
+      // bulk model for prose a different model wrote.
+      explanationModelName: explanationClient.modelName,
+      enhanceExpression: (input: Parameters<LlmClient["enhanceExpression"]>[0]) =>
+        explanationClient.enhanceExpression(input),
+      enhancePhrase: (input: Parameters<LlmClient["enhancePhrase"]>[0]) => explanationClient.enhancePhrase(input)
+    };
+  }
+
   // Optional second-opinion reviewer. Off unless LLM_REVIEW_MODEL is set, so nothing changes
   // for existing setups. The reviewer must not be the model that writes the sentences: a
   // model cannot catch its own systematic bias (gemma4:12b rates its own toneless "Elo" as

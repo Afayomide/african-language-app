@@ -11,6 +11,8 @@ import type {
   LlmLessonSuggestion
 } from "./types.js";
 import { extractThemeAnchors } from "./unitTheme.js";
+import { contentTextKey } from "../content/contentTextKey.js";
+import { getMinSentenceWords } from "../../config/lessonGeneration.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 
 type Level = "beginner" | "intermediate" | "advanced";
@@ -34,6 +36,15 @@ function containsSentencePunctuation(value: string) {
 
 function normalize(value: string) {
   return String(value || "").trim().toLowerCase();
+}
+
+/**
+ * Duplicate detection has to use the same key the database dedupes on, or a batch holding
+ * both "Ọ dị." and "Ọ dị" passes validation as two sentences and the second one dies on the
+ * unique index at insert time.
+ */
+function dedupeKey(value: string) {
+  return contentTextKey(value);
 }
 
 function normalizeEnglishMeaning(value: string) {
@@ -332,6 +343,21 @@ export function validateGeneratedChapters(
   return { accepted, rejected };
 }
 
+/**
+ * A sentence row is one utterance by one speaker, everywhere downstream: TTS reads it in a
+ * single voice, `sp-pronunciation-compare` asks the learner to say all of it, `fg-word-order`
+ * scrambles it into one word pile, and the meaning segments gloss it as one chain. The model
+ * nonetheless writes both halves of an exchange into one text -- "Ụtụtụ ọma, kedu? Ọ dị mma."
+ * (good morning, how are you? it is fine), the same speaker asking and answering.
+ *
+ * Sentence-final punctuation followed by more words is the signal. A comma is deliberately not
+ * in the set: "Ndewo, ụtụtụ ọma" is one greeting, not two utterances. Trailing punctuation is
+ * ignored, so an ordinary sentence ending in "." or "?" passes.
+ */
+function isMultiUtteranceText(value: string) {
+  return /[.?!]\s+\S/.test(String(value || "").trim());
+}
+
 function sentenceReasons(
   sentence: LlmGeneratedSentence,
   input: GenerateSentencesInput,
@@ -343,7 +369,7 @@ function sentenceReasons(
     Array.isArray(sentence.translations) ? sentence.translations.map((item) => String(item || "").trim()) : []
   );
   const components = Array.isArray(sentence.components) ? sentence.components : [];
-  const normalizedText = normalize(text);
+  const normalizedText = dedupeKey(text);
   const allowedExpressions = new Set(
     (input.allowedExpressions || []).map((item) => `expression:${normalize(item.text)}`)
   );
@@ -384,7 +410,8 @@ function sentenceReasons(
   if (seenTexts.has(normalizedText)) reasons.push("duplicate sentence in batch");
   if (translations.length === 0) reasons.push("missing translations");
   if (components.length === 0) reasons.push("missing components");
-  if (words.length < 2) reasons.push("sentence too short");
+  if (words.length < getMinSentenceWords()) reasons.push("sentence too short");
+  if (isMultiUtteranceText(text)) reasons.push("more than one utterance in a sentence");
   if (components.length > 0 && !sentenceComponentsCoverText(text, componentTexts)) {
     reasons.push("components do not cover full sentence");
   }

@@ -156,11 +156,8 @@ function buildGapFillQuestion(
   const uniqueDistractors = makeUniqueOptions(distractorPool).filter(
     (item) => item.toLowerCase() !== answer.toLowerCase()
   );
+  // Never pad with placeholders; fewer real options is the honest result of a thin pool.
   const options = shuffle(makeUniqueOptions([answer, ...uniqueDistractors.slice(0, 3)])).slice(0, 4);
-  while (options.length < 4) {
-    const fallback = `Option ${options.length + 1}`;
-    if (!options.includes(fallback)) options.push(fallback);
-  }
 
   const correctIndex = options.findIndex((item) => item.toLowerCase() === answer.toLowerCase());
   return {

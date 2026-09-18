@@ -225,7 +225,7 @@ export class DrizzleSentenceRepository implements SentenceRepository {
     const rows = await db
       .select()
       .from(sentences)
-      .where(and(scoped, eq(sentences.textNormalized, text.trim().toLowerCase()), notDeleted()))
+      .where(and(scoped, eq(sentences.textNormalized, normalizeContentText(text).textNormalized), notDeleted()))
       .limit(1);
     return hydrateOne(rows[0]);
   }

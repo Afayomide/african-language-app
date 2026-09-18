@@ -121,7 +121,9 @@ export const SENTENCE_PROMPT_GUARDRAILS = [
   "Do not introduce personal names, named addressees, or vocative add-ons unless explicitly requested.",
   "Do not append a person's name to a greeting or routine phrase unless the lesson context explicitly requires addressing that named person.",
   "If a sentence needs an addressee or social role, prefer unnamed roles such as elder, friend, customer, neighbour, or teacher instead of using a personal name.",
-  "For Yoruba sentences, do not add sentence-final emphasis or discourse particles such as o, oo, sha, jare, or na unless that particle is the explicit lesson target."
+  "For Yoruba sentences, do not add sentence-final emphasis or discourse particles such as o, oo, sha, jare, or na unless that particle is the explicit lesson target.",
+  "Each sentence is ONE utterance by ONE speaker. Never put a question and its answer in the same sentence, and never write two statements separated by a full stop. If the lesson calls for an exchange, return only the question, and let the reply be its own sentence.",
+  "Examples of what this forbids: a sentence meaning \"How are you? It is fine.\", or \"Do you want food? No.\" Return the question alone."
 ];
 
 export function getSuggestionGuardrails(level: Level, language: Language) {

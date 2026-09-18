@@ -1027,10 +1027,9 @@ export class LearnerLessonUseCases {
           .filter((candidate) => candidate.id !== item.id)
           .flatMap((candidate) => candidate.translations)
       ).filter((candidate: string) => candidate.toLowerCase() !== correct.toLowerCase());
+      // Never pad to four with "Option N": a placeholder reads as a real choice and is never
+      // the answer. A thin pool yields three real options, or two, and that is the honest set.
       const options = shuffleMatchingItems([correct, ...distractors.slice(0, 3)]);
-      while (options.length < 4) {
-        options.push(`Option ${options.length + 1}`);
-      }
       const correctIndex = options.findIndex((value) => value.toLowerCase() === correct.toLowerCase());
       return { options, correctIndex: correctIndex >= 0 ? correctIndex : 0, correct };
     };

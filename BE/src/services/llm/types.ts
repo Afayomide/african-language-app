@@ -283,6 +283,15 @@ export type LlmClient = {
    */
   sentenceModelName?: string;
   /**
+   * The model that actually writes teaching metadata -- `enhanceExpression` and
+   * `enhancePhrase` -- when it is routed away from the bulk model. Same reason
+   * `sentenceModelName` exists: without it the composed client reports the bulk model for
+   * prose it never wrote.
+   *
+   * Undefined when nothing is routed away, in which case `modelName` is the truth.
+   */
+  explanationModelName?: string;
+  /**
    * Per-word meanings for components whose meaning segment covers several words at once, so
    * no per-word meaning can be derived from it. English only -- see componentGloss.ts.
    * Returns [] rather than throwing when the reply fails validation: a sentence with empty
