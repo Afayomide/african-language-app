@@ -33,28 +33,9 @@ const TARGETS: Target[] = [
     from: ["(-ing)", "is (-ing)", "am (-ing)", "are (-ing)", "is"],
     why: "imperfective marker; invariant, so the English subject agreement does not belong to it"
   },
-  // `ni` is not one word being described inconsistently -- the literature treats the copula
-  // and the focus marker as homonyms in complementary distribution. The three jobs below stay
-  // separate; only the wordings WITHIN each job collapse. Every gloss the pass produced is
-  // listed, so nothing is left unclassified and nothing is guessed at.
-  {
-    word: "ni",
-    to: "is/are",
-    from: ["is", "It is", "it is", "He is", "She is", "are", "is it", "Is she", "are the one", "are you"],
-    why: "copula; invariant in Yoruba, so is/He is/She is/are was English agreement leaking in"
-  },
-  {
-    word: "ni",
-    to: "(focus marker)",
-    from: ["(focus marker)", "(focus)"],
-    why: "focus marker: fronts the questioned or emphasised constituent"
-  },
-  {
-    word: "ni",
-    to: "(object marker)",
-    from: ["(object marker)", "(particle)"],
-    why: "marks the recipient in a give-type clause; `(particle)` named the form, not the job"
-  },
+  // `ni` is deliberately absent. Collapsing its copula glosses to "is/are" erased the
+  // per-sentence reading learners need ("it is" in `Omi ni.`, "am" in `Èmi ni bàbá rẹ.`).
+  // Its glosses are set per occurrence by reviewNiGlosses.ts, after human review.
   {
     word: "Ẹ",
     to: "you (respectful)",
