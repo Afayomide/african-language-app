@@ -93,6 +93,7 @@ export type LearnerOverviewStats = {
 export type LearnerOverviewData = {
   stats: LearnerOverviewStats
   learnerLanguages?: LearnerLanguageSummary[]
+  availableLanguages?: string[]
   nextLesson: LearnerOverviewNextLesson | null
   units?: LearnerOverviewUnit[]
   chapters?: LearnerOverviewChapter[]

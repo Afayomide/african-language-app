@@ -6,6 +6,7 @@ import type { LearnerProfileRepository } from "../../../../domain/repositories/L
 import type { LessonProgressRepository } from "../../../../domain/repositories/LessonProgressRepository.js";
 import type { UnitRepository } from "../../../../domain/repositories/UnitRepository.js";
 import type { ChapterRepository } from "../../../../domain/repositories/ChapterRepository.js";
+import type { LanguageRepository } from "../../../../domain/repositories/LanguageRepository.js";
 import { LANGUAGE_VALUES, type Language, type LessonEntity } from "../../../../domain/entities/Lesson.js";
 import type { LessonSummaryEntity } from "../../../../domain/repositories/LessonRepository.js";
 import {
@@ -159,7 +160,8 @@ export class LearnerDashboardUseCases {
     private readonly chapters: ChapterRepository,
     private readonly learnerProfiles: LearnerProfileRepository,
     private readonly learnerLanguageStates: LearnerLanguageStateRepository,
-    private readonly progress: LessonProgressRepository
+    private readonly progress: LessonProgressRepository,
+    private readonly languages: LanguageRepository
   ) {}
 
   private async ensureLearnerLanguageState(input: {
@@ -187,7 +189,7 @@ export class LearnerDashboardUseCases {
     const languageState = await this.ensureLearnerLanguageState({ userId, language, profile });
     if (!languageState) return null;
     const scopedLanguageId = languageState.languageId || (profile.currentLanguage === language ? profile.activeLanguageId || null : null);
-    const [learnerLanguageRows, publishedLessons, publishedChapters, publishedUnits] = await Promise.all([
+    const [learnerLanguageRows, publishedLessons, publishedChapters, publishedUnits, activeLanguages] = await Promise.all([
       this.learnerLanguageStates.listByUser(userId),
       this.lessons.listSummaries({
         status: learnerVisibleStatuses(),
@@ -203,7 +205,8 @@ export class LearnerDashboardUseCases {
         status: learnerVisibleStatuses(),
         language,
         languageId: scopedLanguageId
-      })
+      }),
+      this.languages.listActive()
     ]);
     const learnerLanguages = sortLearnerLanguages(learnerLanguageRows, language);
 
@@ -449,6 +452,9 @@ export class LearnerDashboardUseCases {
         courseProgressPercent
       },
       learnerLanguages: learnerLanguageSummaries,
+      // Every language the admin has made active, so the dashboard switcher can offer ones the
+      // learner hasn't enrolled in yet. updateCurrentLanguage enrolls them on first switch.
+      availableLanguages: activeLanguages.map((item) => item.code),
       nextLesson: nextLesson
         ? {
             id: nextLesson.id,

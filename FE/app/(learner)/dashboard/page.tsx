@@ -380,6 +380,7 @@ function DashboardDesktop({
             </div>
             <LanguageSwitcher
               languages={data?.learnerLanguages || []}
+              availableLanguages={data?.availableLanguages}
               activeLanguage={languageKey}
               disabled={isSwitchingLanguage}
               onSelect={onSelectLanguage}
@@ -754,6 +755,7 @@ function DashboardMobile({
         <h1 className="justify-self-center font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{siteName}</h1>
         <LanguageSwitcher
           languages={data?.learnerLanguages || []}
+          availableLanguages={data?.availableLanguages}
           activeLanguage={languageKey}
           compact
           labelOnly

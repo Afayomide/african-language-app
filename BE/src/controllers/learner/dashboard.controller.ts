@@ -7,6 +7,7 @@ import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/reposi
 import { DrizzleLearnerLanguageStateRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerLanguageStateRepository.js";
 import { DrizzleLearnerProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLearnerProfileRepository.js";
 import { DrizzleLessonProgressRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonProgressRepository.js";
+import { DrizzleLanguageRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLanguageRepository.js";
 import { isValidLessonLanguage } from "../../interfaces/http/validators/lesson.validators.js";
 import type { Language } from "../../domain/entities/Lesson.js";
 
@@ -16,7 +17,8 @@ const useCases = new LearnerDashboardUseCases(
   new DrizzleChapterRepository(),
   new DrizzleLearnerProfileRepository(),
   new DrizzleLearnerLanguageStateRepository(),
-  new DrizzleLessonProgressRepository()
+  new DrizzleLessonProgressRepository(),
+  new DrizzleLanguageRepository()
 );
 
 export async function getDashboardOverview(req: AuthRequest, res: Response) {

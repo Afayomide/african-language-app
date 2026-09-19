@@ -21,6 +21,8 @@ export type LearnerLanguageSummary = {
 
 type Props = {
   languages: LearnerLanguageSummary[]
+  // Languages the learner can start but hasn't enrolled in yet (the backend's active languages).
+  availableLanguages?: string[]
   activeLanguage?: Language
   onSelect?: (language: Language) => void
   disabled?: boolean
@@ -35,8 +37,27 @@ const LANGUAGE_LABELS: Record<Language, { title: string; short: string }> = {
   hausa: { title: 'Hausa', short: 'HA' },
 }
 
+function isKnownLanguage(code: string): code is Language {
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_LABELS, code)
+}
+
+function notEnrolledSummary(languageCode: Language): LearnerLanguageSummary {
+  return {
+    languageCode,
+    isEnrolled: false,
+    isActive: false,
+    totalXp: 0,
+    streakDays: 0,
+    longestStreak: 0,
+    dailyGoalMinutes: 0,
+    todayMinutes: 0,
+    completedLessonsCount: 0,
+  }
+}
+
 export function LanguageSwitcher({
-  languages,
+  languages: enrolledLanguages,
+  availableLanguages = [],
   activeLanguage,
   onSelect,
   disabled = false,
@@ -44,6 +65,13 @@ export function LanguageSwitcher({
   compact = false,
   labelOnly = false,
 }: Props) {
+  const enrolledCodes = new Set(enrolledLanguages.map((language) => language.languageCode))
+  const languages = [
+    ...enrolledLanguages.filter((language) => isKnownLanguage(language.languageCode)),
+    ...availableLanguages
+      .filter((code): code is Language => isKnownLanguage(code) && !enrolledCodes.has(code))
+      .map(notEnrolledSummary),
+  ]
   if (!languages.length) return null
 
   return (
@@ -81,7 +109,9 @@ export function LanguageSwitcher({
               <span className={cn('font-bold', compact ? 'text-xs' : 'text-sm')}>{meta.title}</span>
               {!compact ? (
                 <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">
-                  {language.totalXp} XP · {language.streakDays} day streak
+                  {language.isEnrolled
+                    ? `${language.totalXp} XP · ${language.streakDays} day streak`
+                    : 'Start learning'}
                 </span>
               ) : null}
             </span>

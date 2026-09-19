@@ -197,6 +197,7 @@ export function LanguageOverviewScreen({
                 </div> */}
                 <LanguageSwitcher
                   languages={data?.learnerLanguages || []}
+                  availableLanguages={data?.availableLanguages}
                   activeLanguage={
                     (data?.stats.currentLanguage as Language | undefined) ||
                     undefined
