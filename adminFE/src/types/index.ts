@@ -376,6 +376,8 @@ export interface Expression {
   difficulty: number;
   aiMeta: AIMeta;
   audio: Audio;
+  /** Show learners this expression as one unit instead of breaking it into its words. */
+  keepWhole?: boolean;
   images?: ExpressionImageLink[];
   status: Status;
   deletedAt?: string | null;

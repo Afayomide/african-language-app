@@ -15,6 +15,20 @@
       "when": 1785654050766,
       "tag": "0001_add_sentence_component_gloss",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789835311829,
+      "tag": "0002_add_component_part_glosses",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789842113134,
+      "tag": "0003_add_expression_keep_whole",
+      "breakpoints": true
     }
   ]
 }

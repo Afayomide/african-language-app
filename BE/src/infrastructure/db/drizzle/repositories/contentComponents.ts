@@ -22,10 +22,10 @@ type ComponentRow = SentenceComponentRow | ExpressionComponentRow;
  * it is covered by the (type, ref_id) index for reverse lookups.
  */
 
-/** `gloss` lives only on sentence components; expression components have no such column. */
-function glossOf(row: ComponentRow): string | undefined {
-  const value = (row as SentenceComponentRow).gloss;
-  return value ? String(value) : undefined;
+/** `partGlosses` lives only on sentence components. */
+function partGlossesOf(row: ComponentRow): string[] | undefined {
+  const value = (row as SentenceComponentRow).partGlosses;
+  return Array.isArray(value) && value.some(Boolean) ? value.map((item) => String(item ?? "")) : undefined;
 }
 
 function toRef(row: ComponentRow, fallbackIndex: number): ContentComponentRef {
@@ -34,7 +34,8 @@ function toRef(row: ComponentRow, fallbackIndex: number): ContentComponentRef {
     refId: String(row.refId || ""),
     orderIndex: Number.isInteger(row.orderIndex) ? Number(row.orderIndex) : fallbackIndex,
     textSnapshot: row.textSnapshot ? String(row.textSnapshot) : undefined,
-    gloss: glossOf(row)
+    gloss: row.gloss ? String(row.gloss) : undefined,
+    partGlosses: partGlossesOf(row)
   };
 }
 
@@ -43,16 +44,20 @@ function toValues(components: ContentComponentRef[]) {
     type: component.type === "expression" ? ("expression" as const) : ("word" as const),
     refId: String(component.refId || ""),
     orderIndex: Number.isInteger(component.orderIndex) ? Number(component.orderIndex) : index,
-    textSnapshot: component.textSnapshot ? String(component.textSnapshot) : ""
+    textSnapshot: component.textSnapshot ? String(component.textSnapshot) : "",
+    gloss: component.gloss ? String(component.gloss) : null
   }));
 }
 
-/** Sentence rows carry the extra `gloss` column; expression rows must not receive it. */
+/** Sentence rows also carry `part_glosses`; expression rows have no such column. */
 function toSentenceValues(components: ContentComponentRef[]) {
-  return toValues(components).map((value, index) => ({
-    ...value,
-    gloss: components[index]?.gloss ? String(components[index].gloss) : null
-  }));
+  return toValues(components).map((value, index) => {
+    const parts = components[index]?.partGlosses;
+    return {
+      ...value,
+      partGlosses: Array.isArray(parts) && parts.some(Boolean) ? parts.map((item) => String(item ?? "")) : null
+    };
+  });
 }
 
 function group(rows: ComponentRow[], keyOf: (row: ComponentRow) => string): Map<string, ContentComponentRef[]> {

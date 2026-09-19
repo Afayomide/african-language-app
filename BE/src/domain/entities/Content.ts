@@ -95,6 +95,12 @@ export type ContentComponentRef = {
    * Undefined means "use the word row's translation", which is every existing component.
    */
   gloss?: string;
+  /**
+   * Sentence components that are expressions only: what each of the expression's own words
+   * means in THIS sentence, in the expression's component order. An empty slot falls back
+   * to the expression component's `gloss`.
+   */
+  partGlosses?: string[];
 };
 
 export type ContentBaseEntity = {

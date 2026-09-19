@@ -128,6 +128,7 @@ function buildCreateOrUpdateInput(body: Record<string, unknown>, idForAudio?: st
     difficulty: number;
     audio: ExpressionEntity["audio"];
     register: ExpressionEntity["register"];
+    keepWhole: boolean;
     components: ExpressionEntity["components"];
     status: "draft" | "finished" | "published";
   }> = {};
@@ -160,6 +161,7 @@ function buildCreateOrUpdateInput(body: Record<string, unknown>, idForAudio?: st
     if (!["formal", "neutral", "casual"].includes(register)) return "invalid_register" as const;
     update.register = register as ExpressionEntity["register"];
   }
+  if (body.keepWhole !== undefined) update.keepWhole = body.keepWhole === true;
   if (body.status !== undefined) {
     const status = String(body.status);
     if (!isValidExpressionStatus(status)) return "invalid_status" as const;
@@ -215,6 +217,7 @@ export async function createExpression(req: AuthRequest, res: Response) {
     aiMeta: { generatedByAI: false, model: "", reviewedByAdmin: false },
     audio: audio || { provider: "", model: "", voice: "", locale: "", format: "", url: "", s3Key: "" },
     register: baseInput.register || "neutral",
+    keepWhole: baseInput.keepWhole === true,
     components: baseInput.components || [],
     status: baseInput.status || "draft",
     lessonIds: baseInput.lessonIds,

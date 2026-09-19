@@ -140,6 +140,10 @@ export const expressions = pgTable(
     id: pk(),
     ...contentBase(),
     register: text("register").$type<"formal" | "neutral" | "casual">().notNull().default("neutral"),
+    // An idiom learners should see as one unit: `Bẹ́ẹ̀ ni` is "yes", and splitting it into
+    // "so" + "is" teaches nothing. When true the learner payload sends no word breakdown, so
+    // the expression is never split into separate tappable words. Set by an admin.
+    keepWhole: boolean("keep_whole").notNull().default(false),
     ...timestamps()
   },
   (t) => [
@@ -203,7 +207,12 @@ export const sentenceComponents = pgTable(
     // ("is not present") -- but the unique index allows only one `sí` row, and the
     // learner payload always shows translations[0]. Nullable: null means "use the word
     // row", so existing rows and non-ambiguous words behave exactly as before.
-    gloss: text("gloss")
+    gloss: text("gloss"),
+    // For an expression component: what each of the expression's words means in THIS
+    // sentence, in the expression's component order. `ni` inside `Níbo ni` is "is" in
+    // `Níbo ni omi?` but "are" in `Níbo ni o wà?`, which one expression-level gloss cannot
+    // say. Null (or an empty slot) falls back to expression_components.gloss.
+    partGlosses: text("part_glosses").array()
   },
   (t) => [
     index("sentence_components_parent_idx").on(t.sentenceId, t.orderIndex),
@@ -221,7 +230,11 @@ export const expressionComponents = pgTable(
     type: text("type").$type<"word" | "expression">().notNull(),
     refId: text("ref_id").notNull(),
     orderIndex: integer("order_index").notNull().default(0),
-    textSnapshot: text("text_snapshot").notNull().default("")
+    textSnapshot: text("text_snapshot").notNull().default(""),
+    // What this word means inside the expression, shown in the expression's word breakdown.
+    // Without it the breakdown fell back to the word row's first translation -- "am" for
+    // `ni` in `Níbo ni`. Null means "use the word row", as before.
+    gloss: text("gloss")
   },
   (t) => [
     index("expression_components_parent_idx").on(t.expressionId, t.orderIndex),

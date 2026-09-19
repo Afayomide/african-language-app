@@ -106,7 +106,9 @@ function parseComponents(value: unknown): ContentComponentRef[] | null {
     // destroyed. `gloss` is what a word means in THIS sentence and cannot be recovered from
     // the shared word row -- dropping it silently reverted `ń` from "(-ing)" to the row
     // default "are" on any unrelated edit to the sentence.
-    gloss: item?.gloss ? String(item.gloss) : undefined
+    gloss: item?.gloss ? String(item.gloss) : undefined,
+    // Same reason: the per-sentence meanings of an expression's words, e.g. `ni` in `Níbo ni`.
+    partGlosses: Array.isArray(item?.partGlosses) ? item.partGlosses.map((part: unknown) => String(part ?? "")) : undefined
   }));
 }
 

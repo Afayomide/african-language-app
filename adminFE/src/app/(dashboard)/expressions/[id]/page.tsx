@@ -181,6 +181,7 @@ export default function EditExpressionPage({ params }: { params: Promise<{ id: s
         pronunciation: phrase.pronunciation,
         explanation: phrase.explanation,
         difficulty: phrase.difficulty,
+        keepWhole: phrase.keepWhole === true,
         lessonIds: phrase.lessonIds,
         audioUpload
       })
@@ -331,6 +332,21 @@ export default function EditExpressionPage({ params }: { params: Promise<{ id: s
                   rows={4}
                 />
               </div>
+
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={phrase.keepWhole === true}
+                  onChange={(e) => setExpression({ ...phrase, keepWhole: e.target.checked })}
+                />
+                <span>
+                  <span className="font-medium">Keep whole</span>
+                  <span className="block text-muted-foreground">
+                    Learners see this as one unit, not broken into its words. Use for idioms, e.g. Bẹ́ẹ̀ ni = &quot;yes&quot;.
+                  </span>
+                </span>
+              </label>
 
               <div className="space-y-2">
                 <Label htmlFor="audioUpload">Upload Audio Recording</Label>

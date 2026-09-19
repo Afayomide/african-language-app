@@ -98,7 +98,11 @@ function parseComponents(value: unknown): ContentComponentRef[] | null {
     type: item?.type === "expression" ? "expression" : "word",
     refId: String(item?.refId || ""),
     orderIndex: Number.isInteger(item?.orderIndex) ? Number(item.orderIndex) : index,
-    textSnapshot: item?.textSnapshot ? String(item.textSnapshot) : undefined
+    textSnapshot: item?.textSnapshot ? String(item.textSnapshot) : undefined,
+    // Components are rewritten wholesale on update, so per-sentence meanings not echoed back
+    // here are destroyed -- the same guard the tutor controller has.
+    gloss: item?.gloss ? String(item.gloss) : undefined,
+    partGlosses: Array.isArray(item?.partGlosses) ? item.partGlosses.map((part: unknown) => String(part ?? "")) : undefined
   }));
 }
 

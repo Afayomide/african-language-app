@@ -1,0 +1,1 @@
+ALTER TABLE "expressions" ADD COLUMN "keep_whole" boolean DEFAULT false NOT NULL;

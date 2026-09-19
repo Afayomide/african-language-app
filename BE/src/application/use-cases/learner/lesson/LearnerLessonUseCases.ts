@@ -283,16 +283,21 @@ function contentSupportsDisplayComponents(entity: ResolvedContentEntity) {
   return entity.kind === "sentence" || entity.kind === "expression";
 }
 
-function buildDisplayComponents(
+export function buildDisplayComponents(
   entity: ResolvedContentEntity,
   resolvedContentMap: Map<string, ResolvedContentEntity>,
-  depth = 0
+  depth = 0,
+  /** The parent sentence's per-sentence meanings for this expression's words, by position. */
+  partGlosses?: string[]
 ): LessonDisplayComponent[] | undefined {
   if (!contentSupportsDisplayComponents(entity)) return undefined;
+  // An idiom marked keep-whole gets no breakdown, so the player shows it as one unit
+  // (`Bẹ́ẹ̀ ni` = "yes") instead of splitting it into "so" + "is".
+  if (entity.kind === "expression" && entity.keepWhole) return undefined;
   return entity.components
     .slice()
     .sort((left, right) => left.orderIndex - right.orderIndex)
-    .reduce<LessonDisplayComponent[]>((acc, component) => {
+    .reduce<LessonDisplayComponent[]>((acc, component, position) => {
       const resolved = resolvedContentMap.get(`${component.type}:${component.refId}`);
       if (!resolved || resolved.kind === "sentence") return acc;
       acc.push({
@@ -313,7 +318,10 @@ function buildDisplayComponents(
         // this field as "in this sentence", i.e. as a statement of fact, so an unbacked guess
         // here reads as an answer rather than a suggestion. Empty means "no contextual gloss
         // stored" and the UI falls back to showing the whole dictionary entry instead.
-        selectedTranslation: component.gloss || "",
+        //
+        // A word inside an expression prefers what the parent sentence says it means there
+        // (`ni` in `Níbo ni o wà?` is "are"), then what it means in the expression itself.
+        selectedTranslation: partGlosses?.[position] || component.gloss || "",
         selectedTranslationIndex: 0,
         audio: {
           provider: String(resolved.audio?.provider || ""),
@@ -328,7 +336,7 @@ function buildDisplayComponents(
         // The ref resolution pass ahead of this resolves exactly that one extra level.
         ...(depth === 0 && resolved.kind === "expression"
           ? (() => {
-              const nested = buildDisplayComponents(resolved, resolvedContentMap, depth + 1);
+              const nested = buildDisplayComponents(resolved, resolvedContentMap, depth + 1, component.partGlosses);
               return nested && nested.length > 0 ? { components: nested } : {};
             })()
           : {})

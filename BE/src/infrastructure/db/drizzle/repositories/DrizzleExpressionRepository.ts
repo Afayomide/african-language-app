@@ -43,6 +43,7 @@ function toEntity(row: ExpressionRow, components: ContentComponentRef[]): Expres
     aiMeta: mapAiMeta(row.aiMeta),
     audio: mapContentAudio(row.audio),
     register: row.register === "formal" || row.register === "casual" ? row.register : "neutral",
+    keepWhole: row.keepWhole === true,
     components,
     status: row.status,
     deletedAt: row.deletedAt ?? null,
@@ -84,6 +85,7 @@ export class DrizzleExpressionRepository implements ExpressionRepository {
           aiMeta: mapAiMeta(input.aiMeta),
           audio: mapContentAudio(input.audio),
           register: input.register ?? "neutral",
+          keepWhole: input.keepWhole === true,
           status: input.status ?? "draft"
         })
         .returning();
@@ -238,6 +240,7 @@ export class DrizzleExpressionRepository implements ExpressionRepository {
     if (update.aiMeta !== undefined) values.aiMeta = mapAiMeta(update.aiMeta);
     if (update.audio !== undefined) values.audio = mapContentAudio(update.audio);
     if (update.register !== undefined) values.register = update.register;
+    if (update.keepWhole !== undefined) values.keepWhole = update.keepWhole === true;
     if (update.status !== undefined) values.status = update.status;
 
     const row = await db.transaction(async (tx) => {

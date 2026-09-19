@@ -101,7 +101,15 @@ export function parseGlossResponse(raw: string): Array<{ index: number; word: st
  */
 export function validateGlosses(
   input: GlossRequest,
-  glosses: Array<{ index: number; word: string; gloss: string }>
+  glosses: Array<{ index: number; word: string; gloss: string }>,
+  options: {
+    /**
+     * Skip the "restates the translation" check. That check is for sentences, where one word
+     * never means the whole sentence. A short expression can legitimately share its meaning
+     * with one of its words (`Níbo` in `Níbo ni` = "where"), so it would reject a right answer.
+     */
+    allowWholeTranslation?: boolean;
+  } = {}
 ): GlossResult[] {
   const byIndex = new Map(input.components.map((c) => [c.index, c] as const));
   const accepted: GlossResult[] = [];
@@ -126,7 +134,7 @@ export function validateGlosses(
     const gloss = String(g.gloss || "").trim();
     if (!gloss) throw new Error(`empty gloss at ${index}`);
     if (gloss.length > GLOSS_MAX_CHARS) throw new Error(`gloss too long at ${index}: "${gloss}"`);
-    if (gloss.toLowerCase() === input.translation.trim().toLowerCase()) {
+    if (!options.allowWholeTranslation && gloss.toLowerCase() === input.translation.trim().toLowerCase()) {
       throw new Error(`gloss at ${index} restates the sentence`);
     }
     accepted.push({ index, gloss });

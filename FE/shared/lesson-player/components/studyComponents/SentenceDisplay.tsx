@@ -145,10 +145,10 @@ function SentenceGlossPanel({ component }: { component: LearningContentComponent
           <div className="space-y-1">
             {component.components.map((part, index) => {
               // Unlike the card above, this keeps the dictionary fallback. These rows are the
-              // words INSIDE an expression, and expression components have no gloss column to
-              // read from -- dropping the fallback would blank every breakdown row. A row here
-              // is also a decomposition aid rather than a claim about this sentence, so the
-              // shared entry is honest enough.
+              // words INSIDE an expression; the backend sends their meaning here (per sentence,
+              // else per expression) when one is stored, and many are not yet -- dropping the
+              // fallback would blank those rows. A row here is a decomposition aid rather than
+              // a claim about this sentence, so the shared entry is honest enough.
               const partMeaning = part.selectedTranslation || part.translations.filter(Boolean)[0] || ''
               return (
                 <div
