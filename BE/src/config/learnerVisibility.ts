@@ -8,11 +8,15 @@ import type { Status } from "../domain/entities/Lesson.js";
 // content, so you can walk an unapproved lesson exactly like a real learner without having
 // to approve/publish it first.
 //
-// The NODE_ENV guard is deliberate belt-and-braces: even if the flag is ever set in a
-// production environment, it has no effect there. With the flag off the returned list is
-// exactly ["published"], so production behaviour is byte-for-byte unchanged.
+// The NODE_ENV guard is deliberate belt-and-braces: a production build (NODE_ENV=production,
+// which Fly's Dockerfile and Vercel both set) ignores the flag unless the deployment also sets
+// LEARNER_INCLUDE_UNAPPROVED_IN_PROD=true. That second opt-in is for test deployments (the
+// Vercel backend) that run a production build but should still show drafts. The real
+// production backend (Fly) sets neither, so it keeps serving exactly ["published"].
 export function learnerIncludesUnapproved(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.LEARNER_INCLUDE_UNAPPROVED === "true";
+  if (process.env.LEARNER_INCLUDE_UNAPPROVED !== "true") return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  return process.env.LEARNER_INCLUDE_UNAPPROVED_IN_PROD === "true";
 }
 
 const APPROVED_ONLY: Status[] = ["published"];

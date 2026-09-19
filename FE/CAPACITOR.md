@@ -7,16 +7,20 @@ This FE app is being wrapped as a Capacitor shell without creating a second fron
 - Native shells live in `FE/ios/` and `FE/android/`
 - Phase 1 uses a hosted FE URL inside the native shell
 
-## Required env
-Set one of these before syncing/opening native platforms:
+## Server URL
+By default the shell loads the production FE at `https://tembolang.vercel.app`.
+To point it elsewhere (e.g. a local dev server), set one of these before syncing:
 
 ```bash
-CAP_SERVER_URL=https://your-fe-domain.com
+CAP_SERVER_URL=http://192.168.x.x:3001
 ```
 
 Fallbacks read by `FE/capacitor.config.ts`:
 - `NEXT_PUBLIC_CAP_SERVER_URL`
 - `NEXT_PUBLIC_APP_URL`
+
+Use `https://` for hosted URLs. With `http://`, the host's redirect to `https://` counts as
+leaving the app, so Capacitor opens it in the external browser and the shell stays blank.
 
 ## Commands
 ```bash
