@@ -547,8 +547,15 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         toast.error(`Lesson ${index + 1} needs at least two situations.`);
         return false;
       }
-      if (lesson.sentenceGoals.length < 2) {
-        toast.error(`Lesson ${index + 1} needs at least two sentence goals.`);
+      // A lesson generated without sentences (Sentences / Lesson = 0) has one meaning to
+      // reach, not two: its whole content is the target item. The backend floor is 1.
+      const minSentenceGoals = contentSentencesPerLesson > 0 ? 2 : 1;
+      if (lesson.sentenceGoals.length < minSentenceGoals) {
+        toast.error(
+          minSentenceGoals === 1
+            ? `Lesson ${index + 1} needs at least one sentence goal.`
+            : `Lesson ${index + 1} needs at least two sentence goals.`
+        );
         return false;
       }
     }
