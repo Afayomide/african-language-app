@@ -96,11 +96,16 @@ type LessonQuestionSelectionPlan<T> = {
   historyEntry: LessonQuestionSelectionHistoryEntry;
 };
 
+// These limits assumed a lesson with several new items. A lesson that introduces ONE item --
+// the pacing the curriculum now uses, so the learner meets a word and drills it -- hit the
+// per-item limits long before the stage limits: 2 questions in stage 1 and 1 in stage 3, so
+// the lesson ended at ~13 blocks however many sentences it had. The per-item allowances are
+// raised, with the stage limits raised just enough to let them through.
 const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   1: {
-    stageLimit: 4,
-    groupLimits: { target: 3, sentence: 1, lesson: 0 },
-    perSourceLimits: { target: 2, sentence: 1, lesson: 0 }
+    stageLimit: 5,
+    groupLimits: { target: 4, sentence: 1, lesson: 0 },
+    perSourceLimits: { target: 3, sentence: 1, lesson: 0 }
   },
   2: {
     stageLimit: 5,
@@ -109,8 +114,8 @@ const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   },
   3: {
     stageLimit: 5,
-    groupLimits: { target: 2, sentence: 3, lesson: 0 },
-    perSourceLimits: { target: 1, sentence: 1, lesson: 0 }
+    groupLimits: { target: 2, sentence: 4, lesson: 0 },
+    perSourceLimits: { target: 2, sentence: 1, lesson: 0 }
   }
 };
 

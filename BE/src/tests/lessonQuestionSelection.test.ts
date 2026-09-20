@@ -130,3 +130,57 @@ test("selectLessonQuestionPlan prioritizes scheduled subtype requirements for th
 
   assert.equal(plan.selectedCandidates[0]?.questionSubtype, sentenceRequirement!.questionSubtype);
 });
+
+test("a lesson that introduces one item still fills its stages", () => {
+  // The pacing the curriculum uses is one new item per lesson. The per-item limits used to
+  // stop at 2 questions in stage 1 and 1 in stage 3, so such a lesson ended at ~13 blocks
+  // no matter how many sentences it had. It should now draw more from the single item and
+  // from a fourth sentence in stage 3.
+  const targetSubtypes: Record<1 | 2 | 3, string[]> = {
+    1: ["mc-select-translation", "ls-mc-select-translation", "fg-letter-order", "sp-pronunciation-compare"],
+    2: ["mc-select-context-response", "mc-select-missing-word", "mt-match-translation"],
+    3: ["ls-mc-select-translation", "sp-pronunciation-compare", "mc-select-translation"]
+  };
+  const candidates: LessonQuestionCandidate<string>[] = [];
+  for (const stage of [1, 2, 3] as const) {
+    for (const questionSubtype of targetSubtypes[stage]) {
+      candidates.push(
+        makeCandidate({
+          stage,
+          sourceGroup: questionSubtype === "mt-match-translation" ? "lesson" : "target",
+          sourceKey: questionSubtype === "mt-match-translation" ? "lesson:all" : "word:ni",
+          questionType: questionSubtype.startsWith("ls-") ? "listening" : "multiple-choice",
+          questionSubtype
+        })
+      );
+    }
+    // Each sentence offers a different exercise in each stage, as generation does: the same
+    // source and subtype cannot be selected twice across a lesson.
+    const sentenceSubtypes = ["fg-word-order", "ls-fg-gap-fill", "mc-select-translation", "mc-select-missing-word"];
+    for (const index of [1, 2, 3, 4]) {
+      candidates.push(
+        makeCandidate({
+          stage,
+          sourceGroup: "sentence",
+          sourceKey: `sentence:${index}`,
+          questionType: stage === 3 ? "listening" : "fill-in-the-gap",
+          questionSubtype: sentenceSubtypes[(index + stage) % sentenceSubtypes.length]!
+        })
+      );
+    }
+  }
+
+  const plan = selectLessonQuestionPlan(candidates, { lessonKey: "one-item-lesson", lessonMode: "core" });
+  const perStage = [1, 2, 3].map(
+    (stage) => plan.selectedCandidates.filter((candidate) => candidate.stage === stage).length
+  );
+  const fromTheItem = plan.selectedCandidates.filter((candidate) => candidate.sourceKey === "word:ni").length;
+
+  assert.ok(perStage[0] >= 3, `stage 1 should hold at least 3 questions, got ${perStage[0]}`);
+  assert.ok(perStage[2] >= 4, `stage 3 should hold at least 4 questions, got ${perStage[2]}`);
+  assert.ok(fromTheItem >= 5, `the single new item should carry at least 5 questions, got ${fromTheItem}`);
+  assert.ok(
+    plan.selectedCandidates.length >= 12,
+    `a one-item lesson should reach at least 12 questions, got ${plan.selectedCandidates.length}`
+  );
+});
