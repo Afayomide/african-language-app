@@ -119,6 +119,29 @@ const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   }
 };
 
+// A core lesson that introduces nothing. It is not a review lesson -- it belongs to its unit
+// and drills that unit's sentences -- but every allowance reserved for a new item would go
+// unclaimed, leaving a lesson of about nine blocks. The target allowance folds into sentences
+// instead, so the lesson is as long as any other; what fills it is combination practice
+// rather than a new card.
+const TARGETLESS_CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
+  1: {
+    stageLimit: 5,
+    groupLimits: { target: 0, sentence: 5, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 2, lesson: 0 }
+  },
+  2: {
+    stageLimit: 5,
+    groupLimits: { target: 0, sentence: 4, lesson: 1 },
+    perSourceLimits: { target: 0, sentence: 2, lesson: 1 }
+  },
+  3: {
+    stageLimit: 5,
+    groupLimits: { target: 0, sentence: 5, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 2, lesson: 0 }
+  }
+};
+
 const REVIEW_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   1: {
     stageLimit: 2,
@@ -334,19 +357,25 @@ function buildEmptyStageRequirements(): Record<1 | 2 | 3, ScheduledLessonRequire
   return buildEmptyStageRecord<ScheduledLessonRequirement[]>(() => []);
 }
 
-function getStageSelectionConfig(stage: 1 | 2 | 3, lessonMode: "core" | "review") {
-  return lessonMode === "review" ? REVIEW_STAGE_SELECTION_CONFIG[stage] : CORE_STAGE_SELECTION_CONFIG[stage];
+function getStageSelectionConfig(stage: 1 | 2 | 3, lessonMode: "core" | "review", hasTargets = true) {
+  if (lessonMode === "review") return REVIEW_STAGE_SELECTION_CONFIG[stage];
+  return hasTargets ? CORE_STAGE_SELECTION_CONFIG[stage] : TARGETLESS_CORE_STAGE_SELECTION_CONFIG[stage];
 }
 
 function getGlobalSourceLimit(
   lessonMode: "core" | "review",
-  sourceGroup: LessonQuestionSourceGroup
+  sourceGroup: LessonQuestionSourceGroup,
+  hasTargets = true
 ) {
   // A core lesson had no cap, so selection could spend three exercises on one sentence and
   // never touch the fourth: a lesson with four sentences drilled two of them. Two per
   // sentence forces it on to the next one. Words and expressions stay uncapped -- the
   // lesson's own target is meant to recur.
-  if (sourceGroup === "sentence") return 2;
+  //
+  // A core lesson with no target is the one case where two is too few: there is no target to
+  // carry the lesson, so the sentences must, and three keeps it the length of its neighbours
+  // while still moving on before a fourth exercise on the same sentence.
+  if (sourceGroup === "sentence") return lessonMode === "core" && !hasTargets ? 3 : 2;
   return Number.POSITIVE_INFINITY;
 }
 
@@ -609,11 +638,12 @@ function canSelectCandidate<T>(
   stageState: SelectionStageState,
   selectedSourceSubtypeKeys: Set<string>,
   globalSourceCounts: Map<string, number>,
-  lessonMode: "core" | "review"
+  lessonMode: "core" | "review",
+  hasTargets = true
 ) {
   if (stageState.groupCounts[candidate.sourceGroup] >= stageConfig.groupLimits[candidate.sourceGroup]) return false;
   if ((stageState.sourceCounts.get(candidate.sourceKey) || 0) >= stageConfig.perSourceLimits[candidate.sourceGroup]) return false;
-  if ((globalSourceCounts.get(candidate.sourceKey) || 0) >= getGlobalSourceLimit(lessonMode, candidate.sourceGroup)) return false;
+  if ((globalSourceCounts.get(candidate.sourceKey) || 0) >= getGlobalSourceLimit(lessonMode, candidate.sourceGroup, hasTargets)) return false;
   if (stageState.sourceFamilyKeys.has(`${candidate.sourceKey}:${candidate.family}`)) return false;
   if (selectedSourceSubtypeKeys.has(`${candidate.sourceKey}:${candidate.questionSubtype}`)) return false;
   if (stage >= 2 && (stageState.familyCounts.get(candidate.family) || 0) >= 2) return false;
@@ -887,10 +917,14 @@ export function selectLessonQuestionPlan<T>(
   const selectedByStage = buildEmptyStageRecord<DecoratedCandidate<T>[]>(() => []);
   const selectedSourceSubtypeKeys = new Set<string>();
   const effectiveLessonMode = options.lessonMode || scheduledPlan?.lessonMode || "core";
+  // A core lesson that introduces nothing: its target allowance would go unclaimed, so it is
+  // given to the sentences instead. Read from the candidates rather than passed in, because a
+  // lesson has no target here precisely when nothing offered one.
+  const hasTargets = decoratedCandidates.some((candidate) => candidate.sourceGroup === "target");
   const globalSourceCounts = new Map<string, number>();
 
   for (const stage of [1, 2, 3] as const) {
-    const stageConfig = getStageSelectionConfig(stage, effectiveLessonMode);
+    const stageConfig = getStageSelectionConfig(stage, effectiveLessonMode, hasTargets);
     const stageCandidates = decoratedCandidates.filter((candidate) => candidate.stage === stage);
     const stageState: SelectionStageState = {
       groupCounts: { target: 0, sentence: 0, lesson: 0 },
@@ -917,7 +951,7 @@ export function selectLessonQuestionPlan<T>(
 
       for (let index = 0; index < stageCandidates.length; index += 1) {
         const candidate = stageCandidates[index]!;
-        if (!canSelectCandidate(candidate, stage, stageConfig, stageState, selectedSourceSubtypeKeys, globalSourceCounts, effectiveLessonMode)) continue;
+        if (!canSelectCandidate(candidate, stage, stageConfig, stageState, selectedSourceSubtypeKeys, globalSourceCounts, effectiveLessonMode, hasTargets)) continue;
         const requirementKey = buildRequirementKey(stage, candidate.sourceGroup, candidate.questionSubtype);
         const isPendingRequiredCandidate = pendingRequiredKeys.has(requirementKey);
         if (foundRequiredCandidate && !isPendingRequiredCandidate) {
@@ -1056,11 +1090,12 @@ export function computeReviewSelectionCeiling<T>(
   candidates: LessonQuestionCandidate<T>[],
   lessonMode: "core" | "review" = "review"
 ): number {
+  const hasTargets = candidates.some((candidate) => candidate.sourceGroup === "target");
   const bySourceTotal = new Map<string, number>();
   let stageCapacity = 0;
 
   for (const stage of [1, 2, 3] as const) {
-    const config = getStageSelectionConfig(stage, lessonMode);
+    const config = getStageSelectionConfig(stage, lessonMode, hasTargets);
     const stageCandidates = candidates.filter((candidate) => candidate.stage === stage);
     const perSourceAtStage = new Map<string, number>();
 
@@ -1079,7 +1114,7 @@ export function computeReviewSelectionCeiling<T>(
   let sourceCapacity = 0;
   for (const [sourceKey, total] of bySourceTotal) {
     const group = candidates.find((candidate) => candidate.sourceKey === sourceKey)?.sourceGroup || "sentence";
-    sourceCapacity += Math.min(getGlobalSourceLimit(lessonMode, group), total);
+    sourceCapacity += Math.min(getGlobalSourceLimit(lessonMode, group, hasTargets), total);
   }
 
   return Math.min(stageCapacity, sourceCapacity);

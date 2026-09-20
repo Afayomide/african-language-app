@@ -60,6 +60,24 @@ export function clampSentencesPerLesson(value: number) {
   return clampNewTargetsPerLesson(requested);
 }
 
+/**
+ * A requested count of new items for one lesson, where zero survives.
+ *
+ * A core lesson may legitimately introduce nothing. Roughly twenty Yoruba lessons currently
+ * spend their teaching slot on a phrase that is only its parts joined -- `mu omi` is "drink"
+ * plus "water" -- and once that phrase is gone the lesson has no new item and no spare word in
+ * its unit to take the place. Such a lesson is still a core lesson: it drills the sentences
+ * its unit has built, which is what the slot was worth all along.
+ *
+ * clampNewTargetsPerLesson floors at 1 and stays the unit-level knob; this is the per-lesson
+ * override, and only an explicit zero reaches it.
+ */
+export function clampLessonNewTargets(value: number) {
+  const requested = Number(value);
+  if (Number.isFinite(requested) && requested <= 0) return 0;
+  return clampNewTargetsPerLesson(requested);
+}
+
 export function resolveSentencePlan(input: { sentencesPerLesson: number; isReviewLesson: boolean }) {
   const requested = Number(input.sentencesPerLesson);
   const sentenceFree = !input.isReviewLesson && Number.isFinite(requested) && requested <= 0;

@@ -79,6 +79,8 @@ const UnitAiPreviewPlanLessonSchema = new Schema(
       ],
       default: []
     },
+    sentences: { type: Number },
+    newTargets: { type: Number },
     lessonMode: { type: String, enum: ["core", "review"] },
     sourceCoreLessonIndexes: { type: [Number], default: [] },
     reviewSourceLessonIds: { type: [String], default: [] },

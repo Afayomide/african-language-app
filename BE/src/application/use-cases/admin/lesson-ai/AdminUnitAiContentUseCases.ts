@@ -36,6 +36,7 @@ import {
   LESSON_GENERATION_LIMITS,
   MIN_SENTENCE_SOURCES_FLOOR,
   MIN_SENTENCE_SOURCES_PER_LESSON,
+  clampLessonNewTargets,
   clampNewTargetsPerLesson,
   clampReviewContentPerLesson,
   clampSentencesPerLesson,
@@ -1311,7 +1312,8 @@ function normalizeUnitPlanLesson(lesson: LlmUnitPlanLesson): LlmUnitPlanLesson {
     targetExpressions: routed.targetExpressions,
     // Absent stays absent: the lesson then follows the unit's setting, as every plan written
     // before this field did. Only an explicit number overrides it.
-    sentences: normalizeLessonSentenceCount(lesson.sentences)
+    sentences: normalizeLessonSentenceCount(lesson.sentences),
+    newTargets: normalizeLessonNewTargets(lesson.newTargets)
   };
 }
 
@@ -1320,6 +1322,13 @@ function normalizeLessonSentenceCount(value: unknown): number | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (!Number.isFinite(Number(value))) return undefined;
   return clampSentencesPerLesson(Number(value));
+}
+
+/** A per-lesson count of new items: a whole number 0..MAX, or undefined for "as the unit". */
+function normalizeLessonNewTargets(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (!Number.isFinite(Number(value))) return undefined;
+  return clampLessonNewTargets(Number(value));
 }
 
 function tokenizeReviewPlanKeywords(values: string[]) {
@@ -4715,10 +4724,16 @@ export class AdminUnitAiContentUseCases {
         item
       ] as const)
     );
+    // A core lesson that introduces nothing, said out loud by the plan. Naming no targets and
+    // leaving the choice to the model are otherwise the same input, and the model always picks
+    // something: a lesson emptied on purpose would teach `mu omi` again under another name.
+    // Emptying the plan's targets here covers every branch below at once, including a stale
+    // target list left behind on a lesson later set to introduce nothing.
+    const introducesNothing = !isReviewExerciseLesson && Number(input.plan.newTargets) === 0;
     const explicitCoreTargets: {
       words: Array<{ text: string; translations: string[] }>;
       expressions: Array<{ text: string; translations: string[] }>;
-    } = isReviewExerciseLesson
+    } = isReviewExerciseLesson || introducesNothing
       ? { words: [], expressions: [] }
       : {
           words: planTargetWords.map((target) => {
@@ -4899,8 +4914,12 @@ export class AdminUnitAiContentUseCases {
             : "",
           input.extraInstructions ? input.extraInstructions.trim() : "",
           "Generate practical conversational sentences learners can actually say in this chapter and lesson.",
-          "Use the generated sentences to surface reusable words and expressions, but do not teach the whole sentence as the introductory content item.",
-          "Stage 1 should introduce target words and expressions first, then later stages should apply them in sentence context.",
+          introducesNothing
+            ? "This lesson introduces NO new word or expression. Build every sentence from what the learner already knows; the lesson's whole value is combining taught items in ways they have not met yet."
+            : "Use the generated sentences to surface reusable words and expressions, but do not teach the whole sentence as the introductory content item.",
+          introducesNothing
+            ? ""
+            : "Stage 1 should introduce target words and expressions first, then later stages should apply them in sentence context.",
           input.plan.focusSummary ? `Lesson focus: ${input.plan.focusSummary}` : "",
           input.plan.objectives.length > 0 ? `Lesson objectives: ${input.plan.objectives.join(" | ")}` : "",
           conversationGoal ? `Primary conversation goal: ${conversationGoal}` : "",
@@ -4914,17 +4933,23 @@ export class AdminUnitAiContentUseCases {
         .map(sanitizeGeneratedSentence)
         .filter((item): item is LlmGeneratedSentence => Boolean(item));
 
-      const lockedTargets = await this.selectLockedCoreTargets({
-        lesson: input.lesson,
-        sentenceDrafts: discoverySentenceDrafts,
-        targetCount: targetNewSentences,
-        planTexts: wordTargetPlanTexts,
-        currentLessonWords,
-        currentLessonExpressions,
-        wordLanguagePool: [...input.wordLanguagePool, ...input.wordRepetitionPool],
-        expressionLanguagePool: [...input.languagePool, ...input.repetitionPool]
-      });
-      const effectiveLockedTargets = hasExplicitCoreTargets ? explicitCoreTargets : lockedTargets;
+      const lockedTargets = introducesNothing
+        ? { words: [], expressions: [] }
+        : await this.selectLockedCoreTargets({
+            lesson: input.lesson,
+            sentenceDrafts: discoverySentenceDrafts,
+            targetCount: targetNewSentences,
+            planTexts: wordTargetPlanTexts,
+            currentLessonWords,
+            currentLessonExpressions,
+            wordLanguagePool: [...input.wordLanguagePool, ...input.wordRepetitionPool],
+            expressionLanguagePool: [...input.languagePool, ...input.repetitionPool]
+          });
+      const effectiveLockedTargets = introducesNothing
+        ? { words: [], expressions: [] }
+        : hasExplicitCoreTargets
+          ? explicitCoreTargets
+          : lockedTargets;
       // Auto-selected locked targets still steer sentence generation below, but they must
       // never create expression rows. hasExplicitCoreTargets is a combined word+expression
       // check, so a plan naming only target words fell through to model-inferred targets and

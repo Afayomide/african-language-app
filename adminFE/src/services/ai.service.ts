@@ -28,6 +28,8 @@ export type UnitPlanLesson = {
   targetExpressions?: Array<{ text: string; translations?: string[] }>;
   /** Sentences this lesson generates; undefined follows the unit's setting. */
   sentences?: number;
+  /** New items this lesson introduces; undefined follows the unit's setting, 0 introduces none. */
+  newTargets?: number;
 };
 
 export type UnitPlanSequenceLesson = UnitPlanLesson & {

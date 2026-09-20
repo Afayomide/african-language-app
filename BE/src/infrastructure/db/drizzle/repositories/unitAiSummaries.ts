@@ -105,6 +105,10 @@ function normalizePreviewPlanLesson(value: unknown): UnitAiPreviewPlanLesson {
     focusSummary: input.focusSummary ? String(input.focusSummary) : undefined,
     targetWords: normalizeTargets(input.targetWords),
     targetExpressions: normalizeTargets(input.targetExpressions),
+    // A stored plan is reloaded and approved from the preview, so a per-lesson override
+    // dropped here is an override the editor shows and the generator never sees.
+    sentences: input.sentences == null ? undefined : Number(input.sentences),
+    newTargets: input.newTargets == null ? undefined : Number(input.newTargets),
     lessonMode,
     sourceCoreLessonIndexes: Array.isArray(input.sourceCoreLessonIndexes)
       ? input.sourceCoreLessonIndexes.map(Number).filter((item) => Number.isInteger(item) && item >= 0)

@@ -102,6 +102,15 @@ export type LlmUnitPlanLesson = {
    * (`Ẹ káàárọ̀` is a greeting, not a sentence) and has no second item to combine it with.
    */
   sentences?: number;
+  /**
+   * How many new items this lesson introduces, overriding the unit's setting.
+   *
+   * Absent means "as the unit", which is what every plan written before this field means. 0 is
+   * the case that needs saying out loud: a core lesson that teaches nothing new and spends
+   * itself drilling what the unit has already built. Without it, a plan naming no targets is
+   * indistinguishable from a plan leaving the choice to the model, and the model picks one.
+   */
+  newTargets?: number;
 };
 
 export type LlmLessonRefactorOperation =

@@ -188,6 +188,47 @@ test("a lesson that introduces one item still fills its stages", () => {
   );
 });
 
+test("a core lesson that introduces nothing is still a full lesson", () => {
+  // Roughly twenty Yoruba lessons teach a phrase that is only its parts joined, and their
+  // units hold no spare word to put in its place. Such a lesson stays core and drills its
+  // unit's sentences -- but the allowances reserved for a new item would go unclaimed, so it
+  // would ship at about nine blocks while its neighbours ship fifteen.
+  const sentenceSubtypes = ["fg-word-order", "ls-fg-gap-fill", "mc-select-translation", "mc-select-missing-word"];
+  const candidates: LessonQuestionCandidate<string>[] = [];
+  for (const stage of [1, 2, 3] as const) {
+    for (const index of [1, 2, 3, 4]) {
+      for (const [offset, subtype] of sentenceSubtypes.entries()) {
+        candidates.push(
+          makeCandidate({
+            stage,
+            sourceGroup: "sentence",
+            sourceKey: `sentence:${index}`,
+            questionType: subtype.startsWith("ls-") ? "listening" : "fill-in-the-gap",
+            questionSubtype: sentenceSubtypes[(offset + stage + index) % sentenceSubtypes.length]!
+          })
+        );
+      }
+    }
+  }
+
+  const plan = selectLessonQuestionPlan(candidates, { lessonKey: "targetless-lesson", lessonMode: "core" });
+  const perSentence = new Map<string, number>();
+  for (const candidate of plan.selectedCandidates) {
+    perSentence.set(candidate.sourceKey, (perSentence.get(candidate.sourceKey) || 0) + 1);
+  }
+
+  assert.ok(
+    plan.selectedCandidates.length >= 11,
+    `a targetless lesson should still reach at least 11 questions, got ${plan.selectedCandidates.length}`
+  );
+  assert.equal(perSentence.size, 4, `all four sentences should be used, used ${perSentence.size}`);
+  // Three, not two: with no target to carry the lesson the sentences must, but a fourth
+  // exercise on one sentence would be drilling it rather than teaching the combination.
+  for (const [sourceKey, count] of perSentence) {
+    assert.ok(count <= 3, `${sourceKey} used ${count} times, more than three`);
+  }
+});
+
 test("every sentence in a lesson gets used, and none is drilled to death", () => {
   // A four-sentence lesson spent three exercises on one sentence and never touched the
   // fourth, because a core lesson had no per-source cap.

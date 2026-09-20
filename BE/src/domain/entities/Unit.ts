@@ -41,6 +41,9 @@ export type UnitAiPreviewPlanLesson = {
   focusSummary?: string;
   targetWords?: Array<{ text: string; translations?: string[] }>;
   targetExpressions?: Array<{ text: string; translations?: string[] }>;
+  /** Per-lesson overrides of the unit's settings; undefined means "as the unit". */
+  sentences?: number;
+  newTargets?: number;
   lessonMode?: "core" | "review";
   sourceCoreLessonIndexes?: number[];
   reviewSourceLessonIds?: string[];

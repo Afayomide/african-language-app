@@ -96,7 +96,8 @@ function normalizeEditablePlanLesson(lesson: UnitPlanLesson): UnitPlanLesson {
     targetWords: normalizePlanTargets(lesson.targetWords),
     targetExpressions: normalizePlanTargets(lesson.targetExpressions),
     // undefined means "as the unit", which is how every plan behaved before this field.
-    sentences: lesson.sentences
+    sentences: lesson.sentences,
+    newTargets: lesson.newTargets
   };
 }
 
@@ -1519,6 +1520,24 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                         </p>
                       </div>
                       <div className="space-y-2">
+                        <Label>New Words</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={2}
+                          placeholder={String(contentNewTargetsPerLesson)}
+                          value={lesson.newTargets ?? ""}
+                          onChange={(event) =>
+                            updateEditablePlanLesson(index, {
+                              newTargets: event.target.value === "" ? undefined : Number(event.target.value)
+                            })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Blank follows the unit ({contentNewTargetsPerLesson}). 0 introduces nothing: the lesson drills sentences built from what is already taught.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
                         <Label>Sentence Goals</Label>
                         <Textarea
                           rows={3}
@@ -1733,6 +1752,24 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                           />
                           <p className="text-xs text-muted-foreground">
                             Blank follows the unit ({contentSentencesPerLesson}). 0 teaches this lesson&apos;s targets with no sentences.
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>New Words</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={2}
+                            placeholder={String(contentNewTargetsPerLesson)}
+                            value={lesson.newTargets ?? ""}
+                            onChange={(event) =>
+                              updateEditablePlanLesson(index, {
+                                newTargets: event.target.value === "" ? undefined : Number(event.target.value)
+                              })
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Blank follows the unit ({contentNewTargetsPerLesson}). 0 introduces nothing: the lesson drills sentences built from what is already taught.
                           </p>
                         </div>
                         <div className="space-y-2">

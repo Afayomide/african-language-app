@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { clampSentencesPerLesson, resolveSentencePlan, LESSON_GENERATION_LIMITS } from "../config/lessonGeneration.js";
+import {
+  clampLessonNewTargets,
+  clampSentencesPerLesson,
+  resolveSentencePlan,
+  LESSON_GENERATION_LIMITS
+} from "../config/lessonGeneration.js";
 
 test("a lesson's own zero survives the clamp", () => {
   // clampNewTargetsPerLesson would raise 0 to 1. A lesson that asks for no sentences must
@@ -76,4 +81,14 @@ test("a lesson can opt out of sentences while the unit keeps them", () => {
 
 test("a lesson can also ask for fewer sentences than the unit", () => {
   assert.equal(effective(1, 2).targetNewSentences, 1);
+});
+
+test("a lesson can introduce nothing while the unit still introduces something", () => {
+  // The unit-level clamp floors at 1, so a lesson could not say "no new item" and the
+  // generator picked one for it: a lesson emptied of a phrase that was only its parts joined
+  // would teach that phrase again under another name.
+  assert.equal(clampLessonNewTargets(0), 0);
+  assert.equal(clampLessonNewTargets(1), 1);
+  assert.equal(clampLessonNewTargets(99), LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON);
+  assert.equal(clampLessonNewTargets(Number.NaN), LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON);
 });
