@@ -161,6 +161,9 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [contentLessonCount, setContentLessonCount] = useState(4);
   const [contentNewTargetsPerLesson, setContentNewTargetsPerLesson] = useState(2);
+  // Sentences are counted separately from new targets: a first lesson can teach one item and
+  // no sentences at all (0), which is what an expression-only lesson needs.
+  const [contentSentencesPerLesson, setContentSentencesPerLesson] = useState(2);
   const [contentReviewContentPerLesson, setContentReviewContentPerLesson] = useState(2);
   // One proverb per lesson, shown last. Two meant the generator had to invent a second,
   // and what came back was the unit's own vocabulary in proverb shape rather than
@@ -373,6 +376,9 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
 
     setContentLessonCount(plan.settings.lessonCount || plan.requestedLessons);
     setContentNewTargetsPerLesson(plan.settings.sentencesPerLesson || contentNewTargetsPerLesson);
+    setContentSentencesPerLesson(
+      plan.settings.sentencesPerLesson === undefined ? contentSentencesPerLesson : plan.settings.sentencesPerLesson
+    );
     setContentReviewContentPerLesson(plan.settings.reviewContentPerLesson ?? contentReviewContentPerLesson);
     setContentProverbsPerLesson(plan.settings.proverbsPerLesson ?? contentProverbsPerLesson);
     setContentTopic((plan.settings.topics || [])[0] || "");
@@ -561,6 +567,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         mode,
         lessonCount: contentLessonCount,
         newTargetsPerLesson: contentNewTargetsPerLesson,
+        sentencesPerLesson: contentSentencesPerLesson,
         reviewContentPerLesson: contentReviewContentPerLesson,
         proverbsPerLesson: contentProverbsPerLesson,
         topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
@@ -583,7 +590,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         actualLessonCount: lessonSequence.length,
         settings: result.settings || {
           lessonCount: contentLessonCount,
-          sentencesPerLesson: contentNewTargetsPerLesson,
+          sentencesPerLesson: contentSentencesPerLesson,
           reviewContentPerLesson: contentReviewContentPerLesson,
           proverbsPerLesson: contentProverbsPerLesson,
           topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
@@ -630,6 +637,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         mode,
         lessonCount: contentLessonCount,
         newTargetsPerLesson: contentNewTargetsPerLesson,
+        sentencesPerLesson: contentSentencesPerLesson,
         reviewContentPerLesson: contentReviewContentPerLesson,
         proverbsPerLesson: contentProverbsPerLesson,
         topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
@@ -712,6 +720,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
         mode: revisionMode,
         lessonCount: contentLessonCount,
         newTargetsPerLesson: contentNewTargetsPerLesson,
+        sentencesPerLesson: contentSentencesPerLesson,
         reviewContentPerLesson: contentReviewContentPerLesson,
         proverbsPerLesson: contentProverbsPerLesson,
         topics: contentTopic.trim() ? [contentTopic.trim()] : undefined,
@@ -764,6 +773,10 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
     }
     if (!Number.isInteger(contentNewTargetsPerLesson) || contentNewTargetsPerLesson < 1 || contentNewTargetsPerLesson > 2) {
       toast.error("New Targets / Lesson must be a whole number between 1 and 2.");
+      return false;
+    }
+    if (!Number.isInteger(contentSentencesPerLesson) || contentSentencesPerLesson < 0 || contentSentencesPerLesson > 2) {
+      toast.error("Sentences / Lesson must be a whole number between 0 and 2.");
       return false;
     }
     if (
@@ -1332,6 +1345,20 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                     resetContentPlanEditor();
                   }}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Sentences / Lesson</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={2}
+                  value={contentSentencesPerLesson}
+                  onChange={(event) => {
+                    setContentSentencesPerLesson(Number(event.target.value));
+                    resetContentPlanEditor();
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">0 teaches the targets on their own, with no sentences.</p>
               </div>
               <div className="space-y-2">
                 <Label>Review Items / Lesson</Label>

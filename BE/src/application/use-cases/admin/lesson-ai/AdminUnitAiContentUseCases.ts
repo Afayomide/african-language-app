@@ -34,8 +34,11 @@ import { buildPedagogicalStages } from "../../../services/defaultLessonStages.js
 import { AdminLessonAiUseCases, buildInitialStages } from "./AdminLessonAiUseCases.js";
 import {
   LESSON_GENERATION_LIMITS,
+  MIN_SENTENCE_SOURCES_FLOOR,
+  MIN_SENTENCE_SOURCES_PER_LESSON,
   clampNewTargetsPerLesson,
-  clampReviewContentPerLesson
+  clampReviewContentPerLesson,
+  resolveSentencePlan
 } from "../../../../config/lessonGeneration.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../../../services/llm/aiGenerationLogger.js";
 import { appendAiPlanLog } from "../../../../services/llm/aiPlanFileLogger.js";
@@ -166,12 +169,11 @@ type LessonGenerationSummary = {
   blocksGenerated: number;
 };
 
-const MIN_SENTENCE_SOURCES_PER_LESSON = 3;
-// Absolute floor a lesson is allowed to ship with after DB top-up. When fewer than
-// MIN_SENTENCE_SOURCES_PER_LESSON fresh sentences assemble, we borrow on-target sentences
-// from the DB; if we still can't reach the target we allow the lesson down to this floor
-// (logged as underfilled) instead of failing the whole unit. Below the floor we still throw.
-const MIN_SENTENCE_SOURCES_FLOOR = 2;
+// MIN_SENTENCE_SOURCES_PER_LESSON / MIN_SENTENCE_SOURCES_FLOOR now live in
+// config/lessonGeneration.ts beside resolveSentencePlan, which decides both per lesson: when
+// a lesson is asked for no sentences at all, the target and the floor are zero rather than 3
+// and 2. A sentence-based lesson still borrows from the DB to reach the target and still
+// throws below the floor.
 const REVIEW_ANCHOR_SENTENCES_PER_LESSON = 5;
 const REVIEW_VARIANT_SENTENCES_PER_LESSON = 3;
 
@@ -3317,6 +3319,22 @@ export class AdminUnitAiContentUseCases {
       coreExpressions.set(normalize(expression.text), expression);
     }
 
+    // The same for planned target WORDS. Words otherwise arrive only as sentence components,
+    // so a lesson generated without sentences (sentencesPerLesson: 0) had nothing to teach
+    // when its target was a word like `Màmá`. A word already met as a component is untouched.
+    for (const targetWord of input.targetWords || []) {
+      const normalizedText = normalize(targetWord.text);
+      if (!normalizedText || coreWords.has(normalizedText)) continue;
+      if (splitWords(targetWord.text).length > 1) continue; // a phrase belongs to the loop above
+      const word = await this.upsertWordFromSentenceComponent({
+        lesson: input.lesson,
+        text: targetWord.text,
+        translations: targetWord.translations
+      });
+      coreWords.set(normalize(word.text), word);
+      supportWords.delete(normalize(word.text));
+    }
+
     await this.fillMissingExpressionExplanations(input.lesson, [
       ...coreExpressions.values(),
       ...supportExpressions.values()
@@ -4481,7 +4499,11 @@ export class AdminUnitAiContentUseCases {
           .map((value) => String(value || "").trim())
           .filter(Boolean)
       : [];
-    const targetNewSentences = clampNewTargetsPerLesson(input.sentencesPerLesson);
+    const sentencePlan = resolveSentencePlan({
+      sentencesPerLesson: input.sentencesPerLesson,
+      isReviewLesson: isReviewExerciseLesson
+    });
+    const targetNewSentences = sentencePlan.targetNewSentences;
     const targetReviewContent = clampReviewContentPerLesson(
       Number(input.reviewContentPerLesson),
       targetNewSentences
@@ -4489,10 +4511,12 @@ export class AdminUnitAiContentUseCases {
     const conversationGoal = String((input.plan as { conversationGoal?: unknown }).conversationGoal || "").trim();
     const situations = normalizePlanItems((input.plan as { situations?: unknown }).situations);
     const sentenceGoals = normalizePlanItems((input.plan as { sentenceGoals?: unknown }).sentenceGoals);
-    const baseTargetSentenceCount = Math.min(
-      LESSON_GENERATION_LIMITS.MAX_NEW_SENTENCES_PER_LESSON,
-      Math.max(2, targetNewSentences * LESSON_GENERATION_LIMITS.MIN_SENTENCES_PER_TARGET)
-    );
+    const baseTargetSentenceCount = sentencePlan.sentenceFree
+      ? 0
+      : Math.min(
+          LESSON_GENERATION_LIMITS.MAX_NEW_SENTENCES_PER_LESSON,
+          Math.max(2, targetNewSentences * LESSON_GENERATION_LIMITS.MIN_SENTENCES_PER_TARGET)
+        );
     const targetSentenceCount = isSentenceOnlyReviewUnit
       ? Math.max(baseTargetSentenceCount + 2, 6)
       : baseTargetSentenceCount;
@@ -4597,7 +4621,13 @@ export class AdminUnitAiContentUseCases {
         input.reviewContext.sourceUnitIds.length > 0
     );
 
-    if (useReviewFlow && input.reviewContext && reviewLockedTargets) {
+    if (sentencePlan.sentenceFree) {
+      // Nothing is drafted and nothing is borrowed: the lesson teaches the targets the plan
+      // names, on their own. This is the first lesson of a unit, where the new item IS the
+      // content (`Ẹ káàárọ̀` is a greeting, not a sentence) and inventing a sentence for it
+      // only produced a row duplicating the word card.
+      expressionTargetsForContent = explicitCoreTargets.expressions;
+    } else if (useReviewFlow && input.reviewContext && reviewLockedTargets) {
       const lockedTargets = reviewLockedTargets;
       expressionTargetsForContent = lockedTargets.expressions;
       const allowedWords = Array.from(
@@ -5080,7 +5110,9 @@ export class AdminUnitAiContentUseCases {
     // Reassigning generatedSentences here means borrowed sentences flow through every
     // downstream step (question drafts, stage blocks, stats) exactly like generated ones.
     const assembledSentenceCount = generatedSentences.length;
-    if (assembledSentenceCount < MIN_SENTENCE_SOURCES_PER_LESSON) {
+    // A lesson asked for no sentences borrows none: pulling in old sentences to fill a quota
+    // is what put untaught words in front of beginners.
+    if (!sentencePlan.sentenceFree && assembledSentenceCount < sentencePlan.minSources) {
       const coreTargetIds = new Set<string>([
         ...words.map((item) => item.id),
         ...expressions.map((item) => item.id)
@@ -5120,12 +5152,12 @@ export class AdminUnitAiContentUseCases {
     const lessonSentenceSources = Array.from(
       new Map(reviewSentenceSources.map((sentence) => [sentence.id, sentence] as const)).values()
     );
-    if (lessonSentenceSources.length < MIN_SENTENCE_SOURCES_FLOOR) {
+    if (lessonSentenceSources.length < sentencePlan.floor) {
       throw new Error(
-        `${isReviewExerciseLesson ? "Review lesson" : "Lesson"} requires at least ${MIN_SENTENCE_SOURCES_FLOOR} sentences, but only ${lessonSentenceSources.length} could be assembled or borrowed.`
+        `${isReviewExerciseLesson ? "Review lesson" : "Lesson"} requires at least ${sentencePlan.floor} sentences, but only ${lessonSentenceSources.length} could be assembled or borrowed.`
       );
     }
-    if (lessonSentenceSources.length < MIN_SENTENCE_SOURCES_PER_LESSON) {
+    if (!sentencePlan.sentenceFree && lessonSentenceSources.length < sentencePlan.minSources) {
       console.warn("[SENTENCE_UNDERFILLED]", {
         lessonId: input.lesson.id,
         title: input.lesson.title,

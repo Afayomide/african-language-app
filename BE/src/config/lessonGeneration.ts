@@ -36,6 +36,36 @@ export function clampReviewContentPerLesson(value: number, newTargetsPerLesson: 
   );
 }
 
+/**
+ * How many sentences a lesson aims for, and the floor it may not fall below.
+ *
+ * `sentencesPerLesson: 0` asks for a lesson with NO sentences: the first lesson of a unit
+ * isolates one new item (`Ẹ káàárọ̀`, a greeting, not a sentence), drills it, and only meets
+ * a sentence once a second item exists to combine with. Without this the lesson had to invent
+ * something, which is how one-word "sentences" duplicating the word card appeared.
+ *
+ * A review lesson is always sentence-based -- it exists to revisit sentences already taught --
+ * so it ignores the request.
+ */
+export function resolveSentencePlan(input: { sentencesPerLesson: number; isReviewLesson: boolean }) {
+  const requested = Number(input.sentencesPerLesson);
+  const sentenceFree = !input.isReviewLesson && Number.isFinite(requested) && requested <= 0;
+  if (sentenceFree) {
+    return { sentenceFree: true, targetNewSentences: 0, minSources: 0, floor: 0 } as const;
+  }
+  return {
+    sentenceFree: false,
+    targetNewSentences: clampNewTargetsPerLesson(requested),
+    minSources: MIN_SENTENCE_SOURCES_PER_LESSON,
+    floor: MIN_SENTENCE_SOURCES_FLOOR
+  } as const;
+}
+
+/** Sentences a lesson aims to ship with. */
+export const MIN_SENTENCE_SOURCES_PER_LESSON = 3;
+/** Absolute floor below which a sentence-based lesson fails rather than ships. */
+export const MIN_SENTENCE_SOURCES_FLOOR = 2;
+
 /** Fallback when MIN_SENTENCE_WORDS is unset or unusable -- the long-standing behaviour. */
 export const DEFAULT_MIN_SENTENCE_WORDS = 2;
 

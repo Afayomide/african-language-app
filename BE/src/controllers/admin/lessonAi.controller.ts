@@ -564,11 +564,11 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson < 0 ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}. 0 means a lesson with no sentences.`
     });
   }
   if (
@@ -661,11 +661,11 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson < 0 ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}. 0 means a lesson with no sentences.`
     });
   }
   if (
@@ -766,11 +766,11 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson < 0 ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}. 0 means a lesson with no sentences.`
     });
   }
   if (
@@ -871,11 +871,11 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
+    requestedSentencesPerLesson < 0 ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}.`
+      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}. 0 means a lesson with no sentences.`
     });
   }
   if (

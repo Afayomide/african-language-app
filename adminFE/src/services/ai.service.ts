@@ -231,8 +231,10 @@ export const aiService = {
           } = payload;
           return {
             ...rest,
+            // An explicit sentence count wins over the target count: 0 means "no sentences in
+            // this lesson", and the target count must not override that.
             sentencesPerLesson:
-              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+              payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
             reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
           };
         })()
@@ -267,7 +269,7 @@ export const aiService = {
           return {
             ...rest,
             sentencesPerLesson:
-              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+              payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
             reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
           };
         })()
@@ -304,7 +306,7 @@ export const aiService = {
     const requestPayload = {
       ...rest,
       sentencesPerLesson:
-        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+        payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
     const response = await api.post<AppliedUnitContentResult>(
@@ -338,7 +340,7 @@ export const aiService = {
     const requestPayload = {
       ...rest,
       sentencesPerLesson:
-        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+        payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
     const response = await api.post<UnitRevisionResult>(feAdminRoutes.reviseUnitContent(unitId), requestPayload);
