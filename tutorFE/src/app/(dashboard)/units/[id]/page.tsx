@@ -1718,6 +1718,24 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                           />
                         </div>
                         <div className="space-y-2">
+                          <Label>Sentences</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={2}
+                            placeholder={String(contentSentencesPerLesson)}
+                            value={lesson.sentences ?? ""}
+                            onChange={(event) =>
+                              updateEditablePlanLesson(index, {
+                                sentences: event.target.value === "" ? undefined : Number(event.target.value)
+                              })
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Blank follows the unit ({contentSentencesPerLesson}). 0 teaches this lesson&apos;s targets with no sentences.
+                          </p>
+                        </div>
+                        <div className="space-y-2">
                           <Label>Sentence Goals</Label>
                           <Textarea
                             rows={3}
