@@ -4960,8 +4960,21 @@ export class AdminUnitAiContentUseCases {
           conversationGoal,
           situations,
           sentenceGoals,
+          // The same taught-vocabulary limit as the discovery call above. Without it this
+          // second pass produced `Màmá mi ni.` for a lesson teaching `ni` -- on target, so it
+          // filled the lesson's slots -- while `mi` is the NEXT lesson's word.
+          ...(hasInventory
+            ? {
+                allowedWords: allowedCoreWords,
+                allowedExpressions: allowedCoreExpressions,
+                allowDerivedComponents: false
+              }
+            : {}),
           extraInstructions: [
             input.extraInstructions ? input.extraInstructions.trim() : "",
+            hasInventory
+              ? "Every sentence must use ONLY the allowed words and expressions listed above. They are what this learner has been taught; anything else is unknown to them."
+              : "",
             lockedTargetInstruction,
             "Generate practical conversational sentences learners can actually say in this chapter and lesson.",
             "Use the generated sentences to reinforce the locked targets, not to replace them with different introductory items.",
