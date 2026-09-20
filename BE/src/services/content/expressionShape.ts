@@ -29,8 +29,10 @@ export function isSentenceLikeExpressionText(value: string): boolean {
   const tokens = splitExpressionIntoWordTokens(raw);
   // Longer than a set phrase -> treat as a sentence.
   if (tokens.length > MAX_FIXED_EXPRESSION_WORDS) return true;
-  // A comma joins clauses; combined with enough length it reads as a sentence, not a
-  // phrase. Short two-chunk phrases (fewer than 4 words) stay allowed.
-  if (raw.includes(",") && tokens.length >= 4) return true;
+  // A comma joins a phrase to something else -- a second clause, or the person addressed.
+  // The old rule allowed it under 4 words, which let `Ẹ káàárọ̀, Màmá` ("Good morning, Mom")
+  // be stored as a set phrase: it is a greeting plus an addressee, i.e. a sentence, and it
+  // then competed with the real sentence and with the greeting it contains.
+  if (raw.includes(",")) return true;
   return false;
 }

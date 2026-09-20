@@ -3753,9 +3753,14 @@ export class AdminUnitAiContentUseCases {
       language: input.lesson.language,
       languageId: input.lesson.languageId || null
     });
+    // Only sentences the learner has already met. Borrowing was unordered, so a lesson could
+    // be filled with sentences from later in the course -- `Màmá mi ni` arrived in the
+    // greeting lesson from a unit taught much later, carrying words nobody had introduced.
+    const taughtBefore = await this.listSentenceIdsTaughtBefore(input.lesson);
     const candidates = existing
       .filter((sentence) => !usedIds.has(sentence.id))
-      .filter((sentence) => Array.isArray(sentence.components) && sentence.components.length > 0);
+      .filter((sentence) => Array.isArray(sentence.components) && sentence.components.length > 0)
+      .filter((sentence) => taughtBefore.has(sentence.id));
 
     const picked: TeachingContent[] = [];
     const take = (list: Array<TeachingContent | undefined>) => {
@@ -3797,11 +3802,55 @@ export class AdminUnitAiContentUseCases {
     return picked;
   }
 
+  /**
+   * Sentences already taught to the learner by the time they reach this lesson.
+   *
+   * "Already" is course order -- chapter, then unit, then lesson -- not merely "exists in the
+   * database". A sentence taught later cannot be revision, and pulling one in is how words
+   * the learner has never seen arrived in a beginner lesson.
+   */
+  private async listSentenceIdsTaughtBefore(lesson: LessonEntity): Promise<Set<string>> {
+    const [lessons, units, chapters] = await Promise.all([
+      this.lessons.list({ language: lesson.language, languageId: lesson.languageId || null }),
+      this.units.list({ language: lesson.language, languageId: lesson.languageId || null }),
+      this.chapters.list({ language: lesson.language, languageId: lesson.languageId || null })
+    ]);
+    const chapterOrder = new Map(chapters.map((item) => [item.id, item.orderIndex ?? 0] as const));
+    const unitRank = new Map(
+      units.map((item) => [
+        item.id,
+        [chapterOrder.get(item.chapterId || "") ?? 0, item.orderIndex ?? 0, item.createdAt?.getTime() ?? 0] as const
+      ] as const)
+    );
+    const rankOf = (item: LessonEntity) => {
+      const unit = unitRank.get(item.unitId || "") ?? ([0, 0, 0] as const);
+      return [...unit, item.orderIndex ?? 0, item.createdAt?.getTime() ?? 0];
+    };
+    const isBefore = (left: number[], right: number[]) => {
+      for (let index = 0; index < left.length; index += 1) {
+        if (left[index] !== right[index]) return left[index] < right[index];
+      }
+      return false;
+    };
+
+    const here = rankOf(lesson);
+    const earlierLessonIds = new Set(
+      lessons.filter((item) => item.id !== lesson.id && isBefore(rankOf(item), here)).map((item) => item.id)
+    );
+    if (earlierLessonIds.size === 0) return new Set();
+
+    const attachments = await this.lessonContentItems.list({ contentType: "sentence" });
+    return new Set(
+      attachments.filter((item) => earlierLessonIds.has(item.lessonId)).map((item) => item.contentId)
+    );
+  }
+
   /** Sentence ids taught by other lessons in this lesson's unit, nearest lesson first. */
   private async listUnitSiblingSentenceIds(lesson: LessonEntity): Promise<string[]> {
     if (!lesson.unitId) return [];
     const siblings = (await this.lessons.listByUnitId(lesson.unitId))
       .filter((item) => item.id !== lesson.id && !item.deletedAt)
+      .filter((item) => (item.orderIndex ?? 0) < (lesson.orderIndex ?? 0))
       .sort(
         (a, b) =>
           Math.abs((a.orderIndex || 0) - (lesson.orderIndex || 0)) -
@@ -4959,9 +5008,29 @@ export class AdminUnitAiContentUseCases {
       expressions.filter((item) => !generatedIntroductionMap.get(item.id)),
       explicitExpressionTargetKeys
     );
-    const selectedGeneratedNewWords = rawGeneratedNewWords.slice(0, LESSON_GENERATION_LIMITS.MAX_NEW_WORDS_PER_LESSON);
+    // A target the curriculum named is never crowded out of its own lesson. Slicing words
+    // first let words derived from the generated sentences fill every slot, so a lesson whose
+    // plan said "teach Ẹ káàárọ̀" introduced Màmá instead and the greeting was introduced
+    // nowhere in the course. Explicit targets are taken first and always fit; everything else
+    // fills what is left, under the same caps as before.
+    const isExplicitWord = (item: { text: string }) => explicitTeachableWordKeys.has(normalize(item.text));
+    const isExplicitExpression = (item: { text: string }) => explicitExpressionTargetKeys.has(normalize(item.text));
+
+    const explicitNewWords = rawGeneratedNewWords.filter(isExplicitWord);
+    const spareWordSlots = Math.max(0, LESSON_GENERATION_LIMITS.MAX_NEW_WORDS_PER_LESSON - explicitNewWords.length);
+    const selectedGeneratedNewWords = [
+      ...explicitNewWords,
+      ...rawGeneratedNewWords.filter((item) => !isExplicitWord(item)).slice(0, spareWordSlots)
+    ];
+
+    const explicitNewExpressions = rawGeneratedNewExpressions.filter(isExplicitExpression);
     const remainingNewContentSlots = Math.max(0, targetNewSentences - selectedGeneratedNewWords.length);
-    const selectedGeneratedNewContent = rawGeneratedNewExpressions.slice(0, remainingNewContentSlots);
+    const selectedGeneratedNewContent = [
+      ...explicitNewExpressions,
+      ...rawGeneratedNewExpressions
+        .filter((item) => !isExplicitExpression(item))
+        .slice(0, Math.max(0, remainingNewContentSlots - explicitNewExpressions.length))
+    ];
     const selectedGeneratedReviewWords = teachableWords
       .filter((item) => generatedWordIntroductionMap.get(item.id))
       .slice(0, targetReviewWords);
