@@ -3470,6 +3470,23 @@ export class AdminUnitAiContentUseCases {
     const okDiagnostics: Array<Record<string, unknown>> = [];
 
     for (const draft of input.sentenceDrafts) {
+      // A "sentence" that is just one word or one expression duplicates a row the learner is
+      // already taught from its own card, and the duplicate then competes with it: the lesson
+      // teaches the sentence `Ẹ káàárọ̀.` beside the expression `Ẹ káàárọ̀`, and a word tap
+      // lands on whichever won. Unit instructions that isolate a new item ("Màmá.") produce
+      // these, so the guard lives here rather than in the wording of a prompt.
+      const wholeTextKey = normalize(String(draft.text || "").replace(/[.?!]+\s*$/u, ""));
+      const duplicatesWord = input.componentIndex.words.get(wholeTextKey);
+      const duplicatesExpression = input.componentIndex.expressions.get(wholeTextKey);
+      if (duplicatesWord || duplicatesExpression) {
+        dropDiagnostics.push({
+          text: draft.text,
+          outcome: "dropped",
+          reason: duplicatesWord ? "sentence is just the word" : "sentence is just the expression"
+        });
+        continue;
+      }
+
       const existing = byText.get(contentTextKey(draft.text));
       const existingMeaningSegments = Array.isArray(existing?.meaningSegments) ? existing.meaningSegments : [];
       let componentRefs: ContentComponentRef[] = existing?.components?.length ? existing.components : [];
