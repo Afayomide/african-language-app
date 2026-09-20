@@ -23,7 +23,31 @@ import { toast } from "sonner";
 
 type PersistedAiRun = NonNullable<Unit["lastAiRun"]>;
 type PersistedAiPreviewPlan = NonNullable<Unit["lastAiPreviewPlan"]>;
-type ApiError = { response?: { data?: { error?: string; message?: string } } };
+type ApiError = {
+  response?: {
+    data?: {
+      error?: string;
+      message?: string;
+      // Plan validation answers WHY it was rejected ("invalid sentence goal count",
+      // "situations must be English-like"). Without it the toast says only "Approved plan is
+      // invalid." and there is nothing to act on.
+      details?: { reasons?: string[]; details?: { invalidLessons?: Array<{ index?: number; reasons?: string[] }> } };
+    };
+  };
+};
+
+/** The headline plus whatever the API said was wrong, for a toast. */
+function describeApiError(error: unknown, fallback: string) {
+  const data = (error as ApiError)?.response?.data;
+  const headline = data?.error || data?.message || fallback;
+  const reasons = [
+    ...(data?.details?.reasons || []),
+    ...(data?.details?.details?.invalidLessons || []).flatMap((lesson) =>
+      (lesson.reasons || []).map((reason) => `lesson ${(lesson.index ?? 0) + 1}: ${reason}`)
+    )
+  ];
+  return reasons.length ? `${headline} (${[...new Set(reasons)].slice(0, 4).join("; ")})` : headline;
+}
 
 function normalizePlanLines(value: string) {
   return value.split("\n");
@@ -615,10 +639,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
           : `AI plan ready. Review ${normalizedLessons.length} core lessons before generating.`
       );
     } catch (error) {
-      const message =
-        (error as ApiError)?.response?.data?.error ||
-        (error as ApiError)?.response?.data?.message ||
-        (mode === "regenerate" ? "Failed to preview the AI regeneration plan." : "Failed to preview the AI lesson plan.");
+      const message = describeApiError(error, (mode === "regenerate" ? "Failed to preview the AI regeneration plan." : "Failed to preview the AI lesson plan."));
       toast.error(message);
     } finally {
       setIsPreviewingContentPlan(false);
@@ -700,10 +721,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       setLessonTotal(refreshed.total);
       setLessonTotalPages(refreshed.pagination.totalPages);
     } catch (error) {
-      const message =
-        (error as ApiError)?.response?.data?.error ||
-        (error as ApiError)?.response?.data?.message ||
-        (mode === "regenerate" ? "Failed to regenerate unit content from the approved plan." : "Failed to generate full unit content.");
+      const message = describeApiError(error, (mode === "regenerate" ? "Failed to regenerate unit content from the approved plan." : "Failed to generate full unit content."));
       toast.error(message);
     } finally {
       if (mode === "generate") {
@@ -764,10 +782,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       setLessonTotal(refreshed.total);
       setLessonTotalPages(refreshed.pagination.totalPages);
     } catch (error) {
-      const message =
-        (error as ApiError)?.response?.data?.error ||
-        (error as ApiError)?.response?.data?.message ||
-        `Failed to ${revisionMode} unit content.`;
+      const message = describeApiError(error, `Failed to ${revisionMode} unit content.`);
       toast.error(message);
     } finally {
       setIsRevisingContent(false);

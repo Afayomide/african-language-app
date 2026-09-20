@@ -1799,6 +1799,11 @@ function validateUnitPlanLessons(
     topic?: string;
     curriculumInstruction?: string;
     themeAnchors?: string[];
+    /**
+     * Fewest sentence goals a lesson may declare. 1 normally; 0 for a lesson generated
+     * without sentences, where there is no sentence for a goal to describe.
+     */
+    minSentenceGoals?: number;
   }
 ): UnitPlanValidationResult {
   const reasons: string[] = [];
@@ -1850,7 +1855,8 @@ function validateUnitPlanLessons(
     // Floor is 1, not 2. A lesson whose whole content is one greeting has exactly one meaning
     // to reach, and the old floor of 2 left it unsatisfiable: every goal it could add to reach
     // two was either a repeat or a fragment the length rule below then rejected.
-    if (sentenceGoals.length < 1 || sentenceGoals.length > 5) {
+    const minSentenceGoals = Math.max(0, Math.floor(Number(input.minSentenceGoals ?? 1)));
+    if (sentenceGoals.length < minSentenceGoals || sentenceGoals.length > 5) {
       customReasons.push("invalid sentence goal count");
     }
     // Length and English-likeness are reported separately. Folded together they told the model
@@ -3978,6 +3984,8 @@ export class AdminUnitAiContentUseCases {
     topic?: string;
     curriculumInstruction?: string;
     planLessons: LlmUnitPlanLesson[];
+    /** 0 when the unit is generated without sentences; see validateUnitPlanLessons. */
+    minSentenceGoals?: number;
   }) {
     const normalizedLessons = Array.isArray(input.planLessons)
       ? input.planLessons.map((lesson) => normalizeUnitPlanLesson(lesson))
@@ -3996,7 +4004,8 @@ export class AdminUnitAiContentUseCases {
       unitDescription: input.unitDescription,
       topic: input.topic,
       curriculumInstruction: input.curriculumInstruction,
-      themeAnchors
+      themeAnchors,
+      minSentenceGoals: input.minSentenceGoals
     });
 
     if (!validation.ok) {
@@ -5971,7 +5980,9 @@ export class AdminUnitAiContentUseCases {
       unitDescription: planContext.unit.description,
       topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
       curriculumInstruction: input.lessonGenerationInstruction,
-      planLessons: input.planLessons
+      planLessons: input.planLessons,
+      // A unit generated without sentences has no sentence for a goal to describe.
+      minSentenceGoals: Number(input.sentencesPerLesson) <= 0 ? 0 : 1
     });
     const effectivePlanLessons =
       planContext.unit.kind === "review"
@@ -6008,7 +6019,9 @@ export class AdminUnitAiContentUseCases {
         existingLessonsSummary: planMemory.existingLessonsSummary,
         lessonGenerationInstruction: input.lessonGenerationInstruction
       }),
-      planLessons: input.planLessons
+      planLessons: input.planLessons,
+      // A unit regenerated without sentences has no sentence for a goal to describe.
+      minSentenceGoals: Number(input.sentencesPerLesson) <= 0 ? 0 : 1
     });
     const effectivePlanLessons =
       planContext.unit.kind === "review"
