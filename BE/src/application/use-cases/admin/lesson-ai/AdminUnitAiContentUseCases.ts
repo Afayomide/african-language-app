@@ -1274,6 +1274,11 @@ function summarizeReviewSentenceExamples(sentences: SentenceEntity[], limit: num
  * and the lesson silently loses its real target. Token count is not a matter of opinion,
  * so it is settled here rather than asked for again.
  */
+/** Allowed-inventory entries deduped by text, first occurrence winning. */
+function dedupeAllowedByText(items: Array<{ text: string; translations: string[] }>) {
+  return Array.from(new Map(items.map((item) => [normalize(item.text), item] as const)).values());
+}
+
 function routePlanTargetsByShape(
   words: LlmUnitPlanTarget[],
   expressions: LlmUnitPlanTarget[]
@@ -3810,6 +3815,45 @@ export class AdminUnitAiContentUseCases {
    * the learner has never seen arrived in a beginner lesson.
    */
   private async listSentenceIdsTaughtBefore(lesson: LessonEntity): Promise<Set<string>> {
+    const earlierLessonIds = await this.listEarlierLessonIds(lesson);
+    if (earlierLessonIds.size === 0) return new Set();
+    const attachments = await this.lessonContentItems.list({ contentType: "sentence" });
+    return new Set(
+      attachments.filter((item) => earlierLessonIds.has(item.lessonId)).map((item) => item.contentId)
+    );
+  }
+
+  /**
+   * The words and expressions a learner has already been taught when they reach this lesson.
+   *
+   * Passed to sentence drafting as the allowed inventory, which is what makes the validator
+   * reject a sentence using anything else. Without it a first lesson teaching `ni` was handed
+   * `Bàbá mi ni.` -- correct Yoruba, but `mi` is the NEXT lesson's target.
+   */
+  private async listVocabularyTaughtBefore(lesson: LessonEntity) {
+    const earlierLessonIds = await this.listEarlierLessonIds(lesson);
+    if (earlierLessonIds.size === 0) return { words: [] as WordEntity[], expressions: [] as ExpressionEntity[] };
+
+    const introduced = (
+      await Promise.all([
+        this.lessonContentItems.list({ contentType: "word", role: "introduce" }),
+        this.lessonContentItems.list({ contentType: "expression", role: "introduce" })
+      ])
+    )
+      .flat()
+      .filter((item) => earlierLessonIds.has(item.lessonId));
+
+    const [words, expressions] = await Promise.all([
+      this.words.findByIds(introduced.filter((item) => item.contentType === "word").map((item) => item.contentId)),
+      this.expressions.findByIds(
+        introduced.filter((item) => item.contentType === "expression").map((item) => item.contentId)
+      )
+    ]);
+    return { words, expressions };
+  }
+
+  /** Lessons a learner reaches before this one, in course order: chapter, then unit, then lesson. */
+  private async listEarlierLessonIds(lesson: LessonEntity): Promise<Set<string>> {
     const [lessons, units, chapters] = await Promise.all([
       this.lessons.list({ language: lesson.language, languageId: lesson.languageId || null }),
       this.units.list({ language: lesson.language, languageId: lesson.languageId || null }),
@@ -3834,14 +3878,8 @@ export class AdminUnitAiContentUseCases {
     };
 
     const here = rankOf(lesson);
-    const earlierLessonIds = new Set(
-      lessons.filter((item) => item.id !== lesson.id && isBefore(rankOf(item), here)).map((item) => item.id)
-    );
-    if (earlierLessonIds.size === 0) return new Set();
-
-    const attachments = await this.lessonContentItems.list({ contentType: "sentence" });
     return new Set(
-      attachments.filter((item) => earlierLessonIds.has(item.lessonId)).map((item) => item.contentId)
+      lessons.filter((item) => item.id !== lesson.id && isBefore(rankOf(item), here)).map((item) => item.id)
     );
   }
 
@@ -4795,6 +4833,29 @@ export class AdminUnitAiContentUseCases {
 
       sentenceDrafts = this.lockSentenceDraftsToTargets(reviewSentenceDrafts, lockedTargets);
     } else {
+      // What the learner may meet here: everything taught in an earlier lesson, plus this
+      // lesson's own targets and whatever it already holds. Passing it makes the validator
+      // reject a sentence built from anything else -- a lesson teaching `ni` was being given
+      // `Bàbá mi ni.`, where `mi` is the NEXT lesson's target, because nothing said no.
+      const taughtBefore = await this.listVocabularyTaughtBefore(input.lesson);
+      const asAllowed = (items: Array<{ text: string; translations?: string[] }>) =>
+        items
+          .filter((item) => String(item.text || "").trim())
+          .map((item) => ({ text: item.text, translations: item.translations || [] }));
+      const allowedCoreWords = dedupeAllowedByText([
+        ...asAllowed(taughtBefore.words),
+        ...asAllowed(currentLessonWords),
+        ...asAllowed(planTargetWords)
+      ]);
+      const allowedCoreExpressions = dedupeAllowedByText([
+        ...asAllowed(taughtBefore.expressions),
+        ...asAllowed(currentLessonExpressions),
+        ...asAllowed(planTargetExpressions)
+      ]);
+      // A first lesson has nothing taught before it and may name no targets; with an empty
+      // inventory every sentence would be rejected, so it keeps the old open behaviour.
+      const hasInventory = allowedCoreWords.length + allowedCoreExpressions.length > 0;
+
       const discoverySentenceDrafts = (await this.sentenceOrchestrator.draftForLessonPlan({
         lesson: input.lesson,
         existingLessonSentences: currentLessonSentences,
@@ -4802,7 +4863,17 @@ export class AdminUnitAiContentUseCases {
         conversationGoal,
         situations,
         sentenceGoals,
+        ...(hasInventory
+          ? {
+              allowedWords: allowedCoreWords,
+              allowedExpressions: allowedCoreExpressions,
+              allowDerivedComponents: false
+            }
+          : {}),
         extraInstructions: [
+          hasInventory
+            ? "Every sentence must use ONLY the allowed words and expressions listed above. They are what this learner has been taught; anything else is unknown to them."
+            : "",
           input.extraInstructions ? input.extraInstructions.trim() : "",
           "Generate practical conversational sentences learners can actually say in this chapter and lesson.",
           "Use the generated sentences to surface reusable words and expressions, but do not teach the whole sentence as the introductory content item.",
