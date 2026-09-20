@@ -177,10 +177,56 @@ test("a lesson that introduces one item still fills its stages", () => {
   const fromTheItem = plan.selectedCandidates.filter((candidate) => candidate.sourceKey === "word:ni").length;
 
   assert.ok(perStage[0] >= 3, `stage 1 should hold at least 3 questions, got ${perStage[0]}`);
-  assert.ok(perStage[2] >= 4, `stage 3 should hold at least 4 questions, got ${perStage[2]}`);
+  // Stage 3 takes what the per-sentence cap leaves: each sentence may carry at most two
+  // exercises in a lesson, so by stage 3 some sentences are already spent. The cap is
+  // deliberate -- it stops one sentence being drilled while another goes unused.
+  assert.ok(perStage[2] >= 3, `stage 3 should hold at least 3 questions, got ${perStage[2]}`);
   assert.ok(fromTheItem >= 5, `the single new item should carry at least 5 questions, got ${fromTheItem}`);
   assert.ok(
     plan.selectedCandidates.length >= 12,
     `a one-item lesson should reach at least 12 questions, got ${plan.selectedCandidates.length}`
   );
+});
+
+test("every sentence in a lesson gets used, and none is drilled to death", () => {
+  // A four-sentence lesson spent three exercises on one sentence and never touched the
+  // fourth, because a core lesson had no per-source cap.
+  const sentenceSubtypes = ["fg-word-order", "ls-fg-gap-fill", "mc-select-translation", "mc-select-missing-word"];
+  const candidates: LessonQuestionCandidate<string>[] = [];
+  for (const stage of [1, 2, 3] as const) {
+    candidates.push(
+      makeCandidate({
+        stage,
+        sourceGroup: "target",
+        sourceKey: "word:ni",
+        questionType: "multiple-choice",
+        questionSubtype: stage === 1 ? "mc-select-translation" : stage === 2 ? "mc-select-missing-word" : "fg-letter-order"
+      })
+    );
+    for (const index of [1, 2, 3, 4]) {
+      for (const [offset, subtype] of sentenceSubtypes.entries()) {
+        candidates.push(
+          makeCandidate({
+            stage,
+            sourceGroup: "sentence",
+            sourceKey: `sentence:${index}`,
+            questionType: subtype.startsWith("ls-") ? "listening" : "fill-in-the-gap",
+            questionSubtype: sentenceSubtypes[(offset + stage + index) % sentenceSubtypes.length]!
+          })
+        );
+      }
+    }
+  }
+
+  const plan = selectLessonQuestionPlan(candidates, { lessonKey: "four-sentence-lesson", lessonMode: "core" });
+  const perSentence = new Map<string, number>();
+  for (const candidate of plan.selectedCandidates) {
+    if (candidate.sourceGroup !== "sentence") continue;
+    perSentence.set(candidate.sourceKey, (perSentence.get(candidate.sourceKey) || 0) + 1);
+  }
+
+  assert.equal(perSentence.size, 4, `all four sentences should be used, used ${perSentence.size}`);
+  for (const [sourceKey, count] of perSentence) {
+    assert.ok(count <= 2, `${sourceKey} used ${count} times, more than twice`);
+  }
 });

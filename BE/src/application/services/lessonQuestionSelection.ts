@@ -104,12 +104,12 @@ type LessonQuestionSelectionPlan<T> = {
 const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   1: {
     stageLimit: 5,
-    groupLimits: { target: 4, sentence: 1, lesson: 0 },
+    groupLimits: { target: 4, sentence: 2, lesson: 0 },
     perSourceLimits: { target: 3, sentence: 1, lesson: 0 }
   },
   2: {
     stageLimit: 5,
-    groupLimits: { target: 2, sentence: 2, lesson: 1 },
+    groupLimits: { target: 2, sentence: 3, lesson: 1 },
     perSourceLimits: { target: 2, sentence: 1, lesson: 1 }
   },
   3: {
@@ -342,7 +342,11 @@ function getGlobalSourceLimit(
   lessonMode: "core" | "review",
   sourceGroup: LessonQuestionSourceGroup
 ) {
-  if (lessonMode === "review" && sourceGroup === "sentence") return 2;
+  // A core lesson had no cap, so selection could spend three exercises on one sentence and
+  // never touch the fourth: a lesson with four sentences drilled two of them. Two per
+  // sentence forces it on to the next one. Words and expressions stay uncapped -- the
+  // lesson's own target is meant to recur.
+  if (sourceGroup === "sentence") return 2;
   return Number.POSITIVE_INFINITY;
 }
 
