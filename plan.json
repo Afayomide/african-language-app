@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-17T18:32:38.394Z",
+  "updatedAt": "2026-09-20T06:55:10.344Z",
   "entries": [
     {
       "loggedAt": "2026-03-21T06:31:25.940Z",
@@ -165116,6 +165116,1359 @@
                   "text": "mana",
                   "translations": [
                     "but"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-09-20T05:32:33.916Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69d91052ce1c85da93a6f993",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Good Morning",
+          "description": "Learn the fundamental respectful greeting used at the start of the day.",
+          "objectives": [
+            "Master the respectful morning greeting",
+            "Recognize the importance of the 'Ẹ' honorific"
+          ],
+          "conversationGoal": "Greet an elder respectfully in the morning.",
+          "situations": [
+            "Waking up and seeing an elder in the house",
+            "Entering a room where an elder is present"
+          ],
+          "sentenceGoals": [
+            "Good morning."
+          ],
+          "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Mom",
+          "description": "Expand your morning greetings by addressing a specific family member.",
+          "objectives": [
+            "Introduce the word for mother",
+            "Combine the morning greeting with a name"
+          ],
+          "conversationGoal": "Greet your mother respectfully in the morning.",
+          "situations": [
+            "Greeting your mother upon waking up",
+            "Saying good morning to your mother in the kitchen"
+          ],
+          "sentenceGoals": [
+            "Mom.",
+            "Good morning, Mom.",
+            "Mom, good morning."
+          ],
+          "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+          "targetWords": [
+            {
+              "text": "Màmá",
+              "translations": [
+                "Mom"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀, Màmá",
+              "translations": [
+                "Good morning, Mom"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Dad",
+          "description": "Apply the morning greeting pattern to another key family member.",
+          "objectives": [
+            "Introduce the word for father",
+            "Reinforce the morning greeting pattern with a new subject"
+          ],
+          "conversationGoal": "Greet your father respectfully in the morning.",
+          "situations": [
+            "Greeting your father in the living room",
+            "Saying good morning to your father before he leaves for work"
+          ],
+          "sentenceGoals": [
+            "Dad.",
+            "Good morning, Dad.",
+            "Dad, good morning."
+          ],
+          "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+          "targetWords": [
+            {
+              "text": "Bàbá",
+              "translations": [
+                "Dad"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀, bàbá",
+              "translations": [
+                "Good morning, Dad"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Afternoon",
+          "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+          "objectives": [
+            "Introduce the afternoon greeting",
+            "Use all learned family titles with the new time of day"
+          ],
+          "conversationGoal": "Greet parents respectfully during the afternoon.",
+          "situations": [
+            "Greeting your mother in the afternoon",
+            "Greeting your father after lunch"
+          ],
+          "sentenceGoals": [
+            "Good afternoon.",
+            "Good afternoon, Mom.",
+            "Dad, good afternoon."
+          ],
+          "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàsán",
+              "translations": [
+                "Good afternoon (respectful)"
+              ]
+            }
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Good Morning",
+              "description": "Learn the fundamental respectful greeting used at the start of the day.",
+              "objectives": [
+                "Master the respectful morning greeting",
+                "Recognize the importance of the 'Ẹ' honorific"
+              ],
+              "conversationGoal": "Greet an elder respectfully in the morning.",
+              "situations": [
+                "Waking up and seeing an elder in the house",
+                "Entering a room where an elder is present"
+              ],
+              "sentenceGoals": [
+                "Good morning."
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Mom",
+              "description": "Expand your morning greetings by addressing a specific family member.",
+              "objectives": [
+                "Introduce the word for mother",
+                "Combine the morning greeting with a name"
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking up",
+                "Saying good morning to your mother in the kitchen"
+              ],
+              "sentenceGoals": [
+                "Mom.",
+                "Good morning, Mom.",
+                "Mom, good morning."
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, Màmá",
+                  "translations": [
+                    "Good morning, Mom"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Dad",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Introduce the word for father",
+                "Reinforce the morning greeting pattern with a new subject"
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the living room",
+                "Saying good morning to your father before he leaves for work"
+              ],
+              "sentenceGoals": [
+                "Dad.",
+                "Good morning, Dad.",
+                "Dad, good morning."
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, bàbá",
+                  "translations": [
+                    "Good morning, Dad"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Afternoon",
+              "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Introduce the afternoon greeting",
+                "Use all learned family titles with the new time of day"
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situations": [
+                "Greeting your mother in the afternoon",
+                "Greeting your father after lunch"
+              ],
+              "sentenceGoals": [
+                "Good afternoon.",
+                "Good afternoon, Mom.",
+                "Dad, good afternoon."
+              ],
+              "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-09-20T05:48:13.940Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69d91052ce1c85da93a6f993",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Good Morning",
+          "description": "Learn the fundamental respectful greeting used at the start of the day.",
+          "objectives": [
+            "Master the respectful morning greeting.",
+            "Recognize the honorific prefix for elders."
+          ],
+          "conversationGoal": "Greet an elder respectfully in the morning.",
+          "situations": [
+            "Waking up and seeing an elder in the house.",
+            "Entering a room where an elder is present."
+          ],
+          "sentenceGoals": [
+            "Good morning."
+          ],
+          "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+          "targetWords": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ],
+          "targetExpressions": []
+        },
+        {
+          "title": "Good Morning, Mom",
+          "description": "Expand your morning greetings by addressing a specific family member.",
+          "objectives": [
+            "Address your mother using her title.",
+            "Place names before or after the greeting."
+          ],
+          "conversationGoal": "Greet your mother respectfully in the morning.",
+          "situations": [
+            "Greeting your mother upon waking up.",
+            "Saying good morning to your mother in the kitchen."
+          ],
+          "sentenceGoals": [
+            "Good morning, Mom.",
+            "Mom, good morning."
+          ],
+          "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+          "targetWords": [
+            {
+              "text": "Màmá",
+              "translations": [
+                "Mom"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀, Màmá",
+              "translations": [
+                "Good morning, Mom."
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Dad",
+          "description": "Apply the morning greeting pattern to another key family member.",
+          "objectives": [
+            "Address your father using his title.",
+            "Use the existing morning greeting pattern with a new person."
+          ],
+          "conversationGoal": "Greet your father respectfully in the morning.",
+          "situations": [
+            "Greeting your father in the morning.",
+            "Saying good morning to your father at the breakfast table."
+          ],
+          "sentenceGoals": [
+            "Good morning, Dad.",
+            "Dad, good morning."
+          ],
+          "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+          "targetWords": [
+            {
+              "text": "Bàbá",
+              "translations": [
+                "Dad"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀, bàbá",
+              "translations": [
+                "Good morning, Dad."
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Afternoon",
+          "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+          "objectives": [
+            "Use the respectful afternoon greeting.",
+            "Apply afternoon greetings to parents."
+          ],
+          "conversationGoal": "Greet parents respectfully during the afternoon.",
+          "situations": [
+            "Greeting your mother in the afternoon.",
+            "Greeting your father during the afternoon."
+          ],
+          "sentenceGoals": [
+            "Good afternoon.",
+            "Good afternoon, Mom.",
+            "Good afternoon, Dad."
+          ],
+          "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+          "targetWords": [
+            {
+              "text": "Ẹ káàsán",
+              "translations": [
+                "Good afternoon (respectful)"
+              ]
+            }
+          ],
+          "targetExpressions": []
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "rejected",
+          "plan": [
+            {
+              "title": "The Respectful Morning",
+              "description": "Master the fundamental respectful greeting used at the start of the day.",
+              "objectives": [
+                "Introduce the word for mother",
+                "Combine greeting with name"
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking up",
+                "Saying good morning to your mother in the hallway"
+              ],
+              "sentenceGoals": [
+                "Good morning, Mom",
+                "Mom, good morning"
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions []},{": "title\":\"Addressing Mother\",\"description\":\"Expand morning greetings by addressing a specific family member.",
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, Màmá",
+                  "translations": [
+                    "Good morning, Mom"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Addressing Father",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Introduce the word for father",
+                "Use existing morning greeting with new subject"
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the morning",
+                "Saying good morning to your father during breakfast"
+              ],
+              "sentenceGoals": [
+                "Good morning, Dad",
+                "Dad, good morning"
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, Bàbá",
+                  "translations": [
+                    "Good morning, Dad"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "The Afternoon Transition",
+              "description": "Learn to transition respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Introduce the afternoon greeting",
+                "Apply afternoon greeting to known family members"
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situations": [
+                "Greeting your mother in the afternoon",
+                "Greeting your father after lunch"
+              ],
+              "sentenceGoals": [
+                "Good afternoon",
+                "Good afternoon, Mom",
+                "Good afternoon, Dad"
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+              "targetWords": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàsán, Màmá",
+                  "translations": [
+                    "Good afternoon, Mom"
+                  ]
+                }
+              ]
+            }
+          ],
+          "validation": {
+            "reasons": [
+              "invalid lesson plan count"
+            ],
+            "details": {
+              "duplicateTitles": [],
+              "overlappingPairs": [],
+              "invalidLessonIndexes": [],
+              "invalidLessons": [],
+              "actualLessonCount": 3
+            }
+          }
+        },
+        {
+          "attempt": 2,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Good Morning",
+              "description": "Learn the fundamental respectful greeting used at the start of the day.",
+              "objectives": [
+                "Master the respectful morning greeting.",
+                "Recognize the honorific prefix for elders."
+              ],
+              "conversationGoal": "Greet an elder respectfully in the morning.",
+              "situations": [
+                "Waking up and seeing an elder in the house.",
+                "Entering a room where an elder is present."
+              ],
+              "sentenceGoals": [
+                "Good morning."
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+              "targetWords": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ],
+              "targetExpressions": []
+            },
+            {
+              "title": "Good Morning, Mom",
+              "description": "Expand your morning greetings by addressing a specific family member.",
+              "objectives": [
+                "Address your mother using her title.",
+                "Place names before or after the greeting."
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking up.",
+                "Saying good morning to your mother in the kitchen."
+              ],
+              "sentenceGoals": [
+                "Good morning, Mom.",
+                "Mom, good morning."
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, Màmá",
+                  "translations": [
+                    "Good morning, Mom."
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Dad",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Address your father using his title.",
+                "Use the existing morning greeting pattern with a new person."
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the morning.",
+                "Saying good morning to your father at the breakfast table."
+              ],
+              "sentenceGoals": [
+                "Good morning, Dad.",
+                "Dad, good morning."
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀, bàbá",
+                  "translations": [
+                    "Good morning, Dad."
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Afternoon",
+              "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Use the respectful afternoon greeting.",
+                "Apply afternoon greetings to parents."
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situations": [
+                "Greeting your mother in the afternoon.",
+                "Greeting your father during the afternoon."
+              ],
+              "sentenceGoals": [
+                "Good afternoon.",
+                "Good afternoon, Mom.",
+                "Good afternoon, Dad."
+              ],
+              "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+              "targetWords": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
+                  ]
+                }
+              ],
+              "targetExpressions": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-09-20T06:28:44.523Z",
+      "flow": "regenerate",
+      "planType": "unit-plan",
+      "unitId": "69d91052ce1c85da93a6f993",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Good Morning",
+          "description": "Learn the fundamental respectful greeting used at the start of the day.",
+          "objectives": [
+            "Master the respectful morning greeting",
+            "Understand the use of the honorific 'Ẹ'"
+          ],
+          "conversationGoal": "Greet an elder respectfully in the morning.",
+          "situations": [
+            "Greeting a neighbor during sunrise",
+            "Entering a room in the morning"
+          ],
+          "sentenceGoals": [
+            "Good morning"
+          ],
+          "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Mom",
+          "description": "Expand your morning greetings by addressing a specific family member.",
+          "objectives": [
+            "Address a mother respectfully",
+            "Use names with greetings"
+          ],
+          "conversationGoal": "Greet your mother respectfully in the morning.",
+          "situations": [
+            "Greeting your mother upon waking up",
+            "Saying good morning to your mother before leaving"
+          ],
+          "sentenceGoals": [
+            "Good morning, Mom",
+            "Mom, good morning"
+          ],
+          "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+          "targetWords": [
+            {
+              "text": "Màmá",
+              "translations": [
+                "Mom"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Dad",
+          "description": "Apply the morning greeting pattern to another key family member.",
+          "objectives": [
+            "Address a father respectfully",
+            "Apply existing greeting patterns to new people"
+          ],
+          "conversationGoal": "Greet your father respectfully in the morning.",
+          "situations": [
+            "Greeting your father in the morning",
+            "Saying good morning to your father at breakfast"
+          ],
+          "sentenceGoals": [
+            "Good morning, Dad",
+            "Dad, good morning"
+          ],
+          "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+          "targetWords": [
+            {
+              "text": "Bàbá",
+              "translations": [
+                "Dad"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Afternoon",
+          "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+          "objectives": [
+            "Use the afternoon greeting",
+            "Apply greetings to known family members"
+          ],
+          "conversationGoal": "Greet parents respectfully during the afternoon.",
+          "situations": [
+            "Greeting your mother in the afternoon",
+            "Greeting your father in the afternoon",
+            "Meeting a parent after lunch"
+          ],
+          "sentenceGoals": [
+            "Good afternoon",
+            "Good afternoon, Mom",
+            "Good afternoon, Dad"
+          ],
+          "focusSummary": "A new time of day with both people already known. By the end the learner can greet either parent, morning or afternoon.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàsán",
+              "translations": [
+                "Good afternoon (respectful)"
+              ]
+            }
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "rejected",
+          "plan": [
+            {
+              "title": "The Morning Honorific",
+              "description": "Master the essential respectful greeting for the start of the day.",
+              "objectives": [
+                "Recognize the respectful morning greeting",
+                "Use the honorific prefix 'Ẹ' correctly"
+              ],
+              "conversationGoal": "Greet an elder respectfully in the morning.",
+              "situations": [
+                "Meeting an elder at sunrise",
+                "Entering a room in the morning"
+              ],
+              "sentenceGoals": [
+                "Good morning"
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Greeting Mother",
+              "description": "Expand your morning greetings by addressing a specific family member.",
+              "objectives": [
+                "Identify the word for mother",
+                "Place a name within a greeting"
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking",
+                "Saying good morning to your mother before leaving"
+              ],
+              "sentenceGoals": [
+                "Mom",
+                "Good morning, Mom",
+                "Mom, good morning"
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Greeting Father",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Identify the word for father",
+                "Apply existing morning greeting patterns to new people"
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the morning",
+                "Saying good morning to your father during breakfast"
+              ],
+              "sentenceGoals": [
+                "Dad",
+                "Good morning, Dad",
+                "Dad, good morning"
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "The Afternoon Transition",
+              "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Recognize the respectful afternoon greeting",
+                "Use all previously learned family titles with new time greetings"
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situments": [
+                "Greeting a parent after lunch",
+                "Saying good afternoon to your mother or father"
+              ],
+              "sentenceGoals": [
+                "Good afternoon",
+                "Good afternoon, Mom",
+                "Dad, good afternoon"
+              ],
+              "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
+                  ]
+                }
+              ]
+            }
+          ],
+          "validation": {
+            "reasons": [
+              "unit plan contains invalid lesson slices"
+            ],
+            "details": {
+              "duplicateTitles": [],
+              "overlappingPairs": [],
+              "invalidLessonIndexes": [
+                3
+              ],
+              "invalidLessons": [
+                {
+                  "index": 3,
+                  "title": "The Afternoon Transition",
+                  "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+                  "objectives": [
+                    "Recognize the respectful afternoon greeting",
+                    "Use all previously learned family titles with new time greetings"
+                  ],
+                  "conversationGoal": "Greet parents respectfully during the afternoon.",
+                  "situations": [],
+                  "sentenceGoals": [
+                    "Good afternoon",
+                    "Good afternoon, Mom",
+                    "Dad, good afternoon"
+                  ],
+                  "focusSummary": "The final lesson in this sequence introduces 'Ẹ káàsán' and requires the learner to use all previously learned vocabulary.",
+                  "reasons": [
+                    "invalid situations count"
+                  ],
+                  "validationDetails": {
+                    "titleThemeMatches": 5,
+                    "situationThemeMatches": 3
+                  }
+                }
+              ],
+              "actualLessonCount": 4
+            }
+          }
+        },
+        {
+          "attempt": 2,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Good Morning",
+              "description": "Learn the fundamental respectful greeting used at the start of the day.",
+              "objectives": [
+                "Master the respectful morning greeting",
+                "Understand the use of the honorific 'Ẹ'"
+              ],
+              "conversationGoal": "Greet an elder respectfully in the morning.",
+              "situations": [
+                "Greeting a neighbor during sunrise",
+                "Entering a room in the morning"
+              ],
+              "sentenceGoals": [
+                "Good morning"
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Mom",
+              "description": "Expand your morning greetings by addressing a specific family member.",
+              "objectives": [
+                "Address a mother respectfully",
+                "Use names with greetings"
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking up",
+                "Saying good morning to your mother before leaving"
+              ],
+              "sentenceGoals": [
+                "Good morning, Mom",
+                "Mom, good morning"
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Dad",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Address a father respectfully",
+                "Apply existing greeting patterns to new people"
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the morning",
+                "Saying good morning to your father at breakfast"
+              ],
+              "sentenceGoals": [
+                "Good morning, Dad",
+                "Dad, good morning"
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Afternoon",
+              "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Use the afternoon greeting",
+                "Apply greetings to known family members"
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situations": [
+                "Greeting your mother in the afternoon",
+                "Greeting your father in the afternoon",
+                "Meeting a parent after lunch"
+              ],
+              "sentenceGoals": [
+                "Good afternoon",
+                "Good afternoon, Mom",
+                "Good afternoon, Dad"
+              ],
+              "focusSummary": "A new time of day with both people already known. By the end the learner can greet either parent, morning or afternoon.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "loggedAt": "2026-09-20T06:55:10.295Z",
+      "flow": "generate",
+      "planType": "unit-plan",
+      "unitId": "69d91052ce1c85da93a6f993",
+      "unitTitle": "The 24-Hour Respect Loop",
+      "lessonCount": 4,
+      "finalStatus": "accepted",
+      "finalPlan": [
+        {
+          "title": "Good Morning",
+          "description": "Learn the fundamental respectful greeting used at the start of the day.",
+          "objectives": [
+            "Master the respectful morning greeting",
+            "Understand the importance of the honorific 'Ẹ'"
+          ],
+          "conversationGoal": "Greet an elder respectfully in the morning.",
+          "situations": [
+            "Waking up and greeting a parent",
+            "Entering a room in the morning"
+          ],
+          "sentenceGoals": [
+            "Good morning."
+          ],
+          "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Mom",
+          "description": "Expand your morning greetings by addressing a specific family member.",
+          "objectives": [
+            "Identify 'Màmá' as mother",
+            "Apply the morning greeting to a specific person"
+          ],
+          "conversationGoal": "Greet your mother respectfully in the morning.",
+          "situations": [
+            "Greeting your mother upon waking",
+            "Saying good morning to your mother in the kitchen"
+          ],
+          "sentenceGoals": [
+            "Mom.",
+            "Good morning, Mom.",
+            "Mom, good morning."
+          ],
+          "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+          "targetWords": [
+            {
+              "text": "Màmá",
+              "translations": [
+                "Mom"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Morning, Dad",
+          "description": "Apply the morning greeting pattern to another key family member.",
+          "objectives": [
+            "Identify 'Bàbá' as father",
+            "Use the existing morning greeting pattern with a new subject"
+          ],
+          "conversationGoal": "Greet your father respectfully in the morning.",
+          "situations": [
+            "Greeting your father in the morning",
+            "Saying good and addressing your father"
+          ],
+          "sentenceGoals": [
+            "Dad.",
+            "Good morning, Dad.",
+            "Dad, good morning."
+          ],
+          "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+          "targetWords": [
+            {
+              "text": "Bàbá",
+              "translations": [
+                "Dad"
+              ]
+            }
+          ],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàárọ̀",
+              "translations": [
+                "Good morning (respectful)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Good Afternoon",
+          "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+          "objectives": [
+            "Learn the respectful afternoon greeting",
+            "Use afternoon greetings with known family members"
+          ],
+          "conversationGoal": "Greet parents respectfully during the afternoon.",
+          "situations": [
+            "Greeting your mother in the afternoon",
+            "Greeting your father in the afternoon"
+          ],
+          "sentenceGoals": [
+            "Good afternoon.",
+            "Good afternoon, Mom.",
+            "Dad, good afternoon."
+          ],
+          "focusSummary": "A new time of day with both people already known. By the end the learner can greet either parent, morning or afternoon.",
+          "targetWords": [],
+          "targetExpressions": [
+            {
+              "text": "Ẹ káàsán",
+              "translations": [
+                "Good afternoon (respectful)"
+              ]
+            }
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "accepted",
+          "plan": [
+            {
+              "title": "Good Morning",
+              "description": "Learn the fundamental respectful greeting used at the start of the day.",
+              "objectives": [
+                "Master the respectful morning greeting",
+                "Understand the importance of the honorific 'Ẹ'"
+              ],
+              "conversationGoal": "Greet an elder respectfully in the morning.",
+              "situations": [
+                "Waking up and greeting a parent",
+                "Entering a room in the morning"
+              ],
+              "sentenceGoals": [
+                "Good morning."
+              ],
+              "focusSummary": "The lesson introduces 'Ẹ káàárọ̀' as the standard respectful way to say good morning, emphasizing the use of the honorific 'Ẹ'.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Mom",
+              "description": "Expand your morning greetings by addressing a specific family member.",
+              "objectives": [
+                "Identify 'Màmá' as mother",
+                "Apply the morning greeting to a specific person"
+              ],
+              "conversationGoal": "Greet your mother respectfully in the morning.",
+              "situations": [
+                "Greeting your mother upon waking",
+                "Saying good morning to your mother in the kitchen"
+              ],
+              "sentenceGoals": [
+                "Mom.",
+                "Good morning, Mom.",
+                "Mom, good morning."
+              ],
+              "focusSummary": "This lesson introduces 'Màmá' and teaches how to place the name either before or after the greeting.",
+              "targetWords": [
+                {
+                  "text": "Màmá",
+                  "translations": [
+                    "Mom"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Morning, Dad",
+              "description": "Apply the morning greeting pattern to another key family member.",
+              "objectives": [
+                "Identify 'Bàbá' as father",
+                "Use the existing morning greeting pattern with a new subject"
+              ],
+              "conversationGoal": "Greet your father respectfully in the morning.",
+              "situations": [
+                "Greeting your father in the morning",
+                "Saying good and addressing your father"
+              ],
+              "sentenceGoals": [
+                "Dad.",
+                "Good morning, Dad.",
+                "Dad, good morning."
+              ],
+              "focusSummary": "Building on the previous lesson, this lesson replaces 'Màmá' with 'Bàbá' to demonstrate the pattern's versatility.",
+              "targetWords": [
+                {
+                  "text": "Bàbá",
+                  "translations": [
+                    "Dad"
+                  ]
+                }
+              ],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàárọ̀",
+                  "translations": [
+                    "Good morning (respectful)"
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "Good Afternoon",
+              "description": "Learn to transition your respectful greetings from the morning to the afternoon.",
+              "objectives": [
+                "Learn the respectful afternoon greeting",
+                "Use afternoon greetings with known family members"
+              ],
+              "conversationGoal": "Greet parents respectfully during the afternoon.",
+              "situations": [
+                "Greeting your mother in the afternoon",
+                "Greeting your father in the afternoon"
+              ],
+              "sentenceGoals": [
+                "Good afternoon.",
+                "Good afternoon, Mom.",
+                "Dad, good afternoon."
+              ],
+              "focusSummary": "A new time of day with both people already known. By the end the learner can greet either parent, morning or afternoon.",
+              "targetWords": [],
+              "targetExpressions": [
+                {
+                  "text": "Ẹ káàsán",
+                  "translations": [
+                    "Good afternoon (respectful)"
                   ]
                 }
               ]
