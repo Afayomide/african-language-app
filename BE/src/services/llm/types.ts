@@ -93,6 +93,15 @@ export type LlmUnitPlanLesson = {
   focusSummary?: string;
   targetWords?: LlmUnitPlanTarget[];
   targetExpressions?: LlmUnitPlanTarget[];
+  /**
+   * How many sentences this lesson should generate, overriding the unit's setting.
+   *
+   * Absent means "use the unit's value", which keeps every existing plan behaving as before:
+   * a target of 2, topped up by borrowing from the database, and a floor of 2 below which the
+   * lesson fails. 0 is the exception a first lesson needs -- it isolates one new item
+   * (`Ẹ káàárọ̀` is a greeting, not a sentence) and has no second item to combine it with.
+   */
+  sentences?: number;
 };
 
 export type LlmLessonRefactorOperation =

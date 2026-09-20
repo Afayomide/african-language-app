@@ -24,7 +24,7 @@ import { SentenceDraftPersistenceService } from "../../application/services/Sent
 import { ChapterAiUseCases } from "../../application/use-cases/shared/ChapterAiUseCases.js";
 import { AdminUnitAiContentUseCases, AiPlanValidationError } from "../../application/use-cases/admin/lesson-ai/AdminUnitAiContentUseCases.js";
 import { isValidLevel, validateLessonId } from "../../interfaces/http/validators/ai.validators.js";
-import { LESSON_GENERATION_LIMITS, clampNewTargetsPerLesson, clampSentencesPerLesson } from "../../config/lessonGeneration.js";
+import { LESSON_GENERATION_LIMITS, clampNewTargetsPerLesson } from "../../config/lessonGeneration.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import {
   validateGeneratedProverbs,
@@ -1016,11 +1016,11 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < 0 ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
     });
   }
   if (
@@ -1054,7 +1054,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
       level: unit.level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -1109,11 +1109,11 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < 0 ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
     });
   }
   if (
@@ -1147,7 +1147,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
       level: unit.level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -1210,11 +1210,11 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < 0 ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
     });
   }
   if (
@@ -1248,7 +1248,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
       level: unit.level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -1311,11 +1311,11 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
   }
   if (
     Number.isNaN(requestedSentencesPerLesson) ||
-    requestedSentencesPerLesson < 0 ||
+    requestedSentencesPerLesson < LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON ||
     requestedSentencesPerLesson > LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON
   ) {
     return res.status(400).json({
-      error: `sentencesPerLesson must be between 0 and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
+      error: `sentencesPerLesson must be between ${LESSON_GENERATION_LIMITS.MIN_NEW_TARGETS_PER_LESSON} and ${LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON}`
     });
   }
   if (
@@ -1350,7 +1350,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
       level: unit.level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,

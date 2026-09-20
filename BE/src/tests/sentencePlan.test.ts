@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 
 import { clampSentencesPerLesson, resolveSentencePlan, LESSON_GENERATION_LIMITS } from "../config/lessonGeneration.js";
 
-test("a requested zero survives the controller clamp", () => {
-  // clampNewTargetsPerLesson would raise 0 to 1, which is how "no sentences" was being
-  // turned back into "one sentence" before the request ever reached the generator.
+test("a lesson's own zero survives the clamp", () => {
+  // clampNewTargetsPerLesson would raise 0 to 1. A lesson that asks for no sentences must
+  // keep its 0; the unit-level setting still goes through the old clamp.
   assert.equal(clampSentencesPerLesson(0), 0);
   assert.equal(clampSentencesPerLesson(2), 2);
   assert.equal(clampSentencesPerLesson(99), LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON);
@@ -52,4 +52,28 @@ test("a missing or unusable value keeps the old default rather than emptying the
 
 test("a negative value is treated as none rather than rejected", () => {
   assert.equal(resolveSentencePlan({ sentencesPerLesson: -1, isReviewLesson: false }).sentenceFree, true);
+});
+
+// How generation picks the count: the lesson's own value, else the unit's. This mirrors
+// `input.plan.sentences ?? input.sentencesPerLesson` in populateGeneratedLessonFromPlan.
+const effective = (lessonSentences: number | undefined, unitSentences: number) =>
+  resolveSentencePlan({ sentencesPerLesson: lessonSentences ?? unitSentences, isReviewLesson: false });
+
+test("a lesson with no setting follows the unit, borrowing and floor intact", () => {
+  const plan = effective(undefined, 2);
+  assert.equal(plan.sentenceFree, false);
+  assert.equal(plan.minSources, 3, "still tops up from the database");
+  assert.equal(plan.floor, 2, "still refuses to ship below two sentences");
+});
+
+test("a lesson can opt out of sentences while the unit keeps them", () => {
+  const optedOut = effective(0, 2);
+  assert.equal(optedOut.sentenceFree, true);
+  assert.equal(optedOut.floor, 0);
+  // Its neighbours in the same unit are unaffected.
+  assert.equal(effective(undefined, 2).sentenceFree, false);
+});
+
+test("a lesson can also ask for fewer sentences than the unit", () => {
+  assert.equal(effective(1, 2).targetNewSentences, 1);
 });

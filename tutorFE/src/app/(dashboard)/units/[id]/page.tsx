@@ -94,7 +94,9 @@ function normalizeEditablePlanLesson(lesson: UnitPlanLesson): UnitPlanLesson {
     sentenceGoals: lesson.sentenceGoals.map((item) => item.trim()).filter(Boolean),
     focusSummary: lesson.focusSummary?.trim() || undefined,
     targetWords: normalizePlanTargets(lesson.targetWords),
-    targetExpressions: normalizePlanTargets(lesson.targetExpressions)
+    targetExpressions: normalizePlanTargets(lesson.targetExpressions),
+    // undefined means "as the unit", which is how every plan behaved before this field.
+    sentences: lesson.sentences
   };
 }
 
@@ -576,7 +578,8 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       }
       // A lesson generated without sentences (Sentences / Lesson = 0) has one meaning to
       // reach, not two: its whole content is the target item. The backend floor is 1.
-      const minSentenceGoals = contentSentencesPerLesson > 0 ? 2 : 1;
+      const lessonSentences = lesson.sentences ?? contentSentencesPerLesson;
+      const minSentenceGoals = lessonSentences > 0 ? 2 : 1;
       if (lesson.sentenceGoals.length < minSentenceGoals) {
         toast.error(
           minSentenceGoals === 1
@@ -798,8 +801,8 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
       toast.error("New Targets / Lesson must be a whole number between 1 and 2.");
       return false;
     }
-    if (!Number.isInteger(contentSentencesPerLesson) || contentSentencesPerLesson < 0 || contentSentencesPerLesson > 2) {
-      toast.error("Sentences / Lesson must be a whole number between 0 and 2.");
+    if (!Number.isInteger(contentSentencesPerLesson) || contentSentencesPerLesson < 1 || contentSentencesPerLesson > 2) {
+      toast.error("Sentences / Lesson must be a whole number between 1 and 2.");
       return false;
     }
     if (
@@ -1366,7 +1369,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                 <Label>Sentences / Lesson</Label>
                 <Input
                   type="number"
-                  min={0}
+                  min={1}
                   max={2}
                   value={contentSentencesPerLesson}
                   onChange={(event) => {
@@ -1374,7 +1377,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                     resetContentPlanEditor();
                   }}
                 />
-                <p className="text-xs text-muted-foreground">0 teaches the targets on their own, with no sentences.</p>
+                <p className="text-xs text-muted-foreground">Default for every lesson; a lesson can override it, including 0.</p>
               </div>
               <div className="space-y-2">
                 <Label>Review Items / Lesson</Label>
@@ -1498,6 +1501,24 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                         />
                       </div>
                       <div className="space-y-2">
+                        <Label>Sentences</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={2}
+                          placeholder={String(contentSentencesPerLesson)}
+                          value={lesson.sentences ?? ""}
+                          onChange={(event) =>
+                            updateEditablePlanLesson(index, {
+                              sentences: event.target.value === "" ? undefined : Number(event.target.value)
+                            })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Blank follows the unit ({contentSentencesPerLesson}). 0 teaches this lesson&apos;s targets with no sentences.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
                         <Label>Sentence Goals</Label>
                         <Textarea
                           rows={3}
@@ -1584,7 +1605,7 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
               </div>
               <div className="space-y-2">
                 <Label htmlFor="revise-sentence-count-per-lesson">Sentences / Lesson</Label>
-                <Input id="revise-sentence-count-per-lesson" type="number" min={0} max={2} value={contentSentencesPerLesson} onChange={(event) => {
+                <Input id="revise-sentence-count-per-lesson" type="number" min={1} max={2} value={contentSentencesPerLesson} onChange={(event) => {
                   setContentSentencesPerLesson(Number(event.target.value || 0));
                   if (revisionMode === "regenerate") resetContentPlanEditor();
                 }} />

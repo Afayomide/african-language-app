@@ -38,6 +38,7 @@ import {
   MIN_SENTENCE_SOURCES_PER_LESSON,
   clampNewTargetsPerLesson,
   clampReviewContentPerLesson,
+  clampSentencesPerLesson,
   resolveSentencePlan
 } from "../../../../config/lessonGeneration.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../../../services/llm/aiGenerationLogger.js";
@@ -1302,8 +1303,18 @@ function normalizeUnitPlanLesson(lesson: LlmUnitPlanLesson): LlmUnitPlanLesson {
     sentenceGoals: normalizePlanItems(lesson.sentenceGoals),
     focusSummary: String(lesson.focusSummary || "").trim() || undefined,
     targetWords: routed.targetWords,
-    targetExpressions: routed.targetExpressions
+    targetExpressions: routed.targetExpressions,
+    // Absent stays absent: the lesson then follows the unit's setting, as every plan written
+    // before this field did. Only an explicit number overrides it.
+    sentences: normalizeLessonSentenceCount(lesson.sentences)
   };
+}
+
+/** A per-lesson sentence count from a plan: a whole number 0..MAX, or undefined for "as the unit". */
+function normalizeLessonSentenceCount(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (!Number.isFinite(Number(value))) return undefined;
+  return clampSentencesPerLesson(Number(value));
 }
 
 function tokenizeReviewPlanKeywords(values: string[]) {
@@ -1800,10 +1811,11 @@ function validateUnitPlanLessons(
     curriculumInstruction?: string;
     themeAnchors?: string[];
     /**
-     * Fewest sentence goals a lesson may declare. 1 normally; 0 for a lesson generated
-     * without sentences, where there is no sentence for a goal to describe.
+     * The unit's sentence count, used for any lesson that does not set its own. A lesson that
+     * will generate no sentences needs no sentence goal, because there is no sentence for a
+     * goal to describe; every other lesson still needs at least one.
      */
-    minSentenceGoals?: number;
+    defaultSentencesPerLesson?: number;
   }
 ): UnitPlanValidationResult {
   const reasons: string[] = [];
@@ -1855,7 +1867,8 @@ function validateUnitPlanLessons(
     // Floor is 1, not 2. A lesson whose whole content is one greeting has exactly one meaning
     // to reach, and the old floor of 2 left it unsatisfiable: every goal it could add to reach
     // two was either a repeat or a fragment the length rule below then rejected.
-    const minSentenceGoals = Math.max(0, Math.floor(Number(input.minSentenceGoals ?? 1)));
+    const lessonSentences = Number(lesson.sentences ?? input.defaultSentencesPerLesson ?? 1);
+    const minSentenceGoals = Number.isFinite(lessonSentences) && lessonSentences <= 0 ? 0 : 1;
     if (sentenceGoals.length < minSentenceGoals || sentenceGoals.length > 5) {
       customReasons.push("invalid sentence goal count");
     }
@@ -4006,8 +4019,8 @@ export class AdminUnitAiContentUseCases {
     topic?: string;
     curriculumInstruction?: string;
     planLessons: LlmUnitPlanLesson[];
-    /** 0 when the unit is generated without sentences; see validateUnitPlanLessons. */
-    minSentenceGoals?: number;
+    /** The unit-level count; a lesson may still set its own. See validateUnitPlanLessons. */
+    defaultSentencesPerLesson?: number;
   }) {
     const normalizedLessons = Array.isArray(input.planLessons)
       ? input.planLessons.map((lesson) => normalizeUnitPlanLesson(lesson))
@@ -4027,7 +4040,7 @@ export class AdminUnitAiContentUseCases {
       topic: input.topic,
       curriculumInstruction: input.curriculumInstruction,
       themeAnchors,
-      minSentenceGoals: input.minSentenceGoals
+      defaultSentencesPerLesson: input.defaultSentencesPerLesson
     });
 
     if (!validation.ok) {
@@ -4530,8 +4543,10 @@ export class AdminUnitAiContentUseCases {
           .map((value) => String(value || "").trim())
           .filter(Boolean)
       : [];
+    // The lesson's own count wins; without one it follows the unit, which is the behaviour
+    // every plan had before the field existed.
     const sentencePlan = resolveSentencePlan({
-      sentencesPerLesson: input.sentencesPerLesson,
+      sentencesPerLesson: input.plan.sentences ?? input.sentencesPerLesson,
       isReviewLesson: isReviewExerciseLesson
     });
     const targetNewSentences = sentencePlan.targetNewSentences;
@@ -6003,8 +6018,8 @@ export class AdminUnitAiContentUseCases {
       topic: Array.isArray(input.topics) && input.topics.length > 0 ? input.topics.join(", ") : undefined,
       curriculumInstruction: input.lessonGenerationInstruction,
       planLessons: input.planLessons,
-      // A unit generated without sentences has no sentence for a goal to describe.
-      minSentenceGoals: Number(input.sentencesPerLesson) <= 0 ? 0 : 1
+      // Each lesson may set its own count; this is the default for those that do not.
+      defaultSentencesPerLesson: Number(input.sentencesPerLesson)
     });
     const effectivePlanLessons =
       planContext.unit.kind === "review"
@@ -6042,8 +6057,8 @@ export class AdminUnitAiContentUseCases {
         lessonGenerationInstruction: input.lessonGenerationInstruction
       }),
       planLessons: input.planLessons,
-      // A unit regenerated without sentences has no sentence for a goal to describe.
-      minSentenceGoals: Number(input.sentencesPerLesson) <= 0 ? 0 : 1
+      // Each lesson may set its own count; this is the default for those that do not.
+      defaultSentencesPerLesson: Number(input.sentencesPerLesson)
     });
     const effectivePlanLessons =
       planContext.unit.kind === "review"

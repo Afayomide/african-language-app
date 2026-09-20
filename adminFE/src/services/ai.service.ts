@@ -26,6 +26,8 @@ export type UnitPlanLesson = {
   focusSummary?: string;
   targetWords?: Array<{ text: string; translations?: string[] }>;
   targetExpressions?: Array<{ text: string; translations?: string[] }>;
+  /** Sentences this lesson generates; undefined follows the unit's setting. */
+  sentences?: number;
 };
 
 export type UnitPlanSequenceLesson = UnitPlanLesson & {
