@@ -47,6 +47,19 @@ export function clampReviewContentPerLesson(value: number, newTargetsPerLesson: 
  * A review lesson is always sentence-based -- it exists to revisit sentences already taught --
  * so it ignores the request.
  */
+/**
+ * A requested sentence count on its way in from an API call.
+ *
+ * Unlike clampNewTargetsPerLesson, zero survives: it is the request for a lesson with no
+ * sentences. Anything else is clamped to the usual 1..MAX range, so a stray value still lands
+ * on a sensible lesson rather than an empty one.
+ */
+export function clampSentencesPerLesson(value: number) {
+  const requested = Number(value);
+  if (Number.isFinite(requested) && requested <= 0) return 0;
+  return clampNewTargetsPerLesson(requested);
+}
+
 export function resolveSentencePlan(input: { sentencesPerLesson: number; isReviewLesson: boolean }) {
   const requested = Number(input.sentencesPerLesson);
   const sentenceFree = !input.isReviewLesson && Number.isFinite(requested) && requested <= 0;

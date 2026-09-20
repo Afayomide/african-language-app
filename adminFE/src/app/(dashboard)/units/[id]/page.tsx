@@ -1574,6 +1574,13 @@ export default function EditUnitPage({ params }: { params: Promise<{ id: string 
                 }} />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="revise-sentence-count-per-lesson">Sentences / Lesson</Label>
+                <Input id="revise-sentence-count-per-lesson" type="number" min={0} max={2} value={contentSentencesPerLesson} onChange={(event) => {
+                  setContentSentencesPerLesson(Number(event.target.value || 0));
+                  if (revisionMode === "regenerate") resetContentPlanEditor();
+                }} />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="revise-review-content-per-lesson">Review Items / Lesson</Label>
                 <Input id="revise-review-content-per-lesson" type="number" min={0} max={4} value={contentReviewContentPerLesson} onChange={(event) => {
                   setContentReviewContentPerLesson(Number(event.target.value || 0));

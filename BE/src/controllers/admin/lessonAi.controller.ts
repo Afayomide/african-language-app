@@ -23,7 +23,8 @@ import type { ChapterEntity } from "../../domain/entities/Chapter.js";
 import type { UnitEntity } from "../../domain/entities/Unit.js";
 import {
   LESSON_GENERATION_LIMITS,
-  clampNewTargetsPerLesson
+  clampNewTargetsPerLesson,
+  clampSentencesPerLesson
 } from "../../config/lessonGeneration.js";
 import { buildRetryInstruction, logAiRetry, logAiValidation } from "../../services/llm/aiGenerationLogger.js";
 import { validateLessonSuggestion } from "../../services/llm/outputQuality.js";
@@ -602,7 +603,7 @@ export async function generateUnitContent(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -699,7 +700,7 @@ export async function previewUnitContentPlan(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -804,7 +805,7 @@ export async function applyUnitContentPlan(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,
@@ -910,7 +911,7 @@ export async function reviseUnitContent(req: AuthRequest, res: Response) {
       level: String(unit.level) as Level,
       createdBy: req.user.id,
       lessonCount: requestedLessonCount,
-      sentencesPerLesson: clampNewTargetsPerLesson(requestedSentencesPerLesson),
+      sentencesPerLesson: clampSentencesPerLesson(requestedSentencesPerLesson),
       reviewContentPerLesson: requestedReviewContentPerLesson,
       proverbsPerLesson: requestedProverbsPerLesson,
       topics: Array.isArray(topics) ? topics.map((item) => String(item || "").trim()).filter(Boolean) : undefined,

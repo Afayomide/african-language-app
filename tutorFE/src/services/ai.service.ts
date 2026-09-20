@@ -191,7 +191,7 @@ export const aiService = {
           return {
             ...rest,
             sentencesPerLesson:
-              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+              payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
             reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
           };
         })()
@@ -226,7 +226,7 @@ export const aiService = {
           return {
             ...rest,
             sentencesPerLesson:
-              newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+              payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
             reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
           };
         })()
@@ -263,7 +263,7 @@ export const aiService = {
     const requestPayload = {
       ...rest,
       sentencesPerLesson:
-        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+        payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
     const response = await api.post<AppliedUnitContentResult>(
@@ -297,7 +297,7 @@ export const aiService = {
     const requestPayload = {
       ...rest,
       sentencesPerLesson:
-        newTargetsPerLesson ?? payload.sentencesPerLesson ?? expressionsPerLesson,
+        payload.sentencesPerLesson ?? newTargetsPerLesson ?? expressionsPerLesson,
       reviewContentPerLesson: payload.reviewContentPerLesson ?? reviewExpressionsPerLesson,
     };
     const response = await api.post<UnitRevisionResult>(feTutorAiRoutes.reviseUnitContent(unitId), requestPayload);

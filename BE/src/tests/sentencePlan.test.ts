@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveSentencePlan, LESSON_GENERATION_LIMITS } from "../config/lessonGeneration.js";
+import { clampSentencesPerLesson, resolveSentencePlan, LESSON_GENERATION_LIMITS } from "../config/lessonGeneration.js";
+
+test("a requested zero survives the controller clamp", () => {
+  // clampNewTargetsPerLesson would raise 0 to 1, which is how "no sentences" was being
+  // turned back into "one sentence" before the request ever reached the generator.
+  assert.equal(clampSentencesPerLesson(0), 0);
+  assert.equal(clampSentencesPerLesson(2), 2);
+  assert.equal(clampSentencesPerLesson(99), LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON);
+  assert.equal(clampSentencesPerLesson(Number.NaN), LESSON_GENERATION_LIMITS.MAX_NEW_TARGETS_PER_LESSON);
+});
 
 test("asking for no sentences gives a lesson with none, and no floor to fail against", () => {
   const plan = resolveSentencePlan({ sentencesPerLesson: 0, isReviewLesson: false });
