@@ -32,7 +32,8 @@ const contentCurriculum = new ContentCurriculumService(
   lessonRepo,
   units,
   lessonContentItems,
-  new DrizzleUnitContentItemRepository()
+  new DrizzleUnitContentItemRepository(),
+  chapters
 );
 const lessonUseCases = new TutorLessonUseCases(
   lessonRepo,

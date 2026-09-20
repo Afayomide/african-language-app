@@ -2226,7 +2226,8 @@ export class AdminUnitAiContentUseCases {
       this.lessons,
       this.units,
       this.lessonContentItems,
-      this.unitContentItems
+      this.unitContentItems,
+      this.chapters
     );
     this.curriculumMemory = new CurriculumMemoryService(
       this.chapters,
