@@ -2983,7 +2983,16 @@ export class AdminUnitAiContentUseCases {
     lockedTargets: {
       words: Array<{ text: string; translations: string[] }>;
       expressions: Array<{ text: string; translations: string[] }>;
-    }
+    },
+    options: {
+      /**
+       * Keep drafts that do not contain a target. A lesson's instructions ask for repetition
+       * lines from earlier lessons -- `Ẹ káàárọ̀, Màmá.` in a lesson teaching `ni` -- and
+       * dropping them left the lesson with half the sentences its goals named. The merge step
+       * still puts target sentences first, so repetition only fills what is left.
+       */
+      keepOffTarget?: boolean;
+    } = {}
   ) {
     const lockedWordSet = new Set(lockedTargets.words.map((item) => normalize(item.text)));
     const lockedExpressionSet = new Set(lockedTargets.expressions.map((item) => normalize(item.text)));
@@ -3009,11 +3018,13 @@ export class AdminUnitAiContentUseCases {
           } as typeof component;
         })
       }))
-      .filter((draft) =>
-        sentenceDraftUsesLockedTarget(draft, {
-          words: lockedWordSet,
-          expressions: lockedExpressionSet
-        })
+      .filter(
+        (draft) =>
+          options.keepOffTarget ||
+          sentenceDraftUsesLockedTarget(draft, {
+            words: lockedWordSet,
+            expressions: lockedExpressionSet
+          })
       );
   }
 
@@ -3031,16 +3042,28 @@ export class AdminUnitAiContentUseCases {
     const seenSentenceTexts = new Set<string>();
     const merged: LlmGeneratedSentence[] = [];
 
-    const addDraft = (draft: LlmGeneratedSentence) => {
+    const addDraft = (draft: LlmGeneratedSentence, requireTarget: boolean) => {
       const key = normalize(draft.text);
       if (!key || seenSentenceTexts.has(key)) return;
-      if (!sentenceDraftUsesLockedTarget(draft, { words: lockedWordSet, expressions: lockedExpressionSet })) return;
+      if (
+        requireTarget &&
+        !sentenceDraftUsesLockedTarget(draft, { words: lockedWordSet, expressions: lockedExpressionSet })
+      ) {
+        return;
+      }
       merged.push(draft);
       seenSentenceTexts.add(key);
     };
 
-    for (const draft of input.primary) addDraft(draft);
-    for (const draft of input.fallback) addDraft(draft);
+    // Sentences that drill this lesson's target come first and are never displaced.
+    for (const draft of input.primary) addDraft(draft, true);
+    for (const draft of input.fallback) addDraft(draft, true);
+    // Then repetition -- lines the instructions asked for that revisit earlier lessons --
+    // fills whatever room is left, rather than being thrown away.
+    for (const draft of [...input.primary, ...input.fallback]) {
+      if (merged.length >= input.maxSentences) break;
+      addDraft(draft, false);
+    }
 
     return merged.slice(0, Math.max(0, input.maxSentences));
   }
@@ -4950,8 +4973,14 @@ export class AdminUnitAiContentUseCases {
           .map(sanitizeGeneratedSentence)
           .filter((item): item is LlmGeneratedSentence => Boolean(item));
 
-        const lockedDiscoveryDrafts = this.lockSentenceDraftsToTargets(discoverySentenceDrafts, effectiveLockedTargets);
-        const lockedTargetedDrafts = this.lockSentenceDraftsToTargets(targetedSentenceDrafts, effectiveLockedTargets);
+        // keepOffTarget: the instructions ask for repetition lines that revisit earlier
+        // lessons; the merge below still puts target sentences first.
+        const lockedDiscoveryDrafts = this.lockSentenceDraftsToTargets(discoverySentenceDrafts, effectiveLockedTargets, {
+          keepOffTarget: true
+        });
+        const lockedTargetedDrafts = this.lockSentenceDraftsToTargets(targetedSentenceDrafts, effectiveLockedTargets, {
+          keepOffTarget: true
+        });
         sentenceDrafts = this.mergeSentenceDraftsForLockedTargets({
           primary: lockedTargetedDrafts,
           fallback: lockedDiscoveryDrafts,
