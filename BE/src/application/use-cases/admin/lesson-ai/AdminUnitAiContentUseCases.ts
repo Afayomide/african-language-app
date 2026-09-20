@@ -3328,10 +3328,32 @@ export class AdminUnitAiContentUseCases {
     // The same for planned target WORDS. Words otherwise arrive only as sentence components,
     // so a lesson generated without sentences (sentencesPerLesson: 0) had nothing to teach
     // when its target was a word like `Màmá`. A word already met as a component is untouched.
+    //
+    // A multi-word entry here is an expression typed into Target Words, which the curriculum
+    // does routinely ("Ẹ káàárọ̀", "Níbo ni") -- targetExpressionKeys above already accepts
+    // both lists. It is created as an expression, not split into words, and never dropped:
+    // skipping it left a lesson teaching nothing at all.
     for (const targetWord of input.targetWords || []) {
       const normalizedText = normalize(targetWord.text);
-      if (!normalizedText || coreWords.has(normalizedText)) continue;
-      if (splitWords(targetWord.text).length > 1) continue; // a phrase belongs to the loop above
+      if (!normalizedText) continue;
+
+      if (splitWords(targetWord.text).length > 1) {
+        if (coreExpressions.has(normalizedText) || isSentenceLikeExpressionText(targetWord.text)) continue;
+        const expression = await this.upsertExpressionFromSentenceComponent({
+          lesson: input.lesson,
+          text: targetWord.text,
+          translations: targetWord.translations,
+          components: this.buildExpressionWordComponentRefs({
+            expressionText: targetWord.text,
+            wordsByText: derivedWordsByText
+          })
+        });
+        coreExpressions.set(normalize(expression.text), expression);
+        supportExpressions.delete(normalize(expression.text));
+        continue;
+      }
+
+      if (coreWords.has(normalizedText)) continue;
       const word = await this.upsertWordFromSentenceComponent({
         lesson: input.lesson,
         text: targetWord.text,
