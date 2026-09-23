@@ -45,14 +45,18 @@ async function main() {
 
     const rows = await q(
       `SELECT eq.id, eq.subtype, eq.prompt_template, eq.options, eq.correct_index, eq.review_data,
-              eq.interaction_data, eq.explanation, l.title AS lesson, u.title AS unit, ch.order_index AS co
+              eq.interaction_data, eq.explanation, eq.source_type, eq.source_id,
+              l.title AS lesson, u.title AS unit, ch.order_index AS co
          FROM exercise_questions eq
          JOIN lessons l ON l.id = eq.lesson_id AND l.is_deleted = false
          JOIN units u ON u.id = l.unit_id
          JOIN chapters ch ON ch.id = u.chapter_id
-        WHERE eq.is_deleted = false AND l.language = $1 AND to_jsonb(eq)::text ILIKE $2
+        WHERE eq.is_deleted = false AND l.language = $1
+          AND (to_jsonb(eq)::text ILIKE $2 OR eq.source_id = $3)
         ORDER BY ch.order_index, u.order_index, l.order_index`,
-      [LANGUAGE, `%${FROM}%`]
+      // A question can be ABOUT the word without containing its text: the prompt renders
+      // {phrase} from source_id. Searching only the text misses exactly those.
+      [LANGUAGE, `%${FROM}%`, spec.fromId || ""]
     );
     console.log(`${rows.length} live question(s) mention it\n`);
 

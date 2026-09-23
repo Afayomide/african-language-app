@@ -128,3 +128,58 @@ test("a question that never mentions the word is left completely alone", () => {
   assert.equal(result.refused, false);
   assert.deepEqual(result.fields, {});
 });
+
+test("a question about the retired word repoints at the new one", () => {
+  // The prompt renders {phrase} from source_id, not from any stored text. Rewriting only the
+  // text left "What is {phrase} in English?" still resolving to Màmá on screen while the
+  // database row looked correct -- which is exactly how this was missed the first time.
+  const result = swapQuestionWord(
+    {
+      subtype: "mc-select-translation",
+      prompt_template: "What is {phrase} in English?",
+      options: ["Mother", "good morning (respectful)"],
+      correct_index: 0,
+      source_type: "word",
+      source_id: "69d91264ce1c85da93a6f9f0"
+    },
+    SPEC
+  );
+
+  assert.equal(result.changed, true);
+  assert.equal(result.fields.source_id, "69e066bc94de573cc400d0d9");
+  // Nothing else in this question mentions the word, so nothing else moves.
+  assert.equal(result.fields.options, undefined);
+  assert.equal(result.fields.prompt_template, undefined);
+});
+
+test("a question sourced from a different word keeps its source", () => {
+  const result = swapQuestionWord(
+    {
+      subtype: "mc-select-translation",
+      prompt_template: "What is {phrase} in English?",
+      options: ["good morning (respectful)", "Mother"],
+      source_type: "expression",
+      source_id: "69d91263ce1c85da93a6f9e8"
+    },
+    SPEC
+  );
+
+  assert.equal(result.fields.source_id, undefined);
+  assert.equal(result.changed, false);
+});
+
+test("a letter-order question repoints its source too", () => {
+  const result = swapQuestionWord(
+    {
+      subtype: "fg-letter-order",
+      options: ["M", "à", "m", "á"],
+      review_data: { words: ["M", "à", "m", "á"], meaning: "Mother", sentence: "Màmá", correctOrder: [0, 1, 2, 3] },
+      source_type: "word",
+      source_id: "69d91264ce1c85da93a6f9f0"
+    },
+    SPEC
+  );
+
+  assert.deepEqual(result.fields.options, ["Ì", "y", "á"]);
+  assert.equal(result.fields.source_id, "69e066bc94de573cc400d0d9");
+});

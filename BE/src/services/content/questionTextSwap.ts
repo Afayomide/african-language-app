@@ -26,6 +26,9 @@ export type SwappableQuestion = {
   review_data?: Record<string, unknown> | null;
   interaction_data?: Record<string, unknown> | null;
   explanation?: string | null;
+  /** What the question is about. `{phrase}` in a prompt is rendered from this, not from text. */
+  source_type?: string | null;
+  source_id?: string | null;
 };
 
 export type SwapSpec = {
@@ -47,6 +50,7 @@ export type SwapResult = {
     review_data?: Record<string, unknown>;
     interaction_data?: Record<string, unknown>;
     explanation?: string | null;
+    source_id?: string;
   };
 };
 
@@ -79,6 +83,11 @@ export function swapQuestionWord(question: SwappableQuestion, spec: SwapSpec): S
   const review = (question.review_data || {}) as Record<string, unknown>;
   const interaction = (question.interaction_data || {}) as Record<string, unknown>;
 
+  // What the question is ABOUT, which a prompt renders `{phrase}` from. Rewriting only the text
+  // leaves "What is {phrase} in English?" still resolving to the retired word at display time --
+  // the question reads correctly in the database and wrongly on the screen.
+  const repointsSource = Boolean(spec.fromId && spec.toId && question.source_id === spec.fromId);
+
   // A letter-order question spells one word out. Rebuild it rather than substituting letters.
   const isLetterOrder = question.subtype === "fg-letter-order";
   const spelled = typeof review.sentence === "string" ? (review.sentence as string) : "";
@@ -94,6 +103,7 @@ export function swapQuestionWord(question: SwappableQuestion, spec: SwapSpec): S
     };
     if (mentions(question.prompt_template, spec)) fields.prompt_template = swapInText(question.prompt_template!, spec);
     if (mentions(question.explanation, spec)) fields.explanation = swapInText(question.explanation!, spec);
+    if (repointsSource) fields.source_id = spec.toId;
     return { changed: true, refused: false, warnings, fields };
   }
 
@@ -156,6 +166,11 @@ export function swapQuestionWord(question: SwappableQuestion, spec: SwapSpec): S
       fields.interaction_data = { ...interaction, matchingPairs: nextPairs };
       changed = true;
     }
+  }
+
+  if (repointsSource) {
+    fields.source_id = spec.toId;
+    changed = true;
   }
 
   return { changed, refused: false, warnings, fields };
