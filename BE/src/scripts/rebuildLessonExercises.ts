@@ -157,6 +157,18 @@ async function main() {
     console.log(`\n=== "${lesson.title}" ===`);
     printShape("BEFORE", before.shape);
 
+    // A rebuild that would leave the lesson with fewer exercises than it has is a regression,
+    // whatever the rules say. Across the nineteen thin units a dry run planned fewer for 13 of
+    // 76 lessons -- a lesson with one sentence, or none, has less to select from now than it
+    // was given at generation. Such a lesson is reported and left alone, never rebuilt.
+    const preview = await useCases.rebuildLessonExercises({ lessonId: lesson.id, apply: false, selectionState: null });
+    const currentCount = summarize(before.shape).exercises;
+    if (preview.selected.length + preview.kept.length < currentCount) {
+      console.log(`\nSKIP: rebuilding would leave ${preview.selected.length + preview.kept.length} exercises against ${currentCount} now -- not touching it`);
+      await useCases.rebuildLessonExercises({ lessonId: lesson.id, apply: false, selectionState, record: true });
+      continue;
+    }
+
     const plan = await useCases.rebuildLessonExercises({ lessonId: lesson.id, apply: APPLY, selectionState, record: true });
     console.log(
       `\nplan: ${plan.candidates} candidates -> ${plan.selected.length} selected (profile ${plan.profile}); ` +
