@@ -124,15 +124,11 @@ const CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
 // unclaimed, leaving a lesson of about nine blocks. The target allowance folds into sentences
 // instead, so the lesson is as long as any other; what fills it is combination practice
 // rather than a new card.
-//
-// Stage 1 is deliberately the same as a lesson with a card: two sentence exercises, one per
-// sentence. The opening stage is a lesson's first impression and is to stay as it was; the
-// extra room goes to stages 2 and 3, where the drilling happens.
 const TARGETLESS_CORE_STAGE_SELECTION_CONFIG: Record<1 | 2 | 3, StageSelectionConfig> = {
   1: {
     stageLimit: 5,
-    groupLimits: { target: 0, sentence: 2, lesson: 0 },
-    perSourceLimits: { target: 0, sentence: 1, lesson: 0 }
+    groupLimits: { target: 0, sentence: 5, lesson: 0 },
+    perSourceLimits: { target: 0, sentence: 2, lesson: 0 }
   },
   2: {
     stageLimit: 5,
@@ -653,13 +649,8 @@ function canSelectCandidate<T>(
   if (stage >= 2 && (stageState.familyCounts.get(candidate.family) || 0) >= 2) return false;
 
   if (stage === 3 && candidate.sourceGroup === "sentence") {
-    // One sentence exercise per kind in stage 3 -- speaking, listening, meaning-or-order -- so
-    // the closing stage is not three listening drills. A lesson with a card fills the rest of
-    // the stage from its target; a lesson with none has only its sentences, and one per kind
-    // held it at exactly three exercises. Two per kind there, still on different sentences.
     const bucket = getSentenceStage3Bucket(candidate.family);
-    const perBucket = lessonMode === "core" && !hasTargets ? 2 : 1;
-    if (bucket && (stageState.sentenceStage3Buckets.get(bucket) || 0) >= perBucket) return false;
+    if (bucket && (stageState.sentenceStage3Buckets.get(bucket) || 0) >= 1) return false;
   }
 
   return true;
@@ -929,12 +920,7 @@ export function selectLessonQuestionPlan<T>(
   // A core lesson that introduces nothing: its target allowance would go unclaimed, so it is
   // given to the sentences instead. Read from the candidates rather than passed in, because a
   // lesson has no target here precisely when nothing offered one.
-  //
-  // "Offered one" means a stage-1 target candidate. A word the lesson only reviews still
-  // yields stage-2 and stage-3 drafts in the target group, and counting those meant every
-  // lesson that reviewed anything was treated as introducing something -- so the targetless
-  // limits never applied to a real lesson, and 45 lessons with no card sat at nine exercises.
-  const hasTargets = decoratedCandidates.some((candidate) => candidate.sourceGroup === "target" && candidate.stage === 1);
+  const hasTargets = decoratedCandidates.some((candidate) => candidate.sourceGroup === "target");
   const globalSourceCounts = new Map<string, number>();
 
   for (const stage of [1, 2, 3] as const) {
@@ -1104,9 +1090,7 @@ export function computeReviewSelectionCeiling<T>(
   candidates: LessonQuestionCandidate<T>[],
   lessonMode: "core" | "review" = "review"
 ): number {
-  // The same definition selection uses: a target is something the lesson introduces, which is
-  // the only case that yields a stage-1 target candidate.
-  const hasTargets = candidates.some((candidate) => candidate.sourceGroup === "target" && candidate.stage === 1);
+  const hasTargets = candidates.some((candidate) => candidate.sourceGroup === "target");
   const bySourceTotal = new Map<string, number>();
   let stageCapacity = 0;
 

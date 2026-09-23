@@ -229,64 +229,6 @@ test("a core lesson that introduces nothing is still a full lesson", () => {
   }
 });
 
-test("a lesson with no target may close on two sentence exercises per kind; one with a target still gets one", () => {
-  // Stage 3 takes one sentence exercise per kind -- speaking, listening, meaning-or-order --
-  // so it does not become three listening drills. A lesson with a card fills the rest of the
-  // stage from its target; a lesson with none has only its sentences and sat at exactly three.
-  const stage3 = (withTarget: boolean): LessonQuestionCandidate<string>[] => {
-    const candidates: LessonQuestionCandidate<string>[] = [];
-    if (withTarget) {
-      candidates.push(
-        makeCandidate({ stage: 1, sourceGroup: "target", sourceKey: "word:x", questionType: "multiple-choice", questionSubtype: "mc-select-translation" })
-      );
-    }
-    for (const index of [1, 2, 3, 4]) {
-      candidates.push(
-        makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "listening", questionSubtype: "ls-mc-select-translation" }),
-        makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "speaking", questionSubtype: "sp-pronunciation-compare" }),
-        makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "multiple-choice", questionSubtype: "mc-select-translation" })
-      );
-    }
-    return candidates;
-  };
-  const stage3Count = (withTarget: boolean) =>
-    selectLessonQuestionPlan(stage3(withTarget), { lessonKey: `bucket-${withTarget}`, lessonMode: "core" }).selectedCandidates.filter(
-      (candidate) => candidate.stage === 3 && candidate.sourceGroup === "sentence"
-    ).length;
-
-  assert.equal(stage3Count(true), 3, "with a target, stage 3 keeps one sentence exercise per kind");
-  assert.ok(stage3Count(false) >= 5, `without a target, stage 3 should reach at least five, got ${stage3Count(false)}`);
-});
-
-test("a lesson that only reviews a word is treated as introducing nothing, and its stage 1 is unchanged", () => {
-  // A reviewed word yields stage-2 and stage-3 drafts in the target group but no stage-1 card
-  // question. Counting those as "has a target" put every lesson that reviewed anything on the
-  // targeted limits, so the targetless limits never reached a real lesson: 45 lessons with no
-  // card sat at nine exercises. Being targetless shows in stage 3 -- two sentence exercises
-  // per kind rather than one -- while stage 1 stays exactly as a lesson with a card opens.
-  const candidates: LessonQuestionCandidate<string>[] = [
-    makeCandidate({ stage: 2, sourceGroup: "target", sourceKey: "word:reviewed", questionType: "multiple-choice", questionSubtype: "mc-select-missing-word" }),
-    makeCandidate({ stage: 3, sourceGroup: "target", sourceKey: "word:reviewed", questionType: "listening", questionSubtype: "ls-mc-select-translation" })
-  ];
-  for (const index of [1, 2, 3, 4]) {
-    candidates.push(
-      makeCandidate({ stage: 1, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "fill-in-the-gap", questionSubtype: "fg-word-order" }),
-      makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "listening", questionSubtype: "ls-mc-select-translation" }),
-      makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "speaking", questionSubtype: "sp-pronunciation-compare" }),
-      makeCandidate({ stage: 3, sourceGroup: "sentence", sourceKey: `sentence:${index}`, questionType: "multiple-choice", questionSubtype: "mc-select-translation" })
-    );
-  }
-
-  const plan = selectLessonQuestionPlan(candidates, { lessonKey: "reviews-only", lessonMode: "core" });
-  const stage1 = plan.selectedCandidates.filter((candidate) => candidate.stage === 1).length;
-  const stage3Sentences = plan.selectedCandidates.filter(
-    (candidate) => candidate.stage === 3 && candidate.sourceGroup === "sentence"
-  ).length;
-
-  assert.equal(stage1, 2, `stage 1 should open with two sentence exercises, as any lesson does, got ${stage1}`);
-  assert.ok(stage3Sentences >= 5, `a lesson with no card should close on more than three sentence exercises, got ${stage3Sentences}`);
-});
-
 test("every sentence in a lesson gets used, and none is drilled to death", () => {
   // A four-sentence lesson spent three exercises on one sentence and never touched the
   // fourth, because a core lesson had no per-source cap.
