@@ -119,6 +119,28 @@ type TeachingContent = Pick<
   meaningSegments?: ReviewMeaningSegment[];
 };
 
+/** What rebuildLessonExercises decided, whether or not it wrote anything. */
+export type RebuildLessonExercisesResult = {
+  lessonId: string;
+  title: string;
+  lessonMode: "core" | "review";
+  applied: boolean;
+  profile: string;
+  candidates: number;
+  selected: Array<{
+    stage: 1 | 2 | 3;
+    sourceGroup: "target" | "sentence" | "lesson";
+    sourceKey: string;
+    sourceType: "word" | "expression" | "sentence";
+    type: string;
+    subtype: string;
+  }>;
+  kept: Array<{ id: string; subtype: string }>;
+  replaced: Array<{ id: string; subtype: string; sourceType: string | null }>;
+  cards: Array<{ kind: "word" | "expression"; id: string; text: string }>;
+  proverbIds: string[];
+};
+
 export type GenerateUnitAiContentInput = {
   unitId: string;
   language: LessonEntity["language"];
@@ -4615,6 +4637,293 @@ export class AdminUnitAiContentUseCases {
     }
 
     return { created, skipped, errors };
+  }
+
+  /**
+   * Rebuild a lesson's exercises from the content it already has, under today's selection rules.
+   *
+   * A lesson's blocks are written once, at generation. When the selector's limits were raised,
+   * lessons already built stayed at the old counts -- 128 teaching lessons average 11 exercises
+   * against 12 for the 15 built since, with a cluster at exactly 9 that the change removed. The
+   * exercise phase is deterministic code over the lesson's words, expressions and sentences, so
+   * it can simply be run again. Nothing the lesson teaches changes: title, description, content
+   * items, vocabulary cards and proverbs are untouched, and no model is called.
+   *
+   * The exercises are replaced as a set, not appended to. The selector's rules -- never the
+   * same source and subtype twice, a cap per question family per stage, a rotating exercise
+   * profile -- only hold over a whole set; adding to an old set would double pairs and mix two
+   * profiles. Replacing also rebuilds every exercise from the sentence text as it is now.
+   *
+   * The one question the model wrote, the stage-1 context scenario (`mc-select-context-response`,
+   * the only subtype no deterministic builder emits), is kept and re-placed where generation
+   * puts it. Replaced questions are soft-deleted, so learner miss records still resolve.
+   *
+   * With `apply: false` nothing is written; the planned selection is returned for comparison.
+   */
+  async rebuildLessonExercises(input: {
+    lessonId: string;
+    apply: boolean;
+    selectionState?: LessonQuestionSelectionState | null;
+    /** Record the selection into the state even without applying, so a later lesson sees it. */
+    record?: boolean;
+  }): Promise<RebuildLessonExercisesResult> {
+    const lesson = await this.lessons.findById(input.lessonId);
+    if (!lesson) throw new Error(`lesson ${input.lessonId} not found`);
+    const unit = await this.units.findById(lesson.unitId);
+    const lessonMode: "core" | "review" = unit?.kind === "review" || lesson.kind === "review" ? "review" : "core";
+    const isReviewExerciseLesson = lessonMode === "review";
+
+    const items = await this.lessonContentItems.list({ lessonId: lesson.id });
+    const introduceKeys = new Set(
+      items
+        .filter((item) => item.role === "introduce" && item.contentType !== "sentence")
+        .map((item) => `${item.contentType}:${item.contentId}`)
+    );
+
+    const lessonWords = await this.listLessonWords(lesson.id);
+    const lessonExpressions = await this.listLessonExpressions(lesson.id);
+    const lessonSentences = await this.listLessonSentences(lesson.id);
+    const focusedLessonContent: Array<WordEntity | ExpressionEntity> = [...lessonWords, ...lessonExpressions];
+
+    // Distractors come from what the learner has met by this lesson, as they did at generation:
+    // the lesson's own items, the words its sentences are made of, and what the unit taught in
+    // its earlier lessons. Not the whole unit -- a first version drew on all of it and put
+    // `jẹun`, `mu` and `oúnjẹ` into lesson one's matching question, three lessons before they
+    // are taught, which is the exact fault this course is being cleaned of.
+    const unitItems = await this.lessonContentItems.list({ unitId: lesson.unitId });
+    const earlierLessonIds = new Set(
+      (await this.lessons.list({ unitId: lesson.unitId }))
+        .filter((other) => other.orderIndex < lesson.orderIndex)
+        .map((other) => other.id)
+    );
+    const earlierItems = unitItems.filter((item) => earlierLessonIds.has(item.lessonId));
+    const supportWordIds = lessonSentences.flatMap((sentence) =>
+      sentence.components.filter((component) => component.type === "word").map((component) => component.refId)
+    );
+    const supportExpressionIds = lessonSentences.flatMap((sentence) =>
+      sentence.components.filter((component) => component.type === "expression").map((component) => component.refId)
+    );
+    const poolWordIds = Array.from(
+      new Set([...supportWordIds, ...earlierItems.filter((item) => item.contentType === "word").map((item) => item.contentId)])
+    );
+    const poolExpressionIds = Array.from(
+      new Set([
+        ...supportExpressionIds,
+        ...earlierItems.filter((item) => item.contentType === "expression").map((item) => item.contentId)
+      ])
+    );
+    const poolWords = poolWordIds.length ? await this.words.findByIds(poolWordIds) : [];
+    const poolExpressions = poolExpressionIds.length ? await this.expressions.findByIds(poolExpressionIds) : [];
+    const languageWords = await this.words.list({ language: lesson.language });
+    const dedupe = <T extends { kind: "word" | "expression"; id: string }>(list: T[]) =>
+      Array.from(new Map(list.map((item) => [getContentKey(item), item] as const)).values());
+    const questionOptionPool = dedupe([...focusedLessonContent, ...poolWords, ...poolExpressions]);
+
+    const stage1Introductions = focusedLessonContent
+      .filter((content) => introduceKeys.has(getContentKey(content)))
+      .slice(0, LESSON_GENERATION_LIMITS.MAX_CONTENT_PER_STAGE);
+    const stage1ContentSet = isReviewExerciseLesson
+      ? new Set<string>()
+      : new Set(stage1Introductions.map((content) => getContentKey(content)));
+    const laterStageContentSet = new Set(focusedLessonContent.map((content) => getContentKey(content)));
+
+    const pending: PendingLessonQuestionCreate[] = [];
+    if (!isReviewExerciseLesson) {
+      for (const content of focusedLessonContent) {
+        // What this lesson introduces is new here; everything else it holds was taught before.
+        const alreadyIntroduced = !introduceKeys.has(getContentKey(content));
+        const drafts = filterDraftsForLesson(
+          lesson,
+          content.kind,
+          buildQuestionDrafts(content, focusedLessonContent, questionOptionPool, alreadyIntroduced)
+        );
+        for (const draft of drafts) {
+          const stageTarget = draft.stage === 1 ? stage1ContentSet : laterStageContentSet;
+          if (!stageTarget.has(getContentKey(content))) continue;
+          pending.push({
+            stage: draft.stage,
+            sourceGroup: "target",
+            sourceKey: getContentKey(content),
+            questionType: draft.type,
+            questionSubtype: draft.subtype,
+            createInput: {
+              lessonId: lesson.id,
+              sourceType: content.kind,
+              sourceId: content.id,
+              translationIndex: 0,
+              type: draft.type,
+              subtype: draft.subtype,
+              promptTemplate: draft.promptTemplate,
+              options: draft.options,
+              correctIndex: draft.correctIndex,
+              reviewData: draft.reviewData,
+              explanation: draft.explanation,
+              status: "draft"
+            }
+          });
+        }
+      }
+      const stage2MatchingSubtype: "mt-match-image" | "mt-match-translation" =
+        hashMatchingSeed(`${lesson.id}:${lesson.title}`) % 3 === 0 ? "mt-match-image" : "mt-match-translation";
+      const matchingDraft = buildWordMatchingQuestionDraft({
+        lessonId: lesson.id,
+        subtype: stage2MatchingSubtype,
+        lessonWords: Array.from(new Map([...lessonWords, ...poolWords].map((item) => [item.id, item] as const)).values()),
+        languageWords: Array.from(
+          new Map([...languageWords, ...poolWords, ...lessonWords].map((item) => [item.id, item] as const)).values()
+        )
+      });
+      if (matchingDraft) {
+        pending.push({
+          stage: 2,
+          sourceGroup: "lesson",
+          sourceKey: `lesson:${lesson.id}:matching`,
+          questionType: matchingDraft.type,
+          questionSubtype: matchingDraft.subtype,
+          createInput: matchingDraft
+        });
+      }
+    }
+
+    const sentenceQuestionPool: TeachingContent[] =
+      lessonSentences.length > 1 ? lessonSentences : [...lessonSentences, ...focusedLessonContent];
+    for (const sentence of lessonSentences) {
+      const drafts = buildSentenceQuestionDrafts(sentence, sentenceQuestionPool, focusedLessonContent, {
+        reviewMode: isReviewExerciseLesson
+      });
+      for (const draft of drafts) {
+        pending.push({
+          stage: draft.stage,
+          sourceGroup: "sentence",
+          sourceKey: `sentence:${sentence.id}`,
+          questionType: draft.type,
+          questionSubtype: draft.subtype,
+          createInput: {
+            lessonId: lesson.id,
+            sourceType: "sentence",
+            sourceId: sentence.id,
+            translationIndex: 0,
+            type: draft.type,
+            subtype: draft.subtype,
+            promptTemplate: draft.promptTemplate,
+            options: draft.options,
+            correctIndex: draft.correctIndex,
+            reviewData: draft.reviewData,
+            explanation: draft.explanation,
+            status: "draft"
+          }
+        });
+      }
+    }
+
+    const selectedQuestionPlan = selectLessonQuestionPlan(
+      pending.map((item) => ({
+        stage: item.stage,
+        sourceGroup: item.sourceGroup,
+        sourceKey: item.sourceKey,
+        questionType: item.questionType,
+        questionSubtype: item.questionSubtype,
+        payload: item
+      })),
+      { lessonKey: lesson.id, lessonMode, selectionState: input.selectionState ?? null, commitSelection: false }
+    );
+    const selected = selectedQuestionPlan.selectedCandidates.map((candidate) => candidate.payload);
+
+    const existing = await this.questions.list({ lessonId: lesson.id });
+    const kept = existing.filter((question) => question.subtype === "mc-select-context-response");
+    const replaced = existing.filter((question) => question.subtype !== "mc-select-context-response");
+    const nextStages = this.ensureRefactorStages(lesson);
+    const proverbBlocks = nextStages
+      .flatMap((stage) => stage.blocks)
+      .filter((block): block is Extract<LessonBlock, { type: "proverb" }> => block.type === "proverb");
+
+    const describe = (item: PendingLessonQuestionCreate) => ({
+      stage: item.stage,
+      sourceGroup: item.sourceGroup,
+      sourceKey: item.sourceKey,
+      // The stored source type, so a plan compares like-for-like with what the database holds:
+      // the matching question is grouped as "lesson" for selection but stored against a word.
+      sourceType: item.createInput.sourceType,
+      type: item.questionType,
+      subtype: item.questionSubtype
+    });
+    const result: RebuildLessonExercisesResult = {
+      lessonId: lesson.id,
+      title: lesson.title,
+      lessonMode,
+      applied: false,
+      profile: selectedQuestionPlan.profileName,
+      candidates: pending.length,
+      selected: selected.map(describe),
+      kept: kept.map((question) => ({ id: question.id, subtype: question.subtype })),
+      replaced: replaced.map((question) => ({ id: question.id, subtype: question.subtype, sourceType: question.sourceType || null })),
+      cards: stage1Introductions.map((content) => ({ kind: content.kind, id: content.id, text: content.text })),
+      proverbIds: proverbBlocks.map((block) => block.refId)
+    };
+
+    const shouldRecord = input.record ?? input.apply;
+    if (!input.apply) {
+      if (shouldRecord && input.selectionState) {
+        recordLessonQuestionSelection(input.selectionState, lesson.id, selectedQuestionPlan.profileName, selectedQuestionPlan.selectedCandidates);
+      }
+      return result;
+    }
+
+    const created: Array<{ pending: PendingLessonQuestionCreate; question: QuestionEntity }> = [];
+    for (const item of selected) created.push({ pending: item, question: await this.questions.create(item.createInput) });
+
+    // Stage 1 mirrors generation: the description, then each new item's card followed by its
+    // own questions and the sentence questions that feature it, then whatever is left, then the
+    // scenario question the model wrote.
+    const sentenceById = new Map(lessonSentences.map((sentence) => [sentence.id, sentence] as const));
+    const stage1Target = created.filter((item) => item.pending.stage === 1 && item.pending.sourceGroup === "target");
+    const stage1Sentence = created.filter((item) => item.pending.stage === 1 && item.pending.sourceGroup === "sentence");
+    const byContentKey = new Map<string, QuestionEntity[]>();
+    const unassigned: QuestionEntity[] = [];
+    for (const item of stage1Sentence) {
+      const sentence = sentenceById.get(item.pending.createInput.sourceId);
+      const key = sentence?.components
+        ?.map((component) => `${component.type}:${component.refId}`)
+        .find((candidate) => stage1ContentSet.has(candidate));
+      if (!key) {
+        unassigned.push(item.question);
+        continue;
+      }
+      byContentKey.set(key, [...(byContentKey.get(key) || []), item.question]);
+    }
+    const stage1Blocks: LessonBlock[] = [];
+    if (lesson.description.trim()) stage1Blocks.push({ type: "text", content: lesson.description.trim() });
+    for (const content of stage1Introductions) {
+      stage1Blocks.push({ type: "content", contentType: content.kind, refId: content.id });
+      for (const item of stage1Target.filter((candidate) => candidate.pending.sourceKey === getContentKey(content))) {
+        stage1Blocks.push({ type: "question", refId: item.question.id });
+      }
+      for (const question of byContentKey.get(getContentKey(content)) || []) {
+        stage1Blocks.push({ type: "question", refId: question.id });
+      }
+    }
+    for (const question of unassigned) stage1Blocks.push({ type: "question", refId: question.id });
+    for (const question of kept) stage1Blocks.push({ type: "question", refId: question.id });
+
+    const stage2Blocks: LessonBlock[] = created
+      .filter((item) => item.pending.stage === 2)
+      .map((item) => ({ type: "question" as const, refId: item.question.id }));
+    const stage3Blocks: LessonBlock[] = [
+      ...created.filter((item) => item.pending.stage === 3).map((item) => ({ type: "question" as const, refId: item.question.id })),
+      ...proverbBlocks
+    ];
+    nextStages[0].blocks = stage1Blocks;
+    nextStages[1].blocks = stage2Blocks;
+    nextStages[2].blocks = stage3Blocks;
+    await this.lessons.updateById(lesson.id, { stages: nextStages.filter((stage) => stage.blocks.length > 0) });
+
+    const now = new Date();
+    for (const question of replaced) await this.questions.softDeleteById(question.id, now);
+
+    if (shouldRecord && input.selectionState) {
+      recordLessonQuestionSelection(input.selectionState, lesson.id, selectedQuestionPlan.profileName, selectedQuestionPlan.selectedCandidates);
+    }
+    return { ...result, applied: true };
   }
 
   private ensureRefactorStages(lesson: LessonEntity) {
