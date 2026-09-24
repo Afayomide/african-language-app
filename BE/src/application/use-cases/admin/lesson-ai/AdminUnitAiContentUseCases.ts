@@ -134,11 +134,27 @@ export type RebuildLessonExercisesResult = {
     sourceType: "word" | "expression" | "sentence";
     type: string;
     subtype: string;
+    /** The exercise itself, ready to create -- so a caller can show it or append it. */
+    createInput: PendingLessonQuestionCreate["createInput"];
   }>;
   kept: Array<{ id: string; subtype: string }>;
   replaced: Array<{ id: string; subtype: string; sourceType: string | null }>;
   cards: Array<{ kind: "word" | "expression"; id: string; text: string }>;
   proverbIds: string[];
+  /**
+   * Every exercise the builders could make for this lesson, selected or not. A caller with
+   * its own policy -- equalising drilling across sentences, say -- chooses from these rather
+   * than from what the selector happened to pick. `candidates` above is their count.
+   */
+  drafts: Array<{
+    stage: 1 | 2 | 3;
+    sourceGroup: "target" | "sentence" | "lesson";
+    sourceKey: string;
+    sourceType: "word" | "expression" | "sentence";
+    type: string;
+    subtype: string;
+    createInput: PendingLessonQuestionCreate["createInput"];
+  }>;
 };
 
 export type GenerateUnitAiContentInput = {
@@ -4845,7 +4861,8 @@ export class AdminUnitAiContentUseCases {
       // the matching question is grouped as "lesson" for selection but stored against a word.
       sourceType: item.createInput.sourceType,
       type: item.questionType,
-      subtype: item.questionSubtype
+      subtype: item.questionSubtype,
+      createInput: item.createInput
     });
     const result: RebuildLessonExercisesResult = {
       lessonId: lesson.id,
@@ -4858,7 +4875,8 @@ export class AdminUnitAiContentUseCases {
       kept: kept.map((question) => ({ id: question.id, subtype: question.subtype })),
       replaced: replaced.map((question) => ({ id: question.id, subtype: question.subtype, sourceType: question.sourceType || null })),
       cards: stage1Introductions.map((content) => ({ kind: content.kind, id: content.id, text: content.text })),
-      proverbIds: proverbBlocks.map((block) => block.refId)
+      proverbIds: proverbBlocks.map((block) => block.refId),
+      drafts: pending.map(describe)
     };
 
     const shouldRecord = input.record ?? input.apply;
