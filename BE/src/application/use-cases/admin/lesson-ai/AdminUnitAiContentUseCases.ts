@@ -5481,8 +5481,16 @@ export class AdminUnitAiContentUseCases {
     const isExplicitWord = (item: { text: string }) => explicitTeachableWordKeys.has(normalize(item.text));
     const isExplicitExpression = (item: { text: string }) => explicitExpressionTargetKeys.has(normalize(item.text));
 
+    // When the plan says what a lesson introduces -- named targets, or none at all -- that is
+    // the whole list. The spare slots used to be filled with whatever the sentences surfaced,
+    // so a lesson whose phrase target produced no card gave that card to `Bẹ́ẹ̀` instead, a
+    // word no plan had asked for. Inference still runs only for a plan that names nothing and
+    // does not say "nothing", which is how an unplanned first generation finds its targets.
+    const onlyPlannedItems = hasExplicitCoreTargets || introducesNothing;
     const explicitNewWords = rawGeneratedNewWords.filter(isExplicitWord);
-    const spareWordSlots = Math.max(0, LESSON_GENERATION_LIMITS.MAX_NEW_WORDS_PER_LESSON - explicitNewWords.length);
+    const spareWordSlots = onlyPlannedItems
+      ? 0
+      : Math.max(0, LESSON_GENERATION_LIMITS.MAX_NEW_WORDS_PER_LESSON - explicitNewWords.length);
     const selectedGeneratedNewWords = [
       ...explicitNewWords,
       ...rawGeneratedNewWords.filter((item) => !isExplicitWord(item)).slice(0, spareWordSlots)
@@ -5490,11 +5498,10 @@ export class AdminUnitAiContentUseCases {
 
     const explicitNewExpressions = rawGeneratedNewExpressions.filter(isExplicitExpression);
     const remainingNewContentSlots = Math.max(0, targetNewSentences - selectedGeneratedNewWords.length);
+    const spareExpressionSlots = onlyPlannedItems ? 0 : Math.max(0, remainingNewContentSlots - explicitNewExpressions.length);
     const selectedGeneratedNewContent = [
       ...explicitNewExpressions,
-      ...rawGeneratedNewExpressions
-        .filter((item) => !isExplicitExpression(item))
-        .slice(0, Math.max(0, remainingNewContentSlots - explicitNewExpressions.length))
+      ...rawGeneratedNewExpressions.filter((item) => !isExplicitExpression(item)).slice(0, spareExpressionSlots)
     ];
     const selectedGeneratedReviewWords = teachableWords
       .filter((item) => generatedWordIntroductionMap.get(item.id))
