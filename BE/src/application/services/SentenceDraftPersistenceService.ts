@@ -2,7 +2,7 @@ import { contentTextKey } from "../../services/content/contentTextKey.js";
 import type { LessonEntity } from "../../domain/entities/Lesson.js";
 import type { ContentComponentRef } from "../../domain/entities/Content.js";
 import type { ExpressionEntity } from "../../domain/entities/Expression.js";
-import type { SentenceEntity } from "../../domain/entities/Sentence.js";
+import type { SentenceEntity, SentenceMeaningSegment } from "../../domain/entities/Sentence.js";
 import type { WordEntity } from "../../domain/entities/Word.js";
 import type { LessonContentItemRepository } from "../../domain/repositories/LessonContentItemRepository.js";
 import type { ExpressionRepository } from "../../domain/repositories/ExpressionRepository.js";
@@ -21,6 +21,39 @@ function normalize(text: string) {
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
+/**
+ * The draft's meaning map in stored form: component indexes become word indexes as well, so
+ * the learner's hover can address either. Trusted only when nothing was split on the way to
+ * persistence -- the draft's indexes address the draft's components, and a multi-word chunk
+ * broken into words shifts everything after it.
+ */
+function toStoredMeaningSegments(
+  draft: LlmGeneratedSentence,
+  componentRefs: ContentComponentRef[]
+): SentenceMeaningSegment[] {
+  const segments = draft.meaningSegments || [];
+  if (!segments.length || componentRefs.length !== draft.components.length) return [];
+  const wordIndexes: number[][] = [];
+  let cursor = 0;
+  for (const ref of componentRefs) {
+    const count = String(ref.textSnapshot || "").trim().split(/\s+/).filter(Boolean).length;
+    wordIndexes.push(Array.from({ length: count }, (_, offset) => cursor + offset));
+    cursor += count;
+  }
+  return segments
+    .map((segment) => {
+      const sourceComponentIndexes = Array.from(
+        new Set(
+          (segment.componentIndexes || []).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < componentRefs.length)
+        )
+      );
+      const text = String(segment.text || "").trim();
+      const sourceWordIndexes = sourceComponentIndexes.flatMap((i) => wordIndexes[i] || []);
+      return text && sourceWordIndexes.length ? { text, sourceWordIndexes, sourceComponentIndexes } : null;
+    })
+    .filter((segment): segment is SentenceMeaningSegment => Boolean(segment));
 }
 
 function resolveDifficulty(level: LessonEntity["level"]) {
@@ -320,6 +353,7 @@ export class SentenceDraftPersistenceService {
       if (componentRefs.length === 0) continue;
 
       await this.fillChunkGlosses(draft, componentRefs, needsGloss);
+      const meaningSegments = toStoredMeaningSegments(draft, componentRefs);
 
       const existing = byText.get(contentTextKey(draft.text));
       if (existing) {
@@ -329,7 +363,8 @@ export class SentenceDraftPersistenceService {
           literalTranslation: existing.literalTranslation || draft.literalTranslation || "",
           usageNotes: existing.usageNotes || draft.usageNotes || "",
           explanation: existing.explanation || draft.explanation || "",
-          components: existing.components.length > 0 ? existing.components : componentRefs
+          components: existing.components.length > 0 ? existing.components : componentRefs,
+          meaningSegments: existing.meaningSegments?.length ? existing.meaningSegments : meaningSegments
         });
         createdOrReused.push(updated || existing);
         continue;
@@ -361,6 +396,7 @@ export class SentenceDraftPersistenceService {
         literalTranslation: draft.literalTranslation || "",
         usageNotes: draft.usageNotes || "",
         components: componentRefs,
+        meaningSegments,
         status: "draft"
       });
       createdOrReused.push(created);

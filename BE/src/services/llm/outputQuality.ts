@@ -90,6 +90,9 @@ function isSentenceMeaningSegmentReason(reason: string) {
   return reason.includes("meaning segment");
 }
 
+/** How many components one English chunk of the meaning map may cover. */
+export const MAX_COMPONENTS_PER_MEANING_SEGMENT = 2;
+
 function looksEnglishOnly(value: string) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return false;
@@ -456,6 +459,19 @@ function sentenceReasons(
         sortedIndexes.some((value, index) => value !== expectedIndexes[index])
       ) {
         reasons.push("meaning segments must cover each component exactly once");
+      }
+
+      // The map is what the learner hovers, word by word. Grouping is for the cases English
+      // needs it -- `Bẹ́ẹ̀ ni` -> "Yes", `ò sí` -> "is not" -- not for glossing a clause as one
+      // chain: a weaker model returned "it is a lot of money" for three separate words and "I
+      // do not want to buy" for four, and the hover taught nothing about any of them.
+      for (const segment of meaningSegments) {
+        const componentIndexes = Array.isArray(segment?.componentIndexes) ? segment.componentIndexes : [];
+        if (componentIndexes.length > MAX_COMPONENTS_PER_MEANING_SEGMENT) {
+          reasons.push(
+            `meaning segment "${String(segment?.text || "").trim()}" groups ${componentIndexes.length} components; gloss each word, grouping at most ${MAX_COMPONENTS_PER_MEANING_SEGMENT}`
+          );
+        }
       }
     }
   }

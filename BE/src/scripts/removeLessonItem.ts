@@ -23,9 +23,11 @@ const arg = (name: string) => {
 const LESSON_ID = arg("lesson");
 const WORD = arg("word");
 const EXPRESSION = arg("expression");
+const SENTENCE = arg("sentence");
 
 async function main() {
-  if (!LESSON_ID || (!WORD && !EXPRESSION)) throw new Error("--lesson <id> and one of --word <text> / --expression <text> are required");
+  if (!LESSON_ID || (!WORD && !EXPRESSION && !SENTENCE))
+    throw new Error("--lesson <id> and one of --word <text> / --expression <text> / --sentence <text> are required");
   const c = new Client({ connectionString: process.env.DATABASE_URL });
   c.on("error", (err) => console.error(`database connection error: ${err.message}`));
   await c.connect();
@@ -34,13 +36,14 @@ async function main() {
   try {
     const lesson = (await q(`SELECT id, title, language FROM lessons WHERE id = $1 AND is_deleted = false`, [LESSON_ID]))[0];
     if (!lesson) throw new Error("lesson not found");
-    const table = WORD ? "words" : "expressions";
+    const kind = WORD ? "word" : EXPRESSION ? "expression" : "sentence";
+    const table = `${kind}s`;
     const item = (await q(`SELECT id, text FROM ${table} WHERE language = $1 AND is_deleted = false AND lower(text) = lower($2) LIMIT 1`, [
       lesson.language,
-      WORD || EXPRESSION
+      WORD || EXPRESSION || SENTENCE
     ]))[0];
-    if (!item) throw new Error(`no live ${WORD ? "word" : "expression"} row for "${WORD || EXPRESSION}"`);
-    console.log(`lesson "${lesson.title}", ${WORD ? "word" : "expression"} "${item.text}" (${item.id})`);
+    if (!item) throw new Error(`no live ${kind} row for "${WORD || EXPRESSION || SENTENCE}"`);
+    console.log(`lesson "${lesson.title}", ${kind} "${item.text}" (${item.id})`);
 
     const links = await q(`SELECT id, role FROM lesson_content_items WHERE lesson_id = $1 AND content_id = $2`, [LESSON_ID, item.id]);
     const questions = await q(
