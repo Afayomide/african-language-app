@@ -17,8 +17,14 @@
  * clash is listed and the question is still repointed: two on one sentence beats one on a
  * sentence that is gone, and the equalise script's listing will show it for cleanup.
  *
+ * With --delete-orphans, a question with no replacement is removed instead of listed: the
+ * question row is soft-deleted and its block leaves the lesson stage, the blocks after it
+ * closing the gap. That is for sentences retired outright (`Ẹ káalẹ́`, `báwo ni`), where the
+ * lesson holds nothing to point at and the ghost otherwise renders a retired sentence.
+ *
  *   npx tsx src/scripts/repointDeletedSentenceQuestions.ts            # dry run
  *   npx tsx src/scripts/repointDeletedSentenceQuestions.ts --apply
+ *   npx tsx src/scripts/repointDeletedSentenceQuestions.ts --delete-orphans [--apply]
  */
 import "dotenv/config";
 import { Client } from "pg";
@@ -26,6 +32,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 
 const APPLY = process.argv.includes("--apply");
+const DELETE_ORPHANS = process.argv.includes("--delete-orphans");
 
 const fold = (s: string) => s.normalize("NFC").toLowerCase().replace(/\s+/g, " ").trim();
 const swapped = (s: string) => fold(s).replace(/màmá/g, "ìyá");
@@ -69,7 +76,9 @@ async function main() {
       const match = live.find((s) => fold(s.text) === want);
       if (!match) {
         orphan.push(row);
-        console.log(`   ?  ${row.subtype.padEnd(26)} "${row.old_text}"  -- no live sentence in this lesson reads "${want}"`);
+        console.log(
+          `   ${DELETE_ORPHANS ? "x " : "? "} ${row.subtype.padEnd(26)} "${row.old_text}"  -- no live sentence in this lesson reads "${want}"${DELETE_ORPHANS ? "; removing" : ""}`
+        );
         continue;
       }
       const clash = await q(
@@ -86,22 +95,53 @@ async function main() {
         `   ->  ${row.subtype.padEnd(26)} "${row.old_text}"  ->  "${match.text}"${clash.length ? `   !! lesson already has a ${row.subtype} on that sentence` : ""}`
       );
     }
-    console.log(`\n${repoint.length} to repoint, ${orphan.length} with no replacement in their lesson`);
+    console.log(
+      `\n${repoint.length} to repoint, ${orphan.length} with no replacement in their lesson${DELETE_ORPHANS ? " (to remove)" : ""}`
+    );
     if (!APPLY) return console.log("\ndry run -- pass --apply to write");
-    if (!repoint.length) return;
+    if (!repoint.length && !(DELETE_ORPHANS && orphan.length)) return;
 
     mkdirSync("scratch", { recursive: true });
+    const blocks = orphan.length
+      ? await q(`SELECT * FROM lesson_blocks WHERE ref_id = ANY($1) AND type = 'question'`, [orphan.map((o) => o.id)])
+      : [];
     const backupPath = path.resolve("scratch", `repoint-sentence-questions-backup-${Date.now()}.json`);
-    writeFileSync(backupPath, JSON.stringify(stale, null, 2));
+    writeFileSync(backupPath, JSON.stringify({ questions: stale, blocks }, null, 2));
     await c.query("BEGIN");
-    for (const r of repoint) {
-      await c.query(
-        `UPDATE exercise_questions SET source_id = $1, related_source_refs = COALESCE($2::jsonb, related_source_refs), updated_at = now() WHERE id = $3`,
-        [r.to, r.refs ? JSON.stringify(r.refs) : null, r.id]
-      );
+    try {
+      for (const r of repoint) {
+        await c.query(
+          `UPDATE exercise_questions SET source_id = $1, related_source_refs = COALESCE($2::jsonb, related_source_refs), updated_at = now() WHERE id = $3`,
+          [r.to, r.refs ? JSON.stringify(r.refs) : null, r.id]
+        );
+      }
+      let removed = 0;
+      if (DELETE_ORPHANS) {
+        for (const o of orphan) {
+          await c.query(`UPDATE exercise_questions SET is_deleted = true, deleted_at = now(), updated_at = now() WHERE id = $1`, [o.id]);
+          for (const b of blocks.filter((b) => b.ref_id === o.id)) {
+            await c.query(`DELETE FROM lesson_blocks WHERE id = $1`, [b.id]);
+            removed += 1;
+          }
+        }
+        // Renumber each touched stage once, after all its removals, from the order that remains.
+        // Shifting per deletion went wrong when a stage lost two blocks: the second one's
+        // recorded index was stale by then.
+        for (const stageId of new Set(blocks.map((b) => b.stage_id as string))) {
+          await c.query(
+            `UPDATE lesson_blocks lb SET order_index = r.rn - 1
+               FROM (SELECT id, row_number() OVER (ORDER BY order_index, id) rn FROM lesson_blocks WHERE stage_id = $1) r
+              WHERE lb.id = r.id AND lb.order_index <> r.rn - 1`,
+            [stageId]
+          );
+        }
+      }
+      await c.query("COMMIT");
+      console.log(`\nrepointed ${repoint.length} questions${DELETE_ORPHANS ? `, removed ${orphan.length} orphans (${removed} blocks)` : ""}; backup ${backupPath}`);
+    } catch (err) {
+      await c.query("ROLLBACK");
+      throw err;
     }
-    await c.query("COMMIT");
-    console.log(`\nrepointed ${repoint.length} questions; backup ${backupPath}`);
   } finally {
     await c.end();
   }

@@ -15,6 +15,7 @@
  *
  *   npx tsx src/scripts/splitEveningGreeting.ts            # dry run, prints every action
  *   npx tsx src/scripts/splitEveningGreeting.ts --apply
+ *   npx tsx src/scripts/splitEveningGreeting.ts --spelling "Ẹ káàlẹ́" [--apply]   # the other row
  */
 import "dotenv/config";
 import { Client } from "pg";
@@ -23,7 +24,12 @@ import path from "path";
 import { genObjectId } from "../infrastructure/db/drizzle/ids.js";
 
 const APPLY = process.argv.includes("--apply");
-const EVENING = "Ẹ káalẹ́";
+// The greeting is stored under two spellings, `Ẹ káalẹ́` and `Ẹ káàlẹ́`; each is its own
+// expression row with its own sentences, so the script runs once per spelling.
+const spellingAt = process.argv.indexOf("--spelling");
+const EVENING = spellingAt >= 0 ? String(process.argv[spellingAt + 1] || "").trim() : "Ẹ káalẹ́";
+if (!EVENING) throw new Error("--spelling needs a value, e.g. --spelling \"Ẹ káàlẹ́\"");
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 type Variant = { label: "morning" | "afternoon"; greeting: string; english: string };
 const VARIANTS: Variant[] = [
@@ -35,7 +41,9 @@ const lower = (s: string) => s.normalize("NFC").toLowerCase();
 
 /** Swap the greeting, keeping the rest of the sentence and its capitalisation intact. */
 function swapText(text: string, greeting: string) {
-  return text.replace(/Ẹ káalẹ́/g, greeting).replace(/ẹ káalẹ́/g, greeting.toLowerCase());
+  return text
+    .replace(new RegExp(escapeRegExp(EVENING), "g"), greeting)
+    .replace(new RegExp(escapeRegExp(EVENING.toLowerCase()), "g"), greeting.toLowerCase());
 }
 function swapEnglish(english: string, replacement: string) {
   return english.replace(/Good evening/g, replacement).replace(/good evening/g, replacement.toLowerCase());
@@ -60,8 +68,9 @@ async function main() {
     const sources = await q(
       `SELECT s.id, s.text, s.translations, s.language_id, s.explanation, s.literal_translation, s.difficulty, s.status
          FROM sentences s
-        WHERE s.language='yoruba' AND s.is_deleted=false AND s.text ILIKE '%káalẹ́%'
-        ORDER BY s.text`
+        WHERE s.language='yoruba' AND s.is_deleted=false AND s.text ILIKE '%' || $1 || '%'
+        ORDER BY s.text`,
+      [EVENING.replace(/^Ẹ /, "")]
     );
 
     const existing = new Map(
