@@ -371,12 +371,22 @@ export function LessonPlayer({
   const questionSentenceComponents =
     questionSource?.kind === 'sentence' && Array.isArray(questionSource.components) ? questionSource.components : []
   const questionSentenceAudioUrl = questionSource?.kind === 'sentence' ? questionSource.audio?.url : undefined
+  // Which way the tiles run decides what the card above them may show. When the tiles spell
+  // the target language -- "Arrange the words to mean: {meaning}", "Listen and arrange the
+  // words to match: {meaning}" -- the card shows the English, never the sentence: the sentence
+  // is the answer. When the tiles spell the English ("Build the English meaning of this
+  // sentence."), the card shows the target sentence. This used to be keyed on one subtype and
+  // one prompt wording, so a listening word-order on an expression showed `Ẹ káàárọ̀` above
+  // tiles reading Ẹ / káàárọ̀.
+  // Letter tiles always spell the target word, so a letter-order card shows the meaning too.
+  const foldForTiles = (value: string) => String(value || '').toLocaleLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '')
+  const tilesSpellTarget =
+    isWordOrderQuestion &&
+    interactionWords.length > 0 &&
+    foldForTiles(interactionWords.join(' ')) === foldForTiles(sentenceText || sourceText)
+  const wordOrderBuildsTarget = isWordOrderQuestion && (promptText.includes('{meaning}') || tilesSpellTarget)
   const shouldShowMeaningSentenceCard =
-    exerciseData?.subtype === 'fg-word-order' &&
-    questionSource?.kind === 'sentence' &&
-    Boolean(meaningText.trim()) &&
-    questionSentenceComponents.length > 0 &&
-    /arrange the words to mean/i.test(promptText)
+    wordOrderBuildsTarget && Boolean(meaningText.trim()) && questionSentenceComponents.length > 0
   const inlineSourceComponent =
     questionSource && questionSource.kind && questionSource.kind !== 'sentence'
       ? {
@@ -911,6 +921,7 @@ export function LessonPlayer({
                 choiceSupportText={choiceSupportText}
                 questionSentenceText={questionSentenceText}
                 shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
+                wordOrderBuildsTarget={wordOrderBuildsTarget}
                 meaningText={meaningText}
                 questionSentenceAudioUrl={questionSentenceAudioUrl}
                 questionSentenceComponents={questionSentenceComponents}

@@ -1037,6 +1037,12 @@ function WordOrderExerciseSurface({
   renderedPrompt,
   questionSentenceText,
   shouldShowMeaningSentenceCard,
+  wordOrderBuildsTarget,
+  isListeningQuestion,
+  listeningAudioUrl,
+  isPlayingPrompt,
+  onToggleListeningPrompt,
+  onPlayListeningSlow,
   meaningText,
   questionSentenceAudioUrl,
   questionSentenceComponents,
@@ -1055,6 +1061,13 @@ function WordOrderExerciseSurface({
   renderedPrompt: string
   questionSentenceText: string
   shouldShowMeaningSentenceCard: boolean
+  /** The tiles spell the target language, so the card must not show the sentence. */
+  wordOrderBuildsTarget: boolean
+  isListeningQuestion: boolean
+  listeningAudioUrl?: string
+  isPlayingPrompt: boolean
+  onToggleListeningPrompt: () => void
+  onPlayListeningSlow: () => void
   meaningText: string
   questionSentenceAudioUrl?: string
   questionSentenceComponents: LearningContentComponent[]
@@ -1069,7 +1082,11 @@ function WordOrderExerciseSurface({
   onAddSelectedWord: (wordIndex: number) => void
 }) {
   const isLetterOrderQuestion = exerciseData.subtype === 'fg-letter-order'
-  const taskLabel = isLetterOrderQuestion ? 'Arrange the letters' : 'Arrange the words'
+  const taskLabel = isLetterOrderQuestion
+    ? 'Arrange the letters'
+    : isListeningQuestion
+      ? 'Listen and arrange the words'
+      : 'Arrange the words'
   const renderOrderToken = (token: string) => (/^\s+$/.test(token) ? '' : token)
   const describeOrderToken = (token: string) => (/^\s+$/.test(token) ? 'space' : token)
   const selectedSequence = selectedWords.map((wordIdx) => interactionWords[wordIdx] || '')
@@ -1078,18 +1095,31 @@ function WordOrderExerciseSurface({
   const builtAnswerText = selectedSequence.join(isLetterOrderQuestion ? '' : ' ')
   const canUndoLetterSelection = isLetterOrderQuestion && selectedWords.length > 0 && !isAnswered
 
-  const buildCard = questionSentenceText ? (
+  const meaningOnlyCard = meaningText ? (
     <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
-      {shouldShowMeaningSentenceCard ? (
-        <SentenceMeaningDisplay
-          text={meaningText}
-          audioUrl={questionSentenceAudioUrl}
-          meaningSegments={exerciseData.reviewData?.meaningSegments}
-          interactionWords={interactionWords}
-          sourceComponents={questionSentenceComponents}
-          onPlayAudio={onPlayAudio}
-        />
-      ) : questionSentenceComponents.length > 0 ? (
+      <p className={cx('text-center font-display font-black tracking-[-0.03em] text-[#191713]', isDesktopViewport ? 'text-3xl' : 'text-2xl')}>
+        {meaningText}
+      </p>
+    </div>
+  ) : null
+  // When the tiles spell the target language the sentence is the answer, so the card carries
+  // the English only. When they spell the English, the card shows the target sentence.
+  const buildCard = shouldShowMeaningSentenceCard ? (
+    <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
+      <SentenceMeaningDisplay
+        text={meaningText}
+        audioUrl={questionSentenceAudioUrl}
+        meaningSegments={exerciseData.reviewData?.meaningSegments}
+        interactionWords={interactionWords}
+        sourceComponents={questionSentenceComponents}
+        onPlayAudio={onPlayAudio}
+      />
+    </div>
+  ) : wordOrderBuildsTarget ? (
+    meaningOnlyCard
+  ) : questionSentenceText ? (
+    <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
+      {questionSentenceComponents.length > 0 ? (
         <SentenceContentDisplay
           text={questionSentenceText}
           components={questionSentenceComponents}
@@ -1100,11 +1130,41 @@ function WordOrderExerciseSurface({
         <p className="text-center font-display text-2xl font-black tracking-[-0.03em] text-[#191713]">{questionSentenceText}</p>
       )}
     </div>
-  ) : meaningText ? (
-    <div className={cx('rounded-[1.65rem] border border-[#efe4d8] bg-white p-4 shadow-[0_10px_24px_rgba(57,56,47,0.04)]', isDesktopViewport && 'p-5')}>
-      <p className={cx('text-center font-display font-black tracking-[-0.03em] text-[#191713]', isDesktopViewport ? 'text-3xl' : 'text-2xl')}>
-        {meaningText}
-      </p>
+  ) : (
+    meaningOnlyCard
+  )
+  // A listening word-order has to be heard: the audio is the prompt, the tiles the answer.
+  const listeningControls = isListeningQuestion ? (
+    <div className={cx('flex items-center justify-between gap-4 rounded-[1.65rem] border border-[#efe4d8] bg-[#fff8ef] p-4', isDesktopViewport && 'p-5')}>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8a7d70]">Listening challenge</p>
+        <p className="mt-1 text-sm font-medium text-[#5f5951]">
+          {listeningAudioUrl ? 'Play the audio and arrange the words in the order you hear.' : 'No audio available for this item yet.'}
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          className={cx(
+            'flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#a94600] text-white shadow-[0_8px_18px_rgba(169,70,0,0.25)] transition-all active:scale-95 disabled:opacity-40',
+            isPlayingPrompt && 'animate-pulse',
+          )}
+          onClick={onToggleListeningPrompt}
+          disabled={!listeningAudioUrl}
+          aria-label="Play listening prompt audio"
+        >
+          <Volume2 className="h-6 w-6" />
+        </button>
+        <button
+          type="button"
+          className="flex h-12 w-12 items-center justify-center rounded-[1rem] border-2 border-[#eadfce] bg-white text-[#5f5951] transition-all active:scale-95 disabled:opacity-40"
+          onClick={onPlayListeningSlow}
+          disabled={!listeningAudioUrl}
+          aria-label="Play listening prompt audio slowly"
+        >
+          <Turtle className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   ) : null
 
@@ -1117,6 +1177,7 @@ function WordOrderExerciseSurface({
           </h2>
         </div>
 
+        {listeningControls}
         {buildCard}
 
         <div className="rounded-[2.25rem] bg-[#fdf9f1] px-8 py-10 shadow-[0_18px_40px_rgba(57,56,47,0.05)]">
@@ -1134,7 +1195,9 @@ function WordOrderExerciseSurface({
               </button>
               <div className="text-left">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8a7d70]">Pronunciation</p>
-                <p className="mt-1 text-sm font-medium italic text-[#5f5951]">“{questionSentenceText || builtAnswerText || meaningText}”</p>
+                <p className="mt-1 text-sm font-medium italic text-[#5f5951]">
+                  “{wordOrderBuildsTarget ? meaningText || builtAnswerText : questionSentenceText || builtAnswerText || meaningText}”
+                </p>
               </div>
             </div>
           ) : null}
@@ -1247,6 +1310,7 @@ function WordOrderExerciseSurface({
         </div>
       ) : null}
 
+      {listeningControls}
       {buildCard}
 
       <div className="rounded-[2rem] bg-[#fdf9f1] px-6 py-8 shadow-[0_14px_34px_rgba(57,56,47,0.05)]">
@@ -1332,6 +1396,7 @@ export function ExerciseBlock({
   choiceSupportText,
   questionSentenceText,
   shouldShowMeaningSentenceCard,
+  wordOrderBuildsTarget,
   meaningText,
   questionSentenceAudioUrl,
   questionSentenceComponents,
@@ -1391,6 +1456,7 @@ export function ExerciseBlock({
   choiceSupportText: string
   questionSentenceText: string
   shouldShowMeaningSentenceCard: boolean
+  wordOrderBuildsTarget: boolean
   meaningText: string
   questionSentenceAudioUrl?: string
   questionSentenceComponents: LearningContentComponent[]
@@ -1514,6 +1580,12 @@ export function ExerciseBlock({
           renderedPrompt={renderedPrompt}
           questionSentenceText={questionSentenceText}
           shouldShowMeaningSentenceCard={shouldShowMeaningSentenceCard}
+          wordOrderBuildsTarget={wordOrderBuildsTarget}
+          isListeningQuestion={isListeningQuestion}
+          listeningAudioUrl={listeningAudioUrl}
+          isPlayingPrompt={isPlayingPrompt}
+          onToggleListeningPrompt={onToggleListeningPrompt}
+          onPlayListeningSlow={onPlayListeningSlow}
           meaningText={meaningText}
           questionSentenceAudioUrl={questionSentenceAudioUrl}
           questionSentenceComponents={questionSentenceComponents}
