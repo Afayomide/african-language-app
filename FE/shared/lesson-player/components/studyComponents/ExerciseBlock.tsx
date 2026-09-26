@@ -1112,6 +1112,7 @@ function WordOrderExerciseSurface({
         meaningSegments={exerciseData.reviewData?.meaningSegments}
         interactionWords={interactionWords}
         sourceComponents={questionSentenceComponents}
+        disableGloss={wordOrderBuildsTarget}
         onPlayAudio={onPlayAudio}
       />
     </div>

@@ -1,9 +1,62 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Volume2 } from 'lucide-react'
 import type { LearningContentComponent } from '../../types'
 import { cx } from './StudyUi'
 
 type AudioPlayerFn = (url?: string, speed?: number, onEnd?: () => void) => void
+
+/**
+ * Open/close state for a gloss popover that works with a mouse and with a finger.
+ *
+ * It used to open on mouse-enter and toggle on click. With a mouse the pointer is already over
+ * the word when it clicks, so the click closed what the hover had just opened, and it took a
+ * second click to see anything. A tap fires the same synthetic mouse-enter first, so touch had
+ * the same two-tap problem.
+ *
+ * Now a mouse hover opens it lightly (leaving closes it), a click or tap pins it open, a second
+ * click or tap on the word closes it, and a click or tap anywhere else closes a pinned one.
+ */
+function useGlossPopover() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isPinned, setIsPinned] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!isPinned) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (ref.current && event.target instanceof Node && ref.current.contains(event.target)) return
+      setIsOpen(false)
+      setIsPinned(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [isPinned])
+
+  return {
+    ref,
+    isOpen,
+    hostProps: {
+      ref,
+      onMouseLeave: () => {
+        if (!isPinned) setIsOpen(false)
+      },
+    },
+    triggerProps: {
+      onPointerEnter: (event: ReactPointerEvent) => {
+        if (event.pointerType === 'mouse') setIsOpen(true)
+      },
+      onClick: () => {
+        if (isPinned) {
+          setIsOpen(false)
+          setIsPinned(false)
+        } else {
+          setIsOpen(true)
+          setIsPinned(true)
+        }
+      },
+    },
+  }
+}
 
 type SentenceRenderPart =
   | { type: 'text'; text: string }
@@ -239,18 +292,17 @@ export function SentenceGlossToken({
   children: ReactNode
   buttonClassName?: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const { isOpen, hostProps, triggerProps } = useGlossPopover()
 
   return (
-    <span className="relative inline-flex items-center gap-1 align-baseline" onMouseLeave={() => setIsOpen(false)}>
+    <span className="relative inline-flex items-center gap-1 align-baseline" {...hostProps}>
       <button
         type="button"
         className={cx(
           'inline rounded-none border-b border-[#d9c5b3] bg-transparent px-0.5 py-0 font-bold text-[#39382f] transition-colors hover:border-[#c8a88f] hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20',
           buttonClassName,
         )}
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen((current) => !current)}
+        {...triggerProps}
       >
         {children}
       </button>
@@ -270,15 +322,14 @@ function MeaningGlossToken({
   label: string
   segment: MeaningSegmentDisplay
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const { isOpen, hostProps, triggerProps } = useGlossPopover()
 
   return (
-    <span className="relative inline-block align-baseline" onMouseLeave={() => setIsOpen(false)}>
+    <span className="relative inline-block align-baseline" {...hostProps}>
       <button
         type="button"
         className="inline rounded-none border-b border-[#d9c5b3] bg-transparent px-0.5 py-0 font-bold text-[#39382f] transition-colors hover:border-[#c8a88f] hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen((current) => !current)}
+        {...triggerProps}
       >
         {label}
       </button>
@@ -304,10 +355,10 @@ export function InlineGlossToken({
   component: LearningContentComponent
   onPlayAudio: AudioPlayerFn
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const { isOpen, hostProps, triggerProps } = useGlossPopover()
 
   return (
-    <span className="relative inline-flex items-center gap-2 align-baseline" onMouseLeave={() => setIsOpen(false)}>
+    <span className="relative inline-flex items-center gap-2 align-baseline" {...hostProps}>
       <InlineAudioButton
         audioUrl={component.audio?.url}
         label={component.text}
@@ -317,8 +368,7 @@ export function InlineGlossToken({
       <button
         type="button"
         className="inline rounded-none border-b border-[#d9c5b3] bg-transparent px-0.5 py-0 font-bold text-[#39382f] transition-colors hover:border-[#c8a88f] hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen((current) => !current)}
+        {...triggerProps}
       >
         {label}
       </button>
@@ -380,6 +430,7 @@ export function SentenceMeaningDisplay({
   meaningSegments,
   interactionWords,
   sourceComponents,
+  disableGloss = false,
   onPlayAudio,
 }: {
   text: string
@@ -391,6 +442,11 @@ export function SentenceMeaningDisplay({
   }>
   interactionWords?: string[]
   sourceComponents?: LearningContentComponent[]
+  /**
+   * Show the English plainly, with no hover back to the source words. Above tiles the learner
+   * must arrange into that very sentence, the source words are the answer.
+   */
+  disableGloss?: boolean
   onPlayAudio: AudioPlayerFn
 }) {
   const segmentDisplays = useMemo(() => {
@@ -423,7 +479,7 @@ export function SentenceMeaningDisplay({
       <div className="flex items-start justify-center gap-3">
         <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-2 shrink-0 self-start" onPlayAudio={onPlayAudio} />
         <div className="text-4xl font-black leading-[1.6] tracking-tight text-[#191713] sm:text-5xl">
-          {segmentDisplays.length > 0 ? (
+          {segmentDisplays.length > 0 && !disableGloss ? (
             segmentDisplays.map((segment, index) => (
               <span key={`${segment.text}-${index}`}>
                 {index > 0 ? <span className="whitespace-pre-wrap text-[#191713]"> </span> : null}
@@ -439,7 +495,7 @@ export function SentenceMeaningDisplay({
           )}
         </div>
       </div>
-      {segmentDisplays.length > 0 ? (
+      {segmentDisplays.length > 0 && !disableGloss ? (
         <p className="text-xs font-black uppercase tracking-[0.22em] text-foreground/45">
           Hover or tap the highlighted English parts to see the source wording
         </p>
