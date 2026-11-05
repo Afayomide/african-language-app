@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
+import { isTransientError } from '@lesson-player/retry'
 
 function createLearnerQueryClient() {
   return new QueryClient({
@@ -10,7 +11,9 @@ function createLearnerQueryClient() {
         staleTime: 30_000,
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: true,
-        retry: 1,
+        // Retry twice when the connection or server failed; a refusal such as 404 is final.
+        retry: (failureCount, error) => failureCount < 2 && isTransientError(error),
+        retryDelay: (attempt) => Math.min(700 * 2 ** attempt, 4000),
       },
     },
   })

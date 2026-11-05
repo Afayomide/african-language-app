@@ -7,8 +7,7 @@ import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 import { useLearnerHubOverview } from '@/hooks/use-learner-hub-overview'
 import { cn } from '@/lib/utils'
 
-const SUNRISE_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBqF08U8tBReYC-NbmzpMUdz5Z9vS9fKFr1nVBSGqyWALHyUybj5bLqOqLSjfAI2vWfzkDav83PycWP_DHtHa77U97Wx0G7-xHTmO6ybebxGNW2-mvGTZ-Go5Djoe9gft6kNOePsNxLElQ_Nl6R8dR9gKy6Al3Q7cXtg96021DwaGiz7YKl8BXzoG8D2XLtst5KVl4mfdFNkC4rtj5I5OWjrxaNKCplpExyZICzkxVQrEkCV9IhDgTjcaH77MfGis0-W5dWm3Mb9deK'
+const SUNRISE_IMG = '/images/learner/sunrise.png'
 
 const TAGS = ['Greetings', 'Casual', 'Sunrise', 'Core vocab']
 

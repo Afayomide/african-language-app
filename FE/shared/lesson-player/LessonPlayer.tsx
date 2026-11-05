@@ -13,6 +13,7 @@ import type {
   Lesson,
   LessonFlowData,
   PopulatedLessonBlock,
+  PronunciationLevel,
   QuestionMatchingDisplayItem,
   StageQuestionResult,
   StageCompletionResult,
@@ -21,8 +22,11 @@ import { ExerciseBlock } from './components/studyComponents/ExerciseBlock'
 import { ContentStudyBlock, ProverbStudyBlock, TeacherNoteBlock } from './components/studyComponents/StaticStudyBlocks'
 import { StudyFooter } from './components/studyComponents/StudyFooter'
 import { StudyHeader } from './components/studyComponents/StudyHeader'
-import { cx } from './components/studyComponents/StudyUi'
-import { blobToBase64, playAudioUrl } from './components/studyComponents/studyMedia'
+import { Button, cx } from './components/studyComponents/StudyUi'
+import { blobToBase64, playAudioUrl, stopAllAudio } from './components/studyComponents/studyMedia'
+import { withRetry } from './retry'
+import { MotionStyles } from './motion'
+import { KelaMascot } from './components/mascot/KelaMascot'
 import {
   SOUNDS,
   XP_PER_BLOCK,
@@ -51,7 +55,7 @@ type CueType = 'celebration' | 'proverb'
 type PronunciationComparisonResponse = {
   comparison: {
     score: number
-    level: 'excellent' | 'good' | 'fair' | 'poor'
+    level: PronunciationLevel
     dtwDistance: number
     normalizedDistance: number
     pathLength: number
@@ -96,6 +100,44 @@ type LessonPlayerProps = {
   ) => Promise<PronunciationComparisonResponse>
 }
 
+
+// Stage progress is saved in the background so the lesson never pauses or shows a save state.
+// Saves run one at a time (the backend rewrites the whole progress record, so two at once
+// could undo each other). Each save is written to this browser first and removed once the
+// backend has it, so a save that still fails after its retries, or is cut off by closing the
+// tab, is sent again the next time a lesson opens.
+const PENDING_STAGE_SAVES_KEY = 'kela:pending-stage-saves'
+const FINISH_WAIT_MS = 1200
+const MIC_WARMUP_MS = 120
+
+type PendingStageSave = {
+  lessonId: string
+  stageIndex: number
+  payload: { xpEarned?: number; minutesSpent?: number; questionResults?: StageQuestionResult[] }
+}
+
+function readPendingStageSaves(): PendingStageSave[] {
+  try {
+    const raw = window.localStorage.getItem(PENDING_STAGE_SAVES_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writePendingStageSaves(items: PendingStageSave[]) {
+  try {
+    if (items.length) window.localStorage.setItem(PENDING_STAGE_SAVES_KEY, JSON.stringify(items))
+    else window.localStorage.removeItem(PENDING_STAGE_SAVES_KEY)
+  } catch {
+    // Storage can be unavailable (private mode); the in-memory retries still run.
+  }
+}
+
+const isSameStageSave = (a: PendingStageSave, b: PendingStageSave) =>
+  a.lessonId === b.lessonId && a.stageIndex === b.stageIndex
+
 export function LessonPlayer({
   lessonId,
   loadFlow,
@@ -119,6 +161,9 @@ export function LessonPlayer({
   const [nextRetryQueue, setNextRetryQueue] = useState<number[]>([])
   const [retryPosition, setRetryPosition] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [audioFailed, setAudioFailed] = useState(false)
   const [selectedOption, setSelectedAnswer] = useState<number | null>(null)
   const [selectedWords, setSelectedWords] = useState<number[]>([])
   const [selectedMatchingLeftId, setSelectedMatchingLeftId] = useState<string | null>(null)
@@ -126,11 +171,8 @@ export function LessonPlayer({
   const [isAnswered, setIsAnswered] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [xpEarned, setXpEarned] = useState(0)
-  const [mistakesCount, setMistakesCount] = useState(0)
   const [stageMistakesCount, setStageMistakesCount] = useState(0)
-  const [isListening, setIsListening] = useState(false)
   const [isPlayingPrompt, setIsPlayingPrompt] = useState(false)
-  const [isSavingStage, setIsSavingStage] = useState(false)
   const [stageStartedAt, setStageStartedAt] = useState<number | null>(null)
   const [stageQuestionResults, setStageQuestionResults] = useState<Record<string, StageQuestionResult>>({})
   const [isRecordingSpeech, setIsRecordingSpeech] = useState(false)
@@ -145,6 +187,10 @@ export function LessonPlayer({
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaChunksRef = useRef<BlobPart[]>([])
   const stageAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
+  const isFinishingRef = useRef(false)
+  const lessonIdRef = useRef(lessonId)
+  lessonIdRef.current = lessonId
 
   const clearStageAdvanceTimeout = useCallback(() => {
     if (stageAdvanceTimeoutRef.current) {
@@ -185,12 +231,25 @@ export function LessonPlayer({
     [enableUiSounds],
   )
 
+  // Fetch the short UI sounds up front. Otherwise the first one plays late, after its file
+  // downloads, and can land on top of whatever happens next (such as a recording starting).
+  useEffect(() => {
+    if (!enableUiSounds) return
+    Object.values(SOUNDS).forEach((src) => {
+      const audio = new Audio(src)
+      audio.preload = 'auto'
+      audio.load()
+    })
+  }, [enableUiSounds])
+
   useEffect(() => {
     if (!lessonId) return
 
     clearStageAdvanceTimeout()
+    isFinishingRef.current = false
     setIsLoading(true)
-    loadFlow(lessonId)
+    setLoadFailed(false)
+    withRetry(() => loadFlow(lessonId))
       .then((data) => {
         setLesson({
           ...data.lesson,
@@ -216,19 +275,29 @@ export function LessonPlayer({
         setSelectedMatches({})
         setIsAnswered(false)
         setIsCorrect(false)
-        setIsListening(false)
         setIsPlayingPrompt(false)
         setXpEarned(0)
-        setMistakesCount(0)
         setStageMistakesCount(0)
         resetSpeakingState()
       })
       .catch((error) => {
         console.error('Failed to load lesson flow', error)
+        setLoadFailed(true)
         onLoadError?.(error)
       })
       .finally(() => setIsLoading(false))
-  }, [clearStageAdvanceTimeout, lessonId, loadFlow, onLoadError, resetSpeakingState])
+  }, [clearStageAdvanceTimeout, lessonId, loadAttempt, loadFlow, onLoadError, resetSpeakingState])
+
+  // A failed clip is reported once, then the notice clears itself.
+  useEffect(() => {
+    if (!audioFailed) return
+    const timeout = setTimeout(() => setAudioFailed(false), 4000)
+    return () => clearTimeout(timeout)
+  }, [audioFailed])
+
+  const playLessonAudio = useCallback((url?: string, speed = 1, onEnd?: () => void) => {
+    playAudioUrl(url, speed, onEnd, () => setAudioFailed(true))
+  }, [])
 
   useEffect(() => {
     resetSpeakingState()
@@ -343,9 +412,7 @@ export function LessonPlayer({
   const isShortViewport = viewportHeight !== null && viewportHeight <= 860
   const isVeryShortViewport = viewportHeight !== null && viewportHeight <= 740
   const isUltraShortViewport = viewportHeight !== null && viewportHeight <= 680
-  const isNarrowViewport = viewportWidth !== null && viewportWidth <= 640
   const isDesktopViewport = viewportWidth !== null && viewportWidth >= 1024
-  const isExtraNarrowViewport = viewportWidth !== null && viewportWidth <= 420
   const meaningText =
     exerciseData?.reviewData?.meaning ||
     exerciseData?.interactionData?.meaning ||
@@ -359,8 +426,6 @@ export function LessonPlayer({
     sentenceText,
   )
   const interactionWords: string[] = exerciseData?.interactionData?.words || exerciseData?.reviewData?.words || []
-  const correctOrder: number[] =
-    exerciseData?.interactionData?.correctOrder || exerciseData?.reviewData?.correctOrder || []
   const wordOrderDisplayOrder = useMemo(
     () => buildWordOrderDisplayOrder(interactionWords, `${exerciseData?._id || currentGlobalBlockIndex}:${promptText}:${interactionWords.join("||")}`),
     [currentGlobalBlockIndex, exerciseData?._id, interactionWords, promptText],
@@ -385,6 +450,27 @@ export function LessonPlayer({
     interactionWords.length > 0 &&
     foldForTiles(interactionWords.join(' ')) === foldForTiles(sentenceText || sourceText)
   const wordOrderBuildsTarget = isWordOrderQuestion && (promptText.includes('{meaning}') || tilesSpellTarget)
+  const expectedWordOrderText =
+    exerciseData?.subtype === 'fg-letter-order'
+      ? questionSentenceText
+      : /build the english meaning of this sentence/i.test(promptText)
+        ? meaningText
+        : questionSentenceText
+  // What the red panel shows after a wrong answer. Speaking has no single right text to show.
+  const correctAnswerText = (() => {
+    if (!exerciseData || isSpeakingQuestion) return ''
+    if (isMatchingQuestion) {
+      return matchingLeftItems
+        .map((left) => {
+          const right = matchingRightItems.find((item) => item.id === left.id)
+          return right ? `${left.label} = ${right.image?.altText || right.label}` : ''
+        })
+        .filter(Boolean)
+        .join(' · ')
+    }
+    if (isWordOrderQuestion) return expectedWordOrderText
+    return exerciseData.options?.[exerciseData.correctIndex] ?? ''
+  })()
   const shouldShowMeaningSentenceCard =
     wordOrderBuildsTarget && Boolean(meaningText.trim()) && questionSentenceComponents.length > 0
   const inlineSourceComponent =
@@ -463,7 +549,6 @@ export function LessonPlayer({
     setSelectedMatches({})
     setIsAnswered(false)
     setIsCorrect(false)
-    setIsListening(false)
     setIsPlayingPrompt(false)
   }, [])
 
@@ -551,7 +636,6 @@ export function LessonPlayer({
         return
       }
 
-      setMistakesCount((prev) => prev + 1)
       setStageMistakesCount((prev) => prev + 1)
       const failedBlockIndex = currentGlobalBlockIndex
       if (isRetryMode) {
@@ -589,8 +673,13 @@ export function LessonPlayer({
     setSelectedMatchingLeftId(null)
   }
 
-  const finishLesson = useCallback(() => {
+  const finishLesson = useCallback(async () => {
+    if (isFinishingRef.current) return
+    isFinishingRef.current = true
     clearStageAdvanceTimeout()
+    // Closing the lesson writes "completed" for every stage, so let a stage save that is
+    // still in flight land first. Capped so a slow network never holds the learner here.
+    await Promise.race([saveChainRef.current, new Promise((resolve) => setTimeout(resolve, FINISH_WAIT_MS))])
     if (onLessonComplete) {
       onLessonComplete({ lessonId, xpEarned, language: lesson?.language })
     } else {
@@ -613,7 +702,7 @@ export function LessonPlayer({
         startLessonRetry()
         return
       }
-      finishLesson()
+      void finishLesson()
       return
     }
 
@@ -621,51 +710,70 @@ export function LessonPlayer({
     resetStageState()
   }, [clearStageAdvanceTimeout, finishLesson, isLastStage, resetStageState, retryQueue.length, startLessonRetry])
 
-  const completeCurrentStage = useCallback(async () => {
+  const queueStageSave = useCallback(
+    (item: PendingStageSave) => {
+      if (!onCompleteStage) return
+      writePendingStageSaves([...readPendingStageSaves().filter((saved) => !isSameStageSave(saved, item)), item])
+      saveChainRef.current = saveChainRef.current.then(async () => {
+        try {
+          const result = await withRetry(() => onCompleteStage(item.lessonId, item.stageIndex, item.payload), {
+            attempts: 4,
+            baseDelayMs: 1000,
+          })
+          writePendingStageSaves(readPendingStageSaves().filter((saved) => !isSameStageSave(saved, item)))
+          if (result && item.lessonId === lessonIdRef.current) {
+            setLesson((prevLesson) =>
+              prevLesson
+                ? {
+                    ...prevLesson,
+                    currentStageIndex: result.currentStageIndex,
+                    stageProgress: result.stageProgress,
+                    progressPercent: result.progressPercent,
+                    status: result.status === 'completed' ? 'published' : prevLesson.status,
+                  }
+                : prevLesson,
+            )
+          }
+        } catch (error) {
+          // Stays in the pending list and is sent again when a lesson next opens.
+          console.error('Stage progress not saved yet; will retry later', error)
+        }
+      })
+    },
+    [onCompleteStage],
+  )
+
+  // Send any saves left over from an earlier session, once.
+  const flushedPendingRef = useRef(false)
+  useEffect(() => {
+    if (flushedPendingRef.current || !onCompleteStage || typeof window === 'undefined') return
+    flushedPendingRef.current = true
+    readPendingStageSaves().forEach((item) => queueStageSave(item))
+  }, [onCompleteStage, queueStageSave])
+
+  const completeCurrentStage = useCallback(() => {
     if (!lessonId || !currentStage) return
     const elapsedMs = stageStartedAt ? Date.now() - stageStartedAt : 0
     const minutesSpent = Math.max(1, Math.round(elapsedMs / 60000))
     resetAnswerState()
 
-    if (!onCompleteStage) {
-      handleAdvanceStage()
-      return
-    }
-
-    setIsSavingStage(true)
-    try {
-      const result = await onCompleteStage(lessonId, currentStageIndex, {
+    queueStageSave({
+      lessonId,
+      stageIndex: currentStageIndex,
+      payload: {
         xpEarned: stageXpEarned,
         minutesSpent,
         questionResults: Object.values(stageQuestionResults),
-      })
-      if (result) {
-        setLesson((prevLesson) =>
-          prevLesson
-            ? {
-                ...prevLesson,
-                currentStageIndex: result.currentStageIndex,
-                stageProgress: result.stageProgress,
-                progressPercent: result.progressPercent,
-                status: result.status === 'completed' ? 'published' : prevLesson.status,
-              }
-            : prevLesson,
-        )
-      }
-    } catch (error) {
-      console.error('Failed to save stage progress', error)
-    } finally {
-      setIsSavingStage(false)
-      handleAdvanceStage()
-    }
+      },
+    })
+    handleAdvanceStage()
   }, [
     currentStage,
     currentStageIndex,
     handleAdvanceStage,
     lessonId,
-    onCompleteStage,
+    queueStageSave,
     resetAnswerState,
-    stageMistakesCount,
     stageQuestionResults,
     stageStartedAt,
     stageXpEarned,
@@ -690,11 +798,8 @@ export function LessonPlayer({
     } else if (isWordOrderQuestion) {
       const selectedSequence = selectedWords.map((index) => interactionWords[index] || '')
       if (exerciseData?.subtype === 'fg-letter-order') {
-        correct = selectedSequence.join('') === questionSentenceText
+        correct = selectedSequence.join('') === expectedWordOrderText
       } else {
-        const expectedWordOrderText = /build the english meaning of this sentence/i.test(promptText)
-          ? meaningText
-          : questionSentenceText
         correct =
           normalizeWordSequence(selectedSequence.join(' ')) === normalizeWordSequence(expectedWordOrderText)
       }
@@ -728,18 +833,11 @@ export function LessonPlayer({
     }
 
     if (isRetryMode) {
-      finishLesson()
+      void finishLesson()
       return
     }
 
-    void completeCurrentStage()
-  }
-
-  const toggleMic = () => {
-    setIsListening((prevListening) => !prevListening)
-    if (!isListening) {
-      setTimeout(() => setIsListening(false), 3000)
-    }
+    completeCurrentStage()
   }
 
   const startSpeakingRecording = useCallback(async () => {
@@ -750,9 +848,13 @@ export function LessonPlayer({
     }
 
     resetSpeakingState()
+    // Anything still coming out of the speakers would be picked up by the mic.
+    stopAllAudio()
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
       const recorder = new MediaRecorder(stream)
       mediaStreamRef.current = stream
       mediaRecorderRef.current = recorder
@@ -778,6 +880,10 @@ export function LessonPlayer({
         stopSpeechCapture()
       }
 
+      // A freshly opened mic often pops as it switches on. Let it settle before capturing;
+      // the recording indicator only appears once it is really listening.
+      await new Promise((resolve) => setTimeout(resolve, MIC_WARMUP_MS))
+      if (mediaStreamRef.current !== stream) return // stopped or reset while warming up
       recorder.start()
       setSpeakingError('')
       setIsRecordingSpeech(true)
@@ -833,19 +939,48 @@ export function LessonPlayer({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-        <div className="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="animate-pulse text-xl font-bold text-foreground/60">{loadingMessage}</p>
+      <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background p-6">
+        <MotionStyles />
+        <KelaMascot mood="thinking" size={180} decorative />
+        <p className="animate-pulse font-display text-xl font-bold text-foreground/60">{loadingMessage}</p>
+      </div>
+    )
+  }
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <MotionStyles />
+        <KelaMascot mood="sad" size={180} decorative />
+        <p className="kela-enter font-display text-2xl font-black text-foreground">We couldn&apos;t load this lesson</p>
+        <p className="max-w-sm text-base text-foreground/70">Check your connection and try again.</p>
+        <div className="flex w-full max-w-xs flex-col gap-3">
+          <Button size="lg" className="h-14 rounded-2xl font-display font-extrabold" onClick={() => setLoadAttempt((n) => n + 1)}>
+            Try again
+          </Button>
+          <Button size="lg" variant="outline" className="h-14 rounded-2xl font-display font-extrabold" onClick={onExit}>
+            Go back
+          </Button>
+        </div>
       </div>
     )
   }
 
   if (!currentStage || !currentBlock) {
-    return <div className="flex min-h-screen items-center justify-center">{emptyMessage}</div>
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <KelaMascot mood="idle" size={160} decorative />
+        <p className="font-display text-xl font-black text-foreground">{emptyMessage}</p>
+        <Button size="lg" variant="outline" className="h-14 w-full max-w-xs rounded-2xl font-display font-extrabold" onClick={onExit}>
+          Go back
+        </Button>
+      </div>
+    )
   }
 
   return (
     <main className="relative flex min-h-[100svh] select-none flex-col overflow-x-hidden bg-[#fffbff]">
+      <MotionStyles />
       <div
         className={cx(
           'pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,213,171,0.2),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0),rgba(253,249,241,0.78))]',
@@ -869,7 +1004,10 @@ export function LessonPlayer({
           isUltraShortViewport ? 'pb-24 pt-2' : isShortViewport ? 'pb-28 pt-3' : 'pb-32 pt-6',
         )}
       >
-        <div className={cx('mx-auto flex w-full flex-col', isMatchingQuestion ? 'max-w-[70rem]' : isSpeakingQuestion ? 'max-w-5xl' : 'max-w-4xl')}>
+        <div
+          key={`${isRetryMode ? 'retry' : 'main'}-${currentGlobalBlockIndex}`}
+          className={cx('kela-enter mx-auto flex w-full flex-col', isMatchingQuestion ? 'max-w-[70rem]' : isSpeakingQuestion ? 'max-w-5xl' : 'max-w-4xl')}
+        >
           <>
             {currentBlock.type === 'text' ? (
               <TeacherNoteBlock
@@ -886,7 +1024,7 @@ export function LessonPlayer({
                 isShortViewport={isShortViewport}
                 isUltraShortViewport={isUltraShortViewport}
                 isDesktopViewport={isDesktopViewport}
-                onPlayAudio={playAudioUrl}
+                onPlayAudio={playLessonAudio}
                 onPlayClick={playClick}
               />
             ) : null}
@@ -947,20 +1085,20 @@ export function LessonPlayer({
                 orderPromptPlaceholder={orderPromptPlaceholder}
                 wordOrderDisplayOrder={wordOrderDisplayOrder}
                 isAnswered={isAnswered}
-                onPlayAudio={playAudioUrl}
+                onPlayAudio={playLessonAudio}
                 onPlayClick={playClick}
                 onToggleListeningPrompt={() => {
                   if (!listeningAudioUrl) return
                   playClick()
                   setIsPlayingPrompt(true)
-                  playAudioUrl(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
+                  playLessonAudio(listeningAudioUrl, 1, () => setIsPlayingPrompt(false))
                 }}
                 onPlayListeningSlow={() => {
                   playClick()
-                  playAudioUrl(listeningAudioUrl, 0.6)
+                  playLessonAudio(listeningAudioUrl, 0.6)
                 }}
                 onToggleRecording={() => {
-                  playClick()
+                  // No click sound here: it would land at the start of the recording.
                   if (isRecordingSpeech) {
                     stopSpeakingRecording()
                   } else {
@@ -969,7 +1107,7 @@ export function LessonPlayer({
                 }}
                 onReplayRecording={() => {
                   playClick()
-                  if (recordedSpeechUrl) playAudioUrl(recordedSpeechUrl)
+                  if (recordedSpeechUrl) playLessonAudio(recordedSpeechUrl)
                 }}
                 onSubmitSpeakingAttempt={() => {
                   playClick()
@@ -1011,11 +1149,11 @@ export function LessonPlayer({
         preview={preview}
         answerStatusLabel={answerStatusLabel}
         explanation={exerciseData?.explanation}
+        correctAnswer={correctAnswerText}
         canCheck={canCheck}
         canCheckSpeaking={canCheckSpeaking}
         isRecordingSpeech={isRecordingSpeech}
         isCheckingSpeakingAnswer={isComparingSpeech}
-        isSavingStage={isSavingStage}
         isShortViewport={isShortViewport}
         isUltraShortViewport={isUltraShortViewport}
         isVeryShortViewport={isVeryShortViewport}
@@ -1026,6 +1164,15 @@ export function LessonPlayer({
         }}
         onNext={handleNext}
       />
+
+      {audioFailed ? (
+        <div
+          role="status"
+          className="fixed left-1/2 top-4 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-[#f6d4ce] bg-[#fff1ee] px-4 py-3 text-center text-sm font-bold text-[#b23d21] shadow-lg"
+        >
+          The audio didn&apos;t play. Check your connection and tap play again.
+        </div>
+      ) : null}
     </main>
   )
 }

@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
   ArrowRight,
   Bell,
-  BookOpen,
   BookText,
-  ChartColumnBig,
   Check,
   Flame,
   GraduationCap,
@@ -18,13 +16,12 @@ import {
   Search,
   Settings,
   Sparkles,
-  Star,
   Target,
   User,
-  X,
 } from 'lucide-react'
 import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 import { Logo } from '@/components/branding/logo'
+import { KelaMascot } from '@lesson-player/components/mascot/KelaMascot'
 import { LanguageSwitcher } from '@/components/learner/language-switcher'
 import { WeeklyBars, DEFAULT_LEARNER_WEEK as DEFAULT_WEEK } from '@/components/learner/weekly-bars'
 import { learnerDashboardService } from '@/services'
@@ -33,7 +30,6 @@ import {
   invalidateLearnerOverview,
   type LearnerOverviewCompletedLesson as MasteryLesson,
   type LearnerOverviewData as DashboardData,
-  type LearnerOverviewLesson as UnitLesson,
   type LearnerOverviewUnit as UnitSummary,
   useLearnerOverviewQuery,
 } from '@/hooks/queries/learner-overview'
@@ -52,7 +48,6 @@ const LANGUAGE_UI_COPY: Record<
     insightBody: string
     proverbTitle: string
     proverbBody: string
-    placeholderLessons: Array<{ title: string; description: string }>
   }
 > = {
   yoruba: {
@@ -65,12 +60,6 @@ const LANGUAGE_UI_COPY: Record<
     proverbTitle: 'The Power of Proverb',
     proverbBody:
       '“Owe l’ẹṣin ọ̀rọ̀.” Proverbs are the horses of speech. In Yoruba culture, proverbs carry wisdom and social intelligence.',
-    placeholderLessons: [
-      { title: 'Ẹ kú àárọ̀', description: 'Good morning' },
-      { title: 'Ẹ ṣé', description: 'Thank you' },
-      { title: 'Òruń', description: 'Sun / Day' },
-      { title: 'Ọjà', description: 'Market' },
-    ],
   },
   igbo: {
     greeting: 'Ndewo',
@@ -82,12 +71,6 @@ const LANGUAGE_UI_COPY: Record<
     proverbTitle: 'The Wisdom of Saying',
     proverbBody:
       'Traditional sayings carry social meaning and cultural depth. They help learners hear how language holds respect and wisdom.',
-    placeholderLessons: [
-      { title: 'Ndewo', description: 'Hello / Greetings' },
-      { title: 'Daalụ', description: 'Thank you' },
-      { title: 'Ụtụtụ ọma', description: 'Good morning' },
-      { title: 'Ahịa', description: 'Market' },
-    ],
   },
   hausa: {
     greeting: 'Sannu',
@@ -99,29 +82,12 @@ const LANGUAGE_UI_COPY: Record<
     proverbTitle: 'Language and Wisdom',
     proverbBody:
       'Short cultural sayings carry a lot of meaning. They teach how language reflects respect, restraint, and social understanding.',
-    placeholderLessons: [
-      { title: 'Sannu', description: 'Hello / Welcome' },
-      { title: 'Na gode', description: 'Thank you' },
-      { title: 'Ina kwana', description: 'Good morning' },
-      { title: 'Kasuwa', description: 'Market' },
-    ],
   },
 }
 
-const HERO_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDYry1i8BrwmeEaCpCMy3Bw1vjOshZ_cpas35XLOVnyC_dN8BVbnocw1sHiTEQ5FK6QwxXTy3NhXQ5jKitgL-MMBGWHym52IZlU_8tkJkRZifvTrAbG5cUooRUbchmbObEa8DmR6vV9IkOBu8gO6HWRbzY3RfBYp987QbEuYE37omJh4JaNW10Cyv4Qm4cAoosEJAm94aa9TCKKksmGVlVFZjP2IH95upXmZ8MFan4hRFKRIwhZ2teLjf9cVETvtVV41fYvuZbpJKbO'
-const CULTURAL_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCUVH-ssJihozVUeb9l7RSZ-KOWixmgIyLJN88rRVwGiNlGLG7ho2FZ3F8FVGysNl2AVTWwOiXzGdsUxdDO6HxmGR-TVF2LyNtwETEVU09qV2o9PjYVG3brdiB9GQDh06ppiIRbWXGJcXhIoiDivvHo2nX3lBSqNnKh7BDucTzmEwEqudhk8YWZr-yFHqsyR9RuiLSLQh3WupaXWQ1hedBdRtJ3YI8_uYmSxuT2gSGsQWiMzC-zboSeg61pfPN-aPsu0q8-NleU3Zv_'
-const HERO_PATTERN =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDyhWun97SF7KOBU8-z0ViS1Ay4h1RRWgyi88RdTfOXEaWFy8Y3B5M48PPQK69GQERt8CuAt6Ytt_ruy_vJjvwRgg3TK0Vjezo_47xwo9mi_io7Y9Fj93duDjNNTeAX6Bvm_88IAm1CSyBgF_vrWvVEo0MN8QIOofzkvzQbBaldQUwkKoT-YXUNcJeg9qDnRLawD5yl0U2pfKpQUpGgrdtLIaK458MopivaVEMPGGlvqVHLYuEVod2O47XIdIy6hOBpUZaqePkc698d'
-const DEFAULT_AVATAR =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuChHsMGj_MWqxZDMDUlyYwVvVcrjDU8deEgWcVtkFJoD-tvNp2dyxs94WERV7pwX_Xzdq62PkBrGD4afYfXJTdfZAbSF9gqcECVjLD23Gp5drdCF-ZcPimXPHdRQuDjlBWRzjIR_JOxQSVC5q-XIbc9dCMPFB9UMuIL_TR8HTQwsqqcVTNwrVVfH4PQsROCSnZDQRTY9nUk-gPBAyasFZdIsnvKZLbABsZUGrVYWQb9P1ypIxJYpcY0yWP-qp_m9f4HKxerXKLzL-OK'
-
-const LESSON_STATUS_LABELS: Record<UnitLesson['status'], string> = {
-  not_started: 'Start',
-  in_progress: 'Continue',
-  completed: 'Review',
-}
+const CULTURAL_IMAGE = '/images/learner/cultural.png'
+const HERO_PATTERN = '/images/learner/hero-pattern.png'
+const DEFAULT_AVATAR = '/images/learner/default-avatar.png'
 
 const DESKTOP_NAV_ITEMS = [
   { label: 'Dashboard', icon: Home, href: '/dashboard', active: true },
@@ -158,23 +124,13 @@ function firstName(value?: string) {
 export default function DashboardScreen() {
   const { logout, isLoading: isAuthLoading, isAuthenticated, refreshSession, session } = useLearnerAuth()
   const queryClient = useQueryClient()
-  const [expandedUnitId, setExpandedUnitId] = useState('')
   const [isSwitchingLanguage, setIsSwitchingLanguage] = useState(false)
   const overviewQuery = useLearnerOverviewQuery({
     enabled: !isAuthLoading && isAuthenticated && !session?.requiresOnboarding,
   })
   const data = overviewQuery.data ?? null
 
-  useEffect(() => {
-    if (!data?.units?.length) return
-    if (expandedUnitId && data.units.some((unit: UnitSummary) => unit.id === expandedUnitId)) return
-    setExpandedUnitId(data.units[0].id)
-  }, [data?.units, expandedUnitId])
-
-  const activeUnit = useMemo(() => {
-    if (!data?.units?.length) return null
-    return data.units.find((unit: UnitSummary) => unit.id === expandedUnitId) || data.units[0]
-  }, [data?.units, expandedUnitId])
+  const activeUnit: UnitSummary | null = data?.units?.[0] ?? null
 
   const nextLessonHref = data?.nextLesson ? `/lesson-overview?lessonId=${data.nextLesson.id}` : '/dashboard'
   const dailyProgressPercent = data?.stats.dailyProgressPercent ?? (data
@@ -226,11 +182,9 @@ export default function DashboardScreen() {
         nextLessonHref={nextLessonHref}
         onLogout={() => void logout()}
         onSelectLanguage={handleLanguageChange}
-        onSelectUnit={setExpandedUnitId}
         weeklyOverview={weeklyOverview}
       />
       <DashboardMobile
-        activeUnit={activeUnit}
         courseProgressPercent={courseProgressPercent}
         data={data}
         dailyProgressPercent={dailyProgressPercent}
@@ -262,7 +216,6 @@ function DashboardDesktop({
   nextLessonHref,
   onLogout,
   onSelectLanguage,
-  onSelectUnit,
   weeklyOverview,
 }: {
   activeUnit: UnitSummary | null
@@ -279,7 +232,6 @@ function DashboardDesktop({
   nextLessonHref: string
   onLogout: () => void
   onSelectLanguage: (language: SupportedLanguage) => void
-  onSelectUnit: (unitId: string) => void
   weeklyOverview: DashboardData['weeklyOverview']
 }) {
   return (
@@ -388,24 +340,20 @@ function DashboardDesktop({
           </section>
 
           <section className="grid grid-cols-12 gap-6">
-            <div className="relative col-span-8 h-[402px] overflow-hidden rounded-[22px] bg-[#fdf9f1]">
+            <div className="kela-enter relative col-span-8 h-[402px] overflow-hidden rounded-[22px] bg-[#fdf9f1]">
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,14,11,0.82),rgba(15,14,11,0.48),rgba(15,14,11,0.06))]" />
               <img
                 alt="Nigerian marketplace"
                 className="h-full w-full object-cover"
                 src={HERO_PATTERN}
               />
+              <div className="kela-float absolute right-10 top-10 drop-shadow-[0_18px_30px_rgba(0,0,0,0.35)]">
+                <KelaMascot mood="idle" size={200} interactive title="Kela, tap to say hello" />
+              </div>
               <div className="absolute inset-0 flex max-w-[420px] flex-col justify-end px-12 pb-12 text-white">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ffdeac]">
                   Continue journey
                 </p>
-                {/* <h2 className="font-display text-[48px] font-extrabold leading-[0.95] tracking-[-0.05em]">
-                  {data?.nextLesson?.title || languageCopy.lessonFallbackTitle}
-                </h2>
-                <p className="mt-4 text-sm font-medium leading-6 text-stone-200">
-                  {data?.nextLesson?.description ||
-                    languageCopy.lessonFallbackDescription}
-                </p> */}
                 <h2 className="font-display text-[48px] font-extrabold leading-[0.95] tracking-[-0.05em]">
                   {languageCopy.greeting}, {learnerFirstName}
                 </h2>
@@ -447,7 +395,7 @@ function DashboardDesktop({
               </div>
             </div>
 
-            <div className="col-span-4 flex flex-col gap-6">
+            <div className="kela-enter col-span-4 flex flex-col gap-6" style={{ animationDelay: '120ms' }}>
               <StatPanel
                 accent="secondary"
                 label="Global streak"
@@ -505,7 +453,7 @@ function DashboardDesktop({
               </button>
             </div>
           </section>
-{ masteryLessons.length > 0 &&
+          {masteryLessons.length > 0 && (
           <section>
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
@@ -516,23 +464,15 @@ function DashboardDesktop({
                   Recent Mastery
                 </h3>
               </div>
-              <Link href="/lesson-expressions">
-                <button
-                  type="button"
-                  className="text-sm font-bold text-[#8b3900] transition-colors hover:text-[#a94600]"
-                >
-                  View All Vocabulary
-                </button>
+              <Link
+                href="/lesson-expressions"
+                className="text-sm font-bold text-[#8b3900] transition-colors hover:text-[#a94600]"
+              >
+                View All Vocabulary
               </Link>
             </div>
-            <div className="grid grid-cols-4 gap-4">
-              {/* {(
-                masteryLessons.length > 0
-                ? masteryLessons
-                : buildPlaceholderMastery(languageKey)
-
-              )*/}
-              { (masteryLessons).map((lesson) => ( 
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {masteryLessons.map((lesson) => (
                 <div
                   key={lesson.id}
                   className="rounded-2xl bg-[#fdf9f1] px-5 py-4 shadow-[0_1px_0_rgba(235,228,219,0.5)]"
@@ -559,7 +499,7 @@ function DashboardDesktop({
               ))}
             </div>
           </section>
-}
+          )}
 
           <section className="space-y-5 pb-8">
             <div className="flex items-end justify-between gap-4">
@@ -579,135 +519,6 @@ function DashboardDesktop({
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-
-            {/* {data?.units?.length ? (
-              <>
-                <div className="flex gap-4 overflow-x-auto pb-2">
-                  {data.units.map((unit) => {
-                    const active = activeUnit?.id === unit.id;
-                    return (
-                      <button
-                        key={unit.id}
-                        type="button"
-                        onClick={() => onSelectUnit(unit.id)}
-                        className={cn(
-                          "min-w-[320px] rounded-[24px] bg-[#fdf9f1] p-5 text-left transition-all",
-                          active
-                            ? "ring-2 ring-[#ffdeac] shadow-[0_18px_34px_rgba(169,70,0,0.08)]"
-                            : "hover:-translate-y-0.5",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#998d81]">
-                              Unit {unit.orderIndex + 1}
-                            </p>
-                            <h4 className="mt-2 font-display text-xl font-extrabold tracking-[-0.03em] text-[#191713]">
-                              {unit.title}
-                            </h4>
-                          </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#66655a]">
-                            {unit.level}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#66655a]">
-                          {unit.description}
-                        </p>
-                        <div className="mt-4">
-                          <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">
-                            <span>Progress</span>
-                            <span>{unit.progressPercent}%</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-[#ece8db]">
-                            <div
-                              className="h-2 rounded-full bg-[linear-gradient(90deg,#a94600,#ffae86)]"
-                              style={{ width: `${unit.progressPercent}%` }}
-                            />
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {activeUnit ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {activeUnit.lessons.map((lesson: UnitLesson) => {
-                      const isLocked = lesson.status === "not_started";
-                      return (
-                        <Link
-                          key={lesson.id}
-                          href={
-                            isLocked
-                              ? "#"
-                              : `/lesson-overview?lessonId=${lesson.id}`
-                          }
-                          className={cn(isLocked && "pointer-events-none")}
-                        >
-                          <div className="rounded-[24px] bg-[#fdf9f1] p-5 transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(57,56,47,0.06)]">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-4">
-                                <div
-                                  className={cn(
-                                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black",
-                                    lesson.status === "completed"
-                                      ? "bg-[#2d7c37] text-white"
-                                      : lesson.status === "in_progress"
-                                        ? "bg-[#a94600] text-white"
-                                        : "bg-[#ece8db] text-[#8a7d70]",
-                                  )}
-                                >
-                                  {lesson.status === "completed" ? (
-                                    <Check className="h-5 w-5" />
-                                  ) : (
-                                    lesson.orderIndex + 1
-                                  )}
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#998d81]">
-                                    Lesson {lesson.orderIndex + 1}
-                                  </p>
-                                  <h4 className="mt-2 font-display text-xl font-extrabold tracking-[-0.03em] text-[#191713]">
-                                    {lesson.title}
-                                  </h4>
-                                  <p className="mt-2 text-sm leading-6 text-[#66655a]">
-                                    {lesson.description ||
-                                      "Continue your path."}
-                                  </p>
-                                </div>
-                              </div>
-                              <LessonStatusPill status={lesson.status} />
-                            </div>
-                            <div className="mt-5 flex items-center justify-between border-t border-[#ebe4db] pt-4">
-                              <div className="flex gap-2">
-                                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#66655a]">
-                                  {lesson.level}
-                                </span>
-                                {lesson.totalStages ? (
-                                  <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#66655a]">
-                                    {lesson.totalStages} Stages
-                                  </span>
-                                ) : null}
-                              </div>
-                              {!isLocked ? (
-                                <span className="inline-flex items-center gap-2 text-sm font-bold text-[#8b3900]">
-                                  {LESSON_STATUS_LABELS[lesson.status]}
-                                  <ArrowRight className="h-4 w-4" />
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="rounded-[24px] bg-[#fdf9f1] p-8 text-center text-[#66655a]">
-                No units available yet.
-              </div>
-            )} */}
           </section>
         </div>
       </div>
@@ -716,7 +527,6 @@ function DashboardDesktop({
 }
 
 function DashboardMobile({
-  activeUnit,
   courseProgressPercent,
   data,
   dailyProgressPercent,
@@ -729,7 +539,6 @@ function DashboardMobile({
   onSelectLanguage,
   weeklyOverview,
 }: {
-  activeUnit: UnitSummary | null
   courseProgressPercent: number
   data: DashboardData | null
   dailyProgressPercent: number
@@ -748,9 +557,9 @@ function DashboardMobile({
 
   return (
     <div className="lg:hidden">
-      <header className="fixed inset-x-0 top-0 z-30 grid h-[72px] grid-cols-[32px_1fr_auto] items-center gap-3 bg-[#fff7ef]/90 px-4 backdrop-blur-xl">
-        <Link href="/dashboard" className="text-[#7c2d12]" aria-label="Home">
-          <X className="h-4 w-4" />
+      <header className="fixed inset-x-0 top-0 z-30 grid h-[72px] grid-cols-[52px_1fr_auto] items-center gap-3 bg-[#fff7ef]/90 px-4 backdrop-blur-xl">
+        <Link href="/dashboard" aria-label="Home">
+          <KelaMascot mood="idle" size={52} interactive decorative />
         </Link>
         <h1 className="justify-self-center font-display text-sm font-extrabold tracking-[-0.03em] text-[#3f220f]">{siteName}</h1>
         <LanguageSwitcher
@@ -766,13 +575,16 @@ function DashboardMobile({
       </header>
 
       <div className="space-y-8 px-6 pb-28 pt-24">
-        <section className="relative h-[320px] overflow-hidden rounded-[26px] bg-[#fdf9f1] shadow-[0_18px_32px_rgba(57,56,47,0.12)]">
+        <section className="kela-enter relative h-[320px] overflow-hidden rounded-[26px] bg-[#fdf9f1] shadow-[0_18px_32px_rgba(57,56,47,0.12)]">
           <img
             alt="Nigerian marketplace"
             className="h-full w-full object-cover"
             src={HERO_PATTERN}
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,14,11,0.82),rgba(15,14,11,0.52),rgba(15,14,11,0.14))]" />
+          <div className="kela-float absolute right-4 top-5 drop-shadow-[0_12px_20px_rgba(0,0,0,0.35)]">
+            <KelaMascot mood="idle" size={112} interactive title="Kela, tap to say hello" />
+          </div>
           <div className="absolute inset-0 flex flex-col justify-end px-7 pb-7 text-white">
             <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#ffdeac]">
               Continue journey
@@ -811,7 +623,7 @@ function DashboardMobile({
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-4">
+        <section className="kela-enter grid grid-cols-2 gap-4" style={{ animationDelay: '120ms' }}>
           <MobileStatCard
             icon={Flame}
             label="Global streak"
@@ -852,44 +664,6 @@ function DashboardMobile({
           </p>
         </section>
 
-        {/* <section className="rounded-[28px] bg-[#f7f3ea] p-6">
-          <div className="mb-6 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b9eeab]/55 text-[#2d5a27]">
-              <Target className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#191713]">
-                Next Lesson
-              </h3>
-              <p className="text-sm text-[#66655a]">
-                {nextLesson?.unitTitle ||
-                  activeUnit?.title ||
-                  languageCopy.moduleFallback}
-              </p>
-            </div>
-          </div>
-          <Link
-            href={nextLessonHref}
-            className="flex items-center justify-between rounded-2xl bg-white px-4 py-4"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-[#a94600]">
-                {String((nextLesson?.orderIndex ?? 0) + 1).padStart(2, "0")}
-              </span>
-              <span className="text-sm font-bold text-[#191713]">
-                {nextLesson?.title || "Formal Greetings"}
-              </span>
-            </div>
-            <ArrowRight className="h-4 w-4 text-[#a59d95]" />
-          </Link>
-          <Link
-            href={nextLessonHref}
-            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#a94600,#953d00)] text-sm font-bold uppercase tracking-[0.08em] text-white shadow-[0_14px_26px_rgba(169,70,0,0.24)]"
-          >
-            Continue Learning
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </section> */}
 
         <section className="space-y-4">
           <div className="flex items-end justify-between gap-3">
@@ -1064,38 +838,6 @@ function MobileStatCard({
       </div>
     </div>
   )
-}
-
-function LessonStatusPill({ status }: { status: UnitLesson['status'] }) {
-  if (status === 'completed') {
-    return <span className="rounded-full bg-[#edf7ea] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#2d7c37]">Done</span>
-  }
-  if (status === 'in_progress') {
-    return <span className="rounded-full bg-[#ffeddc] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8b3900]">Live</span>
-  }
-  return <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8a7d70]">Up next</span>
-}
-
-function buildPlaceholderLessons(language: SupportedLanguage): UnitLesson[] {
-  return LANGUAGE_UI_COPY[language].placeholderLessons.map((item, orderIndex) => ({
-    id: `placeholder-${language}-${orderIndex + 1}`,
-    title: item.title,
-    description: item.description,
-    level: 'Beginner',
-    orderIndex,
-    status: orderIndex < 3 ? 'completed' : 'not_started',
-    progressPercent: orderIndex < 3 ? 100 : 0,
-  }))
-}
-
-function buildPlaceholderMastery(language: SupportedLanguage): MasteryLesson[] {
-  return LANGUAGE_UI_COPY[language].placeholderLessons.slice(0, 4).map((item, orderIndex) => ({
-    id: `mastery-placeholder-${language}-${orderIndex + 1}`,
-    title: item.title,
-    description: item.description,
-    level: 'Beginner',
-    completedAt: null,
-  }))
 }
 
 function shortWordLabel(input: string) {

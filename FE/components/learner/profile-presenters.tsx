@@ -13,8 +13,7 @@ import { cn } from '@/lib/utils'
 import type { Language } from '@/types'
 import type { LearnerLanguageSummary } from '@/components/learner/language-switcher'
 
-export const DEFAULT_LEARNER_AVATAR =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuChHsMGj_MWqxZDMDUlyYwVvVcrjDU8deEgWcVtkFJoD-tvNp2dyxs94WERV7pwX_Xzdq62PkBrGD4afYfXJTdfZAbSF9gqcECVjLD23Gp5drdCF-ZcPimXPHdRQuDjlBWRzjIR_JOxQSVC5q-XIbc9dCMPFB9UMuIL_TR8HTQwsqqcVTNwrVVfH4PQsROCSnZDQRTY9nUk-gPBAyasFZdIsnvKZLbABsZUGrVYWQb9P1ypIxJYpcY0yWP-qp_m9f4HKxerXKLzL-OK'
+export const DEFAULT_LEARNER_AVATAR = '/images/learner/default-avatar.png'
 
 const LANGUAGE_META: Record<Language, { icon: LucideIcon; badge: string; badgeText: string; progress: string; title: string }> = {
   yoruba: {

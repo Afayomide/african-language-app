@@ -1,9 +1,9 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { siteName } from '@/lib/seo'
+import { KelaMascot } from '@lesson-player/components/mascot/KelaMascot'
 
 interface LogoProps {
   href?: string | null
@@ -26,22 +26,11 @@ export function Logo({
     lg: 'text-3xl',
   }
 
+  // Width of the elephant mark in pixels.
   const markSizes = {
-    sm: 'w-[56px]',
-    md: 'w-[72px]',
-    lg: 'w-[92px]',
-  }
-
-  const markRadii = {
-    sm: 'rounded-xl',
-    md: 'rounded-2xl',
-    lg: 'rounded-[20px]',
-  }
-
-  const markImageSizes = {
-    sm: { width: 1408, height: 768 },
-    md: { width: 1408, height: 768 },
-    lg: { width: 1408, height: 768 },
+    sm: 56,
+    md: 72,
+    lg: 92,
   }
 
   const gapSizes = {
@@ -55,27 +44,19 @@ export function Logo({
       {surface === 'showcase' ? (
         <div className="absolute -inset-3 rounded-[28px] bg-gradient-to-r from-primary/30 via-accent/20 to-primary/25 blur-xl" />
       ) : null}
-      <div
+      {/* Kela blinks and flaps idly, winks on hover and hops when tapped. */}
+      <KelaMascot
+        mood="idle"
+        size={markSizes[size]}
+        interactive
+        title={`${siteName} logo`}
         className={cn(
           'relative',
-          markSizes[size]
+          surface === 'showcase'
+            ? 'drop-shadow-[0_22px_40px_rgba(15,23,42,0.26)]'
+            : 'drop-shadow-[0_10px_20px_rgba(15,23,42,0.14)]'
         )}
-      >
-        <Image
-          src="/logo.png"
-          alt={`${siteName} logo`}
-          width={markImageSizes[size].width}
-          height={markImageSizes[size].height}
-          className={cn(
-            'h-auto w-full object-contain',
-            markRadii[size],
-            surface === 'showcase'
-              ? 'drop-shadow-[0_22px_40px_rgba(15,23,42,0.26)]'
-              : 'drop-shadow-[0_10px_20px_rgba(15,23,42,0.14)]'
-          )}
-          priority={surface === 'showcase' || size === 'lg'}
-        />
-      </div>
+      />
     </div>
   )
 

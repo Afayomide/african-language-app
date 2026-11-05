@@ -38,7 +38,7 @@ export function StudyHeader({
 
   const progressTrack = (
     <div className={cx('relative w-full overflow-hidden griot-progress-track', immersiveExerciseChrome ? 'h-2.5 sm:h-3' : 'h-3 sm:h-3.5')}>
-      <div className="h-full griot-progress-fill transition-all duration-700 ease-out" style={{ width: `${pct}%` }} />
+      <div className="kela-shimmer h-full griot-progress-fill transition-[width] duration-700" style={{ width: `${pct}%`, transitionTimingFunction: 'cubic-bezier(.3,1.3,.5,1)' }} />
     </div>
   )
 
@@ -61,12 +61,13 @@ export function StudyHeader({
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="min-w-0 flex-1">{progressTrack}</div>
           <span
+            key={pct}
             className={cx(
-              'shrink-0 font-body font-black text-foreground/60',
+              'kela-bump inline-block shrink-0 font-body font-black text-foreground/60',
               isUltraShortViewport ? 'text-[11px]' : isShortViewport ? 'text-xs' : immersiveExerciseChrome ? 'text-xs uppercase tracking-wide' : 'text-sm',
             )}
           >
-            {immersiveExerciseChrome ? `${pct}%` : `${pct}%`}
+            {`${pct}%`}
           </span>
         </div>
       </div>

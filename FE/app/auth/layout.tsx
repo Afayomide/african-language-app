@@ -4,7 +4,7 @@ import { buildNoIndexMetadata } from '@/lib/seo'
 
 export const metadata = buildNoIndexMetadata(
   'Learner Authentication',
-  'Sign in or create your LinguaHub learner account.',
+  'Sign in or create your Kela learner account.',
 )
 
 export default function AuthLayout({ children }: { children: ReactNode }) {

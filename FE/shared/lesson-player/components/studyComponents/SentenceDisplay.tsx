@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Volume2 } from 'lucide-react'
 import type { LearningContentComponent } from '../../types'
 import { cx } from './StudyUi'
@@ -15,11 +15,51 @@ type AudioPlayerFn = (url?: string, speed?: number, onEnd?: () => void) => void
  *
  * Now a mouse hover opens it lightly (leaving closes it), a click or tap pins it open, a second
  * click or tap on the word closes it, and a click or tap anywhere else closes a pinned one.
+ * Escape closes it too.
+ *
+ * The popover is centred under its word, but a word near the edge of a phone screen would push
+ * a centred box off-screen. Before it paints, it is measured and slid sideways to stay at
+ * least EDGE_GAP pixels inside the viewport.
  */
+const EDGE_GAP = 16
+
 function useGlossPopover() {
   const [isOpen, setIsOpen] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
+  const [shift, setShift] = useState(0)
   const ref = useRef<HTMLSpanElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const popoverId = useId()
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setShift(0)
+      return
+    }
+    const popover = popoverRef.current
+    if (!popover) return
+    const rect = popover.getBoundingClientRect()
+    const unshiftedLeft = rect.left - shift
+    const unshiftedRight = rect.right - shift
+    const viewportWidth = document.documentElement.clientWidth
+    let next = 0
+    if (unshiftedLeft < EDGE_GAP) next = EDGE_GAP - unshiftedLeft
+    else if (unshiftedRight > viewportWidth - EDGE_GAP) next = viewportWidth - EDGE_GAP - unshiftedRight
+    if (next !== shift) setShift(next)
+    // Measure once per opening; shift is read only to undo the previous measurement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setIsOpen(false)
+      setIsPinned(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen])
 
   useEffect(() => {
     if (!isPinned) return
@@ -41,7 +81,15 @@ function useGlossPopover() {
         if (!isPinned) setIsOpen(false)
       },
     },
+    popoverProps: {
+      ref: popoverRef,
+      id: popoverId,
+      role: 'dialog' as const,
+      style: { transform: `translateX(calc(-50% + ${shift}px))` },
+    },
     triggerProps: {
+      'aria-expanded': isOpen,
+      'aria-controls': isOpen ? popoverId : undefined,
       onPointerEnter: (event: ReactPointerEvent) => {
         if (event.pointerType === 'mouse') setIsOpen(true)
       },
@@ -292,7 +340,7 @@ export function SentenceGlossToken({
   children: ReactNode
   buttonClassName?: string
 }) {
-  const { isOpen, hostProps, triggerProps } = useGlossPopover()
+  const { isOpen, hostProps, triggerProps, popoverProps } = useGlossPopover()
 
   return (
     <span className="relative inline-flex items-center gap-1 align-baseline" {...hostProps}>
@@ -307,7 +355,7 @@ export function SentenceGlossToken({
         {children}
       </button>
       {isOpen ? (
-        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-[#efe4d8] bg-white p-4 shadow-xl">
+        <div {...popoverProps} className="absolute left-1/2 top-full z-30 mt-3 w-72 max-w-[calc(100vw-2rem)] select-text rounded-3xl border border-[#efe4d8] bg-white p-4 text-left shadow-xl">
           <SentenceGlossPanel component={component} />
         </div>
       ) : null}
@@ -322,7 +370,7 @@ function MeaningGlossToken({
   label: string
   segment: MeaningSegmentDisplay
 }) {
-  const { isOpen, hostProps, triggerProps } = useGlossPopover()
+  const { isOpen, hostProps, triggerProps, popoverProps } = useGlossPopover()
 
   return (
     <span className="relative inline-block align-baseline" {...hostProps}>
@@ -334,7 +382,7 @@ function MeaningGlossToken({
         {label}
       </button>
       {isOpen ? (
-        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-[#efe4d8] bg-white p-4 shadow-xl">
+        <div {...popoverProps} className="absolute left-1/2 top-full z-30 mt-3 w-72 max-w-[calc(100vw-2rem)] select-text rounded-3xl border border-[#efe4d8] bg-white p-4 text-left shadow-xl">
           {segment.components.length === 1 ? (
             <SentenceGlossPanel component={segment.components[0]!} />
           ) : (
@@ -355,7 +403,7 @@ export function InlineGlossToken({
   component: LearningContentComponent
   onPlayAudio: AudioPlayerFn
 }) {
-  const { isOpen, hostProps, triggerProps } = useGlossPopover()
+  const { isOpen, hostProps, triggerProps, popoverProps } = useGlossPopover()
 
   return (
     <span className="relative inline-flex items-center gap-2 align-baseline" {...hostProps}>
@@ -373,7 +421,7 @@ export function InlineGlossToken({
         {label}
       </button>
       {isOpen ? (
-        <div className="absolute left-1/2 top-full z-30 mt-3 w-72 -translate-x-1/2 rounded-3xl border border-[#efe4d8] bg-white p-4 shadow-xl">
+        <div {...popoverProps} className="absolute left-1/2 top-full z-30 mt-3 w-72 max-w-[calc(100vw-2rem)] select-text rounded-3xl border border-[#efe4d8] bg-white p-4 text-left shadow-xl">
           <SentenceGlossPanel component={component} />
         </div>
       ) : null}
@@ -400,7 +448,7 @@ export function SentenceContentDisplay({
     <div className="space-y-6 text-center">
       <div className="flex items-start justify-center gap-3">
         <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-2 shrink-0 self-start" onPlayAudio={onPlayAudio} />
-        <div className="text-4xl font-black leading-[1.6] tracking-tight text-[#191713] sm:text-5xl">
+        <div className="min-w-0 select-text break-words text-3xl font-black leading-[1.6] tracking-tight text-[#191713] sm:text-5xl">
           {parts.map((part, index) =>
             part.type === 'text' ? (
               <span key={`text-${index}`} className="whitespace-pre-wrap text-[#191713]">
@@ -478,7 +526,7 @@ export function SentenceMeaningDisplay({
     <div className="space-y-6 text-center">
       <div className="flex items-start justify-center gap-3">
         <InlineAudioButton audioUrl={audioUrl} label={text} className="mt-2 shrink-0 self-start" onPlayAudio={onPlayAudio} />
-        <div className="text-4xl font-black leading-[1.6] tracking-tight text-[#191713] sm:text-5xl">
+        <div className="min-w-0 select-text break-words text-3xl font-black leading-[1.6] tracking-tight text-[#191713] sm:text-5xl">
           {segmentDisplays.length > 0 && !disableGloss ? (
             segmentDisplays.map((segment, index) => (
               <span key={`${segment.text}-${index}`}>

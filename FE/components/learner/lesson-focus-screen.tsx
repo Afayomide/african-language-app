@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { ArrowRight, BookOpen, GraduationCap, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const TEXTILE_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDVDH70G3jk7MMZ3ZAhtbhTiovfEw8HzvPUFgBHOm-6xXya8P6It2PETQIrZrvVa5VIUcLqUgJhuRW7LYFlbWBs96FeVGu7F0aYX1AugRr6s0gViyd1wifi3i89uHVKvjKG5JXkNawYp53Xs1SrZ5DNxZ0gxhVLm4HSKinSKx7er2hyUmtDMAGQc4KawyEGCyi5GWyDNoTGNXRAP-HN1kR8_n-MtlGPWWFbFr_OhGKgxhKkdhZTLHbEhQVzZBZDAZ-HL52N7cVfcDXO'
+const TEXTILE_IMAGE = '/images/learner/textile.png'
 
 type LessonFocusAction = {
   href?: string

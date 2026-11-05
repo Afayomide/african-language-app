@@ -7,6 +7,7 @@ import { ArrowRight, ChevronLeft, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { learnerDashboardService } from '@/services'
+import { withRetry } from '@lesson-player/retry'
 
 const goals = [
   { id: '5', minutes: 5, description: 'Quick learner' },
@@ -18,15 +19,20 @@ function DailyGoalContent() {
   const searchParams = useSearchParams()
   const language = searchParams.get('language') || 'language'
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false)
 
-  const handleContinue = () => {
-    if (selectedGoal) {
-      learnerDashboardService
-        .updateDailyGoal(Number(selectedGoal))
-        .catch((error) => console.error("Failed to update daily goal", error))
-        .finally(() => {
-          window.location.href = `/dashboard?language=${language}&goal=${selectedGoal}`
-        })
+  const handleContinue = async () => {
+    if (!selectedGoal || isSaving) return
+    setIsSaving(true)
+    setSaveFailed(false)
+    try {
+      await withRetry(() => learnerDashboardService.updateDailyGoal(Number(selectedGoal)))
+      window.location.href = `/dashboard?language=${language}&goal=${selectedGoal}`
+    } catch (error) {
+      console.error("Failed to update daily goal", error)
+      setSaveFailed(true)
+      setIsSaving(false)
     }
   }
 
@@ -36,7 +42,7 @@ function DailyGoalContent() {
       <header className="border-b border-border/20 bg-background/95 px-4 py-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <Link href="/language-selection">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Back">
               <ChevronLeft className="h-5 w-5" />
             </Button>
           </Link>
@@ -58,7 +64,7 @@ function DailyGoalContent() {
           </div>
 
           {/* Goal Cards */}
-          <div className="space-y-4">
+          <div className="space-y-4" role="radiogroup" aria-label="Daily goal">
             {goals.map((goal) => (
               <Card
                 key={goal.id}
@@ -67,7 +73,16 @@ function DailyGoalContent() {
                     ? 'border-primary bg-primary/5'
                     : 'border-border/30 hover:border-primary/50'
                 }`}
+                role="radio"
+                aria-checked={selectedGoal === goal.id}
+                tabIndex={0}
                 onClick={() => setSelectedGoal(goal.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setSelectedGoal(goal.id)
+                  }
+                }}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
@@ -94,15 +109,20 @@ function DailyGoalContent() {
 
           {/* Continue Button */}
           <div className="fixed bottom-0 left-0 right-0 border-t border-border/20 bg-background/95 p-4 backdrop-blur-sm">
-            <div className="mx-auto max-w-2xl">
+            <div className="mx-auto max-w-2xl space-y-2">
+              {saveFailed ? (
+                <p role="alert" className="text-center text-sm font-medium text-destructive">
+                  We couldn&apos;t save your goal. Check your connection and try again.
+                </p>
+              ) : null}
               <Button
                 size="lg"
                 className="w-full gap-2"
-                disabled={!selectedGoal}
+                disabled={!selectedGoal || isSaving}
                 onClick={handleContinue}
               >
-                Continue
-                <ArrowRight className="h-4 w-4" />
+                {isSaving ? 'Saving...' : saveFailed ? 'Try again' : 'Continue'}
+                {isSaving ? null : <ArrowRight className="h-4 w-4" />}
               </Button>
             </div>
           </div>

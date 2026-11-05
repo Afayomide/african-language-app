@@ -2,6 +2,7 @@ import React from 'react'
 import type { Metadata, Viewport } from 'next'
 import { Manrope, Plus_Jakarta_Sans } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
+import { NativeAppShell } from '@/components/app/native-app-shell'
 import { defaultOgImage, siteDescription, siteName, siteUrl } from '@/lib/seo'
 
 import './globals.css'
@@ -92,6 +93,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${manrope.variable} ${plusJakartaSans.variable} font-sans antialiased`}>
+        <NativeAppShell />
         {children}
         <Toaster richColors position="top-center" />
       </body>

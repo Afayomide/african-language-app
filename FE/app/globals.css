@@ -203,3 +203,30 @@
     @apply inline-flex items-center gap-2 rounded-full border border-[rgba(169,70,0,0.16)] bg-white/85 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-primary shadow-[0_10px_20px_rgba(57,56,47,0.04)];
   }
 }
+
+/*
+ * Inside the mobile app (NativeAppShell adds .native-app to <html>): behave like an installed
+ * app rather than a web page. No grey flash on tap, no long-press callout or text selection,
+ * and no rubber-band bounce past the top or bottom. Inputs and text deliberately marked
+ * select-text (such as lesson sentences) stay selectable.
+ */
+html.native-app {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+html.native-app body {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.native-app input,
+html.native-app textarea,
+html.native-app [contenteditable='true'],
+html.native-app .select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+html.native-app img {
+  -webkit-user-drag: none;
+}

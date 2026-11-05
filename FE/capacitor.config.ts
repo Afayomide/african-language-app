@@ -14,6 +14,26 @@ const config: CapacitorConfig = {
   appId: process.env.CAP_APP_ID || 'com.kela.app',
   appName: process.env.CAP_APP_NAME || 'Kela',
   webDir: 'www',
+  // Lets the website recognise the app (see FE/lib/nativeApp.ts) and open the app's own
+  // welcome screen instead of the marketing page.
+  appendUserAgent: 'KelaApp',
+  backgroundColor: '#fffbff',
+  ios: {
+    // Keep page content out from under the notch and the home bar.
+    contentInset: 'always',
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1500,
+      backgroundColor: '#fffbff',
+      showSpinner: false,
+    },
+    StatusBar: {
+      style: 'LIGHT',
+      backgroundColor: '#fffbff',
+      overlaysWebView: false,
+    },
+  },
   server: remoteUrl
     ? {
         url: remoteUrl,

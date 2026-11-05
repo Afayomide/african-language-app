@@ -179,7 +179,7 @@ function LessonExpressionsContent() {
 
 export default function LessonExpressionsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center font-bold">Loading Materials...</div>}>
+    <Suspense fallback={<div className="p-8 text-center font-bold">Loading materials...</div>}>
       <LessonExpressionsContent />
     </Suspense>
   )

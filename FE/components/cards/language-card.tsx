@@ -14,7 +14,8 @@ interface LanguageCardProps {
   speakers: number
   maleCharacter: string
   femaleCharacter: string
-  href: string
+  /** Omit when the card sits inside a picker that saves the choice first. */
+  href?: string
 }
 
 export function LanguageCard({
@@ -68,15 +69,17 @@ export function LanguageCard({
             <p>speakers</p>
           </div>
 
-          <Link href={href}>
-            <Button
-              size="sm"
-              className="gap-2 group-hover:gap-3 transition-all"
-            >
-              Start
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </Link>
+          {href ? (
+            <Link href={href}>
+              <Button
+                size="sm"
+                className="gap-2 group-hover:gap-3 transition-all"
+              >
+                Start
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
     </Card>

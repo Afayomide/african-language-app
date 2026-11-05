@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
+import { Reveal } from '@/components/landing/reveal'
 
 interface CulturalItem {
   title: string
@@ -62,9 +63,9 @@ export function CulturalShowcaseSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {culturalItems.map((item, index) => (
+            <Reveal key={item.title} delay={index * 90} className="h-full">
             <Card
-              key={item.title}
-              className="group relative overflow-hidden border-2 border-border/30 bg-white/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-xl"
+              className="group relative h-full overflow-hidden border-2 border-border/30 bg-white/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-xl"
             >
               {/* Gradient background on hover */}
               <div
@@ -92,6 +93,7 @@ export function CulturalShowcaseSection() {
                 />
               </div>
             </Card>
+            </Reveal>
           ))}
         </div>
 

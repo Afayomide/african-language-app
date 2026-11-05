@@ -39,8 +39,13 @@ export default function LessonOverviewPage() {
   useEffect(() => {
     if (!resolvedLessonId) return
     if (overviewQuery.isLoading || overviewQuery.isFetching) return
-    if (overviewQuery.isError || !overviewQuery.data?.lesson) {
+    // A failed request shows an error with a retry button below. Only a lesson that loaded
+    // but does not exist sends the learner home.
+    if (overviewQuery.isError) {
       console.error('Failed to load lesson overview', overviewQuery.error)
+      return
+    }
+    if (!overviewQuery.data?.lesson) {
       router.push('/dashboard')
     }
   }, [overviewQuery.data?.lesson, overviewQuery.error, overviewQuery.isError, overviewQuery.isFetching, overviewQuery.isLoading, resolvedLessonId, router])
@@ -58,7 +63,30 @@ export default function LessonOverviewPage() {
 
   const isLoading = (!lessonIdParam && nextLessonQuery.isLoading) || overviewQuery.isLoading
 
+  const loadFailed = overviewQuery.isError && !overviewQuery.isFetching && !lesson
+  const retryOverview = overviewQuery.refetch
+
   const screenProps = useMemo(() => {
+    if (loadFailed) {
+      return {
+        mode: 'overview' as const,
+        progress: 0,
+        closeHref: '/dashboard',
+        title: 'We couldn’t load this lesson',
+        subtitle: 'Check your connection and try again.',
+        primaryAction: {
+          label: 'Try again',
+          onClick: () => {
+            void retryOverview()
+          },
+        },
+        secondaryAction: {
+          href: '/dashboard',
+          label: 'Back to dashboard',
+        },
+      }
+    }
+
     if (!lesson) {
       return {
         mode: 'loading' as const,
@@ -141,7 +169,7 @@ export default function LessonOverviewPage() {
         label: 'Open Resources',
       },
     }
-  }, [isLoading, isStartingLesson, lesson, queryClient, router])
+  }, [isLoading, isStartingLesson, lesson, loadFailed, queryClient, retryOverview, router])
 
   return <LessonFocusScreen {...screenProps} />
 }

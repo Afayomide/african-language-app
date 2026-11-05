@@ -18,8 +18,7 @@ import { cn } from '@/lib/utils'
 
 export type LearnerHubNavId = 'dashboard' | 'learn' | 'profile' | 'settings'
 
-const DEFAULT_AVATAR =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuChHsMGj_MWqxZDMDUlyYwVvVcrjDU8deEgWcVtkFJoD-tvNp2dyxs94WERV7pwX_Xzdq62PkBrGD4afYfXJTdfZAbSF9gqcECVjLD23Gp5drdCF-ZcPimXPHdRQuDjlBWRzjIR_JOxQSVC5q-XIbc9dCMPFB9UMuIL_TR8HTQwsqqcVTNwrVVfH4PQsROCSnZDQRTY9nUk-gPBAyasFZdIsnvKZLbABsZUGrVYWQb9P1ypIxJYpcY0yWP-qp_m9f4HKxerXKLzL-OK'
+const DEFAULT_AVATAR = '/images/learner/default-avatar.png'
 
 type LearnerHubLayoutProps = {
   children: React.ReactNode

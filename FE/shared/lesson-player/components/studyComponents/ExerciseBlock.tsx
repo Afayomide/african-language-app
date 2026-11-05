@@ -1,7 +1,9 @@
-import { CheckCircle2, GripVertical, Languages, Lightbulb, Loader2, Mic, Turtle, Volume2 } from 'lucide-react'
-import type { ExerciseQuestion, LearningContentComponent, QuestionMatchingDisplayItem } from '../../types'
+import { Check, CheckCircle2, GripVertical, Languages, Lightbulb, Loader2, Mic, Turtle, Volume2, X, XCircle } from 'lucide-react'
+import type { ExerciseQuestion, LearningContentComponent, PronunciationLevel, QuestionMatchingDisplayItem } from '../../types'
 import { SentenceContentDisplay, SentenceGlossToken, SentenceMeaningDisplay } from './SentenceDisplay'
 import { cx } from './StudyUi'
+import spellingContextImage from '../../assets/spelling-context.png'
+import matchingPatternImage from '../../assets/matching-earth-ethos-pattern.png'
 
 type AudioPlayerFn = (url?: string, speed?: number, onEnd?: () => void) => void
 
@@ -13,12 +15,11 @@ type SpeakingTarget = {
 }
 
 type SpeakingFeedback = {
-  level: 'excellent' | 'good' | 'fair' | 'poor'
+  level: PronunciationLevel
 }
 
-const SPELLING_CONTEXT_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBSJLUFH1PuZO_HDC5ipmEuAY-Kh5GRfoqWpdKzxi29fwLDMMhANMm0SBtNGrYKJJDU2AiMdwxtBDqE5-W1buTwq8UGKzHkxhFo1ftxYagVq-ij1BAcwKLdljp_nWOSbwO-0-MM8i68YKEAUOowLNOflSINW3Bz4fQ9IACW9I9gtRY0pPvm8uSbCvC9aTLe7DQ6Ldz7nAgYjjI4vB2iy0imeXI3NjkgnjJoBd8DBIY292h9KL6Dno3V2ya2GjAtGcyr_wLt8g_aSSD0'
-const MATCHING_DECORATIVE_IMAGE = '/images/stitch/matching-earth-ethos-pattern.png'
+const SPELLING_CONTEXT_IMAGE = spellingContextImage.src
+const MATCHING_DECORATIVE_IMAGE = matchingPatternImage.src
 
 function splitOptionText(option: string) {
   const raw = String(option ?? '')
@@ -66,19 +67,6 @@ function renderPromptText({
   ))
 }
 
-function renderPromptWithTrailingAccent(prompt: string) {
-  const [prefix, ...rest] = String(prompt || '').split(':')
-  if (rest.length === 0) return prompt
-
-  return (
-    <>
-      {prefix}
-      {':' + ' '}
-      <span className="text-[#a94600] italic">{rest.join(':')}</span>
-    </>
-  )
-}
-
 function AudioCircleButton({
   onClick,
   disabled,
@@ -113,6 +101,27 @@ function AudioCircleButton({
   )
 }
 
+/** Option letter before answering; a tick or cross after, so the result does not rest on colour. */
+function OptionBadge({ label, isRight, isWrong }: { label: string; isRight: boolean; isWrong: boolean }) {
+  if (isRight) {
+    return (
+      <>
+        <Check className="h-5 w-5 stroke-[3px]" aria-hidden="true" />
+        <span className="sr-only">Correct answer:</span>
+      </>
+    )
+  }
+  if (isWrong) {
+    return (
+      <>
+        <X className="h-5 w-5 stroke-[3px]" aria-hidden="true" />
+        <span className="sr-only">Your answer, incorrect:</span>
+      </>
+    )
+  }
+  return <>{label}</>
+}
+
 function TranslationOptionCard({
   option,
   index,
@@ -140,9 +149,11 @@ function TranslationOptionCard({
       type="button"
       className={cx(
         'group relative overflow-hidden text-left transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none',
+        // Cards rise in one after another, then pop when right or shake when wrongly picked.
+        isRightSelection ? 'kela-pop' : isWrongSelection ? 'kela-shake' : !isAnswered && 'kela-enter',
         isDesktopViewport
           ? 'flex items-center rounded-[1.55rem] border-2 p-6'
-          : 'flex items-center rounded-[1.2rem] border p-5',
+          : 'flex w-full items-center rounded-[1.2rem] border p-5',
         !selected &&
           !isRightSelection &&
           !isWrongSelection &&
@@ -163,6 +174,7 @@ function TranslationOptionCard({
             ? 'border-[#fa7150] bg-[#fff1ee] text-[#b23d21]'
             : 'border-[#ba1a1a] bg-[#fff1ee] text-[#b23d21] shadow-[0_4px_0_0_rgba(186,26,26,0.18)]'),
       )}
+      style={!isAnswered ? { animationDelay: `${120 + index * 70}ms` } : undefined}
       onClick={onClick}
     >
       {isDesktopViewport ? (
@@ -178,7 +190,7 @@ function TranslationOptionCard({
                   : 'bg-[#f1eee2] text-[#7d7467] group-hover:bg-[#a94600] group-hover:text-white',
           )}
         >
-          {label}
+          <OptionBadge label={label} isRight={isRightSelection} isWrong={isWrongSelection} />
         </span>
       ) : (
         <span
@@ -193,7 +205,7 @@ function TranslationOptionCard({
                   : 'bg-[#ece8db] text-[#66655a] group-hover:bg-[#ffffff]',
           )}
         >
-          {label}
+          <OptionBadge label={label} isRight={isRightSelection} isWrong={isWrongSelection} />
         </span>
       )}
 
@@ -207,14 +219,6 @@ function TranslationOptionCard({
           </p>
         ) : null}
       </div>
-
-      {!isDesktopViewport && isRightSelection ? (
-        <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#2c694e]" />
-      ) : null}
-
-      {!isDesktopViewport && isWrongSelection ? (
-        <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#ba1a1a]" />
-      ) : null}
 
       {!isDesktopViewport && selected && !isAnswered ? (
         <CheckCircle2 className="ml-3 h-5 w-5 shrink-0 text-[#a94600]" />
@@ -728,7 +732,7 @@ function SpeakingExerciseSurface({
         </button>
 
         <div className="space-y-3 text-center">
-          <p className="text-sm font-medium text-[#5f5951]">{isRecordingSpeech ? 'Tap to stop' : 'Tap to Record'}</p>
+          <p className="text-sm font-medium text-[#5f5951]">{isRecordingSpeech ? 'Tap to stop' : 'Tap to speak'}</p>
           {recordedSpeechUrl && !isComparingSpeech ? (
             <button
               type="button"
@@ -775,6 +779,18 @@ function MatchingCard({
   disabled?: boolean
   isDesktopViewport: boolean
 }) {
+  // Every call site disables the cards once the answer is checked, so disabled marks "answered".
+  const result: 'right' | 'wrong' | null = answeredWrong ? 'wrong' : disabled && matched ? 'right' : null
+  const resultBadge = result ? (
+    <span className="absolute right-3 top-3">
+      {result === 'right' ? (
+        <CheckCircle2 className="h-5 w-5 text-[#2c694e]" aria-hidden="true" />
+      ) : (
+        <XCircle className="h-5 w-5 text-[#ba1a1a]" aria-hidden="true" />
+      )}
+      <span className="sr-only">{result === 'right' ? 'Matched correctly' : 'Matched incorrectly'}</span>
+    </span>
+  ) : null
   const mobileCardTextColor = matched
     ? 'text-[#2c694e]'
     : answeredWrong
@@ -787,7 +803,7 @@ function MatchingCard({
     <button
       type="button"
       className={cx(
-        'w-full text-left transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none',
+        'relative w-full text-left transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none',
         isDesktopViewport
           ? cx(
               'rounded-[1.5rem] p-6',
@@ -813,6 +829,7 @@ function MatchingCard({
       onClick={onClick}
       disabled={disabled}
     >
+      {resultBadge}
       {image ? (
         <div className="space-y-3">
           <div className="overflow-hidden rounded-[1rem] bg-[#f1eee2]">
@@ -836,9 +853,6 @@ function MatchingCard({
         </div>
       ) : !isDesktopViewport ? (
         <div className="flex h-full flex-col items-center justify-center gap-3">
-          {matched ? (
-            <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-[#2c694e]" />
-          ) : null}
           {icon === 'left' ? (
             <Volume2 className={cx('h-4 w-4', mobileCardTextColor)} />
           ) : null}
@@ -855,8 +869,8 @@ function MatchingCard({
             </p>
           </div>
 
-          {matched ? (
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-[#416f39]" />
+          {result ? (
+            <span className="h-5 w-5 shrink-0" aria-hidden="true" />
           ) : icon === 'left' ? (
             <GripVertical className="h-5 w-5 shrink-0 text-[#d5cabc]" />
           ) : (
@@ -917,7 +931,6 @@ function MatchingExerciseSurface({
             <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#b0a498]">Yoruba</p>
             {matchingLeftItems.map((item) => {
               const matchedRight = selectedMatches[item.id] ? getMatchingRightItem(selectedMatches[item.id]) : null
-              const matchedCorrectly = Boolean(isAnswered && selectedMatches[item.id] === item.id)
               const matchedWrong = Boolean(isAnswered && selectedMatches[item.id] && selectedMatches[item.id] !== item.id)
               return (
                 <MatchingCard
@@ -940,12 +953,14 @@ function MatchingExerciseSurface({
             <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#b0a498]">{isImageMatching ? 'Images' : 'English'}</p>
             {matchingRightItems.map((item) => {
               const isUsed = Object.values(selectedMatches).includes(item.id)
+              const usedWrongly = Boolean(isAnswered && isUsed && selectedMatches[item.id] !== item.id)
               return (
                 <MatchingCard
                   key={item.id}
                   label={item.label}
                   caption={isImageMatching ? 'Image' : 'Translation'}
-                  matched={Boolean(isUsed && isAnswered)}
+                  matched={Boolean(isUsed && isAnswered && !usedWrongly)}
+                  answeredWrong={usedWrongly}
                   selected={Boolean(selectedMatchingLeftId && !isUsed)}
                   icon="right"
                   image={item.image}

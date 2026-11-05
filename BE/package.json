@@ -13,6 +13,7 @@
     "db:hard-delete-pidgin-units": "node --enable-source-maps --import tsx src/scripts/hardDeletePidginUnits.ts",
     "db:hard-delete-today": "node --enable-source-maps --import tsx src/scripts/hardDeleteGeneratedToday.ts",
     "db:clear": "node --enable-source-maps --import tsx src/scripts/clearDatabase.ts",
+    "audio:set-today-pending": "node --enable-source-maps --import tsx src/scripts/setAudioToPending.ts",
     "migrate:review-tracking": "node --enable-source-maps --import tsx src/scripts/migrateReviewTracking.ts",
     "audio:backfill-analysis": "node --enable-source-maps --import tsx src/scripts/backfillAudioAnalysis.ts",
     "test:unit": "node --test --import tsx src/tests/*.test.ts",

@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card'
 import React from 'react'
+import { Reveal } from '@/components/landing/reveal'
 
 interface Feature {
   icon: React.ElementType
@@ -17,23 +18,26 @@ export function FeaturesSection({ title, features }: FeaturesSectionProps) {
   return (
     <section id="features" className="relative px-4 py-20">
       <div className="mx-auto max-w-6xl">
-        <h2 className="mb-16 text-center text-4xl font-bold text-foreground">
-          {title}
-        </h2>
+        <Reveal>
+          <h2 className="mb-16 text-center font-display text-4xl font-black tracking-[-0.03em] text-foreground md:text-5xl">
+            {title}
+          </h2>
+        </Reveal>
 
         <div className="grid gap-8 md:grid-cols-3">
           {features.map((feature, index) => {
             const Icon = feature.icon
             const accentColor = feature.accentColor === 'accent' ? 'accent' : 'primary'
+            // The theme's accent is a pale beige, too faint for an icon, so the accent card uses green.
             const bgColor =
-              accentColor === 'accent' ? 'bg-accent/10' : 'bg-primary/10'
+              accentColor === 'accent' ? 'bg-[#edf7ea]' : 'bg-primary/10'
             const textColor =
-              accentColor === 'accent' ? 'text-accent' : 'text-primary'
+              accentColor === 'accent' ? 'text-[#2d7c37]' : 'text-primary'
 
             return (
+              <Reveal key={index} delay={index * 90} className="h-full">
               <Card
-                key={index}
-                className="group relative overflow-hidden border border-border/50 bg-white p-8 transition-all duration-300 hover:border-primary/50 hover:shadow-lg"
+                className="group relative h-full overflow-hidden rounded-[1.6rem] border-2 border-[#efe4d8] bg-white p-8 shadow-[0_5px_0_0_#efe4d8] transition-all duration-300 hover:-translate-y-1 hover:border-[#ffbe9b] hover:shadow-[0_8px_0_0_#ffdeac]"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <div className="relative space-y-4">
@@ -46,6 +50,7 @@ export function FeaturesSection({ title, features }: FeaturesSectionProps) {
                   <p className="text-foreground/70">{feature.description}</p>
                 </div>
               </Card>
+              </Reveal>
             )
           })}
         </div>

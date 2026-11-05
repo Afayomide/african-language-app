@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { AfricaLanguageSelector } from '@/components/sections/africa-language-selector'
+import { siteName } from '@/lib/seo'
 
 export function AfricaMapSection({ startHref = '/auth/signup' }: { startHref?: string }) {
   return (
@@ -22,7 +23,7 @@ export function AfricaMapSection({ startHref = '/auth/signup' }: { startHref?: s
             Built for African Language Learning
           </h2>
           <p className="mx-auto max-w-3xl text-lg text-foreground/70">
-            LinguaHub is being shaped as a continent-scale language platform. The current launch
+            {siteName} is being shaped as a continent-scale language platform. The current launch
             starts with Yoruba, Igbo, Hausa, and Pidgin, with room to grow across Africa over time.
           </p>
         </div>

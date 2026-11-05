@@ -212,3 +212,6 @@ export type AdaptiveReviewSuggestion =
       };
       reason: "no_struggle_data";
     };
+
+/** How closely a learner's recording matched the reference, as scored by the backend. */
+export type PronunciationLevel = 'excellent' | 'good' | 'fair' | 'poor'

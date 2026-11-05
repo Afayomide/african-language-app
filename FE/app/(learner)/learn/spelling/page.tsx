@@ -6,8 +6,7 @@ import { LearnerHubLayout } from '@/components/learner/learner-hub-layout'
 import { useLearnerAuth } from '@/components/auth/learner-auth-provider'
 import { useLearnerHubOverview } from '@/hooks/use-learner-hub-overview'
 
-const ILLUSTRATION =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBSJLUFH1PuZO_HDC5ipmEuAY-Kh5GRfoqWpdKzxi29fwLDMMhANMm0SBtNGrYKJJDU2AiMdwxtBDqE5-W1buTwq8UGKzHkxhFo1ftxYagVq-ij1BAcwKLdljp_nWOSbwO-0-MM8i68YKEAUOowLNOflSINW3Bz4fQ9IACW9I9gtRY0pPvm8uSbCvC9aTLe7DQ6Ldz7nAgYjjI4vB2iy0imeXI3NjkgnjJoBd8DBIY292h9KL6Dno3V2ya2GjAtGcyr_wLt8g_aSSD0'
+const ILLUSTRATION = '/images/learner/spelling-illustration.png'
 
 export default function SpellingHubPage() {
   const { isLoading: isAuthLoading, isAuthenticated, session } = useLearnerAuth()

@@ -39,10 +39,6 @@ function StudyPageContent() {
     [queryClient],
   )
 
-  const handleLoadError = useCallback(() => {
-    router.push('/dashboard')
-  }, [router])
-
   const handleComparePronunciation = useCallback(
     (
       contentType: 'word' | 'expression' | 'sentence',
@@ -78,7 +74,7 @@ function StudyPageContent() {
   )
 
   if (!lessonId) {
-    return null
+    return <MissingLessonRedirect />
   }
 
   return (
@@ -88,12 +84,20 @@ function StudyPageContent() {
       onExit={handleExit}
       onCompleteStage={handleCompleteStage}
       onLessonComplete={handleLessonComplete}
-      onLoadError={handleLoadError}
       onComparePronunciation={handleComparePronunciation}
       enableUiSounds
       culturalSoundResolver={getCulturalSoundPath}
     />
   )
+}
+
+// A link to /study without a lesson has nothing to show, so send the learner home.
+function MissingLessonRedirect() {
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/dashboard')
+  }, [router])
+  return null
 }
 
 export default function StudyPage() {

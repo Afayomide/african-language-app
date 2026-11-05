@@ -2,16 +2,16 @@ import { Info, Quote, Turtle, Volume2 } from 'lucide-react'
 import type { Language, LearningContent, Proverb } from '../../types'
 import { Button, cx } from './StudyUi'
 import { SentenceContentDisplay } from './SentenceDisplay'
+import wordFocusYorubaImage from '../../assets/word-focus-yoruba.png'
+import wordFocusIgboImage from '../../assets/word-focus-igbo.png'
+import wordFocusHausaImage from '../../assets/word-focus-hausa.png'
 
 type AudioPlayerFn = (url?: string, speed?: number, onEnd?: () => void) => void
 
 const WORD_FOCUS_CONTEXT_IMAGE_BY_LANGUAGE: Record<Language, string> = {
-  yoruba:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBqF08U8tBReYC-NbmzpMUdz5Z9vS9fKFr1nVBSGqyWALHyUybj5bLqOqLSjfAI2vWfzkDav83PycWP_DHtHa77U97Wx0G7-xHTmO6ybebxGNW2-mvGTZ-Go5Djoe9gft6kNOePsNxLElQ_Nl6R8dR9gKy6Al3Q7cXtg96021DwaGiz7YKl8BXzoG8D2XLtst5KVl4mfdFNkC4rtj5I5OWjrxaNKCplpExyZICzkxVQrEkCV9IhDgTjcaH77MfGis0-W5dWm3Mb9deK',
-  igbo:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDYry1i8BrwmeEaCpCMy3Bw1vjOshZ_cpas35XLOVnyC_dN8BVbnocw1sHiTEQ5FK6QwxXTy3NhXQ5jKitgL-MMBGWHym52IZlU_8tkJkRZifvTrAbG5cUooRUbchmbObEa8DmR6vV9IkOBu8gO6HWRbzY3RfBYp987QbEuYE37omJh4JaNW10Cyv4Qm4cAoosEJAm94aa9TCKKksmGVlVFZjP2IH95upXmZ8MFan4hRFKRIwhZ2teLjf9cVETvtVV41fYvuZbpJKbO',
-  hausa:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuChHsMGj_MWqxZDMDUlyYwVvVcrjDU8deEgWcVtkFJoD-tvNp2dyxs94WERV7pwX_Xzdq62PkBrGD4afYfXJTdfZAbSF9gqcECVjLD23Gp5drdCF-ZcPimXPHdRQuDjlBWRzjIR_JOxQSVC5q-XIbc9dCMPFB9UMuIL_TR8HTQwsqqcVTNwrVVfH4PQsROCSnZDQRTY9nUk-gPBAyasFZdIsnvKZLbABsZUGrVYWQb9P1ypIxJYpcY0yWP-qp_m9f4HKxerXKLzL-OK',
+  yoruba: wordFocusYorubaImage.src,
+  igbo: wordFocusIgboImage.src,
+  hausa: wordFocusHausaImage.src,
 }
 
 function capitalizeLabel(value: string) {
