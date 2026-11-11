@@ -41,6 +41,8 @@ const CONTENT_LABELS: Record<ContentType, string> = {
   sentence: "Sentence"
 };
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 function isLanguage(value: string): value is Language {
   return value === "yoruba" || value === "igbo" || value === "hausa";
 }
@@ -239,6 +241,18 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
   const levelRafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Typing in a search box waits for a pause before asking the server again.
+  const [debouncedQueueSearch, setDebouncedQueueSearch] = useState("");
+  const [debouncedSubmissionSearch, setDebouncedSubmissionSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQueueSearch(queueSearch), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [queueSearch]);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSubmissionSearch(submissionSearch), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [submissionSearch]);
+
   const isValidLanguageParam = isLanguage(languageParam);
   const language: Language = isValidLanguageParam ? languageParam : "yoruba";
 
@@ -256,12 +270,12 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
     try {
       const [queueData, submissionData] = await Promise.all([
         expressionService.getQueuePage({
-          q: queueSearch || undefined,
+          q: debouncedQueueSearch || undefined,
           page: queuePage,
           limit: queueLimit
         }),
         expressionService.listMySubmissionsPage({
-          q: submissionSearch || undefined,
+          q: debouncedSubmissionSearch || undefined,
           page: submissionPage,
           limit: submissionLimit
         })
@@ -277,7 +291,51 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
     } finally {
       setIsLoading(false);
     }
-  }, [queuePage, queueSearch, queueLimit, submissionPage, submissionSearch, submissionLimit]);
+  }, [queuePage, debouncedQueueSearch, queueLimit, submissionPage, debouncedSubmissionSearch, submissionLimit]);
+
+  // After an upload, update the two tables in place instead of reloading both lists:
+  // each reload reads the whole curriculum for the language from the database.
+  const applySubmitted = useCallback(
+    (contentType: ContentType, content: VoiceContent, created: unknown) => {
+      const submission = created as Partial<VoiceSubmissionItem> & { _id?: string } | null;
+      const id = submission?.id || submission?._id;
+      if (!id) {
+        void fetchData();
+        return;
+      }
+      const status = submission?.status ?? "pending";
+      const rejectionReason = submission?.rejectionReason ?? "";
+      const createdAt = String(submission?.createdAt ?? new Date().toISOString());
+      const isSame = (item: { contentType: ContentType; content: VoiceContent | null }) =>
+        item.contentType === contentType && item.content?._id === content._id;
+
+      const queueItem = queue.find(isSame);
+      setQueue((prev) =>
+        prev.map((item) => (isSame(item) ? { ...item, latestSubmission: { id, status, rejectionReason, createdAt } } : item))
+      );
+
+      const nextTotal = submissionTotal + 1;
+      setSubmissionTotal(nextTotal);
+      setSubmissionTotalPages(Math.max(1, Math.ceil(nextTotal / submissionLimit)));
+      if (submissionPage === 1 && !debouncedSubmissionSearch) {
+        const row: VoiceSubmissionItem = {
+          id,
+          contentType,
+          contentId: content._id,
+          status,
+          rejectionReason,
+          createdAt,
+          content,
+          lessons: queueItem?.lessons ?? [],
+          units: queueItem?.units ?? [],
+          chapters: queueItem?.chapters ?? [],
+          audio: submission?.audio ?? content.audio
+        };
+        setSubmissions((prev) => [row, ...prev].slice(0, submissionLimit));
+      }
+    },
+    [debouncedSubmissionSearch, fetchData, queue, submissionLimit, submissionPage, submissionTotal]
+  );
 
   useEffect(() => {
     if (!isValidLanguageParam) return;
@@ -397,13 +455,15 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
       setUploadingExpressionId(contentId);
       const base64 = await fileToBase64(file);
       const analysis = await analyzeAudioBlob(file);
-      await expressionService.createSubmission(contentType, contentId, {
+      const created = await expressionService.createSubmission(contentType, contentId, {
         base64,
         mimeType: file.type || "audio/mpeg",
         analysis
       });
       toast.success("Audio submitted for review");
-      await fetchData();
+      const item = queue.find((entry) => entry.contentType === contentType && entry.content._id === contentId);
+      if (item) applySubmitted(contentType, item.content, created);
+      else await fetchData();
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
@@ -464,7 +524,9 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
 
     try {
       resetRecordedAudio();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: false }
+      });
       mediaStreamRef.current = stream;
       chunksRef.current = [];
       const recorder = new MediaRecorder(stream);
@@ -538,7 +600,7 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
       setUploadingExpressionId(recordingItem.content._id);
       const base64 = await blobToBase64(recordedBlob);
       const analysis = await analyzeAudioBlob(recordedBlob);
-      await expressionService.createSubmission(recordingItem.contentType, recordingItem.content._id, {
+      const created = await expressionService.createSubmission(recordingItem.contentType, recordingItem.content._id, {
         base64,
         mimeType: recordedBlob.type || "audio/webm",
         analysis
@@ -546,7 +608,7 @@ export default function VoiceExpressionsPage({ params }: { params: Promise<{ lan
       toast.success("Recorded audio submitted for review");
       setRecorderOpen(false);
       resetRecordedAudio();
-      await fetchData();
+      applySubmitted(recordingItem.contentType, recordingItem.content, created);
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&

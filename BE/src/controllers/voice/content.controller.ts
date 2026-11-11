@@ -4,24 +4,18 @@ import { isValidId } from "../../utils/ids.js";
 import { AudioAnalysisService } from "../../application/services/AudioAnalysisService.js";
 import { VoiceArtistAudioUseCases } from "../../application/use-cases/voice/audio/VoiceArtistAudioUseCases.js";
 import type { AudioAnalysis, AudioPitchPoint, AudioSpectrogramFrame, ContentType } from "../../domain/entities/Content.js";
-import { DrizzleChapterRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleChapterRepository.js";
 import { DrizzleExpressionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleExpressionRepository.js";
-import { DrizzleLessonContentItemRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonContentItemRepository.js";
-import { DrizzleLessonRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleLessonRepository.js";
 import { DrizzleSentenceRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleSentenceRepository.js";
-import { DrizzleUnitRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleUnitRepository.js";
 import { DrizzleVoiceArtistProfileRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceArtistProfileRepository.js";
 import { DrizzleVoiceAudioSubmissionRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceAudioSubmissionRepository.js";
+import { DrizzleVoiceWorkReadRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleVoiceWorkReadRepository.js";
 import { DrizzleWordRepository } from "../../infrastructure/db/drizzle/repositories/DrizzleWordRepository.js";
 import { uploadAudio } from "../../services/storage/s3.js";
 import type { AuthRequest } from "../../utils/authMiddleware.js";
 import { getSearchQuery, includesSearch, paginate, parsePaginationQuery } from "../../interfaces/http/utils/pagination.js";
 
 const useCases = new VoiceArtistAudioUseCases(
-  new DrizzleLessonRepository(),
-  new DrizzleUnitRepository(),
-  new DrizzleChapterRepository(),
-  new DrizzleLessonContentItemRepository(),
+  new DrizzleVoiceWorkReadRepository(),
   new DrizzleWordRepository(),
   new DrizzleExpressionRepository(),
   new DrizzleSentenceRepository(),
